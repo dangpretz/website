@@ -12,10 +12,10 @@
 
 :root {
   /* colors */
-  --background-color: white;
+  --background-color: #101820;
   --light-color: #f8f8f8;
   --dark-color: #505050;
-  --text-color: #131313;
+  --text-color: #f5f5f5;
   --link-color: #fa374a;
   --link-hover-color: #fa374a;
 
@@ -190,7 +190,7 @@ button {
   text-align: center;
   text-decoration: none;
   background-color: var(--link-color);
-  color: var(--background-color);
+  color: var(--text-color);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -256,4 +256,13 @@ main .section.highlight {
   background-color: var(--light-color);
   margin: 0;
   padding: 40px 0;
+}
+
+
+/* icon sizing */
+.icon {
+  display: inline-block
+}
+.icon-ruin-dinner {
+  height: 200px;
 }

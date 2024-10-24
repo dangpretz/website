@@ -1,6 +1,6 @@
 /* header and nav layout */
 header .nav-wrapper {
-  background-color: black;
+  background-color: var(--background-color);
   width: 100%;
   z-index: 2;
   position: fixed;
@@ -17,7 +17,7 @@ header nav {
   margin: auto;
   max-width: 1248px;
   height: var(--nav-height);
-  padding: 0 24px;
+  padding: 0 24px; 
   font-family: var(--body-font-family);
 }
 
@@ -332,6 +332,6 @@ header .breadcrumbs ol li[aria-current] {
 
 header nav .nav-tools .button {
   background-color: var(--link-color);
-  padding: 4px 16px; 
+  padding: 8px 16px; 
   line-height: unset;
 }
