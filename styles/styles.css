@@ -16,8 +16,8 @@
   --light-color: #f8f8f8;
   --dark-color: #505050;
   --text-color: #131313;
-  --link-color: #3b63fb;
-  --link-hover-color: #1d3ecf;
+  --link-color: #fa374a;
+  --link-hover-color: #fa374a;
 
   /* fonts */
   --body-font-family: roboto, roboto-fallback, sans-serif;
@@ -37,7 +37,7 @@
   --heading-font-size-xs: 22px;
 
   /* nav heights */
-  --nav-height: 64px;
+  --nav-height: 74px;
   --breadcrumbs-height: 34px;
   --header-height: var(--nav-height);
 }
@@ -224,17 +224,6 @@ main img {
   height: auto;
 }
 
-.icon {
-  display: inline-block;
-  height: 24px;
-  width: 24px;
-}
-
-.icon img {
-  height: 100%;
-  width: 100%;
-}
-
 /* sections */
 main > .section {
   margin: 40px 0;
@@ -251,6 +240,11 @@ main > .section:first-of-type {
 }
 
 @media (width >= 900px) {
+  /* nav heights */
+  :root {
+    --nav-height: 64px;
+  }
+
   main > .section > div {
     padding: 0 32px;
   }
