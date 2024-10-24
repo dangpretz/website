@@ -316,7 +316,7 @@ header .breadcrumbs ol li[aria-current] {
 
 @media (width >= 900px) {
   header .breadcrumbs {
-    display: block;
+    display: block; 
     max-width: 1264px;
     padding: 0 32px;
   }

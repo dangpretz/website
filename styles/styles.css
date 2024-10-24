@@ -16,12 +16,13 @@
   --light-color: #f8f8f8;
   --dark-color: #505050;
   --text-color: #f5f5f5;
-  --link-color: #fa374a;
-  --link-hover-color: #fa374a;
+  --link-color: #da172a;
+  --link-hover-color: #da172a;
 
   /* fonts */
   --body-font-family: roboto, roboto-fallback, sans-serif;
   --heading-font-family: roboto-condensed, roboto-condensed-fallback, sans-serif;
+  --em-font-family: autobahn, autobahn-fallback, sans-serif;
 
   /* body sizes */
   --body-font-size-m: 22px;
@@ -48,6 +49,13 @@
   size-adjust: 88.82%;
   src: local('Arial');
 }
+
+@font-face {
+  font-family: autobahn-fallback;
+  size-adjust: 88.82%;
+  src: local('Arial');
+}
+
 
 @font-face {
   font-family: roboto-fallback;
