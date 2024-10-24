@@ -269,7 +269,11 @@ main .section.highlight {
 
 /* icon sizing */
 .icon {
-  display: inline-block
+  display: inline-block;
+}
+
+.icon img {
+  max-width: 100%;
 }
 .icon-ruin-dinner {
   height: 200px;
