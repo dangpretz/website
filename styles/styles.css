@@ -172,7 +172,7 @@ button {
 
 /* links */
 a:any-link {
-  color: var(--link-color);
+  color: var(--lighter-red);
   text-decoration: none;
   word-break: break-word;
 }
