@@ -135,6 +135,28 @@ async function loadLazy(doc) {
  * without impacting the user experience.
  */
 function loadDelayed() {
+  document.querySelectorAll('.section.mission-statement').forEach((section) => {
+    [1, 2, 3, 4, 5].forEach((i) => {
+      const devil = document.createElement('img');
+      devil.src = `/icons/devil-${i}.svg`;
+      devil.alt = 'devil';
+      devil.loading = 'lazy';
+      devil.classList.add('blink-1');
+      devil.classList.add('animated-devil');
+      setTimeout(() => {
+        const place = (devil) => {
+          devil.style.top = `${Math.floor(Math.random() * 60) + 20}%`;
+          devil.style.left = `${Math.floor(Math.random() * 60) + 20}%`;
+        }
+        section.append(devil);
+        place(devil);
+        setInterval(() => {
+          place(devil);
+        }, 5000);
+      }, i * 1000);
+      
+    });
+  });
   // eslint-disable-next-line import/no-cycle
   window.setTimeout(() => import('./delayed.js'), 3000);
   // load anything that can be postponed to the latest here
