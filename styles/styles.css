@@ -97,6 +97,8 @@ body.appear {
 
 header {
   height: var(--header-height);
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 header .header,
@@ -362,4 +364,71 @@ em {
     filter: blur(0);
     opacity: 1;
   }
+}
+
+.menu {
+  background-color: var(--light-color);
+  color: var(--background-color);
+}
+
+.menu h2 {
+  font-family: var(--em-font-family);
+}
+
+.menu h1 {
+  color: var(--link-color);
+}
+
+.menu h2::before {
+  content: ' ';
+  background-image: url("data:image/svg+xml,%3csvg width='20px' height='2px' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='10px' height='2px' fill='red' stroke='none' /%3e%3c/svg%3e");
+  display: block;
+  height: 2px;
+  line-height: 0;
+  margin-bottom: 32px;
+}
+
+.menu h2 {
+  font-size: var(--heading-font-size-xxl);
+}
+
+.menu h3 {
+  font-weight: 900;
+  background-image: url("data:image/svg+xml,%3csvg width='30px' height='15px' xmlns='http://www.w3.org/2000/svg'%3e%3ccircle cx='5px' cy='2.5px' r='2.5px' fill='black' stroke='none' /%3e%3c/svg%3e");
+  background-repeat: repeat-x;
+  background-position-y: 0.8em;
+  display: flex;
+  justify-content: space-between;
+}
+
+.menu h3 > span {
+  background-color: var(--light-color);
+}
+
+.menu h3 em {
+  color: var(--link-color);
+  font-family: var(--heading-font-family);
+  font-size: var(--body-font-size-s);
+  font-weight: 700;
+}
+
+.menu code {
+  color: var(--link-color);
+  font-family: var(--body-font-family);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-size: var(--body-font-size-s);
+  font-weight: 700;
+}
+
+.menu main div {
+  max-width: 800px;
+}
+
+.menu h3 + p {
+  margin-top: 0;
+}
+
+.menu p:has(code) {
+  margin-top: 2em;
 }

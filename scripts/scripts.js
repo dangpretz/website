@@ -66,6 +66,19 @@ function buildAutoBlocks(main) {
   }
 }
 
+function decorateMenu(main) {
+  const h3s = main.querySelectorAll('h3');
+  h3s.forEach((h3) => {
+    const inner = h3.innerHTML;
+    if (inner.includes(' ... ')) {
+      const [item, price] = inner.split(' ... ');
+      h3.innerHTML = `<span>${item}</span><span>${price}</span>`;
+    } else {
+      h3.innerHTML = `<span>${inner}</span>`;
+    }
+  });
+}
+
 /**
  * Decorates the main element.
  * @param {Element} main The main element
@@ -73,6 +86,7 @@ function buildAutoBlocks(main) {
 // eslint-disable-next-line import/prefer-default-export
 export function decorateMain(main) {
   // hopefully forward compatible button decoration
+  if (document.body.classList.contains('menu')) decorateMenu(main);
   decorateButtons(main);
   decorateIcons(main);
   buildAutoBlocks(main);
