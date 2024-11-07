@@ -111,6 +111,10 @@ footer .footer[data-block-status="loaded"] {
   visibility: visible;
 }
 
+footer {
+  margin-top: 128px;
+}
+
 @media (width >= 900px) {
   body[data-breadcrumbs] {
     --header-height: calc(var(--nav-height) + var(--breadcrumbs-height));
@@ -405,6 +409,15 @@ em {
   background-color: var(--light-color);
 }
 
+.menu h3 > span:nth-of-type(1) {
+  padding-right: 8px;
+}
+
+.menu h3 > span:nth-of-type(2) {
+  padding-left: 8px;
+}
+
+
 .menu h3 em {
   color: var(--link-color);
   font-family: var(--heading-font-family);
@@ -423,6 +436,7 @@ em {
 
 .menu main div {
   max-width: 800px;
+  margin: auto;
 }
 
 .menu h3 + p {
