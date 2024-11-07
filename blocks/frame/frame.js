@@ -9,7 +9,8 @@ export default function decorate(block) {
             devil.classList.add('animated-devil');
             setTimeout(() => {
               const place = (devil) => {
-                const distro = window.clientWidth > 900 ? 40 : 60;
+                const distro = window.innerWidth > 900 ? 40 : 60;
+                console.log(distro, window.innerWidth);
                 devil.style.top = `2.1em`;
                 devil.style.left = `${Math.floor(Math.random() * distro)}%`;
               }
