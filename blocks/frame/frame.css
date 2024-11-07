@@ -1,0 +1,36 @@
+.frame.top-devils {
+    position: relative;
+    border: 2px solid var(--link-color);
+    border-radius: 32px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding: 16px;
+    margin-top: 32px;
+} 
+
+.frame.top-devils > div > div {
+    display: flex;
+}
+
+.frame.top-devils h1 {
+    font-weight: 900;
+    font-size: var(--heading-font-size-huge);
+    line-height: 1em;
+    letter-spacing: -0.05em;
+}
+
+@media (min-width: 900px) {
+    .frame.top-devils h1 {
+        padding-right: 40%;
+    }
+}
+
+.frame.top-devils > div > div > p {
+    align-self: flex-end;
+}
+
+.frame.top-devils .icon img {
+    height: 96px;
+    width: 96px;
+    vertical-align: bottom;
+}
