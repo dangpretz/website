@@ -5,16 +5,29 @@ footer {
 
 footer .footer > div {
   margin: auto;
-  max-width: 1200px;
+  max-width: 800px;
   padding: 40px 24px 24px;
+  gap: 32px;
+  color: var(--background-color);
+}
+
+footer .footer .icon-delightfully-sinful img {
+  max-width: 200px;
 }
 
 footer .footer p {
   margin: 0;
 }
 
+
 @media (width >= 900px) {
   footer .footer > div {
     padding: 40px 32px 24px;
   }
+
+  footer .footer > div {
+    display: flex;
+    justify-content: space-between;
+  }
+
 }
