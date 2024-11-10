@@ -19,6 +19,10 @@ footer .footer p {
   margin: 0;
 }
 
+footer .footer a:any-link {
+  color: var(--background-color);
+}
+
 
 @media (width >= 900px) {
   footer .footer > div {
