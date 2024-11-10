@@ -180,7 +180,7 @@ button {
 
 /* links */
 a:any-link {
-  color: var(--lighter-red);
+  color: var(--link-color);
   word-break: break-word;
 }
 
