@@ -158,17 +158,16 @@ function loadDelayed() {
       devil.classList.add('blink-1');
       devil.classList.add('animated-devil');
       setTimeout(() => {
-        const place = (devil) => {
-          devil.style.top = `${Math.floor(Math.random() * 60) + 20}%`;
-          devil.style.left = `${Math.floor(Math.random() * 60) + 20}%`;
-        }
+        const place = (d) => {
+          d.style.top = `${Math.floor(Math.random() * 60) + 20}%`;
+          d.style.left = `${Math.floor(Math.random() * 60) + 20}%`;
+        };
         section.append(devil);
         place(devil);
         setInterval(() => {
           place(devil);
         }, 5000);
       }, i * 1000);
-      
     });
   });
   // eslint-disable-next-line import/no-cycle

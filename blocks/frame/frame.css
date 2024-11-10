@@ -19,7 +19,7 @@
     letter-spacing: -0.05em;
 }
 
-@media (min-width: 900px) {
+@media (width >= 900px) {
     .frame.top-devils h1 {
         padding-right: 40%;
     }
