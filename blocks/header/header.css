@@ -58,7 +58,6 @@ header nav a:any-link {
 header nav .nav-hamburger {
   grid-area: hamburger;
   height: 22px;
-  display: flex;
   align-items: center;
   display: none;
 }
@@ -272,9 +271,10 @@ header nav .nav-tools {
 header nav .nav-tools .button {
   margin: 0;
   border: none;
-  padding: 0.5em;
   background: none;
-  line-height: 0;
+  background-color: var(--link-color);
+  padding: 8px 16px; 
+  line-height: unset;
 }
 
 /* breadcrumbs */
@@ -328,10 +328,4 @@ header .breadcrumbs ol li[aria-current] {
   header nav .icon-logo img {
     height: 50px;
   }
-}
-
-header nav .nav-tools .button {
-  background-color: var(--link-color);
-  padding: 8px 16px; 
-  line-height: unset;
 }
