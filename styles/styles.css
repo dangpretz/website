@@ -193,6 +193,29 @@ a:hover {
   text-decoration: underline;
 }
 
+main img {
+  max-width: 100%;
+  width: auto;
+  height: auto;
+}
+
+/* icon sizing */
+.icon {
+  display: inline-block;
+}
+
+.icon img {
+  max-width: 100%;
+}
+
+.icon-ruin-dinner img {
+  height: 200px;
+}
+
+.icon-dpc img {
+  height: 48px;
+}
+
 /* buttons */
 a.button:any-link,
 button {
@@ -238,12 +261,6 @@ button.secondary {
   color: var(--text-color);
 }
 
-main img {
-  max-width: 100%;
-  width: auto;
-  height: auto;
-}
-
 a.button .icon img {
   height: 1em;
   width: 1em;
@@ -285,23 +302,6 @@ main .section.highlight {
   padding: 40px 0;
 }
 
-
-/* icon sizing */
-.icon {
-  display: inline-block;
-}
-
-.icon img {
-  max-width: 100%;
-}
-
-.icon-ruin-dinner img {
-  height: 200px;
-}
-
-.icon-dpc img {
-  height: 48px;
-}
 
 .icon-cute-devil {
     animation: slide-in-blurred-left 5s cubic-bezier(0.230, 1.000, 0.320, 1.000) infinite alternate-reverse both;
