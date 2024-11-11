@@ -1,5 +1,5 @@
 footer {
-  background-color: var(--dark-color);
+  background-color: var(--mustard);
   font-size: var(--body-font-size-xs);
 }
 
@@ -8,7 +8,6 @@ footer .footer > div {
   max-width: 800px;
   padding: 40px 24px 24px;
   gap: 32px;
-  color: var(--background-color);
 }
 
 footer .footer .icon-delightfully-sinful img {
@@ -20,6 +19,10 @@ footer .footer p {
 }
 
 footer .footer a:any-link {
+  color: var(--text-color);
+}
+
+footer .footer a.button:any-link {
   color: var(--background-color);
 }
 

@@ -12,14 +12,18 @@
 
 :root {
   /* colors */
+  --mustard: #e8cf82;
+  --devils-red: #da172a;
+
+  /* semantic colors */
   --background-color: #f5f5f5;
   --light-color: #f8f8f8;
   --dark-color: #505050;
   --text-color: #101820;
   --lighter-red: #fa374a;
-  --link-color: #da172a;
+  --link-color: var(--devils-red);
   --link-hover-color: #da172a;
-
+  
   /* fonts */
   --body-font-family: roboto, roboto-fallback, sans-serif;
   --heading-font-family: roboto-condensed, roboto-condensed-fallback, sans-serif;
