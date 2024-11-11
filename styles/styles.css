@@ -244,6 +244,13 @@ main img {
   height: auto;
 }
 
+a.button .icon img {
+  height: 1em;
+  width: 1em;
+  margin-right: 0.5em;
+}
+
+
 /* sections */
 main > .section {
   margin: 40px 0;
