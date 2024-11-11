@@ -15,6 +15,10 @@
   order: 0;
 }
 
+.columns > div > .columns-img-col p {
+  margin: 0;
+}
+
 .columns > div > .columns-img-col img {
   display: block;
 }

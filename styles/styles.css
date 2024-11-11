@@ -446,3 +446,8 @@ em {
   max-width: 800px;
   margin: auto;
 }
+
+.section.mustard {
+  padding: 32px 0;
+  background-color: var(--mustard);
+}
