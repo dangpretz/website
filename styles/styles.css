@@ -471,3 +471,11 @@ em {
   padding: 32px 0;
   background-color: var(--mustard);
 }
+
+.section.mustard a:any-link {
+  color: var(--text-color);
+}
+
+.section.mustard a.button:any-link {
+  color: var(--background-color);
+}
