@@ -240,4 +240,6 @@ export default async function decorate(block) {
   if (getMetadata('breadcrumbs').toLowerCase() === 'true') {
     navWrapper.append(await buildBreadcrumbs());
   }
+
+  document.querySelector('a[href="/"] img').alt = 'Home';
 }
