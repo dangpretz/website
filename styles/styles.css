@@ -447,6 +447,12 @@ em {
   margin: auto;
 }
 
+.menu main h3 .icon img {
+  height: 2em;
+  width: 2em;
+  margin-top: -1em;
+}
+
 .section.mustard {
   padding: 32px 0;
   background-color: var(--mustard);

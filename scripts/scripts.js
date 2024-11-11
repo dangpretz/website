@@ -79,6 +79,26 @@ function decorateMenu(main) {
   });
 }
 
+export function decoratePhoneLinks(elem) {
+  const isMobile = (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+  const isMac = (navigator.appVersion.indexOf('Mac') !== -1);
+  elem.querySelectorAll('a[href^="https://sms/"]').forEach((a) => {
+    if (isMobile || isMac) {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = new URL(a.href);
+        const body = url.searchParams.get('body');
+        const num = `+1${url.pathname}`;
+        // TODO: Make this configurable
+        window.open(`sms:${num}?&body=${body}`);
+      });
+    } else {
+      a.removeAttribute('href');
+      a.classList.remove('button');
+    }
+  });
+}
+
 /**
  * Decorates the main element.
  * @param {Element} main The main element
@@ -92,6 +112,7 @@ export function decorateMain(main) {
   buildAutoBlocks(main);
   decorateSections(main);
   decorateBlocks(main);
+  decoratePhoneLinks(main);
 }
 
 /**
