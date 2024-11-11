@@ -164,11 +164,8 @@ pre {
 }
 
 pre {
-  padding: 16px;
-  border-radius: 8px;
   background-color: var(--light-color);
-  overflow-x: auto;
-  white-space: pre;
+  white-space: inherit;
 }
 
 main > div {
