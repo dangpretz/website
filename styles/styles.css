@@ -453,6 +453,13 @@ em {
   margin-top: -1em;
 }
 
+.menu main h2 .icon img {
+  height: 1.2em;
+  width: 1.2em;
+  margin-top: -0.2em;
+  margin-left: 0.2em;
+}
+
 .section.mustard {
   padding: 32px 0;
   background-color: var(--mustard);
