@@ -1,0 +1,50 @@
+.checklist {
+    background-color: var(--light-color);
+}
+
+.checklist ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.checklist li {
+    font-size: var(--heading-font-size-s);
+    padding: 32px 8px;
+    border-bottom: 2px dashed var(--link-color);
+    margin-left: -16px;
+    margin-right: -16px;
+    position: relative;
+    text-indent: -16px;
+}
+
+.checklist li strong {
+    font-size: var(--heading-font-size-m);
+}
+
+.checklist li input[type="checkbox"] {
+    height: 32px;
+    width: 32px;
+    margin-right: 8px;
+    margin-left: 16px;
+    accent-color: var(--link-hover-color);
+    vertical-align: bottom;
+    margin-bottom: 12px;
+}
+
+.checklist li.done {
+    text-decoration: line-through;
+    color: var(--light-color);
+    background-color: var(--link-color);
+}
+
+.checklist li.done input[type="checkbox"] {
+    color: var(--link-color);
+    border: 1px solid white;
+}
+
+.checklist .checklist-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 8px;
+    font-size: var(--body-font-size-s);
+}

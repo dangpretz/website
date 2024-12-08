@@ -329,3 +329,45 @@ header .breadcrumbs ol li[aria-current] {
     height: 50px;
   }
 }
+
+header .nav-logged-in {
+  color: var(--light-color);
+  display: flex;
+}
+
+.nav-icon-user {
+  display: block;
+  box-sizing: border-box;
+  transform: scale(1.5);
+  width: 12px;
+  height: 18px;
+  position:relative;
+  margin-right: 10px;
+  margin-top: 6px;
+}
+
+.nav-icon-user::after,
+.nav-icon-user::before {
+  content: '';
+  display: block;
+  box-sizing: border-box;
+  position: absolute;
+  border: 2px solid;
+}
+
+.nav-icon-user::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 30px;
+  top: 0;
+  left: 2px;
+}
+
+.nav-icon-user::after {
+  width: 12px;
+  height: 9px;
+  border-bottom: 0;
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+  top: 9px;
+}

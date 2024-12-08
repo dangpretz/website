@@ -100,6 +100,39 @@ export function decoratePhoneLinks(elem) {
 }
 
 /**
+ * Handles internal user login dialog
+ * @returns {void}
+ */
+
+function handleInternalUser() {
+  window.internalUser = localStorage.getItem('internalUser');
+  const isInternal = window.location.pathname.includes('/internal/');
+  const forceLogin = window.location.search === '?login';
+  if ((isInternal && !window.internalUser) || forceLogin) {
+    const dialog = document.createElement('dialog');
+    dialog.innerHTML = `
+      <h2>Pretzlers only.</h2>
+      <form>
+        <label for="internalUser">Login with your name to access the bakery</label><br>
+        <input id="internalUser" name="internalUser" type="text" required><br>
+        <button type="submit">Login</button>
+      </form>`;
+    dialog.querySelector('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      window.internalUser = dialog.querySelector('#internalUser').value;
+      localStorage.setItem('internalUser', window.internalUser);
+      if (window.location.search === '?login') {
+        window.location.search = '';
+      }
+      dialog.close();
+      handleInternalUser();
+    });
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+}
+
+/**
  * Decorates the main element.
  * @param {Element} main The main element
  */
@@ -113,6 +146,7 @@ export function decorateMain(main) {
   decorateSections(main);
   decorateBlocks(main);
   decoratePhoneLinks(main);
+  handleInternalUser();
 }
 
 /**

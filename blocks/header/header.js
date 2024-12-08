@@ -241,5 +241,9 @@ export default async function decorate(block) {
     navWrapper.append(await buildBreadcrumbs());
   }
 
+  if (window.location.pathname.includes('/internal/')) {
+    navTools.innerHTML = `<span class="nav-logged-in"><span class="nav-icon-user"></span>${window.internalUser}</span>`;
+  }
+
   document.querySelector('a[href="/"] img').alt = 'Home';
 }

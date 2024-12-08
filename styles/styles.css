@@ -22,7 +22,7 @@
   --text-color: #101820;
   --lighter-red: #fa374a;
   --link-color: var(--devils-red);
-  --link-hover-color: #da172a;
+  --link-hover-color: #ba000a;
   
   /* fonts */
   --body-font-family: roboto, roboto-fallback, sans-serif;
@@ -475,4 +475,25 @@ em {
 
 .section.mustard a.button:any-link {
   color: var(--background-color);
+}
+
+dialog::backdrop {
+  backdrop-filter: blur(10px);
+  
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-backdrop-filter: blur(10px);
+}
+
+dialog {
+  margin: auto;
+  border: 0;
+  text-align: center;
+  border-radius: 16px;
+  box-shadow: 0 0 16px #0007;
+}
+
+dialog input {
+  padding: 6px;
+  border:2px solid var(--devils-red);
+  margin: 32px 0;
 }
