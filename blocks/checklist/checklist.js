@@ -6,7 +6,6 @@ export default function decorate(block) {
 
   const fetchLogData = async (url) => {
     const response = await fetch(url);
-    console.log(response, url);
     return response.json();
   };
 
@@ -27,7 +26,7 @@ export default function decorate(block) {
       const input = block.querySelector(`input[name="${taskname}"]`);
       if (input) {
         input.checked = tasks[task].state === 'done';
-        const li = input.closest('li'); 
+        const li = input.closest('li');
         li.classList.add(tasks[task].state);
         if (li.querySelector('.checklist-badge')) {
           li.querySelector('.checklist-badge').remove();

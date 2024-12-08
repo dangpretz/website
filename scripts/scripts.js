@@ -121,11 +121,13 @@ function handleInternalUser() {
       e.preventDefault();
       window.internalUser = dialog.querySelector('#internalUser').value;
       localStorage.setItem('internalUser', window.internalUser);
-      if (window.location.search === '?login') {
-        window.location.search = '';
-      }
       dialog.close();
       handleInternalUser();
+      if (window.location.search === '?login') {
+        window.location.search = '';
+      } else {
+        window.location.reload();
+      }
     });
     document.body.append(dialog);
     dialog.showModal();
