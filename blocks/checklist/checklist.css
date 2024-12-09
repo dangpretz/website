@@ -22,13 +22,13 @@
 }
 
 .checklist li input[type="checkbox"] {
-    height: 32px;
-    width: 32px;
+    height: 1.2em;
+    width: 1.2em;
     margin-right: 8px;
     margin-left: 16px;
     accent-color: var(--link-hover-color);
     vertical-align: bottom;
-    margin-bottom: 12px;
+    margin-bottom: 0.4em;
 }
 
 .checklist li.done {
