@@ -132,6 +132,12 @@ function handleInternalUser() {
     document.body.append(dialog);
     dialog.showModal();
   }
+
+  if (isInternal && window.internalUser) {
+    document.querySelectorAll('.icon-user').forEach((user) => {
+      user.outerHTML = `${window.internalUser}`;
+    });
+  }
 }
 
 /**
