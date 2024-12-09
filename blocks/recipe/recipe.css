@@ -53,3 +53,61 @@
     margin-left: 16px;
     font-size: var(--body-font-size-m);
 }
+
+.recipe-note-icon {
+    box-sizing: border-box;
+    position: relative;
+    display: block;
+    transform: scale(var(--ggs, 1));
+    width: 20px;
+    height: 22px;
+    border: 2px solid;
+    border-radius: 3px;
+    margin-right: 8px;
+  }
+
+.recipe-note-icon::after,
+.recipe-note-icon::before {
+    content: "";
+    display: block;
+    box-sizing: border-box;
+    position: absolute;
+    border-radius: 3px;
+    height: 2px;
+    background: currentcolor;
+    left: 2px;
+  }
+
+.recipe-note-icon::before {
+    box-shadow:
+      0 4px 0,
+      0 8px 0;
+    width: 12px;
+    top: 2px;
+  }
+  
+.recipe-note-icon::after {
+    width: 6px;
+    top: 14px;
+  }
+
+.recipe-note {
+    display: flex;
+    color: #888;
+    margin: 16px -16px 0;
+    padding: 16px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.recipe-note.recipe-note-highlight {
+    background-color: var(--mustard);
+    color: unset;
+}
+
+
+.recipe-note textarea {
+    width: 100%;
+    background-color: transparent;
+    border: 0;
+}

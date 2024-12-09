@@ -1,4 +1,5 @@
 import { toClassName } from '../../scripts/aem.js';
+import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
 export default function decorate(block) {
   const heading = block.querySelector('h1, h2, h3');
@@ -21,6 +22,13 @@ export default function decorate(block) {
 
   heading.append(select);
 
+  const note = document.createElement('span');
+  note.className = 'recipe-note';
+  note.innerHTML = '<span class="recipe-note-icon"></span><textarea placeholder="Type notes for this prep..."></textarea>';
+  heading.after(note);
+
+  const noteTextArea = note.querySelector('textarea');
+
   const updateIngredientAmounts = () => {
     const humanReadable = (grams) => {
       if (grams >= 1000) {
@@ -39,22 +47,16 @@ export default function decorate(block) {
 
   select.addEventListener('change', updateIngredientAmounts);
 
-  const fetchLogData = async (url) => {
-    const response = await fetch(url);
-    return response.json();
-  };
-
   const transposeToTasks = (logData) => {
     const taskStatus = {};
     logData.forEach((item) => {
-      const { state, timeStamp, by } = item;
-      taskStatus[item.task] = { state, timeStamp, by };
+      taskStatus[item.task] = item;
     });
     return taskStatus;
   };
 
   const updateRecipe = async () => {
-    const logData = await fetchLogData(`https://sheet-logger.david8603.workers.dev/dangpretz/recipes/${recipeName}/${date}`);
+    const logData = await fetchLog(`/dangpretz/recipes/${recipeName}/${date}`);
     const tasks = transposeToTasks(logData);
     Object.keys(tasks).forEach((task) => {
       const taskname = toClassName(task);
@@ -73,7 +75,33 @@ export default function decorate(block) {
         li.append(badge);
       }
     });
+
+    if (tasks.note && tasks.note.message) {
+      note.classList.add('recipe-note-highlight');
+      noteTextArea.value = tasks.note.message;
+      if (note.querySelector('.recipe-badge')) {
+        note.querySelector('.recipe-badge').remove();
+      }
+      const badge = document.createElement('span');
+      badge.classList.add('recipe-badge');
+      const completedDate = new Date(tasks.note.timeStamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      badge.textContent = `${tasks.note.by} ${completedDate}`;
+      note.append(badge);
+    } else {
+      note.classList.remove('recipe-note-highlight');
+    }
   };
+
+  noteTextArea.addEventListener('change', async () => {
+    const by = window.internalUser;
+    const message = noteTextArea.value;
+    await appendLog(`/dangpretz/recipes/${recipeName}/${date}`, {
+      task: 'note',
+      by,
+      message,
+    });
+    updateRecipe();
+  });
 
   block.querySelectorAll('ul li').forEach((li) => {
     const ingredient = li.textContent.split(' (')[0].split(' ').pop();
@@ -98,12 +126,11 @@ export default function decorate(block) {
       const state = input.checked ? 'done' : 'open';
       li.classList.toggle('done');
       const by = window.internalUser;
-      const resp = await fetch(`https://sheet-logger.david8603.workers.dev/dangpretz/recipes/${recipeName}/${date}?task=${taskname}&state=${state}&by=${by}`, {
-        method: 'POST',
+      await appendLog(`/dangpretz/recipes/${recipeName}/${date}`, {
+        task: taskname,
+        by,
+        state,
       });
-      if (resp.status === 200) {
-        console.log('Logged', taskname, state, by);
-      }
       updateRecipe();
     };
 

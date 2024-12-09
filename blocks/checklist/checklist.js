@@ -1,14 +1,10 @@
 import { toClassName } from '../../scripts/aem.js';
+import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
 export default function decorate(block) {
   const checklistName = toClassName(block.querySelector('h1, h2, h3').textContent);
   const now = new Date();
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  const fetchLogData = async (url) => {
-    const response = await fetch(url);
-    return response.json();
-  };
 
   const transposeToTasks = (logData) => {
     const taskStatus = {};
@@ -20,7 +16,7 @@ export default function decorate(block) {
   };
 
   const updateChecklist = async () => {
-    const logData = await fetchLogData(`https://sheet-logger.david8603.workers.dev/dangpretz/checklists/${checklistName}/${date}`);
+    const logData = await fetchLog(`/dangpretz/checklists/${checklistName}/${date}`);
     const tasks = transposeToTasks(logData);
     Object.keys(tasks).forEach((task) => {
       const taskname = toClassName(task);
@@ -55,12 +51,11 @@ export default function decorate(block) {
       const state = input.checked ? 'done' : 'open';
       li.classList.toggle('done');
       const by = window.internalUser;
-      const resp = await fetch(`https://sheet-logger.david8603.workers.dev/dangpretz/checklists/${checklistName}/${date}?task=${taskname}&state=${state}&by=${by}`, {
-        method: 'POST',
+      await appendLog(`/dangpretz/checklists/${checklistName}/${date}`, {
+        task: taskname,
+        by,
+        state,
       });
-      if (resp.status === 200) {
-        console.log('Logged', taskname, state, by);
-      }
       updateChecklist();
     };
 
