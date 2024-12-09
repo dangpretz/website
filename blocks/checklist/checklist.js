@@ -20,7 +20,7 @@ export default function decorate(block) {
   };
 
   const updateChecklist = async () => {
-    const logData = await fetchLogData(`https://sheet-logger.david8603.workers.dev/dangpretz/${checklistName}/${date}`);
+    const logData = await fetchLogData(`https://sheet-logger.david8603.workers.dev/dangpretz/checklists/${checklistName}/${date}`);
     const tasks = transposeToTasks(logData);
     Object.keys(tasks).forEach((task) => {
       const taskname = toClassName(task);
@@ -55,7 +55,7 @@ export default function decorate(block) {
       const state = input.checked ? 'done' : 'open';
       li.classList.toggle('done');
       const by = window.internalUser;
-      const resp = await fetch(`https://sheet-logger.david8603.workers.dev/dangpretz/${checklistName}/${date}?task=${taskname}&state=${state}&by=${by}`, {
+      const resp = await fetch(`https://sheet-logger.david8603.workers.dev/dangpretz/checklists/${checklistName}/${date}?task=${taskname}&state=${state}&by=${by}`, {
         method: 'POST',
       });
       if (resp.status === 200) {
