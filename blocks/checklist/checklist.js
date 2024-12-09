@@ -2,7 +2,8 @@ import { toClassName } from '../../scripts/aem.js';
 
 export default function decorate(block) {
   const checklistName = toClassName(block.querySelector('h1, h2, h3').textContent);
-  const date = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const fetchLogData = async (url) => {
     const response = await fetch(url);
@@ -70,4 +71,9 @@ export default function decorate(block) {
   document.querySelector('.icon-date').outerHTML = ` ${date.substring(5)}`;
 
   updateChecklist();
+
+  window.addEventListener('focus', () => {
+    // Code to execute when the window gains focus
+    updateChecklist();
+  });
 }
