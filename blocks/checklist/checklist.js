@@ -16,6 +16,17 @@ export default function decorate(block) {
   };
 
   const updateChecklist = async () => {
+    const badgeElem = (elem, info) => {
+      if (elem.querySelector('.checklist-badge')) {
+        elem.querySelector('.checklist-badge').remove();
+      }
+      const badge = document.createElement('span');
+      badge.classList.add('checklist-badge');
+      const completedDate = new Date(info.timeStamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      badge.textContent = `${info.by} ${completedDate}`;
+      elem.append(badge);
+    };
+
     const logData = await fetchLog(`/dangpretz/checklists/${checklistName}/${date}`);
     const tasks = transposeToTasks(logData);
     Object.keys(tasks).forEach((task) => {
@@ -24,15 +35,8 @@ export default function decorate(block) {
       if (input) {
         input.checked = tasks[task].state === 'done';
         const li = input.closest('li');
-        li.classList.add(tasks[task].state);
-        if (li.querySelector('.checklist-badge')) {
-          li.querySelector('.checklist-badge').remove();
-        }
-        const badge = document.createElement('span');
-        badge.classList.add('checklist-badge');
-        const completedDate = new Date(tasks[task].timeStamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        badge.textContent = `${tasks[task].by} ${completedDate}`;
-        li.append(badge);
+        li.className = tasks[task].state;
+        badgeElem(li, tasks[task]);
       }
     });
   };
@@ -49,7 +53,7 @@ export default function decorate(block) {
       event.preventDefault();
       if (event.target !== input) input.checked = !input.checked;
       const state = input.checked ? 'done' : 'open';
-      li.classList.toggle('done');
+      li.className = state;
       const by = window.internalUser;
       await appendLog(`/dangpretz/checklists/${checklistName}/${date}`, {
         task: taskname,

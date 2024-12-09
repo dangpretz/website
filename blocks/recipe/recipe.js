@@ -56,6 +56,17 @@ export default function decorate(block) {
   };
 
   const updateRecipe = async () => {
+    const badgeElem = (elem, info) => {
+      if (elem.querySelector('.recipe-badge')) {
+        elem.querySelector('.recipe-badge').remove();
+      }
+      const badge = document.createElement('span');
+      badge.classList.add('recipe-badge');
+      const completedDate = new Date(info.timeStamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      badge.textContent = `${info.by} ${completedDate}`;
+      elem.append(badge);
+    };
+
     const logData = await fetchLog(`/dangpretz/recipes/${recipeName}/${date}`);
     const tasks = transposeToTasks(logData);
     Object.keys(tasks).forEach((task) => {
@@ -64,29 +75,15 @@ export default function decorate(block) {
       if (input) {
         input.checked = tasks[task].state === 'done';
         const li = input.closest('li');
-        li.classList.add(tasks[task].state);
-        if (li.querySelector('.recipe-badge')) {
-          li.querySelector('.recipe-badge').remove();
-        }
-        const badge = document.createElement('span');
-        badge.classList.add('recipe-badge');
-        const completedDate = new Date(tasks[task].timeStamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        badge.textContent = `${tasks[task].by} ${completedDate}`;
-        li.append(badge);
+        li.className = tasks[task].state;
+        badgeElem(li, tasks[task]);
       }
     });
 
     if (tasks.note && tasks.note.message) {
       note.classList.add('recipe-note-highlight');
       noteTextArea.value = tasks.note.message;
-      if (note.querySelector('.recipe-badge')) {
-        note.querySelector('.recipe-badge').remove();
-      }
-      const badge = document.createElement('span');
-      badge.classList.add('recipe-badge');
-      const completedDate = new Date(tasks.note.timeStamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      badge.textContent = `${tasks.note.by} ${completedDate}`;
-      note.append(badge);
+      badgeElem(note, tasks.note);
     } else {
       note.classList.remove('recipe-note-highlight');
     }
@@ -124,7 +121,7 @@ export default function decorate(block) {
       event.preventDefault();
       if (event.target !== input) input.checked = !input.checked;
       const state = input.checked ? 'done' : 'open';
-      li.classList.toggle('done');
+      li.className = state;
       const by = window.internalUser;
       await appendLog(`/dangpretz/recipes/${recipeName}/${date}`, {
         task: taskname,
