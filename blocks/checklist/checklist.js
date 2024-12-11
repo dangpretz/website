@@ -4,7 +4,8 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 export default function decorate(block) {
   const checklistName = toClassName(block.querySelector('h1, h2, h3').textContent);
   const now = new Date();
-  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get('date') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const transposeToTasks = (logData) => {
     const taskStatus = {};
