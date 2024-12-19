@@ -561,6 +561,10 @@ body.signage header, body.signage footer {
 body.signage {
   height: 1422px;
   width: 800px;
-  transform: rotate(90deg) translate(-350px, -300px);
+  transform: rotate(90deg);
   overflow: hidden;;
+  position: absolute;
+  bottom: 0;
+  left: 0;
 }
+
