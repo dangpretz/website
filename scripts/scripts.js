@@ -68,16 +68,24 @@ function buildAutoBlocks(main) {
 }
 
 function decorateSignage() {
+  const refresh = () => {
+    fetch(window.location.href, { cache: 'reload' });
+    fetch('/scripts/scripts.js', { cache: 'reload' });
+    fetch('/styles/styles.css', { cache: 'reload' });
+    window.location.reload();
+  }
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode');
   if (mode === 'signage') {
-    document.body.classList.add('signage');
-    document.body.addEventListener('click', () => {
-      alert(`dimensions: ${window.innerWidth} ${window.innerHeight}`)
-      fetch('/scripts/scripts.js', { cache: 'reload' });
-      fetch('/styles/styles.css', { cache: 'reload' });
-      window.location.reload();
+    const screen = +params.get('screen');
+    document.querySelectorAll('.section').forEach((section, i) => {
+      if (i + 1 !== screen) {
+        section.style.display = 'none';
+      }
     });
+    document.body.classList.add('signage');
+    document.body.addEventListener('click', refresh);
+    setTimeout(refresh, 1000 * 60);
   }
 }
 
