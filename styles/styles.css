@@ -418,7 +418,7 @@ em {
 }
 
 .menu h3 > span {
-  background-color: var(--light-color);
+  background-color: var(--background-color);
 }
 
 .menu h3 > span:nth-of-type(1) {

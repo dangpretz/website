@@ -73,7 +73,7 @@ function decorateSignage() {
     fetch('/scripts/scripts.js', { cache: 'reload' });
     fetch('/styles/styles.css', { cache: 'reload' });
     window.location.reload();
-  }
+  };
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode');
   if (mode === 'signage') {
