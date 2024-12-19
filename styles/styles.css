@@ -559,8 +559,8 @@ body.signage header, body.signage footer {
 }
 
 body.signage {
-  height: 1024px;
-  width: 1920px;
-  transform: rotate(90deg);
+  height: 720px;
+  width: 1280px;
+  transform: rotate(90deg) translate(0, 0);
   overflow: hidden;;
 }
