@@ -558,13 +558,12 @@ body.signage header, body.signage footer {
   display: none;
 }
 
-body.signage {
+body.signage main {
+  transform: rotate(90deg) translateY(-311px) translateX(-311px);
+  overflow: hidden;;
   height: 1422px;
   width: 800px;
-  transform: rotate(90deg);
-  overflow: hidden;;
   position: absolute;
-  bottom: 0;
-  left: 0;
 }
+
 
