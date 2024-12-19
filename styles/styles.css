@@ -553,3 +553,14 @@ dialog input {
   transform: rotate(42deg);
   right: -5px;
 }
+
+body.signage header, body.signage footer {
+  display: none;
+}
+
+body.signage {
+  height: 1024px;
+  width: 1920px;
+  transform: rotate(90deg);
+  overflow: hidden;;
+}

@@ -67,6 +67,16 @@ function buildAutoBlocks(main) {
   }
 }
 
+function decorateSignage() {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get('mode');
+  if (mode === 'signage') {
+    document.body.classList.add('signage');
+    fetch('/scripts/scripts.js', { cache: 'reload' });
+    fetch('/styles/styles.css', { cache: 'reload' });
+  }
+}
+
 function decorateMenu(main) {
   const h3s = main.querySelectorAll('h3');
   h3s.forEach((h3) => {
@@ -156,6 +166,7 @@ export function decorateMain(main) {
   decorateBlocks(main);
   decoratePhoneLinks(main);
   handleInternalUser();
+  decorateSignage();
 }
 
 /**
