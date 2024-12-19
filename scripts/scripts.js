@@ -1,3 +1,4 @@
+import { fetchLog, appendLog, transposeByKey } from './sheet-logger.js';
 import {
   buildBlock,
   loadHeader,
@@ -186,6 +187,60 @@ async function loadEager(doc) {
   }
 }
 
+async function loadInventory() {
+  const now = new Date();
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get('date') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isManaged = getMetadata('inventory');
+  if (isManaged) {
+    const inventoryPath = `/dangpretz/inventory/${window.location.pathname.split('/').pop()}/${date}`;
+    const invLog = await fetchLog(inventoryPath);
+    const inventory = transposeByKey(invLog, 'menuitem');
+    console.log(inventory);
+
+    document.querySelectorAll('h3').forEach((item) => {
+      const itemId = item.id.split('--')[0];
+      if (item.querySelector('.inventory-state')) {
+        item.querySelector('.inventory-state').remove();
+      }
+
+      if (inventory[itemId] && inventory[itemId].state) {
+        item.dataset.inventory = inventory[itemId].state;
+        const state = document.createElement('span');
+        if (inventory[itemId].state === 'baking') {
+          const elapsed = (Date.now() - new Date(inventory[itemId].timeStamp).getTime()) / 60000;
+          if (elapsed < 13) {
+            state.textContent = `baking, ${13 - Math.floor(elapsed)} minutes out`;
+          }
+        } else {
+          state.textContent = `${inventory[itemId].state}`;
+        }
+        state.classList.add('inventory-state');
+        item.firstElementChild.append(state);
+      }
+
+      if (window.internalUser) {
+        item.addEventListener('click', async () => {
+          const menuitem = itemId;
+          const by = window.internalUser;
+          const currentState = inventory[menuitem] ? inventory[menuitem].state : '';
+          let state = '';
+          if (currentState === 'baking') state = '';
+          if (currentState === 'out') state = 'baking';
+          if (currentState === '') state = 'out';
+
+          await appendLog(inventoryPath, {
+            menuitem,
+            by,
+            state,
+          });
+          window.location.reload();
+        });
+      }
+    });
+  }
+}
+
 /**
  * Loads everything that doesn't need to be delayed.
  * @param {Element} doc The container element
@@ -205,6 +260,7 @@ async function loadLazy(doc) {
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();
+  loadInventory();
 }
 
 /**

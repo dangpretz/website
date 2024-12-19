@@ -19,3 +19,11 @@ export async function appendLog(logpath, message) {
     console.log(`Logged to ${logpath}`, message);
   }
 }
+
+export function transposeByKey(logData, key) {
+  const status = {};
+  logData.forEach((item) => {
+    status[item[key]] = item;
+  });
+  return status;
+}
