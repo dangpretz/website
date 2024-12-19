@@ -471,6 +471,13 @@ em {
   border-radius: 3px;
   background-color: var(--mustard);
   font-size: var(--body-font-size-xs);
+  vertical-align: top;
+  margin-top: 0.4em;
+}
+
+.menu h3 .inventory-state-out {
+   background-color: var(--link-color);
+   color: var(--background-color);
 }
 
 .section.mustard {
@@ -505,4 +512,44 @@ dialog input {
   padding: 6px;
   border:2px solid var(--devils-red);
   margin: 32px 0;
+}
+
+.icon-alarm {
+  background:
+    linear-gradient(to left, currentcolor 5px, transparent 0) no-repeat 4.5px
+      6px/5px 2px,
+    linear-gradient(to left, currentcolor 7px, transparent 0) no-repeat 4.5px
+      2px/2px 6px;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 100%;
+  border: 2px solid transparent;
+  transform: scale(0.8);
+  vertical-align: bottom;
+  box-shadow: 0 0 0 2px;
+}
+
+.icon-alarm::after,
+.icon-alarm::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  position: absolute;
+  width: 6px;
+  height: 2px;
+  background: currentcolor;
+  top: -4px;
+}
+
+.icon-alarm::before {
+  left: -5px;
+  transform: rotate(-42deg);
+}
+
+.icon-alarm::after {
+  transform: rotate(42deg);
+  right: -5px;
 }

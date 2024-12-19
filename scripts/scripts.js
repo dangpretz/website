@@ -196,7 +196,6 @@ async function loadInventory() {
     const inventoryPath = `/dangpretz/inventory/${window.location.pathname.split('/').pop()}/${date}`;
     const invLog = await fetchLog(inventoryPath);
     const inventory = transposeByKey(invLog, 'menuitem');
-    console.log(inventory);
 
     document.querySelectorAll('h3').forEach((item) => {
       const itemId = item.id.split('--')[0];
@@ -210,13 +209,16 @@ async function loadInventory() {
         if (inventory[itemId].state === 'baking') {
           const elapsed = (Date.now() - new Date(inventory[itemId].timeStamp).getTime()) / 60000;
           if (elapsed < 13) {
-            state.textContent = `baking, ${13 - Math.floor(elapsed)} minutes out`;
+            state.innerHTML = `<span class="icon-alarm"></span> ${13 - Math.floor(elapsed)} min`;
           }
         } else {
           state.textContent = `${inventory[itemId].state}`;
         }
-        state.classList.add('inventory-state');
-        item.firstElementChild.append(state);
+        if (state.textContent) {
+          state.classList.add('inventory-state');
+          state.classList.add(`inventory-state-${inventory[itemId].state}`);
+          item.firstElementChild.append(state);
+        }
       }
 
       if (window.internalUser) {
