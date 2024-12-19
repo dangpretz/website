@@ -68,6 +68,13 @@ function buildAutoBlocks(main) {
 }
 
 function decorateSignage() {
+  const hiddenSetup = document.querySelector('.icon-cute-devil');
+  if (hiddenSetup) {
+    hiddenSetup.addEventListener('click', () => {
+      window.location.href = '/static/signage.html';
+    });
+  }
+
   const refresh = () => {
     fetch(window.location.href, { cache: 'reload' });
     fetch('/scripts/scripts.js', { cache: 'reload' });

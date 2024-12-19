@@ -1,0 +1,54 @@
+<html>
+    <head>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .screen {
+                width: 20%;
+                border: 2px solid black;
+                font-size: 4em;
+                text-align: center;
+                aspect-ratio: 9 / 16;
+                margin: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-decoration: none;
+                color: black;
+                font-family: sans-serif;
+            }
+        </style>
+    </head>
+    <body>
+        <a class="screen" href="signage.html?path=/menu&mode=signage&screen=1">1</a>
+        <a class="screen" href="signage.html?path=/menu&mode=signage&screen=2">2</a>
+        <a class="screen" href="signage.html?path=/menu&mode=signage&screen=3">3</a>
+        <script>
+            const params = new URLSearchParams(window.location.search);
+            const path = params.get('path');
+            if (path) {
+                const mode = params.get('mode');
+                const screen = params.get('screen');
+                document.body.innerHTML = `<iframe src="${path}?mode=${mode}&screen=${screen}"><iframe>`;
+            }
+        </script>
+        </body>
+</html>
