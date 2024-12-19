@@ -72,8 +72,12 @@ function decorateSignage() {
   const mode = params.get('mode');
   if (mode === 'signage') {
     document.body.classList.add('signage');
-    fetch('/scripts/scripts.js', { cache: 'reload' });
-    fetch('/styles/styles.css', { cache: 'reload' });
+    document.body.addEventListener('click', () => {
+      alert(`dimensions: ${window.innerWidth} ${window.innerHeight}`)
+      fetch('/scripts/scripts.js', { cache: 'reload' });
+      fetch('/styles/styles.css', { cache: 'reload' });
+      window.location.reload();
+    });
   }
 }
 
@@ -166,7 +170,6 @@ export function decorateMain(main) {
   decorateBlocks(main);
   decoratePhoneLinks(main);
   handleInternalUser();
-  decorateSignage();
 }
 
 /**
@@ -267,6 +270,8 @@ async function loadLazy(doc) {
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
   if (hash && element) element.scrollIntoView();
+
+  decorateSignage();
 
   loadHeader(doc.querySelector('header'));
   loadFooter(doc.querySelector('footer'));

@@ -559,7 +559,7 @@ body.signage header, body.signage footer {
 }
 
 body.signage {
-  width: 1024px;
+  height: 1024px;
   transform: rotate(90deg) translate(0, 0);
   overflow: hidden;;
   aspect-ratio: 16 / 9;
