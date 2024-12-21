@@ -42,18 +42,9 @@
         <a class="screen" href="signage.html?path=/menu&mode=signage&screen=2">2</a>
         <a class="screen" href="signage.html?path=/menu&mode=signage&screen=3">3</a>
         <script>
-            async function lockScreen() {
-                try {
-                    wakeLock = await navigator.wakeLock.request("screen");
-                    console.log ('Wake Lock is active!');
-                } catch (err) {
-                    console.log(`${err.name}, ${err.message}`);
-                }
-            }
             const params = new URLSearchParams(window.location.search);
             const path = params.get('path');
             if (path) {
-                lockScreen();
                 const mode = params.get('mode');
                 const screen = params.get('screen');
                 document.body.innerHTML = `<iframe src="${path}?mode=${mode}&screen=${screen}"><iframe>`;

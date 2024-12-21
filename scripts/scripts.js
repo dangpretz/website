@@ -67,7 +67,66 @@ function buildAutoBlocks(main) {
   }
 }
 
-function decorateSignage() {
+async function loadInventory() {
+  const now = new Date();
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get('date') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isManaged = getMetadata('inventory');
+  if (isManaged) {
+    const invName = window.location.pathname.split('/').pop();
+    const inventoryPath = `/dangpretz/inventory/${invName}/${date}`;
+    const invLog = await fetchLog(inventoryPath);
+    const inventory = transposeByKey(invLog, 'menuitem');
+
+    document.querySelectorAll('h3').forEach((item) => {
+      const itemId = item.id.split('--')[0];
+      if (item.querySelector('.inventory-state')) {
+        item.querySelector('.inventory-state').remove();
+      }
+
+      if (inventory[itemId] && inventory[itemId].state) {
+        item.dataset.inventory = inventory[itemId].state;
+        const state = document.createElement('span');
+        if (inventory[itemId].state === 'baking') {
+          const elapsed = (Date.now() - new Date(inventory[itemId].timeStamp).getTime()) / 60000;
+          if (elapsed < 13) {
+            state.innerHTML = `<span class="icon-alarm"></span> ${13 - Math.floor(elapsed)} min`;
+          }
+        } else {
+          state.textContent = `${inventory[itemId].state}`;
+        }
+        if (state.textContent) {
+          state.classList.add('inventory-state');
+          state.classList.add(`inventory-state-${inventory[itemId].state}`);
+          item.firstElementChild.append(state);
+        }
+      }
+
+      if (window.internalUser) {
+        item.addEventListener('click', async () => {
+          const menuitem = itemId;
+          const by = window.internalUser;
+          const currentState = inventory[menuitem] ? inventory[menuitem].state : '';
+          let state = '';
+          if (currentState === 'baking') state = '';
+          if (currentState === 'out') state = 'baking';
+          if (currentState === '') state = 'out';
+
+          await appendLog(inventoryPath, {
+            menuitem,
+            by,
+            state,
+          });
+          window.location.reload();
+        });
+      }
+    });
+  }
+}
+
+async function decorateSignage() {
+  let originalFiles = {};
+
   const hiddenSetup = document.querySelector('.icon-cute-devil');
   if (hiddenSetup) {
     hiddenSetup.addEventListener('click', () => {
@@ -75,12 +134,39 @@ function decorateSignage() {
     });
   }
 
-  const refresh = () => {
-    fetch(window.location.href, { cache: 'reload' });
-    fetch('/scripts/scripts.js', { cache: 'reload' });
-    fetch('/styles/styles.css', { cache: 'reload' });
-    window.location.reload();
+  async function fetchFiles() {
+    const files = ['/scripts/scripts.js', '/styles/styles.css', window.location.href];
+    const texts = [];
+    while (files.length) {
+      const file = files.shift();
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(file, { cache: 'reload' });
+      if (resp.status !== 200) {
+        throw new Error(`Failed to fetch ${file}`);
+      }
+      // eslint-disable-next-line no-await-in-loop
+      texts.push(await resp.text());
+    }
+    const invName = window.location.pathname.split('/').pop();
+    const now = new Date();
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get('date') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    texts.push(JSON.stringify(await fetchLog(`/dangpretz/inventory/${invName}/${date}`)));
+    return texts;
+  }
+
+  const refreshIfNeeded = async () => {
+    try {
+      await loadInventory();
+      const texts = await fetchFiles();
+      if (texts.some((text, i) => text !== originalFiles[i])) {
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
+
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode');
   if (mode === 'signage') {
@@ -91,9 +177,10 @@ function decorateSignage() {
       }
     });
     document.body.classList.add('signage');
-    document.body.addEventListener('click', refresh);
-    setTimeout(refresh, 1000 * 60);
+    document.body.addEventListener('click', refreshIfNeeded);
+    setInterval(refreshIfNeeded, 1000 * 10);
   }
+  originalFiles = await fetchFiles();
 }
 
 function decorateMenu(main) {
@@ -213,62 +300,6 @@ async function loadEager(doc) {
     }
   } catch (e) {
     // do nothing
-  }
-}
-
-async function loadInventory() {
-  const now = new Date();
-  const params = new URLSearchParams(window.location.search);
-  const date = params.get('date') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const isManaged = getMetadata('inventory');
-  if (isManaged) {
-    const inventoryPath = `/dangpretz/inventory/${window.location.pathname.split('/').pop()}/${date}`;
-    const invLog = await fetchLog(inventoryPath);
-    const inventory = transposeByKey(invLog, 'menuitem');
-
-    document.querySelectorAll('h3').forEach((item) => {
-      const itemId = item.id.split('--')[0];
-      if (item.querySelector('.inventory-state')) {
-        item.querySelector('.inventory-state').remove();
-      }
-
-      if (inventory[itemId] && inventory[itemId].state) {
-        item.dataset.inventory = inventory[itemId].state;
-        const state = document.createElement('span');
-        if (inventory[itemId].state === 'baking') {
-          const elapsed = (Date.now() - new Date(inventory[itemId].timeStamp).getTime()) / 60000;
-          if (elapsed < 13) {
-            state.innerHTML = `<span class="icon-alarm"></span> ${13 - Math.floor(elapsed)} min`;
-          }
-        } else {
-          state.textContent = `${inventory[itemId].state}`;
-        }
-        if (state.textContent) {
-          state.classList.add('inventory-state');
-          state.classList.add(`inventory-state-${inventory[itemId].state}`);
-          item.firstElementChild.append(state);
-        }
-      }
-
-      if (window.internalUser) {
-        item.addEventListener('click', async () => {
-          const menuitem = itemId;
-          const by = window.internalUser;
-          const currentState = inventory[menuitem] ? inventory[menuitem].state : '';
-          let state = '';
-          if (currentState === 'baking') state = '';
-          if (currentState === 'out') state = 'baking';
-          if (currentState === '') state = 'out';
-
-          await appendLog(inventoryPath, {
-            menuitem,
-            by,
-            state,
-          });
-          window.location.reload();
-        });
-      }
-    });
   }
 }
 
