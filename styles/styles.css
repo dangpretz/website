@@ -579,8 +579,3 @@ body.signage.menu h3 > span {
   background-color: var(--text-color);
 }
 
-
-body.signage.menu h3 {
-  font-weight: 900;
-  background-image: url("data:image/svg+xml,%3csvg width='30px' height='15px' xmlns='http://www.w3.org/2000/svg'%3e%3ccircle cx='5px' cy='2.5px' r='2.5px' fill='white' stroke='none' /%3e%3c/svg%3e");
-}
