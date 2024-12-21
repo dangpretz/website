@@ -178,7 +178,7 @@ async function decorateSignage() {
     });
     document.body.classList.add('signage');
     document.body.addEventListener('click', refreshIfNeeded);
-    setInterval(refreshIfNeeded, 1000 * 10);
+    setInterval(refreshIfNeeded, 1000 * 60);
   }
   originalFiles = await fetchFiles();
 }
