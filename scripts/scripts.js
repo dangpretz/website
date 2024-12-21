@@ -89,8 +89,8 @@ async function loadInventory() {
         const state = document.createElement('span');
         if (inventory[itemId].state === 'baking') {
           const elapsed = (Date.now() - new Date(inventory[itemId].timeStamp).getTime()) / 60000;
-          if (elapsed < 13) {
-            state.innerHTML = `<span class="icon-alarm"></span> ${13 - Math.floor(elapsed)} min`;
+          if (elapsed < 15) {
+            state.innerHTML = `<span class="icon-alarm"></span> ${15 - Math.floor(elapsed)} min`;
           }
         } else {
           state.textContent = `${inventory[itemId].state}`;
