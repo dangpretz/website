@@ -583,3 +583,8 @@ body.signage.menu h3 > span {
 body.signage.menu h3 .inventory-state {
   color: var(--text-color);
 }
+
+body.signage.menu h3 {
+  background-image: none;
+}
+
