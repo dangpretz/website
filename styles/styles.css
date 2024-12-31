@@ -567,6 +567,7 @@ body.signage main {
 }
 
 body.signage.menu #bombs-pretzel-bombs::before,
+body.signage.menu #suds--sodas::before,
 body.signage.menu #the-danger-pretzel-red::before {
   display: none;
 }
