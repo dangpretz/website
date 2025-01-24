@@ -587,5 +587,11 @@ body.signage.menu h3 .inventory-state {
 
 body.signage.menu h3 {
   background-image: none;
+  margin-top: 0.5em;
+  margin-bottom: 0.1em;
+}
+
+body.signage.menu h2 + p {
+  margin-top: 0.2em;
 }
 
