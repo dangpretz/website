@@ -1,0 +1,71 @@
+.stats-legend-item {
+  display: inline-block;
+  margin-right: 30px;
+}
+
+.stats-color-1 {
+  --stats-color: #FFB3BA;
+}
+
+.stats-color-2 {
+  --stats-color: #BAFFC9;
+}
+
+.stats-color-3 {
+  --stats-color: #BAE1FF;
+}
+
+.stats-color-4 {
+  --stats-color: #FFFFBA;
+}
+
+.stats-color-5 {
+  --stats-color: #FFB3F7;
+}
+
+.stats-color-6 {
+  --stats-color: #B3FFF7;
+}
+
+.stats-color-7 {
+  --stats-color: #FFD9BA;
+}
+
+.stats-color-8 {
+  --stats-color: #E5BFFF;
+}
+
+.stats-color-9 {
+  --stats-color: #FFC9C9;
+}
+
+.stats-color-10 {
+  --stats-color: #C9FFD3;
+}
+
+.stats-legend-item::before {
+  content: '';
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background-color: var(--stats-color);
+  margin-right: 10px;
+  border: 1px solid #000;
+}
+
+.stats {
+    margin-top: 10px;
+}
+
+.stats-chart-item {
+    margin: 10px 0;
+}
+
+.stats-chart-item-value {
+  display: inline-flex;
+  height: 50px;
+  background-color: var(--stats-color);
+  overflow-x: visible;
+  justify-content: center;
+  align-items: center;
+}
