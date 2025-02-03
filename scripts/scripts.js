@@ -358,6 +358,16 @@ function loadDelayed() {
   // load anything that can be postponed to the latest here
 }
 
+export function getVoter() {
+  const randomString = () => `${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 5)}`.toUpperCase();
+  let voter = localStorage.getItem('voter');
+  if (!voter) {
+    voter = randomString();
+    localStorage.setItem('voter', voter);
+  }
+  return voter;
+}
+
 async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
