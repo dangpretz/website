@@ -47,7 +47,7 @@ export default async function decorate(widget) {
     widget.querySelector('.stats-legend').innerHTML = allPretzels.map((pretzel, index) => `<span class="stats-legend-item stats-color-${index + 1}">${pretzel}</span>`).join('');
   });
 
-  Object.entries(week).forEach(([date, data]) => {
+  Object.entries(week).forEach(([, data]) => {
     const humanDate = data.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const total = Object.values(data.stats.pretzels).reduce((a, b) => a + b, 0);
     if (total) {
