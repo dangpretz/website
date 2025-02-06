@@ -10,8 +10,19 @@ export default async function decorate(widget) {
   };
   const fetchStats = async (date) => {
     const response = await fetch(`https://toast-report.david8603.workers.dev/?date=${date}`);
-    const data = await response.json();
-    return data;
+    if (response.status === 200) {
+      const data = await response.json();
+      return data;
+    }
+    widget.querySelector('.stats-status').textContent = 'Credentials expired, update for latest data';
+    return {
+      stats: {
+        pretzels: {},
+        items: {},
+        categories: {},
+      },
+      data: [],
+    };
   };
 
   const fetchDays = async (days) => {
@@ -50,6 +61,7 @@ export default async function decorate(widget) {
   Object.entries(week).forEach(([, data]) => {
     const humanDate = data.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const total = Object.values(data.stats.pretzels).reduce((a, b) => a + b, 0);
+    console.log(total);
     if (total) {
       const div = document.createElement('div');
       div.className = 'stats-chart-item';
