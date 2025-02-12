@@ -595,3 +595,20 @@ body.signage.menu h2 + p {
   margin-top: 0.2em;
 }
 
+
+body .screens-only {
+  display: none;
+}
+
+body .web-only {
+  display: block;
+}
+
+
+body.signage .screens-only {
+  display: block;
+}
+
+body.signage .web-only {
+  display: none;
+}
