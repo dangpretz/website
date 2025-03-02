@@ -187,8 +187,8 @@ function decorateMenu(main) {
   const h3s = main.querySelectorAll('h3');
   h3s.forEach((h3) => {
     const inner = h3.innerHTML;
-    if (inner.includes(' ... ')) {
-      const [item, price] = inner.split(' ... ');
+    if (inner.includes('... ')) {
+      const [item, price] = inner.split('... ');
       h3.innerHTML = `<span>${item}</span><span>${price}</span>`;
     } else {
       h3.innerHTML = `<span>${inner}</span>`;
@@ -257,6 +257,13 @@ function handleInternalUser() {
   }
 }
 
+function decorateMenuIcons(main) {
+  const spans = main.querySelectorAll('.icon-v, .icon-vg');
+  spans.forEach((span) => {
+    span.classList.remove('icon');
+  });
+}
+
 /**
  * Decorates the main element.
  * @param {Element} main The main element
@@ -266,6 +273,7 @@ export function decorateMain(main) {
   // hopefully forward compatible button decoration
   if (document.body.classList.contains('menu')) decorateMenu(main);
   decorateButtons(main);
+  decorateMenuIcons(main);
   decorateIcons(main);
   buildAutoBlocks(main);
   decorateSections(main);

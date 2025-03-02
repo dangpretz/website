@@ -610,3 +610,29 @@ body.signage .screens-only {
 body.signage .web-only {
   display: none;
 }
+
+.icon-v, .icon-vg {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  fill: currentcolor;
+  border-radius: 100%;
+  border: 0.08em solid currentcolor;
+  position: relative;
+  margin-right: 0.2em;
+}
+
+.icon-v::after, .icon-vg::after {
+  content: 'V';
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  font-size: 0.4em;
+  font-weight: 900;
+}
+
+.icon-vg::after {
+  content: 'VG';
+}
