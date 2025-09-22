@@ -1,8 +1,6 @@
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 import { getVoter } from '../../scripts/scripts.js';
 
-
-
 export default async function decorate(widget) {
   const LIST = widget.querySelector('#suggestions-list');
   const RECIPE = widget.querySelector('#suggestions-recipe');
@@ -45,8 +43,6 @@ export default async function decorate(widget) {
   const form = widget.querySelector('form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    console.log(widget.dataset);
-    console.log(box);
     const recipe = RECIPE.value;
     const description = DESCRIPTION.value;
     const by = getVoter();

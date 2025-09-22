@@ -61,7 +61,6 @@ export default async function decorate(widget) {
   Object.entries(week).forEach(([, data]) => {
     const humanDate = data.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const total = Object.values(data.stats.pretzels).reduce((a, b) => a + b, 0);
-    console.log(total);
     if (total) {
       const div = document.createElement('div');
       div.className = 'stats-chart-item';

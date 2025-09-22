@@ -16,6 +16,7 @@ export async function appendLog(logpath, message) {
   });
 
   if (resp.status === 200) {
+    // eslint-disable-next-line no-console
     console.log(`Logged to ${logpath}`, message);
   }
 }

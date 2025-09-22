@@ -163,6 +163,7 @@ async function decorateSignage() {
         window.location.reload();
       }
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.error(e);
     }
   };
