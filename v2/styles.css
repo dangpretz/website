@@ -111,11 +111,35 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   margin: 0 0 12px;
 }
 
-/* Homepage hero with bg image */
+/* Homepage hero with picture/img as background */
 .hero-home {
-  background: linear-gradient(rgba(26,26,26,.55), rgba(26,26,26,.8)),
-              url('https://www.dangerouspretzel.com/images/backgrounds/dipped-bbk-with-cheese.jpg') 70% center/cover no-repeat;
+  position: relative;
+  overflow: hidden;
   padding: clamp(70px, 12vw, 140px) 5% clamp(50px, 8vw, 70px);
+}
+.hero-home .hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.hero-home .hero-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 70% center;
+  display: block;
+}
+.hero-home::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(rgba(26,26,26,.55), rgba(26,26,26,.8));
+  pointer-events: none;
+}
+.hero-home .hero-inner {
+  position: relative;
+  z-index: 2;
 }
 .hero-home h1 {
   font-size: clamp(48px, 8vw, 80px);
@@ -126,7 +150,8 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   font-size: clamp(16px, 2vw, 22px);
 }
 @media (max-width: 768px) {
-  .hero-home { background-position: 65% 50%; padding: 60px 6% 40px; }
+  .hero-home .hero-bg img { object-position: 65% 50%; }
+  .hero-home { padding: 60px 6% 40px; }
 }
 
 /* ─── Buttons ─── */
