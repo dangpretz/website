@@ -114,7 +114,7 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
 /* Homepage hero with bg image */
 .hero-home {
   background: linear-gradient(rgba(26,26,26,.55), rgba(26,26,26,.8)),
-              url('https://cdn.prod.website-files.com/6877e785e80fd4ae08e4a397/68794d60a23fd460bbd3ba5e_Dipped%20BBK%20with%20Cheese%20%281%29.jpg') 70% center/cover no-repeat;
+              url('https://www.dangerouspretzel.com/images/backgrounds/dipped-bbk-with-cheese.jpg') 70% center/cover no-repeat;
   padding: clamp(70px, 12vw, 140px) 5% clamp(50px, 8vw, 70px);
 }
 .hero-home h1 {
