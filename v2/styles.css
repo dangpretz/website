@@ -270,8 +270,10 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   width: calc(100% + 48px);
   margin: -24px -24px 16px -24px;
 }
-.card-img {
+.card picture img.card-img,
+.card img.card-img {
   width: 100%;
+  max-width: none;
   height: 200px;
   object-fit: cover;
   display: block;
