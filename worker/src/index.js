@@ -55,18 +55,22 @@ export default {
         noteLines.push(`Notes: ${customer.notes}`);
       }
 
+      // Normalize phone to E.164 format for Square
+      const phoneDigits = customer.phone.replace(/\D/g, '');
+      const e164Phone = phoneDigits.length === 10 ? `+1${phoneDigits}` :
+                         phoneDigits.length === 11 && phoneDigits.startsWith('1') ? `+${phoneDigits}` :
+                         `+${phoneDigits}`;
+
       // Create Square Payment Link
       const idempotencyKey = crypto.randomUUID();
+      const locationId = env.SQUARE_LOCATION_ID || 'LEJ3PDZ9V6NYN';
 
       const paymentLinkBody = {
         idempotency_key: idempotencyKey,
-        quick_pay: undefined,
         order: {
-          order: {
-            location_id: env.SQUARE_LOCATION_ID,
-            line_items: lineItems,
-            note: noteLines.join('\n'),
-          },
+          location_id: locationId,
+          line_items: lineItems,
+          note: noteLines.join('\n'),
         },
         checkout_options: {
           allow_tipping: true,
@@ -79,7 +83,7 @@ export default {
         },
         pre_populated_data: {
           buyer_email: customer.email,
-          buyer_phone_number: customer.phone,
+          buyer_phone_number: e164Phone,
         },
       };
 
@@ -100,6 +104,10 @@ export default {
         return json({ error: 'Failed to create checkout', details: sqData.errors }, 500);
       }
 
+      // Extract order ID (may be a string or object with .id)
+      const rawOrder = sqData.related_resources?.orders?.[0];
+      const orderId = typeof rawOrder === 'string' ? rawOrder : rawOrder?.id || null;
+
       // Send email alert to the team (fire-and-forget)
       const itemSummary = items.map(i => `${i.name || i.variationId} x${i.quantity}`).join(', ');
       sendOrderAlert({
@@ -107,12 +115,12 @@ export default {
         fulfillment,
         itemSummary,
         checkoutUrl: sqData.payment_link.url,
-        orderId: sqData.related_resources?.orders?.[0] || 'N/A',
+        orderId: orderId || 'N/A',
       }).catch(err => console.error('Email alert failed:', err));
 
       return json({
         checkout_url: sqData.payment_link.url,
-        order_id: sqData.related_resources?.orders?.[0] || null,
+        order_id: orderId,
       });
 
     } catch (err) {
