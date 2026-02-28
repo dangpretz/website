@@ -1,0 +1,8 @@
+name = "dpc-catering-checkout"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+account_id = "f399e3bcd5ea1501830d0ad1d35d9da3"
+
+[vars]
+SQUARE_LOCATION_ID = "LEJ3PDZ9V6NYN"
+SQUARE_ENV = "production"

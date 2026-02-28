@@ -4,12 +4,319 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Catering | Dangerous Pretzel Co.</title>
-<meta name="description" content="Catering packages for events, offices, and celebrations. Pretzel bombs, full-size boxes, and house-made dips.">
+<meta name="description" content="Order catering for events, offices, and celebrations. Pretzel boxes, bomb trays, and dips — order online and pay instantly.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Paytone+One&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./styles.css">
 <script defer type="text/javascript" src="https://ot.aem.live/.rum/@adobe/helix-rum-js@^2/dist/rum-standalone.js"></script>
+<style>
+/* ─── Catering Order Builder ─── */
+.order-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.section-dark .order-card { background: #2a2a2a; }
+.section-dark .order-card h3 { color: #fff; }
+.section-dark .order-card .order-desc { color: #aaa; }
+.section-dark .order-card .order-unit { color: #888; }
+
+.order-card-info { flex: 1; min-width: 0; }
+.order-card h3 {
+  font: 700 18px 'Paytone One', sans-serif;
+  color: #1A1A1A;
+  margin: 0 0 2px;
+}
+.order-card .price {
+  font: 700 18px 'Manrope', sans-serif;
+  color: #C41E1E;
+  margin: 0 0 4px;
+}
+.order-card .order-desc {
+  font: 400 14px/1.4 'Manrope', sans-serif;
+  color: #666;
+  margin: 0;
+}
+.order-card .order-unit {
+  font: 400 12px 'Manrope', sans-serif;
+  color: #999;
+  margin: 4px 0 0;
+}
+
+/* Quantity Controls */
+.qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.qty-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #C41E1E;
+  background: transparent;
+  color: #C41E1E;
+  font: 700 20px/1 sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+}
+.qty-btn:hover { background: #C41E1E; color: #fff; }
+.qty-btn:disabled { border-color: #ddd; color: #ddd; cursor: default; }
+.qty-btn:disabled:hover { background: transparent; color: #ddd; }
+.section-dark .qty-btn:disabled { border-color: #555; color: #555; }
+.section-dark .qty-btn:disabled:hover { background: transparent; color: #555; }
+.qty-val {
+  font: 700 20px 'Manrope', sans-serif;
+  color: #1A1A1A;
+  min-width: 28px;
+  text-align: center;
+}
+.section-dark .qty-val { color: #fff; }
+
+/* Order Grid */
+.order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+@media (max-width: 420px) {
+  .order-grid { grid-template-columns: 1fr; }
+  .order-card { flex-direction: column; align-items: flex-start; }
+  .qty-controls { align-self: flex-end; margin-top: -36px; }
+}
+
+/* ─── Sticky Cart Bar ─── */
+.cart-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1A1A1A;
+  border-top: 3px solid #C41E1E;
+  padding: 14px 5%;
+  z-index: 9998;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+.cart-bar.visible { transform: translateY(0); }
+.cart-bar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.cart-summary {
+  color: #fff;
+  font: 400 15px 'Manrope', sans-serif;
+}
+.cart-summary strong {
+  font-weight: 700;
+  font-size: 20px;
+  color: #C41E1E;
+}
+.cart-count {
+  color: #999;
+  font-size: 13px;
+  margin-top: 2px;
+}
+.cart-bar .btn-red {
+  padding: 12px 32px;
+  white-space: nowrap;
+  font-size: 15px;
+}
+@media (max-width: 500px) {
+  .cart-bar-inner { flex-direction: column; gap: 8px; }
+  .cart-bar .btn-red { width: 100%; text-align: center; }
+}
+
+/* Adjust bottom padding when cart is visible */
+body.cart-open { padding-bottom: 80px; }
+body.cart-open #tw { bottom: 90px; }
+
+/* ─── Fulfillment Section ─── */
+.fulfillment-wrap {
+  max-width: 600px;
+  margin: 0 auto;
+}
+.toggle-group {
+  display: flex;
+  gap: 0;
+  margin-bottom: 24px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 2px solid #C41E1E;
+}
+.toggle-btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  background: transparent;
+  color: #C41E1E;
+  font: 700 15px 'Manrope', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.toggle-btn.active {
+  background: #C41E1E;
+  color: #fff;
+}
+.delivery-fields { display: none; }
+.delivery-fields.visible { display: block; }
+.delivery-fee-note {
+  background: #fff3cd;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font: 400 13px/1.4 'Manrope', sans-serif;
+  color: #856404;
+  margin-bottom: 16px;
+}
+.lead-time-note {
+  background: #e8f4fd;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font: 400 13px/1.4 'Manrope', sans-serif;
+  color: #0c5460;
+  margin-bottom: 16px;
+}
+.field-label {
+  font: 700 13px 'Manrope', sans-serif;
+  color: #1A1A1A;
+  margin: 0 0 6px;
+  display: block;
+}
+
+/* ─── Custom Inquiry Multi-Step ─── */
+.inquiry-wrap {
+  max-width: 500px;
+  margin: 0 auto;
+  text-align: center;
+}
+.inquiry-step { display: none; }
+.inquiry-step.active { display: block; }
+.inquiry-step h3 {
+  font: 700 22px 'Paytone One', sans-serif;
+  color: #fff;
+  margin: 0 0 8px;
+}
+.inquiry-step p {
+  font: 400 14px 'Manrope', sans-serif;
+  color: #999;
+  margin: 0 0 20px;
+}
+.inquiry-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.inquiry-opt {
+  padding: 14px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  background: #2a2a2a;
+  color: #fff;
+  font: 700 14px 'Manrope', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.inquiry-opt:hover,
+.inquiry-opt.selected {
+  border-color: #C41E1E;
+  background: #3a2020;
+}
+.inquiry-nav {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.inquiry-nav .btn { padding: 12px 28px; font-size: 14px; }
+.inquiry-back {
+  background: transparent;
+  border: 2px solid #555;
+  color: #ccc;
+  padding: 12px 28px;
+  border-radius: 4px;
+  font: 700 14px 'Manrope', sans-serif;
+  cursor: pointer;
+}
+.inquiry-back:hover { border-color: #999; color: #fff; }
+.inquiry-input {
+  width: 100%;
+  padding: 14px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  background: #2a2a2a;
+  color: #fff;
+  font: 400 15px 'Manrope', sans-serif;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.inquiry-input::placeholder { color: #666; }
+.inquiry-input:focus { border-color: #C41E1E; outline: none; }
+.inquiry-success {
+  display: none;
+  text-align: center;
+}
+.inquiry-success h3 {
+  font: 700 24px 'Paytone One', sans-serif;
+  color: #C41E1E;
+  margin: 0 0 12px;
+}
+.inquiry-success p {
+  color: #ccc;
+  font: 400 15px/1.5 'Manrope', sans-serif;
+}
+
+/* ─── Checkout Overlay ─── */
+.checkout-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 10000;
+  justify-content: center;
+  align-items: center;
+}
+.checkout-overlay.visible { display: flex; }
+.checkout-spinner {
+  text-align: center;
+  color: #fff;
+}
+.checkout-spinner .spin {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #333;
+  border-top-color: #C41E1E;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.checkout-spinner p {
+  font: 700 16px 'Manrope', sans-serif;
+}
+.checkout-error {
+  color: #ff6b6b;
+  font: 400 14px 'Manrope', sans-serif;
+  margin-top: 12px;
+  display: none;
+}
+</style>
 </head>
 <body>
 <nav class="site-nav">
@@ -25,85 +332,343 @@
     </div>
   </div>
 </nav>
+
+<!-- ═══ HERO ═══ -->
 <section class="hero">
   <h1>FEED THE CROWD.</h1>
-  <p class="hero-sub">Party boxes, catering packages, and bulk orders for events, offices, and celebrations.</p>
+  <p class="hero-sub">Pretzel boxes, bomb trays, and dips for events, offices, and celebrations. Order online &amp; pay instantly.</p>
   <div class="btn-group">
-    <a href="#catering-form" class="btn btn-red">REQUEST A QUOTE</a>
-    <a href="https://www.toasttab.com/local/order/dangerous-pretzels-352-w-600-s" class="btn btn-outline-white">ORDER NOW</a>
+    <a href="#order-builder" class="btn btn-red">BUILD YOUR ORDER</a>
+    <a href="#custom-inquiry" class="btn btn-outline-white">SOMETHING CUSTOM?</a>
   </div>
 </section>
-<section class="section-cream">
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="section-dark">
+  <h2>STUPID SIMPLE.</h2>
+  <div class="steps-grid max-900">
+    <div class="step"><h3>1. Pick Your Items</h3><p>Pretzel boxes, bomb trays, dips — add what you need below.</p></div>
+    <div class="step"><h3>2. Choose Date &amp; Details</h3><p>Pickup or delivery, when you need it, and where.</p></div>
+    <div class="step"><h3>3. Pay &amp; Done</h3><p>Secure checkout with tips. We'll have it ready.</p></div>
+  </div>
+</section>
+
+<!-- ═══ ORDER BUILDER ═══ -->
+<section class="section-cream" id="order-builder">
   <div class="menu-section">
-    <h2>BITE-SIZED DANGER</h2>
-    <p class="section-sub">25 pretzel bombs per box. Feeds 3–4. $16 per box.</p>
-    <div class="card-grid">
-      <div class="card"><h3>Salty Bombs</h3><p class="price">$16</p><p>25 sea salt bombs. Warm, shareable, zero regrets.</p></div>
-      <div class="card"><h3>Saint Bombs</h3><p class="price">$16</p><p>25 cinnamon sugar bombs. Sweet, sinful, gone fast.</p></div>
-      <div class="card"><h3>For The Kids</h3><p class="price">$16</p><p>25 fruity pebble-topped bombs. Kid-approved.</p></div>
+    <h2>PRETZEL BOXES</h2>
+    <p class="section-sub">15 pretzels per box. The main event.</p>
+    <div class="order-grid">
+
+      <div class="order-card" data-id="QZVG22COWO6WSBF5N7ZKXA4H" data-price="6000" data-name="Salty Pretzel Box">
+        <div class="order-card-info">
+          <h3>Salty</h3>
+          <p class="price">$60</p>
+          <p class="order-desc">The OG. Sea salt, warm dough, crowd-pleaser.</p>
+          <p class="order-unit">$4/pretzel &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="E44FO7G6XCNTNFDPELEGC4EW" data-price="6375" data-name="BBK Pretzel Box">
+        <div class="order-card-info">
+          <h3>BBK</h3>
+          <p class="price">$63.75</p>
+          <p class="order-desc">Parmesan, garlic, herbs. The flavor bomb.</p>
+          <p class="order-unit">$4.25/pretzel &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="S3A7VPNHA26CSVM6FE2YXDF7" data-price="6375" data-name="Spicy Bee Pretzel Box">
+        <div class="order-card-info">
+          <h3>Spicy Bee</h3>
+          <p class="price">$63.75</p>
+          <p class="order-desc">Hot honey, candied jalape&ntilde;os. Sweet heat.</p>
+          <p class="order-unit">$4.25/pretzel &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="CWMBPQVVU3QYGYQ47CE4CM6E" data-price="6375" data-name="Devil's Delight Pretzel Box">
+        <div class="order-card-info">
+          <h3>Devil's Delight</h3>
+          <p class="price">$63.75</p>
+          <p class="order-desc">Pepperjack and pepperoni. Office destroyer.</p>
+          <p class="order-unit">$4.25/pretzel &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="EQ43CX3FXX6P5N2KGZ6FW5Y5" data-price="6375" data-name="Saint Pretzel Box">
+        <div class="order-card-info">
+          <h3>Saint</h3>
+          <p class="price">$63.75</p>
+          <p class="order-desc">Cinnamon sugar. Enough to forgive anything.</p>
+          <p class="order-unit">$4.25/pretzel &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
+
 <section class="section-dark">
   <div class="menu-section">
-    <h2>FULL-SIZE PRETZEL BOXES</h2>
-    <p class="section-sub-light">6 full-size pretzels per box. The main event.</p>
-    <div class="card-grid">
-      <div class="card"><h3>Salty</h3><p class="price">$42</p><p>The OG. Sea salt, warm dough, crowd-pleaser.</p></div>
-      <div class="card"><h3>BBK</h3><p class="price">$49</p><p>Parmesan, garlic, herbs. The flavor bomb.</p></div>
-      <div class="card"><h3>Spicy Bee</h3><p class="price">$49</p><p>Hot honey, candied jalapeños. Sweet heat.</p></div>
-      <div class="card"><h3>Devil’s Delight</h3><p class="price">$49</p><p>Pepperjack and pepperoni. Office destroyer.</p></div>
-      <div class="card"><h3>Saint</h3><p class="price">$42</p><p>Cinnamon sugar. Enough to forgive anything.</p></div>
-      <div class="card"><h3>Assorted</h3><p class="price">$45</p><p>6 pretzels, your pick. Mix and match.</p></div>
+    <h2>BOMB TRAYS</h2>
+    <p class="section-sub-light">100 pretzel bombs per tray. 4&ndash;6 per serving. Feeds 16&ndash;25.</p>
+    <div class="order-grid">
+
+      <div class="order-card" data-id="IXVDDI2JKZ44BHNAWFM7FGCA" data-price="5000" data-name="Salty Bomb Tray">
+        <div class="order-card-info">
+          <h3>Salty Bombs</h3>
+          <p class="price">$50</p>
+          <p class="order-desc">Sea salt bombs. Warm, shareable, zero regrets.</p>
+          <p class="order-unit">$0.50/bomb &middot; 100 per tray</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="N5QPHHVTL2LCN67H7NQJIPV5" data-price="6000" data-name="Saint Bomb Tray">
+        <div class="order-card-info">
+          <h3>Saint Bombs</h3>
+          <p class="price">$60</p>
+          <p class="order-desc">Cinnamon sugar bombs. Sweet, sinful, gone fast.</p>
+          <p class="order-unit">$0.60/bomb &middot; 100 per tray</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
+
 <section class="section-cream">
   <div class="menu-section">
-    <h2>DIPS BY THE TUB</h2>
-    <p class="section-sub">16 oz tubs. Enough for the whole crew.</p>
-    <div class="card-grid">
-      <div class="card"><h3>Dangerous Dip</h3><p class="price">$12</p><p>House beer cheese. Bold, sharp, dangerously good.</p></div>
-      <div class="card"><h3>Honey Mustard</h3><p class="price">$10</p><p>Sweet, tangy, crowd-approved.</p></div>
-      <div class="card"><h3>Hot Ranch</h3><p class="price">$10</p><p>Creamy ranch with a cayenne kick.</p></div>
+    <h2>DIPS</h2>
+    <p class="section-sub">15 &times; 2oz cups per box. One for every pretzel.</p>
+    <div class="order-grid">
+
+      <div class="order-card" data-id="FN4AUPUYJVEN2BOMEMMP2PX7" data-price="2625" data-name="Dangerous Dip Box">
+        <div class="order-card-info">
+          <h3>Dangerous Dip</h3>
+          <p class="price">$26.25</p>
+          <p class="order-desc">House beer cheese. Bold, sharp, dangerously good.</p>
+          <p class="order-unit">$1.75/cup &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="RBXFPJLDGTCTZG3ODUKS7UZ7" data-price="2625" data-name="Honey Mustard Dip Box">
+        <div class="order-card-info">
+          <h3>Honey Mustard</h3>
+          <p class="price">$26.25</p>
+          <p class="order-desc">Sweet, tangy, crowd-approved.</p>
+          <p class="order-unit">$1.75/cup &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
+      <div class="order-card" data-id="KBYZ5LHNCARUULDZS5TK2VNZ" data-price="2625" data-name="Hot Ranch Dip Box">
+        <div class="order-card-info">
+          <h3>Hot Ranch</h3>
+          <p class="price">$26.25</p>
+          <p class="order-desc">Creamy ranch with a cayenne kick.</p>
+          <p class="order-unit">$1.75/cup &middot; 15 per box</p>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn qty-minus" disabled>&minus;</button>
+          <span class="qty-val">0</span>
+          <button class="qty-btn qty-plus">+</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
-<section class="section-dark" style="text-align:center">
-  <h2>CATERING MADE STUPID SIMPLE</h2>
-  <div class="steps-grid max-900">
-    <div class="step"><h3>1. Pick Your Order</h3><p>Bombs, boxes, dips—mix and match to feed your crew.</p></div>
-    <div class="step"><h3>2. Tell Us When</h3><p>48 hours notice for standard orders. Bigger events? Let’s talk.</p></div>
-    <div class="step"><h3>3. Pick Up or Deliver</h3><p>Swing by 352 W 600 S or we’ll deliver to your event.</p></div>
-  </div>
-  <div class="btn-group" style="margin-top:40px">
-    <a href="mailto:info@dangerouspretzel.com" class="btn btn-red">EMAIL US</a>
-    <a href="tel:+18019160275" class="btn btn-outline-white">CALL NOW</a>
+
+<!-- ═══ FULFILLMENT & CUSTOMER INFO ═══ -->
+<section class="section-dark" id="fulfillment">
+  <h2>DETAILS.</h2>
+  <div class="fulfillment-wrap">
+
+    <label class="field-label" style="color:#fff">How do you want it?</label>
+    <div class="toggle-group">
+      <button class="toggle-btn active" data-type="pickup">PICKUP</button>
+      <button class="toggle-btn" data-type="delivery">DELIVERY (+$75)</button>
+    </div>
+
+    <div class="delivery-fields" id="delivery-fields">
+      <div class="delivery-fee-note">Delivery fee: $75 flat rate within SLC metro area.</div>
+      <label class="field-label" style="color:#fff">Delivery Address</label>
+      <input type="text" id="address" placeholder="123 Main St, Salt Lake City, UT" class="inquiry-input" style="text-align:left;margin-bottom:16px">
+    </div>
+
+    <div class="lead-time-note" id="lead-time-note" style="background:#2a2a2a;color:#ccc;border:1px solid #444">
+      Under $200: 12hr notice &middot; $200&ndash;$500: 24hr notice &middot; $500+: 48hr notice
+    </div>
+
+    <div class="form-row" style="margin-bottom:12px">
+      <div>
+        <label class="field-label" style="color:#fff">Date</label>
+        <input type="date" id="order-date" class="inquiry-input" style="text-align:left">
+      </div>
+      <div>
+        <label class="field-label" style="color:#fff">Time</label>
+        <select id="order-time" class="inquiry-input" style="text-align:left">
+          <option value="">Select time...</option>
+          <option>8:00 AM</option><option>8:30 AM</option>
+          <option>9:00 AM</option><option>9:30 AM</option>
+          <option>10:00 AM</option><option>10:30 AM</option>
+          <option>11:00 AM</option><option>11:30 AM</option>
+          <option>12:00 PM</option><option>12:30 PM</option>
+          <option>1:00 PM</option><option>1:30 PM</option>
+          <option>2:00 PM</option><option>2:30 PM</option>
+          <option>3:00 PM</option><option>3:30 PM</option>
+          <option>4:00 PM</option><option>4:30 PM</option>
+          <option>5:00 PM</option><option>5:30 PM</option>
+          <option>6:00 PM</option><option>6:30 PM</option>
+          <option>7:00 PM</option><option>7:30 PM</option>
+          <option>8:00 PM</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="field-label" style="color:#fff">Your Info</label>
+    <input type="text" id="cust-name" placeholder="Full Name" class="inquiry-input" style="text-align:left;margin-bottom:8px">
+    <div class="form-row" style="margin-bottom:8px">
+      <input type="email" id="cust-email" placeholder="Email" class="inquiry-input" style="text-align:left">
+      <input type="tel" id="cust-phone" placeholder="Phone" class="inquiry-input" style="text-align:left">
+    </div>
+    <textarea id="cust-notes" placeholder="Special requests, allergies, setup instructions..." class="inquiry-input" style="text-align:left;height:70px;resize:vertical"></textarea>
+
   </div>
 </section>
-<section class="section-cream" id="catering-form">
-  <div class="form-wrap">
-    <h2>REQUEST CATERING</h2>
-    <p class="form-sub">Fill this out and we’ll get back within 24 hours.</p>
-    <form action="https://formsubmit.co/info@dangerouspretzel.com" method="POST">
-      <input type="hidden" name="_subject" value="Catering Inquiry">
-      <div class="form-row">
-        <input name="name" placeholder="Your Name" required>
-        <input type="email" name="email" placeholder="Email" required>
+
+<!-- ═══ CUSTOM INQUIRY ═══ -->
+<section class="section-dark" id="custom-inquiry" style="border-top:1px solid #333">
+  <h2>SOMETHING BIGGER?</h2>
+  <p class="section-sub-light" style="text-align:center;max-width:500px;margin:0 auto 40px">Big event? Custom menu? Need 500 pretzels and a pretzel wall? Tell us what you're dreaming up.</p>
+
+  <div class="inquiry-wrap">
+    <!-- Step 1: Event Type -->
+    <div class="inquiry-step active" data-step="1">
+      <h3>What's the occasion?</h3>
+      <p>Pick the closest match.</p>
+      <div class="inquiry-options">
+        <button class="inquiry-opt" data-val="Corporate Event">Corporate</button>
+        <button class="inquiry-opt" data-val="Wedding">Wedding</button>
+        <button class="inquiry-opt" data-val="Birthday Party">Birthday</button>
+        <button class="inquiry-opt" data-val="Festival / Market">Festival</button>
+        <button class="inquiry-opt" data-val="School / Nonprofit">School</button>
+        <button class="inquiry-opt" data-val="Other">Other</button>
       </div>
-      <div class="form-row">
-        <input name="phone" placeholder="Phone">
-        <input type="date" name="date">
+      <div class="inquiry-nav">
+        <button class="btn btn-red inquiry-next">NEXT</button>
       </div>
-      <div class="form-row">
-        <input name="headcount" placeholder="Headcount">
-        <input name="budget" placeholder="Budget (optional)">
+    </div>
+
+    <!-- Step 2: Headcount -->
+    <div class="inquiry-step" data-step="2">
+      <h3>How many people?</h3>
+      <p>A rough estimate is fine.</p>
+      <input type="number" class="inquiry-input" id="inq-headcount" placeholder="e.g. 150" min="1">
+      <div class="inquiry-nav">
+        <button class="inquiry-back">BACK</button>
+        <button class="btn btn-red inquiry-next">NEXT</button>
       </div>
-      <textarea name="message" placeholder="Tell us about your event..."></textarea>
-      <button type="submit">SEND REQUEST</button>
-    </form>
+    </div>
+
+    <!-- Step 3: Date -->
+    <div class="inquiry-step" data-step="3">
+      <h3>When is it?</h3>
+      <p>Give us a date or date range.</p>
+      <input type="text" class="inquiry-input" id="inq-date" placeholder="e.g. March 15, 2026 or mid-March">
+      <div class="inquiry-nav">
+        <button class="inquiry-back">BACK</button>
+        <button class="btn btn-red inquiry-next">NEXT</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Details & Contact -->
+    <div class="inquiry-step" data-step="4">
+      <h3>Tell us more &amp; how to reach you.</h3>
+      <p>What are you looking for? Any special requests?</p>
+      <textarea class="inquiry-input" id="inq-details" placeholder="Pretzel wall, custom flavors, dietary needs..." style="height:70px;resize:vertical;text-align:left"></textarea>
+      <input type="text" class="inquiry-input" id="inq-name" placeholder="Your Name">
+      <input type="email" class="inquiry-input" id="inq-email" placeholder="Email">
+      <input type="tel" class="inquiry-input" id="inq-phone" placeholder="Phone (optional)">
+      <div class="inquiry-nav">
+        <button class="inquiry-back">BACK</button>
+        <button class="btn btn-red inquiry-submit">SEND REQUEST</button>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div class="inquiry-success" id="inquiry-success">
+      <h3>GOT IT!</h3>
+      <p>We'll get back to you within 24 hours. Get ready for some dangerous pretzels.</p>
+    </div>
   </div>
 </section>
+
+<!-- ═══ STICKY CART BAR ═══ -->
+<div class="cart-bar" id="cart-bar">
+  <div class="cart-bar-inner">
+    <div class="cart-summary">
+      <div>Subtotal: <strong id="cart-total">$0</strong></div>
+      <div class="cart-count" id="cart-count">0 items</div>
+    </div>
+    <a href="#fulfillment" class="btn btn-red" id="cart-checkout-btn">CONTINUE TO DETAILS</a>
+  </div>
+</div>
+
+<!-- ═══ CHECKOUT OVERLAY ═══ -->
+<div class="checkout-overlay" id="checkout-overlay">
+  <div class="checkout-spinner">
+    <div class="spin"></div>
+    <p>Creating your order...</p>
+    <div class="checkout-error" id="checkout-error"></div>
+  </div>
+</div>
+
 <footer class="site-footer">
   <div class="footer-wrap">
     <div><a href="./index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." style="height:50px;margin-bottom:16px"></a></div>
@@ -132,15 +697,332 @@
       <a href="https://maps.google.com/?q=352+W+600+S+SLC+UT">352 W 600 S, SLC</a>
     </div>
   </div>
-  <p class="copyright">© 2026 Dangerous Pretzel Co.</p>
+  <p class="copyright">&copy; 2026 Dangerous Pretzel Co.</p>
 </footer>
 <a id="tw" href="sms:+13858887603?body=Let%27s%20talk%20pretzels" aria-label="Text us">
   <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg>
 </a>
+
 <script>
-document.querySelector('.hamburger').addEventListener('click', function() {
-  this.nextElementSibling.classList.toggle('open');
-});
+(function() {
+  // ── CONFIG ──
+  const WORKER_URL = 'https://dpc-catering-checkout.drew-f39.workers.dev';
+  const DELIVERY_FEE = 7500; // cents
+
+  // ── STATE ──
+  const cart = {}; // { variationId: { qty, price, name } }
+
+  // ── HAMBURGER ──
+  document.querySelector('.hamburger').addEventListener('click', function() {
+    this.nextElementSibling.classList.toggle('open');
+  });
+
+  // ── QUANTITY CONTROLS ──
+  document.querySelectorAll('.order-card').forEach(card => {
+    const id = card.dataset.id;
+    const price = parseInt(card.dataset.price);
+    const name = card.dataset.name;
+    const minus = card.querySelector('.qty-minus');
+    const plus = card.querySelector('.qty-plus');
+    const val = card.querySelector('.qty-val');
+
+    plus.addEventListener('click', () => {
+      const qty = parseInt(val.textContent) + 1;
+      val.textContent = qty;
+      minus.disabled = qty === 0;
+      cart[id] = { qty, price, name };
+      if (qty === 0) delete cart[id];
+      updateCart();
+    });
+
+    minus.addEventListener('click', () => {
+      const qty = Math.max(0, parseInt(val.textContent) - 1);
+      val.textContent = qty;
+      minus.disabled = qty === 0;
+      if (qty === 0) delete cart[id];
+      else cart[id] = { qty, price, name };
+      updateCart();
+    });
+  });
+
+  // ── CART BAR ──
+  const cartBar = document.getElementById('cart-bar');
+  const cartTotal = document.getElementById('cart-total');
+  const cartCount = document.getElementById('cart-count');
+  const checkoutBtn = document.getElementById('cart-checkout-btn');
+  let fulfillmentReached = false;
+
+  function updateCart() {
+    let total = 0;
+    let items = 0;
+    for (const id in cart) {
+      total += cart[id].qty * cart[id].price;
+      items += cart[id].qty;
+    }
+
+    // Add delivery fee to display if delivery selected
+    const isDelivery = document.querySelector('.toggle-btn[data-type="delivery"]').classList.contains('active');
+    const displayTotal = isDelivery ? total + DELIVERY_FEE : total;
+
+    cartTotal.textContent = '$' + (displayTotal / 100).toFixed(2);
+    cartCount.textContent = items + ' item' + (items !== 1 ? 's' : '') + (isDelivery ? ' + $75 delivery' : '');
+
+    if (items > 0) {
+      cartBar.classList.add('visible');
+      document.body.classList.add('cart-open');
+    } else {
+      cartBar.classList.remove('visible');
+      document.body.classList.remove('cart-open');
+    }
+
+    // Update button text based on scroll position
+    updateCheckoutButton();
+    // Update lead time note
+    updateLeadTime(total);
+  }
+
+  function updateCheckoutButton() {
+    const fulfillmentSection = document.getElementById('fulfillment');
+    const rect = fulfillmentSection.getBoundingClientRect();
+    if (rect.top < window.innerHeight) {
+      checkoutBtn.textContent = 'CHECKOUT';
+      checkoutBtn.href = '#';
+      fulfillmentReached = true;
+    } else {
+      checkoutBtn.textContent = 'CONTINUE TO DETAILS';
+      checkoutBtn.href = '#fulfillment';
+      fulfillmentReached = false;
+    }
+  }
+
+  window.addEventListener('scroll', updateCheckoutButton);
+
+  // ── LEAD TIME ──
+  function updateLeadTime(totalCents) {
+    const note = document.getElementById('lead-time-note');
+    const dateInput = document.getElementById('order-date');
+    const now = new Date();
+    let minHours = 12;
+
+    if (totalCents >= 50000) minHours = 48;
+    else if (totalCents >= 20000) minHours = 24;
+
+    const minDate = new Date(now.getTime() + minHours * 60 * 60 * 1000);
+    const yyyy = minDate.getFullYear();
+    const mm = String(minDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(minDate.getDate()).padStart(2, '0');
+    dateInput.min = `${yyyy}-${mm}-${dd}`;
+
+    // Highlight active tier
+    const tiers = [
+      { max: 20000, label: 'Under $200: 12hr notice' },
+      { max: 50000, label: '$200–$500: 24hr notice' },
+      { max: Infinity, label: '$500+: 48hr notice' },
+    ];
+    const parts = tiers.map(t => {
+      const active = (totalCents > 0 && totalCents < t.max && (t.max === 20000 ? true : totalCents >= (t.max === 50000 ? 20000 : 50000)));
+      return active ? `<strong style="color:#C41E1E">${t.label}</strong>` : t.label;
+    });
+
+    if (totalCents > 0 && totalCents < 20000) {
+      note.innerHTML = `<strong style="color:#C41E1E">Under $200: 12hr notice</strong> · $200–$500: 24hr · $500+: 48hr`;
+    } else if (totalCents >= 20000 && totalCents < 50000) {
+      note.innerHTML = `Under $200: 12hr · <strong style="color:#C41E1E">$200–$500: 24hr notice</strong> · $500+: 48hr`;
+    } else if (totalCents >= 50000) {
+      note.innerHTML = `Under $200: 12hr · $200–$500: 24hr · <strong style="color:#C41E1E">$500+: 48hr notice</strong>`;
+    } else {
+      note.innerHTML = 'Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice';
+    }
+  }
+
+  // ── FULFILLMENT TOGGLE ──
+  const toggleBtns = document.querySelectorAll('.toggle-btn');
+  const deliveryFields = document.getElementById('delivery-fields');
+
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.type === 'delivery') {
+        deliveryFields.classList.add('visible');
+      } else {
+        deliveryFields.classList.remove('visible');
+      }
+      updateCart();
+    });
+  });
+
+  // ── CHECKOUT ──
+  checkoutBtn.addEventListener('click', async (e) => {
+    // If not at fulfillment yet, just scroll
+    if (!fulfillmentReached) return;
+
+    e.preventDefault();
+
+    // Validate
+    const items = Object.entries(cart).map(([id, data]) => ({
+      variationId: id,
+      quantity: data.qty,
+      name: data.name,
+    }));
+
+    if (items.length === 0) {
+      alert('Add some items to your order first!');
+      return;
+    }
+
+    const isDelivery = document.querySelector('.toggle-btn[data-type="delivery"]').classList.contains('active');
+    const date = document.getElementById('order-date').value;
+    const time = document.getElementById('order-time').value;
+    const name = document.getElementById('cust-name').value.trim();
+    const email = document.getElementById('cust-email').value.trim();
+    const phone = document.getElementById('cust-phone').value.trim();
+    const notes = document.getElementById('cust-notes').value.trim();
+    const address = document.getElementById('address').value.trim();
+
+    if (!date) { alert('Please select a date.'); return; }
+    if (!time) { alert('Please select a time.'); return; }
+    if (!name) { alert('Please enter your name.'); return; }
+    if (!email) { alert('Please enter your email.'); return; }
+    if (!phone) { alert('Please enter your phone number.'); return; }
+    if (isDelivery && !address) { alert('Please enter a delivery address.'); return; }
+
+    // Show loading
+    const overlay = document.getElementById('checkout-overlay');
+    const errorEl = document.getElementById('checkout-error');
+    overlay.classList.add('visible');
+    errorEl.style.display = 'none';
+
+    try {
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          fulfillment: {
+            type: isDelivery ? 'delivery' : 'pickup',
+            date,
+            time,
+            address: isDelivery ? address : undefined,
+          },
+          customer: { name, email, phone, notes },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.checkout_url) {
+        throw new Error(data.error || 'Failed to create checkout');
+      }
+
+      // Redirect to Square checkout
+      window.location.href = data.checkout_url;
+
+    } catch (err) {
+      errorEl.textContent = err.message || 'Something went wrong. Please try again.';
+      errorEl.style.display = 'block';
+      // Hide overlay after delay so user can read error
+      setTimeout(() => { overlay.classList.remove('visible'); }, 3000);
+    }
+  });
+
+  // ── CUSTOM INQUIRY ──
+  const inquiryData = {};
+  let currentStep = 1;
+
+  // Option selection
+  document.querySelectorAll('.inquiry-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.inquiry-options').querySelectorAll('.inquiry-opt').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      inquiryData.event_type = btn.dataset.val;
+    });
+  });
+
+  // Next buttons
+  document.querySelectorAll('.inquiry-next').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Validate current step
+      if (currentStep === 1 && !inquiryData.event_type) { alert('Pick an event type.'); return; }
+      if (currentStep === 2) {
+        const hc = document.getElementById('inq-headcount').value;
+        if (!hc) { alert('Enter a headcount estimate.'); return; }
+        inquiryData.headcount = hc;
+      }
+      if (currentStep === 3) {
+        const d = document.getElementById('inq-date').value;
+        if (!d) { alert('Enter a date or date range.'); return; }
+        inquiryData.date = d;
+      }
+
+      currentStep++;
+      showStep(currentStep);
+    });
+  });
+
+  // Back buttons
+  document.querySelectorAll('.inquiry-back').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentStep--;
+      showStep(currentStep);
+    });
+  });
+
+  function showStep(step) {
+    document.querySelectorAll('.inquiry-step').forEach(s => s.classList.remove('active'));
+    const target = document.querySelector(`.inquiry-step[data-step="${step}"]`);
+    if (target) target.classList.add('active');
+  }
+
+  // Submit inquiry
+  document.querySelector('.inquiry-submit')?.addEventListener('click', async () => {
+    const details = document.getElementById('inq-details').value.trim();
+    const name = document.getElementById('inq-name').value.trim();
+    const email = document.getElementById('inq-email').value.trim();
+    const phone = document.getElementById('inq-phone').value.trim();
+
+    if (!name || !email) { alert('Please enter your name and email.'); return; }
+
+    inquiryData.details = details;
+    inquiryData.name = name;
+    inquiryData.email = email;
+    inquiryData.phone = phone;
+
+    // Send via FormSubmit
+    const formData = new FormData();
+    formData.append('_subject', 'Custom Catering Inquiry');
+    formData.append('Event Type', inquiryData.event_type);
+    formData.append('Headcount', inquiryData.headcount);
+    formData.append('Date', inquiryData.date);
+    formData.append('Details', inquiryData.details);
+    formData.append('Name', inquiryData.name);
+    formData.append('Email', inquiryData.email);
+    formData.append('Phone', inquiryData.phone || 'Not provided');
+
+    try {
+      await fetch('https://formsubmit.co/ajax/info@dangerouspretzel.com', {
+        method: 'POST',
+        body: formData,
+      });
+    } catch (e) {
+      // Silently fail — show success anyway since FormSubmit is best-effort
+    }
+
+    // Show success
+    document.querySelectorAll('.inquiry-step').forEach(s => s.classList.remove('active'));
+    document.getElementById('inquiry-success').style.display = 'block';
+  });
+
+  // ── DATE INPUT DEFAULT ──
+  const dateInput = document.getElementById('order-date');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yyyy = tomorrow.getFullYear();
+  const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const dd = String(tomorrow.getDate()).padStart(2, '0');
+  dateInput.min = `${yyyy}-${mm}-${dd}`;
+
+})();
 </script>
 </body>
 </html>
