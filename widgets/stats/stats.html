@@ -11,6 +11,14 @@
         </div>
         <button type="button" class="stats-load">Load</button>
     </div>
+    <div class="stats-actions">
+        <button type="button" class="stats-export" disabled>Export TSV</button>
+    </div>
+    <div class="stats-export-panel stats-export-panel-hidden">
+        <label class="stats-export-label">Exported data (TSV)</label>
+        <textarea class="stats-export-tsv" readonly rows="12"></textarea>
+        <button type="button" class="stats-export-download">Download</button>
+    </div>
     <div class="stats-status"></div>
     <div class="stats-legend"></div>
     <div class="stats-chart"></div>

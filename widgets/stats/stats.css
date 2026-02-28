@@ -62,7 +62,14 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
+    margin-bottom: 8px;
+}
+
+.stats-actions {
     margin-bottom: 12px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
 }
 
 .stats-range-type {
@@ -93,9 +100,53 @@
     padding: 6px 10px;
 }
 
-.stats-load {
+.stats-load,
+.stats-export,
+.stats-export-download {
     padding: 8px 16px;
     cursor: pointer;
+}
+
+/* Distinct background so button is visible on page */
+.stats .stats-actions .stats-export,
+.stats .stats-export {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+.stats .stats-export:disabled {
+    cursor: not-allowed;
+    opacity: 0.8;
+    background-color: #e0e0e0;
+    color: #666;
+}
+
+.stats .stats-export:not(:disabled) {
+    font-weight: 600;
+}
+
+.stats-export-panel {
+    margin: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stats-export-panel-hidden {
+    display: none;
+}
+
+.stats-export-label {
+    font-weight: 600;
+}
+
+.stats-export-tsv {
+    width: 100%;
+    max-width: 640px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    padding: 8px;
+    box-sizing: border-box;
 }
 
 .stats-chart-placeholder,
