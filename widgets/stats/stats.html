@@ -1,4 +1,16 @@
 <div class="stats">
+    <div class="stats-controls">
+        <div class="stats-range-type">
+            <label><input type="radio" name="stats-range" value="week" checked> This week</label>
+            <label><input type="radio" name="stats-range" value="month"> This month</label>
+            <label><input type="radio" name="stats-range" value="pick"> Month & year</label>
+        </div>
+        <div class="stats-month-year">
+            <select class="stats-month" aria-label="Month"></select>
+            <select class="stats-year" aria-label="Year"></select>
+        </div>
+        <button type="button" class="stats-load">Load</button>
+    </div>
     <div class="stats-status"></div>
     <div class="stats-legend"></div>
     <div class="stats-chart"></div>
