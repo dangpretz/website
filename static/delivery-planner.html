@@ -168,6 +168,9 @@
     .totals-date-sku-list li:last-child { border-bottom: none; }
     .totals-date-sku-list .sku-name { font-weight: 600; color: var(--text); }
     .totals-date-sku-list .sku-qty { font-weight: 700; color: var(--devils-red); }
+    .totals-weekly-section { margin-bottom: 24px; }
+    .totals-weekly-section h3 { font-size: 0.9rem; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+    .totals-by-day-section h3 { font-size: 0.9rem; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
     .type-badge {
       display: inline-block;
       padding: 2px 8px;
@@ -476,6 +479,45 @@
       return dateStr;
     }
 
+    /** Get ISO week Monday date as YYYY-MM-DD for a given date string. */
+    function getWeekKey(dateStr) {
+      if (!dateStr || dateStr === '—') return null;
+      try {
+        const d = new Date(dateStr + 'T12:00:00');
+        if (Number.isNaN(d.getTime())) return null;
+        const day = d.getDay();
+        const daysSinceMonday = (day + 6) % 7;
+        d.setDate(d.getDate() - daysSinceMonday);
+        return d.toISOString().slice(0, 10);
+      } catch (_) {}
+      return null;
+    }
+
+    function formatWeekLabel(weekKey) {
+      if (!weekKey) return weekKey;
+      try {
+        const d = new Date(weekKey + 'T12:00:00');
+        if (!Number.isNaN(d.getTime())) return 'Week of ' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch (_) {}
+      return weekKey;
+    }
+
+    /** Returns { weekKey: { sku: totalQty } } using ISO week (Monday start). */
+    function totalsByWeekFromDeliveries(deliveries) {
+      const byDate = totalsByDateFromDeliveries(deliveries);
+      const byWeek = {};
+      Object.keys(byDate).forEach((dateStr) => {
+        const weekKey = getWeekKey(dateStr);
+        if (!weekKey) return;
+        const weekTotals = byWeek[weekKey] || (byWeek[weekKey] = {});
+        const dateTotals = byDate[dateStr];
+        Object.keys(dateTotals).forEach((sku) => {
+          weekTotals[sku] = (weekTotals[sku] || 0) + dateTotals[sku];
+        });
+      });
+      return byWeek;
+    }
+
     function renderTotalsBySku(deliveries) {
       const byDate = totalsByDateFromDeliveries(deliveries);
       const dates = Object.keys(byDate).sort();
@@ -483,14 +525,25 @@
         totalsBySkuList.innerHTML = '<p class="empty">No data yet.</p>';
         return;
       }
-      totalsBySkuList.innerHTML = dates.map((dateStr) => {
+      const byWeek = totalsByWeekFromDeliveries(deliveries);
+      const weekKeys = Object.keys(byWeek).sort();
+      const weeklyHtml = weekKeys.length === 0 ? '' : '<div class="totals-weekly-section"><h3>Weekly totals</h3>' + weekKeys.map((weekKey) => {
+        const totals = byWeek[weekKey];
+        const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
+        const rows = entries.map(([sku, qty]) =>
+          `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`
+        ).join('');
+        return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatWeekLabel(weekKey))}</h3><ul class="totals-date-sku-list">${rows}</ul></div>`;
+      }).join('') + '</div>';
+      const dailyHtml = '<div class="totals-by-day-section"><h3>By day</h3>' + dates.map((dateStr) => {
         const totals = byDate[dateStr];
         const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
         const rows = entries.map(([sku, qty]) =>
           `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`
         ).join('');
         return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatDateLabel(dateStr))}</h3><ul class="totals-date-sku-list">${rows}</ul></div>`;
-      }).join('');
+      }).join('') + '</div>';
+      totalsBySkuList.innerHTML = weeklyHtml + dailyHtml;
     }
 
     function renderOneDelivery(row) {
