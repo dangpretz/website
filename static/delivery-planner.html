@@ -6,192 +6,122 @@
   <title>Delivery Planner | Dangerous Pretzel Co.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --mustard: #e8cf82;
-      --devils-red: #da172a;
-      --bg: #f8f6f2;
-      --card: #fff;
-      --text: #101820;
-      --muted: #505050;
-      --border: #e0ddd8;
+    /* v2 design system: #C41E1E red, #F5F0E8 cream, #1A1A1A dark */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    .site-nav {
+      background: #1A1A1A;
+      padding: 14px 5%;
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      border-bottom: 1px solid #333;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 24px;
-      font-family: 'Manrope', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    .hero {
+      background: #1A1A1A;
+      text-align: center;
+      padding: clamp(40px, 6vw, 70px) 5% clamp(24px, 4vw, 40px);
     }
-    .wrap {
-      max-width: 720px;
+    .hero h1 {
+      font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif;
+      color: #fff;
+      margin: 0 0 12px;
+    }
+    .hero-sub {
+      font: 400 clamp(14px, 1.6vw, 18px)/1.5 'Manrope', sans-serif;
+      color: #ccc;
+      max-width: 560px;
       margin: 0 auto;
     }
-    h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      margin: 0 0 8px;
-      color: var(--text);
+
+    .section-cream {
+      background: #F5F0E8;
+      padding: clamp(32px, 5vw, 60px) 5%;
     }
-    .sub {
-      color: var(--muted);
-      font-size: 0.95rem;
-      margin-bottom: 24px;
+    .section-cream h2 {
+      font: 900 italic clamp(22px, 3vw, 32px)/1.1 Georgia, serif;
+      color: #1A1A1A;
+      margin: 0 0 20px;
     }
+    .section-dark {
+      background: #1A1A1A;
+      padding: clamp(32px, 5vw, 60px) 5%;
+    }
+    .section-dark h2 {
+      font: 900 italic clamp(22px, 3vw, 32px)/1.1 Georgia, serif;
+      color: #fff;
+      text-align: center;
+      margin: 0 0 24px;
+    }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+
     .card {
-      background: var(--card);
-      border-radius: 12px;
+      background: #fff;
+      border-radius: 8px;
       padding: 24px;
       margin-bottom: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-      border: 1px solid var(--border);
     }
+    .section-cream .card { box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     .card h2 {
-      font-size: 1.1rem;
-      font-weight: 700;
+      font: 700 20px 'Paytone One', sans-serif;
+      color: #1A1A1A;
       margin: 0 0 16px;
-      color: var(--text);
     }
-    .form-grid {
-      display: grid;
-      gap: 16px;
-    }
+    .form-grid { display: grid; gap: 16px; }
     label {
       display: block;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--muted);
-      margin-bottom: 4px;
+      font: 700 12px 'Manrope', sans-serif;
+      color: #555;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
     }
     input, select, textarea {
       width: 100%;
-      padding: 10px 12px;
-      font: inherit;
-      font-size: 1rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--card);
+      padding: 12px;
+      font: 400 15px 'Manrope', sans-serif;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      box-sizing: border-box;
     }
-    textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
+    textarea { min-height: 80px; resize: vertical; }
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: var(--devils-red);
-      box-shadow: 0 0 0 2px rgba(218, 23, 42, 0.15);
+      border-color: #C41E1E;
+      box-shadow: 0 0 0 2px rgba(196, 30, 30, 0.15);
     }
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 520px) {
-      .row { grid-template-columns: 1fr; }
-    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+
     .btn {
-      padding: 12px 24px;
-      font: inherit;
-      font-weight: 600;
-      font-size: 1rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      background: var(--devils-red);
-      color: #fff;
-      transition: background 0.2s, transform 0.1s;
-    }
-    .btn:hover {
-      background: #ba000a;
-    }
-    .btn:active { transform: scale(0.98); }
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    #records-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    #records-list > li:not(.schedule-date-group) {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.95rem;
-      display: grid;
-      gap: 4px;
-    }
-    #records-list > li:not(.schedule-date-group):last-child { border-bottom: none; }
-    #records-list > li:not(.schedule-date-group) .meta {
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
-    #records-list li .sku { font-weight: 600; color: var(--devils-red); }
-    #records-list .empty,
-    #totals-by-sku .empty {
-      padding: 32px;
-      text-align: center;
-      color: var(--muted);
-    }
-    #totals-by-sku {
-      margin: 0;
-      padding: 0;
-    }
-    .totals-date-group {
-      margin-bottom: 20px;
-    }
-    .totals-date-group:last-child { margin-bottom: 0; }
-    .totals-date {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      margin: 0 0 8px;
-      padding-bottom: 4px;
-      border-bottom: 2px solid var(--border);
-    }
-    .totals-date-sku-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    .totals-date-sku-list li {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.95rem;
-    }
-    .totals-date-sku-list li:last-child { border-bottom: none; }
-    .totals-date-sku-list .sku-name { font-weight: 600; color: var(--text); }
-    .totals-date-sku-list .sku-qty { font-weight: 700; color: var(--devils-red); }
-    .totals-weekly-section { margin-bottom: 24px; }
-    .totals-weekly-section h3 { font-size: 0.9rem; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
-    .totals-by-day-section h3 { font-size: 0.9rem; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
-    .type-badge {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
+      padding: 14px 32px;
+      border-radius: 4px;
+      font: 700 16px 'Manrope', sans-serif;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
     }
-    .type-badge.delivery { background: #e8f4ea; color: #1b5e20; }
-    .type-badge.pickup { background: #e3f2fd; color: #0d47a1; }
-    .error {
-      color: var(--devils-red);
-      font-size: 0.9rem;
-      margin-top: 8px;
-    }
-    .line-items-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-red { background: #C41E1E; color: #fff; }
+    .btn-secondary { background: #ddd; color: #1A1A1A; }
+    .btn-secondary:hover { background: #ccc; }
+    .form-edit-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .form-edit-bar .cancel-edit { background: #ddd; color: #1A1A1A; }
+    .form-edit-bar .cancel-edit:hover { background: #ccc; }
+
+    .line-items-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
     .line-items-head label { margin-bottom: 0; }
     .line-item-row {
       display: grid;
@@ -203,96 +133,133 @@
     .line-item-row .remove-row {
       padding: 10px;
       min-width: 40px;
-      background: var(--border);
-      color: var(--muted);
+      background: #ddd;
+      color: #555;
       font-size: 1.2rem;
       line-height: 1;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
-    .line-item-row .remove-row:hover {
-      background: var(--devils-red);
-      color: #fff;
-    }
-    .btn-secondary {
-      background: var(--border);
-      color: var(--text);
-    }
-    .btn-secondary:hover { background: #ccc; }
+    .line-item-row .remove-row:hover { background: #C41E1E; color: #fff; }
     #line-items-container { margin-top: 8px; }
-    .line-items-empty { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
-    #records-list li .line-items { margin-top: 4px; }
-    #records-list li .line-item { font-size: 0.9rem; }
-    .schedule-date-group {
-      list-style: none;
-      margin: 0 0 20px;
-      padding: 0;
-    }
-    .schedule-date-group:last-child { margin-bottom: 0; }
-    .schedule-date-heading {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      margin: 0 0 8px;
-      padding-bottom: 4px;
-      border-bottom: 2px solid var(--border);
-    }
-    .schedule-date-items {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    .schedule-date-items > li {
+    .line-items-empty { color: #666; font-size: 0.9rem; margin-bottom: 12px; }
+    .error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
+
+    #records-list { list-style: none; margin: 0; padding: 0; }
+    #records-list > li:not(.schedule-date-group) {
       padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #333;
       font-size: 0.95rem;
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
     }
-    .schedule-date-items > li:last-child { border-bottom: none; }
-    .schedule-date-items > li .meta { color: var(--muted); font-size: 0.85rem; }
-    .schedule-date-items > li .record-content { min-width: 0; flex: 1; }
-    .record-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
+    #records-list > li:not(.schedule-date-group):last-child { border-bottom: none; }
+    #records-list > li:not(.schedule-date-group) .meta { color: #999; font-size: 0.85rem; }
+    #records-list li .sku { font-weight: 600; color: #C41E1E; }
+    #records-list li .line-items { margin-top: 4px; }
+    #records-list li .line-item { font-size: 0.9rem; }
+    #records-list .empty { padding: 32px; text-align: center; color: #999; }
+
+    .schedule-date-group { list-style: none; margin: 0 0 24px; padding: 0; }
+    .schedule-date-group:last-child { margin-bottom: 0; }
+    .schedule-date-heading {
+      font: 700 16px 'Paytone One', sans-serif;
+      color: #fff;
+      margin: 0 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #333;
     }
-    .record-actions .btn-icon {
-      padding: 6px 12px;
-      font-size: 0.85rem;
-    }
-    .record-actions .btn-edit { background: var(--muted); }
-    .record-actions .btn-edit:hover { background: #333; }
-    .record-actions .btn-duplicate { background: var(--mustard); color: var(--text); }
-    .record-actions .btn-duplicate:hover { background: #d4b85c; }
-    .record-actions .btn-delete { background: #c62828; }
-    .record-actions .btn-delete:hover { background: #b71c1c; }
-    .record-content { flex: 1; }
-    #records-list > li:not(.schedule-date-group) {
+    .schedule-date-items { list-style: none; margin: 0; padding: 0; }
+    .schedule-date-items > li {
+      padding: 14px 16px;
+      border-bottom: 1px solid #333;
+      font-size: 0.95rem;
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
+      color: #ccc;
     }
+    .schedule-date-items > li:last-child { border-bottom: none; }
+    .schedule-date-items > li .meta { color: #999; font-size: 0.85rem; }
+    .schedule-date-items > li .record-content { min-width: 0; flex: 1; }
+    .schedule-date-items > li strong { color: #fff; }
+
+    .record-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .record-actions .btn-icon { padding: 6px 12px; font-size: 0.85rem; border-radius: 4px; border: none; cursor: pointer; font: 700 13px 'Manrope', sans-serif; }
+    .record-actions .btn-edit { background: #444; color: #fff; }
+    .record-actions .btn-edit:hover { background: #555; }
+    .record-actions .btn-duplicate { background: #F5F0E8; color: #1A1A1A; }
+    .record-actions .btn-duplicate:hover { background: #e8e0d5; }
+    .record-actions .btn-delete { background: #8B0000; color: #fff; }
+    .record-actions .btn-delete:hover { background: #a00; }
+    .record-content { flex: 1; }
     #records-list > li:not(.schedule-date-group) .record-content { min-width: 0; }
-    .form-edit-bar {
+
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .type-badge.delivery { background: rgba(196, 30, 30, 0.25); color: #f88; }
+    .type-badge.pickup { background: rgba(245, 240, 232, 0.2); color: #F5F0E8; }
+
+    #totals-by-sku { margin: 0; padding: 0; }
+    #totals-by-sku .empty { padding: 32px; text-align: center; color: #666; }
+    .totals-date-group { margin-bottom: 20px; }
+    .totals-date-group:last-child { margin-bottom: 0; }
+    .totals-date {
+      font: 700 16px 'Paytone One', sans-serif;
+      color: #1A1A1A;
+      margin: 0 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #ddd;
+    }
+    .totals-date-sku-list { list-style: none; margin: 0; padding: 0; }
+    .totals-date-sku-list li {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+      font: 400 15px 'Manrope', sans-serif;
     }
-    .form-edit-bar .cancel-edit {
-      background: var(--border);
-      color: var(--text);
+    .totals-date-sku-list li:last-child { border-bottom: none; }
+    .totals-date-sku-list .sku-name { font-weight: 700; color: #1A1A1A; }
+    .totals-date-sku-list .sku-qty { font-weight: 700; color: #C41E1E; }
+    .totals-weekly-section { margin-bottom: 24px; }
+    .totals-weekly-section h3, .totals-by-day-section h3 {
+      font: 700 12px 'Manrope', sans-serif;
+      color: #666;
+      letter-spacing: 1px;
+      margin: 0 0 12px;
     }
-    .form-edit-bar .cancel-edit:hover { background: #ccc; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Delivery Planner</h1>
-    <p class="sub">Schedule deliveries and pickups. Select a customer, then add SKU rows with quantities.</p>
-
-    <div class="card">
-      <h2>Schedule a delivery or pickup</h2>
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+      </div>
+    </div>
+  </nav>
+  <section class="hero">
+    <h1>DELIVERY PLANNER.</h1>
+    <p class="hero-sub">Schedule deliveries and pickups. Select a customer, then add SKU rows with quantities.</p>
+  </section>
+  <section class="section-cream">
+    <div class="max-1100">
+      <div class="card">
+        <h2>Schedule a delivery or pickup</h2>
       <form id="delivery-form" class="form-grid">
         <div>
           <label for="customer">Customer</label>
@@ -322,27 +289,30 @@
         </div>
         <div id="form-error" class="error" role="alert" hidden></div>
         <div class="form-edit-bar">
-          <button type="submit" class="btn" id="submit-btn">Schedule</button>
+          <button type="submit" class="btn btn-red" id="submit-btn">Schedule</button>
           <button type="button" class="btn cancel-edit" id="cancel-edit-btn" hidden>Cancel edit</button>
         </div>
         <input type="hidden" id="delivery-id" name="deliveryId" value="">
       </form>
+      </div>
     </div>
-
-    <div class="card">
-      <h2>Scheduled deliveries & pickups</h2>
+  </section>
+  <section class="section-dark">
+    <div class="max-1100">
+      <h2>SCHEDULED DELIVERIES &amp; PICKUPS</h2>
       <ul id="records-list">
         <li class="empty">Loading…</li>
       </ul>
     </div>
-
-    <div class="card">
-      <h2>Totals by date</h2>
+  </section>
+  <section class="section-cream">
+    <div class="max-1100">
+      <h2>TOTALS BY DATE</h2>
       <div id="totals-by-sku">
         <p class="empty">No data yet.</p>
       </div>
     </div>
-  </div>
+  </section>
 
   <script type="module">
     import { fetchLog, appendLog } from '../scripts/sheet-logger.js';
