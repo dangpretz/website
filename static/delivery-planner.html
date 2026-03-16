@@ -117,15 +117,15 @@
       margin: 0;
       padding: 0;
     }
-    #records-list li {
+    #records-list > li:not(.schedule-date-group) {
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
       font-size: 0.95rem;
       display: grid;
       gap: 4px;
     }
-    #records-list li:last-child { border-bottom: none; }
-    #records-list li .meta {
+    #records-list > li:not(.schedule-date-group):last-child { border-bottom: none; }
+    #records-list > li:not(.schedule-date-group) .meta {
       color: var(--muted);
       font-size: 0.85rem;
     }
@@ -221,6 +221,36 @@
     .line-items-empty { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
     #records-list li .line-items { margin-top: 4px; }
     #records-list li .line-item { font-size: 0.9rem; }
+    .schedule-date-group {
+      list-style: none;
+      margin: 0 0 20px;
+      padding: 0;
+    }
+    .schedule-date-group:last-child { margin-bottom: 0; }
+    .schedule-date-heading {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--border);
+    }
+    .schedule-date-items {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .schedule-date-items > li {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .schedule-date-items > li:last-child { border-bottom: none; }
+    .schedule-date-items > li .meta { color: var(--muted); font-size: 0.85rem; }
+    .schedule-date-items > li .record-content { min-width: 0; flex: 1; }
     .record-actions {
       display: flex;
       gap: 8px;
@@ -237,12 +267,12 @@
     .record-actions .btn-delete { background: #c62828; }
     .record-actions .btn-delete:hover { background: #b71c1c; }
     .record-content { flex: 1; }
-    #records-list li {
+    #records-list > li:not(.schedule-date-group) {
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
     }
-    #records-list li .record-content { min-width: 0; }
+    #records-list > li:not(.schedule-date-group) .record-content { min-width: 0; }
     .form-edit-bar {
       display: flex;
       align-items: center;
@@ -481,6 +511,25 @@
       return dateStr;
     }
 
+    /** For schedule list: "Today (Wed, Mar 15)", "Tomorrow (Thu, Mar 16)", or "Wed, Mar 15". */
+    function formatScheduleDateLabel(dateStr) {
+      if (!dateStr || dateStr === '—') return dateStr;
+      try {
+        const d = new Date(dateStr + 'T12:00:00');
+        if (Number.isNaN(d.getTime())) return dateStr;
+        const datePart = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        const today = new Date();
+        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
+        if (dateStr === todayStr) return 'Today (' + datePart + ')';
+        if (dateStr === tomorrowStr) return 'Tomorrow (' + datePart + ')';
+        return datePart;
+      } catch (_) {}
+      return dateStr;
+    }
+
     /** Get ISO week Monday date as YYYY-MM-DD for a given date string. */
     function getWeekKey(dateStr) {
       if (!dateStr || dateStr === '—') return null;
@@ -551,7 +600,7 @@
     function renderOneDelivery(row) {
       const type = (row.type || 'delivery').toLowerCase();
       const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
-      const date = row.date || '—';
+      const dateLabel = formatScheduleDateLabel(row.date || '—');
       const customer = row.customer || row.location || '—';
       let lineItemsHtml = '';
       if (row.lineItems) {
@@ -574,7 +623,7 @@
           <div class="record-content">
             <span class="type-badge ${type}">${typeLabel}</span>
             <strong>${escapeHtml(customer)}</strong>
-            <span class="meta">${escapeHtml(date)}</span>
+            <span class="meta">${escapeHtml(dateLabel)}</span>
             ${lineItemsHtml}
             <div class="record-actions">
               <button type="button" class="btn btn-icon btn-edit" data-action="edit" data-delivery-id="${id}">Edit</button>
@@ -620,7 +669,18 @@
           renderTotalsBySku([]);
           return;
         }
-        recordsList.innerHTML = deliveries.map((row) => renderOneDelivery(row)).join('');
+        const byDate = {};
+        deliveries.forEach((row) => {
+          const dateStr = (row.date && String(row.date).trim()) || '—';
+          if (!byDate[dateStr]) byDate[dateStr] = [];
+          byDate[dateStr].push(row);
+        });
+        const sortedDates = Object.keys(byDate).sort();
+        recordsList.innerHTML = sortedDates.map((dateStr) => {
+          const dateLabel = formatScheduleDateLabel(dateStr);
+          const rows = byDate[dateStr].map((row) => renderOneDelivery(row)).join('');
+          return `<li class="schedule-date-group"><h3 class="schedule-date-heading">${escapeHtml(dateLabel)}</h3><ul class="schedule-date-items">${rows}</ul></li>`;
+        }).join('');
         recordsList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
           btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId, deliveries));
         });
