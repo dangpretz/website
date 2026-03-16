@@ -266,6 +266,14 @@
     .totals-date-sku-list li:last-child { border-bottom: none; }
     .totals-date-sku-list .sku-name { font-weight: 700; color: #1A1A1A; }
     .totals-date-sku-list .sku-qty { font-weight: 700; color: #C41E1E; }
+    .totals-week-summary {
+      font: 700 15px 'Manrope', sans-serif;
+      color: #1A1A1A;
+      margin: 0 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+    .totals-week-summary .sep { color: #999; font-weight: 400; margin: 0 6px; }
     .totals-weekly-section { margin-bottom: 24px; }
     .totals-weekly-section h3, .totals-by-day-section h3 {
       font: 700 12px 'Manrope', sans-serif;
@@ -600,15 +608,35 @@
         totalsBySkuList.innerHTML = '<p class="empty">No data yet.</p>';
         return;
       }
+      function summarizePretzelsBombsDips(totals) {
+        let pretzels = 0, bombs = 0, dips = 0;
+        Object.entries(totals || {}).forEach(([sku, qty]) => {
+          const s = sku.toLowerCase();
+          const n = Number(qty) || 0;
+          if (s.includes('dip')) dips += n;
+          else if (s.includes('bomb')) bombs += n;
+          else pretzels += n;
+        });
+        return { pretzels, bombs, dips };
+      }
+      function formatWeekSummaryLine(totals) {
+        const { pretzels, bombs, dips } = summarizePretzelsBombsDips(totals);
+        const parts = [];
+        if (pretzels > 0) parts.push(`Pretzels ${pretzels}`);
+        if (bombs > 0) parts.push(`Bombs ${bombs}`);
+        if (dips > 0) parts.push(`Dips ${dips}`);
+        return parts.length ? parts.join('<span class="sep"> · </span>') : '—';
+      }
       const byWeek = totalsByWeekFromDeliveries(deliveries);
       const weekKeys = Object.keys(byWeek).sort();
       const weeklyHtml = weekKeys.length === 0 ? '' : '<div class="totals-weekly-section"><h3>Weekly totals</h3>' + weekKeys.map((weekKey) => {
         const totals = byWeek[weekKey];
+        const summaryLine = formatWeekSummaryLine(totals);
         const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
         const rows = entries.map(([sku, qty]) =>
           `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`
         ).join('');
-        return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatWeekLabel(weekKey))}</h3><ul class="totals-date-sku-list">${rows}</ul></div>`;
+        return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatWeekLabel(weekKey))}</h3><p class="totals-week-summary">${summaryLine}</p><ul class="totals-date-sku-list">${rows}</ul></div>`;
       }).join('') + '</div>';
       const dailyHtml = '<div class="totals-by-day-section"><h3>By day</h3>' + dates.map((dateStr) => {
         const totals = byDate[dateStr];
