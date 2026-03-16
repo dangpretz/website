@@ -180,11 +180,45 @@
       flex-wrap: wrap;
       align-items: flex-start;
       color: #ccc;
+      transition: opacity 0.2s, background 0.2s;
     }
     .schedule-date-items > li:last-child { border-bottom: none; }
     .schedule-date-items > li .meta { color: #999; font-size: 0.85rem; }
-    .schedule-date-items > li .record-content { min-width: 0; flex: 1; }
+    .schedule-date-items > li .record-content {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .schedule-date-items > li .record-main { flex: 1; min-width: 0; }
     .schedule-date-items > li strong { color: #fff; }
+    .schedule-date-items > li.status-ready_deliver,
+    .schedule-date-items > li.status-ready_pickup {
+      background: rgba(196, 30, 30, 0.18);
+      border-left: 4px solid #C41E1E;
+      margin-left: -4px;
+      padding-left: 20px;
+    }
+    .schedule-date-items > li.status-delivered,
+    .schedule-date-items > li.status-picked_up {
+      opacity: 0.5;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .schedule-date-items > li .status-select {
+      flex-shrink: 0;
+      padding: 4px 6px;
+      font: 400 11px 'Manrope', sans-serif;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+      min-width: 0;
+      width: 108px;
+      max-width: 108px;
+    }
+    .schedule-date-items > li .status-select:focus { outline: none; border-color: #C41E1E; }
 
     .record-actions { display: flex; gap: 8px; margin-top: 8px; }
     .record-actions .btn-icon { padding: 6px 12px; font-size: 0.85rem; border-radius: 4px; border: none; cursor: pointer; font: 700 13px 'Manrope', sans-serif; }
@@ -336,6 +370,19 @@
       return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `del-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     }
 
+    const STATUS_OPTIONS = {
+      delivery: [
+        { value: 'scheduled', label: 'Scheduled' },
+        { value: 'ready_deliver', label: 'Ready for delivery' },
+        { value: 'delivered', label: 'Delivered' },
+      ],
+      pickup: [
+        { value: 'scheduled', label: 'Scheduled' },
+        { value: 'ready_pickup', label: 'Ready for pickup' },
+        { value: 'picked_up', label: 'Picked up' },
+      ],
+    };
+
     /** From raw log rows, resolve current deliveries (apply updates and deletes). */
     function resolveDeliveriesFromLogs(logs) {
       const byId = {};
@@ -346,11 +393,18 @@
           delete byId[id];
           return;
         }
+        if (row.action === 'status') {
+          if (byId[id]) byId[id].status = row.status || 'scheduled';
+          return;
+        }
         if (row.action === 'update') {
           byId[id] = { ...row, deliveryId: id };
+          if (row.status) byId[id].status = row.status;
+          else if (!byId[id].status) byId[id].status = 'scheduled';
           return;
         }
         byId[id] = { ...row, deliveryId: id };
+        if (!byId[id].status) byId[id].status = 'scheduled';
       });
       return Object.values(byId).sort((a, b) => {
         const d = (a.date || '').localeCompare(b.date || '');
@@ -569,9 +623,15 @@
 
     function renderOneDelivery(row) {
       const type = (row.type || 'delivery').toLowerCase();
+      const typeKey = type === 'pickup' ? 'pickup' : 'delivery';
       const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
       const dateLabel = formatScheduleDateLabel(row.date || '—');
       const customer = row.customer || row.location || '—';
+      const status = row.status || 'scheduled';
+      const statusOpts = STATUS_OPTIONS[typeKey] || STATUS_OPTIONS.delivery;
+      const statusOptionsHtml = statusOpts.map((o) =>
+        `<option value="${escapeHtml(o.value)}"${o.value === status ? ' selected' : ''}>${escapeHtml(o.label)}</option>`
+      ).join('');
       let lineItemsHtml = '';
       if (row.lineItems) {
         try {
@@ -589,17 +649,22 @@
       if (!lineItemsHtml) lineItemsHtml = '<div class="line-items"><span class="line-item">—</span></div>';
       const id = escapeHtml(row.deliveryId || '');
       return `
-        <li data-delivery-id="${id}">
+        <li data-delivery-id="${id}" class="status-${escapeHtml(status)}">
           <div class="record-content">
-            <span class="type-badge ${type}">${typeLabel}</span>
-            <strong>${escapeHtml(customer)}</strong>
-            <span class="meta">${escapeHtml(dateLabel)}</span>
-            ${lineItemsHtml}
-            <div class="record-actions">
-              <button type="button" class="btn btn-icon btn-edit" data-action="edit" data-delivery-id="${id}">Edit</button>
-              <button type="button" class="btn btn-icon btn-duplicate" data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
-              <button type="button" class="btn btn-icon btn-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
+            <div class="record-main">
+              <span class="type-badge ${type}">${typeLabel}</span>
+              <strong>${escapeHtml(customer)}</strong>
+              <span class="meta">${escapeHtml(dateLabel)}</span>
+              ${lineItemsHtml}
+              <div class="record-actions">
+                <button type="button" class="btn btn-icon btn-edit" data-action="edit" data-delivery-id="${id}">Edit</button>
+                <button type="button" class="btn btn-icon btn-duplicate" data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
+                <button type="button" class="btn btn-icon btn-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
+              </div>
             </div>
+            <select class="status-select" data-delivery-id="${id}" data-action="status" aria-label="Delivery status">
+              ${statusOptionsHtml}
+            </select>
           </div>
         </li>
       `;
@@ -659,6 +724,9 @@
         });
         recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
           btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
+        });
+        recordsList.querySelectorAll('.status-select').forEach((sel) => {
+          sel.addEventListener('change', () => updateDeliveryStatus(sel.dataset.deliveryId, sel.value));
         });
         updateCustomerDatalist(deliveries);
         renderTotalsBySku(deliveries);
@@ -754,6 +822,22 @@
       })();
     }
 
+    async function updateDeliveryStatus(deliveryId, status) {
+      if (!deliveryId || !status) return;
+      try {
+        await appendLog(LOG_PATH, {
+          action: 'status',
+          deliveryId,
+          status,
+          timeStamp: new Date().toISOString(),
+        });
+        await loadRecords();
+      } catch (err) {
+        showError('Failed to update status.');
+        console.error(err);
+      }
+    }
+
     function escapeHtml(s) {
       const div = document.createElement('div');
       div.textContent = s;
@@ -797,6 +881,7 @@
             date,
             type,
             lineItems: JSON.stringify(lineItems),
+            status: 'scheduled',
             timeStamp,
           });
         } else {
@@ -807,6 +892,7 @@
             date,
             type,
             lineItems: JSON.stringify(lineItems),
+            status: 'scheduled',
             timeStamp,
           });
         }
