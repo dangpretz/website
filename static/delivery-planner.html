@@ -232,6 +232,8 @@
     }
     .record-actions .btn-edit { background: var(--muted); }
     .record-actions .btn-edit:hover { background: #333; }
+    .record-actions .btn-duplicate { background: var(--mustard); color: var(--text); }
+    .record-actions .btn-duplicate:hover { background: #d4b85c; }
     .record-actions .btn-delete { background: #c62828; }
     .record-actions .btn-delete:hover { background: #b71c1c; }
     .record-content { flex: 1; }
@@ -576,6 +578,7 @@
             ${lineItemsHtml}
             <div class="record-actions">
               <button type="button" class="btn btn-icon btn-edit" data-action="edit" data-delivery-id="${id}">Edit</button>
+              <button type="button" class="btn btn-icon btn-duplicate" data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
               <button type="button" class="btn btn-icon btn-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
             </div>
           </div>
@@ -621,6 +624,9 @@
         recordsList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
           btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId, deliveries));
         });
+        recordsList.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
+          btn.addEventListener('click', () => startDuplicate(btn.dataset.deliveryId, deliveries));
+        });
         recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
           btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
         });
@@ -637,10 +643,7 @@
     form.customer.addEventListener('input', defaultTypeFromCustomer);
     form.customer.addEventListener('change', defaultTypeFromCustomer);
 
-    function startEdit(deliveryId, deliveries) {
-      const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
-      const row = map[deliveryId];
-      if (!row) return;
+    function fillFormFromDelivery(row) {
       form.customer.value = row.customer || row.location || '';
       form.date.value = row.date || '';
       form.type.value = (row.type || 'delivery').toLowerCase();
@@ -673,9 +676,27 @@
         lineRow.append(skuSelect, qtySelect, removeBtn);
         lineItemsContainer.insertBefore(lineRow, lineItemsEmpty);
       });
+    }
+
+    function startEdit(deliveryId, deliveries) {
+      const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
+      const row = map[deliveryId];
+      if (!row) return;
+      fillFormFromDelivery(row);
       deliveryIdInput.value = deliveryId;
       submitBtn.textContent = 'Update delivery';
       cancelEditBtn.hidden = false;
+      showError('');
+    }
+
+    function startDuplicate(deliveryId, deliveries) {
+      const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
+      const row = map[deliveryId];
+      if (!row) return;
+      fillFormFromDelivery(row);
+      deliveryIdInput.value = '';
+      submitBtn.textContent = 'Schedule';
+      cancelEditBtn.hidden = true;
       showError('');
     }
 
