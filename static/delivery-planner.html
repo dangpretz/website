@@ -325,6 +325,7 @@
     const cancelEditBtn = document.getElementById('cancel-edit-btn');
 
     let skus = [];
+    let currentDeliveries = [];
 
     function generateDeliveryId() {
       return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `del-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -529,11 +530,35 @@
       `;
     }
 
+    function getLastTypeForCustomer(customerName) {
+      const name = (customerName || '').trim().toLowerCase();
+      if (!name || !currentDeliveries.length) return null;
+      const forCustomer = currentDeliveries.filter((row) => {
+        const c = (row.customer || row.location || '').trim().toLowerCase();
+        return c === name;
+      });
+      if (forCustomer.length === 0) return null;
+      forCustomer.sort((a, b) => {
+        const d = (b.date || '').localeCompare(a.date || '');
+        return d !== 0 ? d : (b.timeStamp || '').localeCompare(a.timeStamp || '');
+      });
+      const type = (forCustomer[0].type || 'delivery').toLowerCase();
+      return type === 'pickup' ? 'pickup' : 'delivery';
+    }
+
+    function defaultTypeFromCustomer() {
+      if (deliveryIdInput.value) return;
+      const type = getLastTypeForCustomer(form.customer.value);
+      if (type) form.type.value = type;
+    }
+
     async function loadRecords() {
       try {
         const logs = await fetchLog(LOG_PATH);
         const deliveries = resolveDeliveriesFromLogs(logs);
+        currentDeliveries = deliveries;
         if (deliveries.length === 0) {
+          currentDeliveries = [];
           recordsList.innerHTML = '<li class="empty">No scheduled deliveries or pickups yet.</li>';
           updateCustomerDatalist([]);
           renderTotalsBySku([]);
@@ -549,11 +574,15 @@
         updateCustomerDatalist(deliveries);
         renderTotalsBySku(deliveries);
       } catch (e) {
+        currentDeliveries = [];
         recordsList.innerHTML = '<li class="empty">Could not load records. Check console.</li>';
         totalsBySkuList.innerHTML = '<p class="empty">—</p>';
         console.error('fetchLog error', e);
       }
     }
+
+    form.customer.addEventListener('input', defaultTypeFromCustomer);
+    form.customer.addEventListener('change', defaultTypeFromCustomer);
 
     function startEdit(deliveryId, deliveries) {
       const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
