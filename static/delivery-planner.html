@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Planner | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --mustard: #e8cf82;
+      --devils-red: #da172a;
+      --bg: #f8f6f2;
+      --card: #fff;
+      --text: #101820;
+      --muted: #505050;
+      --border: #e0ddd8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: 'Manrope', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+      color: var(--text);
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0 0 16px;
+      color: var(--text);
+    }
+    .form-grid {
+      display: grid;
+      gap: 16px;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--devils-red);
+      box-shadow: 0 0 0 2px rgba(218, 23, 42, 0.15);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 520px) {
+      .row { grid-template-columns: 1fr; }
+    }
+    .btn {
+      padding: 12px 24px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--devils-red);
+      color: #fff;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover {
+      background: #ba000a;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #records-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    #records-list li {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      display: grid;
+      gap: 4px;
+    }
+    #records-list li:last-child { border-bottom: none; }
+    #records-list li .meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    #records-list li .sku { font-weight: 600; color: var(--devils-red); }
+    #records-list .empty {
+      padding: 32px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .type-badge.delivery { background: #e8f4ea; color: #1b5e20; }
+    .type-badge.pickup { background: #e3f2fd; color: #0d47a1; }
+    .error {
+      color: var(--devils-red);
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+    .line-items-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .line-items-head label { margin-bottom: 0; }
+    .line-item-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 40px;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+    .line-item-row .remove-row {
+      padding: 10px;
+      min-width: 40px;
+      background: var(--border);
+      color: var(--muted);
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+    .line-item-row .remove-row:hover {
+      background: var(--devils-red);
+      color: #fff;
+    }
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover { background: #ccc; }
+    #line-items-container { margin-top: 8px; }
+    .line-items-empty { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+    #records-list li .line-items { margin-top: 4px; }
+    #records-list li .line-item { font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Delivery Planner</h1>
+    <p class="sub">Schedule deliveries and pickups. Select a customer, then add SKU rows with quantities.</p>
+
+    <div class="card">
+      <h2>Schedule a delivery or pickup</h2>
+      <form id="delivery-form" class="form-grid">
+        <div>
+          <label for="customer">Customer</label>
+          <input type="text" id="customer" name="customer" required placeholder="Customer name or location" autocomplete="off">
+        </div>
+        <div class="row">
+          <div>
+            <label for="date">Date</label>
+            <input type="date" id="date" name="date" required>
+          </div>
+          <div>
+            <label for="type">Type</label>
+            <select id="type" name="type" required>
+              <option value="">Select…</option>
+              <option value="delivery">Delivery</option>
+              <option value="pickup">Pickup</option>
+            </select>
+          </div>
+        </div>
+        <div class="line-items-head">
+          <label>Line items (SKU + quantity)</label>
+          <button type="button" class="btn btn-secondary" id="add-row-btn">+ Add row</button>
+        </div>
+        <div id="line-items-container">
+          <p class="line-items-empty" id="line-items-empty">Add at least one SKU and quantity.</p>
+        </div>
+        <div id="form-error" class="error" role="alert" hidden></div>
+        <div>
+          <button type="submit" class="btn" id="submit-btn">Schedule</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Scheduled deliveries & pickups</h2>
+      <ul id="records-list">
+        <li class="empty">Loading…</li>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../scripts/sheet-logger.js';
+
+    const LOG_PATH = '/dangpretz/delivery-planner';
+    const form = document.getElementById('delivery-form');
+    const recordsList = document.getElementById('records-list');
+    const lineItemsContainer = document.getElementById('line-items-container');
+    const lineItemsEmpty = document.getElementById('line-items-empty');
+    const addRowBtn = document.getElementById('add-row-btn');
+    const formError = document.getElementById('form-error');
+    const submitBtn = document.getElementById('submit-btn');
+
+    let skus = [];
+
+    async function loadSkus() {
+      const res = await fetch('skus.json');
+      skus = await res.json();
+    }
+
+    function buildSkuSelect() {
+      const select = document.createElement('select');
+      select.name = 'sku';
+      select.setAttribute('data-line-sku', '');
+      select.innerHTML = '<option value="">Select SKU…</option>';
+      skus.forEach((sku) => {
+        const opt = document.createElement('option');
+        opt.value = sku;
+        opt.textContent = sku;
+        select.appendChild(opt);
+      });
+      return select;
+    }
+
+    function addLineRow() {
+      lineItemsEmpty.hidden = true;
+      const row = document.createElement('div');
+      row.className = 'line-item-row';
+      row.innerHTML = '';
+      const skuSelect = buildSkuSelect();
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'number';
+      qtyInput.name = 'quantity';
+      qtyInput.min = '1';
+      qtyInput.placeholder = 'Qty';
+      qtyInput.setAttribute('data-line-qty', '');
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn remove-row';
+      removeBtn.setAttribute('aria-label', 'Remove row');
+      removeBtn.textContent = '−';
+      removeBtn.addEventListener('click', () => {
+        row.remove();
+        if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false;
+      });
+      row.append(skuSelect, qtyInput, removeBtn);
+      lineItemsContainer.insertBefore(row, lineItemsEmpty);
+    }
+
+    function showError(msg) {
+      formError.textContent = msg || '';
+      formError.hidden = !msg;
+    }
+
+    async function loadRecords() {
+      try {
+        const logs = await fetchLog(LOG_PATH);
+        if (!Array.isArray(logs) || logs.length === 0) {
+          recordsList.innerHTML = '<li class="empty">No scheduled deliveries or pickups yet.</li>';
+          return;
+        }
+        recordsList.innerHTML = logs.map((row) => {
+          const type = (row.type || 'delivery').toLowerCase();
+          const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
+          const date = row.date || '—';
+          const customer = row.customer || row.location || '—';
+          let lineItemsHtml = '';
+          if (row.lineItems) {
+            try {
+              const items = JSON.parse(row.lineItems);
+              if (Array.isArray(items) && items.length) {
+                lineItemsHtml = '<div class="line-items">' + items.map((it) =>
+                  `<span class="line-item">${escapeHtml(it.sku || '—')} × ${escapeHtml(String(it.quantity || 0))}</span>`
+                ).join(', ') + '</div>';
+              }
+            } catch (_) { /* ignore */ }
+          }
+          if (!lineItemsHtml && (row.sku || row.volume)) {
+            lineItemsHtml = `<div class="line-items"><span class="line-item">${escapeHtml(row.sku || '—')} × ${escapeHtml(String(row.volume || '—'))}</span></div>`;
+          }
+          if (!lineItemsHtml) lineItemsHtml = '<div class="line-items"><span class="line-item">—</span></div>';
+          return `
+            <li>
+              <span class="type-badge ${type}">${typeLabel}</span>
+              <strong>${escapeHtml(customer)}</strong>
+              <span class="meta">${escapeHtml(date)}</span>
+              ${lineItemsHtml}
+            </li>
+          `;
+        }).join('');
+      } catch (e) {
+        recordsList.innerHTML = '<li class="empty">Could not load records. Check console.</li>';
+        console.error('fetchLog error', e);
+      }
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    addRowBtn.addEventListener('click', addLineRow);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError('');
+      const customer = form.customer.value.trim();
+      const date = form.date.value.trim();
+      const type = form.type.value;
+      const rows = lineItemsContainer.querySelectorAll('.line-item-row');
+      const lineItems = [];
+      rows.forEach((row) => {
+        const sku = row.querySelector('[data-line-sku]').value;
+        const qty = row.querySelector('[data-line-qty]').value.trim();
+        if (sku && qty && Number(qty) > 0) lineItems.push({ sku, quantity: Number(qty) });
+      });
+
+      if (!customer || !date || !type) {
+        showError('Please fill in customer, date, and type.');
+        return;
+      }
+      if (lineItems.length === 0) {
+        showError('Add at least one line item (SKU + quantity).');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      try {
+        await appendLog(LOG_PATH, {
+          customer,
+          date,
+          type,
+          lineItems: JSON.stringify(lineItems),
+          timeStamp: new Date().toISOString(),
+        });
+        form.reset();
+        document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+        lineItemsEmpty.hidden = false;
+        lineItemsContainer.querySelectorAll('.line-item-row').forEach((r) => r.remove());
+        await loadRecords();
+      } catch (err) {
+        showError('Failed to save. Try again.');
+        console.error('appendLog error', err);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    const today = new Date();
+    document.getElementById('date').value = today.toISOString().slice(0, 10);
+
+    (async () => {
+      await loadSkus();
+      loadRecords();
+    })();
+  </script>
+</body>
+</html>
