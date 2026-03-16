@@ -130,11 +130,44 @@
       font-size: 0.85rem;
     }
     #records-list li .sku { font-weight: 600; color: var(--devils-red); }
-    #records-list .empty {
+    #records-list .empty,
+    #totals-by-sku .empty {
       padding: 32px;
       text-align: center;
       color: var(--muted);
     }
+    #totals-by-sku {
+      margin: 0;
+      padding: 0;
+    }
+    .totals-date-group {
+      margin-bottom: 20px;
+    }
+    .totals-date-group:last-child { margin-bottom: 0; }
+    .totals-date {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--border);
+    }
+    .totals-date-sku-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .totals-date-sku-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+    .totals-date-sku-list li:last-child { border-bottom: none; }
+    .totals-date-sku-list .sku-name { font-weight: 600; color: var(--text); }
+    .totals-date-sku-list .sku-qty { font-weight: 700; color: var(--devils-red); }
     .type-badge {
       display: inline-block;
       padding: 2px 8px;
@@ -185,6 +218,37 @@
     .line-items-empty { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
     #records-list li .line-items { margin-top: 4px; }
     #records-list li .line-item { font-size: 0.9rem; }
+    .record-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .record-actions .btn-icon {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+    }
+    .record-actions .btn-edit { background: var(--muted); }
+    .record-actions .btn-edit:hover { background: #333; }
+    .record-actions .btn-delete { background: #c62828; }
+    .record-actions .btn-delete:hover { background: #b71c1c; }
+    .record-content { flex: 1; }
+    #records-list li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    #records-list li .record-content { min-width: 0; }
+    .form-edit-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .form-edit-bar .cancel-edit {
+      background: var(--border);
+      color: var(--text);
+    }
+    .form-edit-bar .cancel-edit:hover { background: #ccc; }
   </style>
 </head>
 <body>
@@ -221,9 +285,11 @@
           <p class="line-items-empty" id="line-items-empty">Add at least one SKU and quantity.</p>
         </div>
         <div id="form-error" class="error" role="alert" hidden></div>
-        <div>
+        <div class="form-edit-bar">
           <button type="submit" class="btn" id="submit-btn">Schedule</button>
+          <button type="button" class="btn cancel-edit" id="cancel-edit-btn" hidden>Cancel edit</button>
         </div>
+        <input type="hidden" id="delivery-id" name="deliveryId" value="">
       </form>
     </div>
 
@@ -233,6 +299,13 @@
         <li class="empty">Loading…</li>
       </ul>
     </div>
+
+    <div class="card">
+      <h2>Totals by date</h2>
+      <div id="totals-by-sku">
+        <p class="empty">No data yet.</p>
+      </div>
+    </div>
   </div>
 
   <script type="module">
@@ -241,13 +314,42 @@
     const LOG_PATH = '/dangpretz/delivery-planner';
     const form = document.getElementById('delivery-form');
     const recordsList = document.getElementById('records-list');
+    const totalsBySkuList = document.getElementById('totals-by-sku');
     const lineItemsContainer = document.getElementById('line-items-container');
     const lineItemsEmpty = document.getElementById('line-items-empty');
     const addRowBtn = document.getElementById('add-row-btn');
     const formError = document.getElementById('form-error');
     const submitBtn = document.getElementById('submit-btn');
+    const deliveryIdInput = document.getElementById('delivery-id');
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
 
     let skus = [];
+
+    function generateDeliveryId() {
+      return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `del-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    /** From raw log rows, resolve current deliveries (apply updates and deletes). */
+    function resolveDeliveriesFromLogs(logs) {
+      const byId = {};
+      if (!Array.isArray(logs)) return [];
+      logs.forEach((row, idx) => {
+        const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
+        if (row.action === 'delete') {
+          delete byId[id];
+          return;
+        }
+        if (row.action === 'update') {
+          byId[id] = { ...row, deliveryId: id };
+          return;
+        }
+        byId[id] = { ...row, deliveryId: id };
+      });
+      return Object.values(byId).sort((a, b) => {
+        const d = (a.date || '').localeCompare(b.date || '');
+        return d !== 0 ? d : (a.timeStamp || '').localeCompare(b.timeStamp || '');
+      });
+    }
 
     async function loadSkus() {
       const res = await fetch('skus.json');
@@ -298,46 +400,189 @@
       formError.hidden = !msg;
     }
 
+    /** Returns { dateStr: { sku: totalQty } } for each day. */
+    function totalsByDateFromDeliveries(deliveries) {
+      const byDate = {};
+      if (!Array.isArray(deliveries)) return byDate;
+      deliveries.forEach((row) => {
+        const dateStr = row.date && String(row.date).trim() || '—';
+        const totals = byDate[dateStr] || (byDate[dateStr] = {});
+        if (row.lineItems) {
+          try {
+            const items = JSON.parse(row.lineItems);
+            if (Array.isArray(items)) {
+              items.forEach((it) => {
+                const sku = it.sku && String(it.sku).trim();
+                const qty = Number(it.quantity) || 0;
+                if (sku && qty > 0) totals[sku] = (totals[sku] || 0) + qty;
+              });
+            }
+          } catch (_) { /* ignore */ }
+        } else if (row.sku && (row.volume != null)) {
+          const sku = String(row.sku).trim();
+          const qty = Number(row.volume) || 0;
+          if (sku && qty > 0) totals[sku] = (totals[sku] || 0) + qty;
+        }
+      });
+      return byDate;
+    }
+
+    function formatDateLabel(dateStr) {
+      if (!dateStr || dateStr === '—') return dateStr;
+      try {
+        const d = new Date(dateStr + 'T12:00:00');
+        if (!Number.isNaN(d.getTime())) return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+      } catch (_) {}
+      return dateStr;
+    }
+
+    function renderTotalsBySku(deliveries) {
+      const byDate = totalsByDateFromDeliveries(deliveries);
+      const dates = Object.keys(byDate).sort();
+      if (dates.length === 0) {
+        totalsBySkuList.innerHTML = '<p class="empty">No data yet.</p>';
+        return;
+      }
+      totalsBySkuList.innerHTML = dates.map((dateStr) => {
+        const totals = byDate[dateStr];
+        const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
+        const rows = entries.map(([sku, qty]) =>
+          `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`
+        ).join('');
+        return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatDateLabel(dateStr))}</h3><ul class="totals-date-sku-list">${rows}</ul></div>`;
+      }).join('');
+    }
+
+    function renderOneDelivery(row) {
+      const type = (row.type || 'delivery').toLowerCase();
+      const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
+      const date = row.date || '—';
+      const customer = row.customer || row.location || '—';
+      let lineItemsHtml = '';
+      if (row.lineItems) {
+        try {
+          const items = JSON.parse(row.lineItems);
+          if (Array.isArray(items) && items.length) {
+            lineItemsHtml = '<div class="line-items">' + items.map((it) =>
+              `<span class="line-item">${escapeHtml(it.sku || '—')} × ${escapeHtml(String(it.quantity || 0))}</span>`
+            ).join(', ') + '</div>';
+          }
+        } catch (_) { /* ignore */ }
+      }
+      if (!lineItemsHtml && (row.sku || row.volume)) {
+        lineItemsHtml = `<div class="line-items"><span class="line-item">${escapeHtml(row.sku || '—')} × ${escapeHtml(String(row.volume || '—'))}</span></div>`;
+      }
+      if (!lineItemsHtml) lineItemsHtml = '<div class="line-items"><span class="line-item">—</span></div>';
+      const id = escapeHtml(row.deliveryId || '');
+      return `
+        <li data-delivery-id="${id}">
+          <div class="record-content">
+            <span class="type-badge ${type}">${typeLabel}</span>
+            <strong>${escapeHtml(customer)}</strong>
+            <span class="meta">${escapeHtml(date)}</span>
+            ${lineItemsHtml}
+            <div class="record-actions">
+              <button type="button" class="btn btn-icon btn-edit" data-action="edit" data-delivery-id="${id}">Edit</button>
+              <button type="button" class="btn btn-icon btn-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
+            </div>
+          </div>
+        </li>
+      `;
+    }
+
     async function loadRecords() {
       try {
         const logs = await fetchLog(LOG_PATH);
-        if (!Array.isArray(logs) || logs.length === 0) {
+        const deliveries = resolveDeliveriesFromLogs(logs);
+        if (deliveries.length === 0) {
           recordsList.innerHTML = '<li class="empty">No scheduled deliveries or pickups yet.</li>';
+          renderTotalsBySku([]);
           return;
         }
-        recordsList.innerHTML = logs.map((row) => {
-          const type = (row.type || 'delivery').toLowerCase();
-          const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
-          const date = row.date || '—';
-          const customer = row.customer || row.location || '—';
-          let lineItemsHtml = '';
-          if (row.lineItems) {
-            try {
-              const items = JSON.parse(row.lineItems);
-              if (Array.isArray(items) && items.length) {
-                lineItemsHtml = '<div class="line-items">' + items.map((it) =>
-                  `<span class="line-item">${escapeHtml(it.sku || '—')} × ${escapeHtml(String(it.quantity || 0))}</span>`
-                ).join(', ') + '</div>';
-              }
-            } catch (_) { /* ignore */ }
-          }
-          if (!lineItemsHtml && (row.sku || row.volume)) {
-            lineItemsHtml = `<div class="line-items"><span class="line-item">${escapeHtml(row.sku || '—')} × ${escapeHtml(String(row.volume || '—'))}</span></div>`;
-          }
-          if (!lineItemsHtml) lineItemsHtml = '<div class="line-items"><span class="line-item">—</span></div>';
-          return `
-            <li>
-              <span class="type-badge ${type}">${typeLabel}</span>
-              <strong>${escapeHtml(customer)}</strong>
-              <span class="meta">${escapeHtml(date)}</span>
-              ${lineItemsHtml}
-            </li>
-          `;
-        }).join('');
+        recordsList.innerHTML = deliveries.map((row) => renderOneDelivery(row)).join('');
+        recordsList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+          btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId, deliveries));
+        });
+        recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
+          btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
+        });
+        renderTotalsBySku(deliveries);
       } catch (e) {
         recordsList.innerHTML = '<li class="empty">Could not load records. Check console.</li>';
+        totalsBySkuList.innerHTML = '<p class="empty">—</p>';
         console.error('fetchLog error', e);
       }
+    }
+
+    function startEdit(deliveryId, deliveries) {
+      const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
+      const row = map[deliveryId];
+      if (!row) return;
+      form.customer.value = row.customer || row.location || '';
+      form.date.value = row.date || '';
+      form.type.value = (row.type || 'delivery').toLowerCase();
+      lineItemsEmpty.hidden = true;
+      lineItemsContainer.querySelectorAll('.line-item-row').forEach((r) => r.remove());
+      let items = [];
+      if (row.lineItems) {
+        try {
+          items = JSON.parse(row.lineItems);
+          if (!Array.isArray(items)) items = [];
+        } catch (_) {}
+      } else if (row.sku && (row.volume != null)) {
+        items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }];
+      }
+      items.forEach((it) => {
+        const lineRow = document.createElement('div');
+        lineRow.className = 'line-item-row';
+        const skuSelect = buildSkuSelect();
+        skuSelect.value = it.sku || '';
+        const qtyInput = document.createElement('input');
+        qtyInput.type = 'number';
+        qtyInput.name = 'quantity';
+        qtyInput.min = '1';
+        qtyInput.value = it.quantity || 0;
+        qtyInput.setAttribute('data-line-qty', '');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn remove-row';
+        removeBtn.setAttribute('aria-label', 'Remove row');
+        removeBtn.textContent = '−';
+        removeBtn.addEventListener('click', () => {
+          lineRow.remove();
+          if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false;
+        });
+        lineRow.append(skuSelect, qtyInput, removeBtn);
+        lineItemsContainer.insertBefore(lineRow, lineItemsEmpty);
+      });
+      deliveryIdInput.value = deliveryId;
+      submitBtn.textContent = 'Update delivery';
+      cancelEditBtn.hidden = false;
+      showError('');
+    }
+
+    function clearEditState() {
+      deliveryIdInput.value = '';
+      submitBtn.textContent = 'Schedule';
+      cancelEditBtn.hidden = true;
+      form.reset();
+      document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+      lineItemsEmpty.hidden = false;
+      lineItemsContainer.querySelectorAll('.line-item-row').forEach((r) => r.remove());
+    }
+
+    function confirmDelete(deliveryId) {
+      if (!deliveryId) return;
+      if (!window.confirm('Delete this delivery?')) return;
+      (async () => {
+        try {
+          await appendLog(LOG_PATH, { action: 'delete', deliveryId, timeStamp: new Date().toISOString() });
+          await loadRecords();
+        } catch (err) {
+          showError('Failed to delete.');
+          console.error(err);
+        }
+      })();
     }
 
     function escapeHtml(s) {
@@ -372,18 +617,31 @@
       }
 
       submitBtn.disabled = true;
+      const editingId = deliveryIdInput.value.trim();
+      const timeStamp = new Date().toISOString();
       try {
-        await appendLog(LOG_PATH, {
-          customer,
-          date,
-          type,
-          lineItems: JSON.stringify(lineItems),
-          timeStamp: new Date().toISOString(),
-        });
-        form.reset();
-        document.getElementById('date').value = new Date().toISOString().slice(0, 10);
-        lineItemsEmpty.hidden = false;
-        lineItemsContainer.querySelectorAll('.line-item-row').forEach((r) => r.remove());
+        if (editingId) {
+          await appendLog(LOG_PATH, {
+            action: 'update',
+            deliveryId: editingId,
+            customer,
+            date,
+            type,
+            lineItems: JSON.stringify(lineItems),
+            timeStamp,
+          });
+        } else {
+          await appendLog(LOG_PATH, {
+            action: 'create',
+            deliveryId: generateDeliveryId(),
+            customer,
+            date,
+            type,
+            lineItems: JSON.stringify(lineItems),
+            timeStamp,
+          });
+        }
+        clearEditState();
         await loadRecords();
       } catch (err) {
         showError('Failed to save. Try again.');
@@ -391,6 +649,11 @@
       } finally {
         submitBtn.disabled = false;
       }
+    });
+
+    cancelEditBtn.addEventListener('click', () => {
+      clearEditState();
+      showError('');
     });
 
     const today = new Date();
