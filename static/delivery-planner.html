@@ -261,7 +261,8 @@
       <form id="delivery-form" class="form-grid">
         <div>
           <label for="customer">Customer</label>
-          <input type="text" id="customer" name="customer" required placeholder="Customer name or location" autocomplete="off">
+          <input type="text" id="customer" name="customer" required placeholder="Customer name or location" list="customer-list" autocomplete="off">
+          <datalist id="customer-list"></datalist>
         </div>
         <div class="row">
           <div>
@@ -356,6 +357,9 @@
       skus = await res.json();
     }
 
+    const QUANTITY_OPTIONS = [];
+    for (let n = 12; n <= 1200; n += 12) QUANTITY_OPTIONS.push(n);
+
     function buildSkuSelect() {
       const select = document.createElement('select');
       select.name = 'sku';
@@ -370,18 +374,36 @@
       return select;
     }
 
+    function buildQuantitySelect(initialValue) {
+      const select = document.createElement('select');
+      select.name = 'quantity';
+      select.setAttribute('data-line-qty', '');
+      select.innerHTML = '<option value="">Qty</option>';
+      const valueNum = Number(initialValue) || 0;
+      const hasCustom = valueNum > 0 && !QUANTITY_OPTIONS.includes(valueNum);
+      if (hasCustom) {
+        const opt = document.createElement('option');
+        opt.value = String(valueNum);
+        opt.textContent = valueNum;
+        select.appendChild(opt);
+      }
+      QUANTITY_OPTIONS.forEach((n) => {
+        const opt = document.createElement('option');
+        opt.value = String(n);
+        opt.textContent = n;
+        select.appendChild(opt);
+      });
+      if (valueNum > 0) select.value = String(valueNum);
+      return select;
+    }
+
     function addLineRow() {
       lineItemsEmpty.hidden = true;
       const row = document.createElement('div');
       row.className = 'line-item-row';
       row.innerHTML = '';
       const skuSelect = buildSkuSelect();
-      const qtyInput = document.createElement('input');
-      qtyInput.type = 'number';
-      qtyInput.name = 'quantity';
-      qtyInput.min = '1';
-      qtyInput.placeholder = 'Qty';
-      qtyInput.setAttribute('data-line-qty', '');
+      const qtySelect = buildQuantitySelect('');
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'btn remove-row';
@@ -391,8 +413,25 @@
         row.remove();
         if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false;
       });
-      row.append(skuSelect, qtyInput, removeBtn);
+      row.append(skuSelect, qtySelect, removeBtn);
       lineItemsContainer.insertBefore(row, lineItemsEmpty);
+    }
+
+    function updateCustomerDatalist(deliveries) {
+      const list = document.getElementById('customer-list');
+      list.innerHTML = '';
+      const names = new Set();
+      if (Array.isArray(deliveries)) {
+        deliveries.forEach((row) => {
+          const name = (row.customer || row.location || '').trim();
+          if (name) names.add(name);
+        });
+      }
+      [...names].sort().forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        list.appendChild(opt);
+      });
     }
 
     function showError(msg) {
@@ -496,6 +535,7 @@
         const deliveries = resolveDeliveriesFromLogs(logs);
         if (deliveries.length === 0) {
           recordsList.innerHTML = '<li class="empty">No scheduled deliveries or pickups yet.</li>';
+          updateCustomerDatalist([]);
           renderTotalsBySku([]);
           return;
         }
@@ -506,6 +546,7 @@
         recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
           btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
         });
+        updateCustomerDatalist(deliveries);
         renderTotalsBySku(deliveries);
       } catch (e) {
         recordsList.innerHTML = '<li class="empty">Could not load records. Check console.</li>';
@@ -537,12 +578,7 @@
         lineRow.className = 'line-item-row';
         const skuSelect = buildSkuSelect();
         skuSelect.value = it.sku || '';
-        const qtyInput = document.createElement('input');
-        qtyInput.type = 'number';
-        qtyInput.name = 'quantity';
-        qtyInput.min = '1';
-        qtyInput.value = it.quantity || 0;
-        qtyInput.setAttribute('data-line-qty', '');
+        const qtySelect = buildQuantitySelect(it.quantity || 0);
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'btn remove-row';
@@ -552,7 +588,7 @@
           lineRow.remove();
           if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false;
         });
-        lineRow.append(skuSelect, qtyInput, removeBtn);
+        lineRow.append(skuSelect, qtySelect, removeBtn);
         lineItemsContainer.insertBefore(lineRow, lineItemsEmpty);
       });
       deliveryIdInput.value = deliveryId;
