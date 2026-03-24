@@ -386,6 +386,426 @@
       letter-spacing: 1px;
       margin: 0 0 12px;
     }
+
+    /* ── Phase 1: Week grid view ── */
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .day-column {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 10px 8px;
+      min-height: 180px;
+    }
+    .day-column.today {
+      background: #333;
+      border-top: 3px solid #C41E1E;
+    }
+    .day-column-header {
+      text-align: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #444;
+    }
+    .day-column-header .day-name {
+      font: 700 11px 'Manrope', sans-serif;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .day-column-header .day-date {
+      display: block;
+      font: 700 20px 'Paytone One', sans-serif;
+      color: #fff;
+    }
+    .day-column-header .delivery-count {
+      display: block;
+      font: 400 11px 'Manrope', sans-serif;
+      color: #666;
+      margin-top: 2px;
+    }
+    .delivery-card {
+      background: #1A1A1A;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 6px;
+      border-left: 3px solid #444;
+      position: relative;
+    }
+    .delivery-card.status-scheduled { border-left-color: #666; }
+    .delivery-card.status-ready_deliver,
+    .delivery-card.status-ready_pickup {
+      border-left-color: #C41E1E;
+      background: rgba(196, 30, 30, 0.1);
+    }
+    .delivery-card.status-delivered,
+    .delivery-card.status-picked_up {
+      opacity: 0.5;
+      border-left-color: #4a4;
+    }
+    .delivery-card .card-customer {
+      font: 700 13px 'Manrope', sans-serif;
+      color: #fff;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .delivery-card .card-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 4px 0;
+    }
+    .delivery-card .item-pill {
+      font: 400 10px 'Manrope', sans-serif;
+      background: #333;
+      color: #ccc;
+      padding: 2px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .delivery-card .card-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .delivery-card .status-select {
+      flex-shrink: 0;
+      padding: 3px 4px;
+      font: 400 10px 'Manrope', sans-serif;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 3px;
+      width: auto;
+      max-width: 120px;
+    }
+    .delivery-card .status-select:focus { outline: none; border-color: #C41E1E; }
+    .delivery-card .card-confirmed {
+      font: 400 10px 'Manrope', sans-serif;
+      color: #4a4;
+      margin-top: 4px;
+    }
+    .delivery-card .recurrence-icon {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      vertical-align: middle;
+      margin-left: 4px;
+      opacity: 0.6;
+    }
+
+    /* Overflow menu */
+    .overflow-wrap { position: relative; }
+    .overflow-btn {
+      background: none;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font: 700 16px 'Manrope', sans-serif;
+      padding: 2px 6px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .overflow-btn:hover { background: #333; color: #fff; }
+    .overflow-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      z-index: 100;
+      min-width: 140px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    .overflow-menu.open { display: block; }
+    .overflow-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      font: 400 13px 'Manrope', sans-serif;
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+    }
+    .overflow-menu button:hover { background: #444; color: #fff; }
+    .overflow-menu button.menu-delete { color: #f88; }
+    .overflow-menu button.menu-delete:hover { background: #8B0000; color: #fff; }
+    .overflow-menu button.menu-confirm { color: #C41E1E; font-weight: 700; }
+
+    @media (max-width: 768px) {
+      .week-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .day-column { min-height: auto; }
+      .day-column:empty, .day-column.day-empty { display: none; }
+      .day-column-header { text-align: left; padding-left: 4px; }
+      .delivery-card { padding: 12px; }
+      .delivery-card .card-customer { font-size: 14px; }
+      .delivery-card .item-pill { font-size: 11px; }
+      .delivery-card .status-select { max-width: 150px; font-size: 11px; }
+    }
+
+    /* ── Phase 2: Confirmation modal ── */
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 10000;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .confirm-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .confirm-modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 95%;
+      max-width: 480px;
+      margin: 20px auto;
+      padding: 28px 24px;
+    }
+    .confirm-modal h2 {
+      font: 700 22px 'Paytone One', sans-serif;
+      color: #1A1A1A;
+      margin: 0 0 4px;
+    }
+    .confirm-modal .confirm-sub {
+      font: 400 14px 'Manrope', sans-serif;
+      color: #666;
+      margin: 0 0 20px;
+    }
+    .confirm-modal .confirm-order-summary {
+      background: #F5F0E8;
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 20px;
+    }
+    .confirm-modal .confirm-order-summary strong {
+      display: block;
+      font: 700 15px 'Manrope', sans-serif;
+      color: #1A1A1A;
+      margin-bottom: 6px;
+    }
+    .confirm-modal .confirm-order-summary .summary-items {
+      font: 400 13px 'Manrope', sans-serif;
+      color: #555;
+    }
+    .confirm-modal label {
+      font: 700 12px 'Manrope', sans-serif;
+      color: #555;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .confirm-modal input {
+      width: 100%;
+      padding: 12px;
+      font: 400 15px 'Manrope', sans-serif;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+    .confirm-modal input:focus {
+      outline: none;
+      border-color: #C41E1E;
+      box-shadow: 0 0 0 2px rgba(196, 30, 30, 0.15);
+    }
+    .sig-section { margin-bottom: 16px; }
+    .sig-section .sig-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .sig-section .sig-label-row label { margin-bottom: 0; }
+    .sig-section .sig-clear-btn {
+      font: 600 12px 'Manrope', sans-serif;
+      color: #C41E1E;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 8px;
+    }
+    .sig-canvas-wrap {
+      border: 2px dashed #ddd;
+      border-radius: 6px;
+      position: relative;
+      background: #fafafa;
+    }
+    .sig-canvas-wrap canvas {
+      display: block;
+      width: 100%;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    .sig-canvas-wrap .sig-placeholder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font: 400 14px 'Manrope', sans-serif;
+      color: #bbb;
+      pointer-events: none;
+    }
+    .sig-toggle-link {
+      font: 600 13px 'Manrope', sans-serif;
+      color: #C41E1E;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .note-section { display: none; margin-bottom: 16px; }
+    .note-section.active { display: block; }
+    .confirm-modal .confirm-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .confirm-modal .confirm-actions .btn { flex: 1; text-align: center; }
+    .confirm-modal .confirm-error {
+      color: #C41E1E;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+    .confirm-modal .confirm-saving {
+      text-align: center;
+      color: #666;
+      font: 400 14px 'Manrope', sans-serif;
+      padding: 20px;
+    }
+
+    /* ── Phase 3: Template picker & management ── */
+    .template-picker-wrap { position: relative; display: inline-block; }
+    .template-picker-btn {
+      font: 600 13px 'Manrope', sans-serif;
+      color: #C41E1E;
+      background: #fff;
+      border: 1px solid #C41E1E;
+      border-radius: 4px;
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+    .template-picker-btn:hover { background: #fef5f5; }
+    .template-dropdown {
+      display: none;
+      position: absolute;
+      left: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 50;
+      min-width: 260px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .template-dropdown.open { display: block; }
+    .template-dropdown .tpl-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      font: 400 14px 'Manrope', sans-serif;
+      color: #1A1A1A;
+      background: none;
+      border: none;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .template-dropdown .tpl-item:last-child { border-bottom: none; }
+    .template-dropdown .tpl-item:hover { background: #F5F0E8; }
+    .template-dropdown .tpl-item .tpl-name { font-weight: 700; display: block; }
+    .template-dropdown .tpl-item .tpl-summary { font-size: 12px; color: #888; }
+    .template-dropdown .tpl-empty { padding: 16px; text-align: center; color: #999; font-size: 13px; }
+
+    .save-template-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .save-template-row input[type="checkbox"] { width: auto; }
+    .save-template-row label { margin-bottom: 0; font-size: 13px; color: #666; }
+
+    /* Templates & Recurring management section */
+    .mgmt-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 16px;
+      border-bottom: 2px solid #ddd;
+    }
+    .mgmt-tab {
+      padding: 10px 20px;
+      font: 700 14px 'Manrope', sans-serif;
+      color: #999;
+      background: none;
+      border: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .mgmt-tab:hover { color: #1A1A1A; }
+    .mgmt-tab.active { color: #C41E1E; border-bottom-color: #C41E1E; }
+    .mgmt-panel { display: none; }
+    .mgmt-panel.active { display: block; }
+    .tpl-list, .rec-list { list-style: none; margin: 0; padding: 0; }
+    .tpl-list li, .rec-list li {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .tpl-list li:last-child, .rec-list li:last-child { border-bottom: none; }
+    .tpl-info, .rec-info { flex: 1; min-width: 0; }
+    .tpl-info .tpl-name, .rec-info .rec-customer { font: 700 14px 'Manrope', sans-serif; color: #1A1A1A; }
+    .tpl-info .tpl-items-summary, .rec-info .rec-detail { font: 400 12px 'Manrope', sans-serif; color: #888; margin-top: 2px; }
+    .tpl-actions, .rec-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .tpl-actions button, .rec-actions button {
+      padding: 5px 10px;
+      font: 700 11px 'Manrope', sans-serif;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .mgmt-empty { text-align: center; color: #999; padding: 24px; font: 400 14px 'Manrope', sans-serif; }
+
+    /* ── Phase 4: Recurring form fields ── */
+    .recurring-fields {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background: #F5F0E8;
+      border-radius: 6px;
+    }
+    .recurring-fields.active { display: block; }
+    .recurring-check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .recurring-check-row input[type="checkbox"] { width: auto; }
+    .recurring-check-row label { margin-bottom: 0; font-size: 13px; color: #555; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -407,7 +827,12 @@
     <div class="max-1100">
       <div class="card" id="form-card">
         <div class="card-header" id="form-toggle">
-          <h2>Schedule a delivery or pickup</h2>
+          <h2>Schedule a delivery or pickup
+            <span class="template-picker-wrap">
+              <button type="button" class="template-picker-btn" id="template-picker-btn">Load template</button>
+              <div class="template-dropdown" id="template-dropdown"></div>
+            </span>
+          </h2>
           <span class="toggle-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </span>
@@ -440,6 +865,41 @@
         <div id="line-items-container">
           <p class="line-items-empty" id="line-items-empty">Add at least one SKU and quantity.</p>
         </div>
+        <div class="recurring-check-row">
+          <input type="checkbox" id="recurring-check">
+          <label for="recurring-check">Make recurring</label>
+        </div>
+        <div class="recurring-fields" id="recurring-fields">
+          <div class="row">
+            <div>
+              <label for="frequency">Frequency</label>
+              <select id="frequency" name="frequency">
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+              </select>
+            </div>
+            <div>
+              <label for="day-of-week">Day of week</label>
+              <select id="day-of-week" name="dayOfWeek">
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+                <option value="0">Sunday</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label for="recurrence-end">End date (optional)</label>
+            <input type="date" id="recurrence-end" name="recurrenceEnd">
+          </div>
+        </div>
+        <div class="save-template-row">
+          <input type="checkbox" id="save-template-check">
+          <label for="save-template-check">Save as template for this customer</label>
+        </div>
         <div id="form-error" class="error" role="alert" hidden></div>
         <div class="form-edit-bar">
           <button type="submit" class="btn btn-red" id="submit-btn">Schedule</button>
@@ -467,9 +927,9 @@
         </button>
         <button class="week-nav-today" id="week-today">Today</button>
       </div>
-      <ul id="records-list">
-        <li class="empty">Loading…</li>
-      </ul>
+      <div class="week-grid" id="week-grid">
+        <div class="week-empty">Loading...</div>
+      </div>
     </div>
   </section>
   <section class="section-cream">
@@ -480,13 +940,72 @@
       </div>
     </div>
   </section>
+  <!-- Templates & Recurring management -->
+  <section class="section-cream" style="border-top: 1px solid #ddd;">
+    <div class="max-1100">
+      <div class="card" id="mgmt-card">
+        <div class="card-header" id="mgmt-toggle">
+          <h2>Templates &amp; Recurring Orders</h2>
+          <span class="toggle-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="card-body" id="mgmt-body">
+          <div class="mgmt-tabs">
+            <button class="mgmt-tab active" data-tab="templates">Templates</button>
+            <button class="mgmt-tab" data-tab="recurring">Recurring</button>
+          </div>
+          <div class="mgmt-panel active" id="panel-templates">
+            <ul class="tpl-list" id="tpl-list">
+              <li class="mgmt-empty">No templates saved yet.</li>
+            </ul>
+          </div>
+          <div class="mgmt-panel" id="panel-recurring">
+            <ul class="rec-list" id="rec-list">
+              <li class="mgmt-empty">No recurring orders set up yet.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Delivery confirmation modal -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-modal" id="confirm-modal">
+      <h2>Confirm Delivery</h2>
+      <p class="confirm-sub">Capture proof of delivery below.</p>
+      <div class="confirm-order-summary" id="confirm-summary"></div>
+      <label for="confirm-receiver">Received by</label>
+      <input type="text" id="confirm-receiver" placeholder="Name of person receiving" autocomplete="off">
+      <div class="sig-section" id="sig-section">
+        <div class="sig-label-row">
+          <label>Signature</label>
+          <button type="button" class="sig-clear-btn" id="sig-clear">Clear</button>
+        </div>
+        <div class="sig-canvas-wrap">
+          <canvas id="sig-canvas" height="150"></canvas>
+          <span class="sig-placeholder" id="sig-placeholder">Sign here</span>
+        </div>
+      </div>
+      <button type="button" class="sig-toggle-link" id="sig-toggle">Add a note instead</button>
+      <div class="note-section" id="note-section">
+        <label for="confirm-note">Delivery note</label>
+        <textarea id="confirm-note" placeholder="Describe the delivery (e.g. left at front door)"></textarea>
+      </div>
+      <div id="confirm-error" class="confirm-error" hidden></div>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-red" id="confirm-submit">Confirm Delivery</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import { fetchLog, appendLog } from '../scripts/sheet-logger.js';
 
     const LOG_PATH = '/dangpretz/delivery-planner';
     const form = document.getElementById('delivery-form');
-    const recordsList = document.getElementById('records-list');
+    const weekGrid = document.getElementById('week-grid');
     const totalsBySkuList = document.getElementById('totals-by-sku');
     const lineItemsContainer = document.getElementById('line-items-container');
     const lineItemsEmpty = document.getElementById('line-items-empty');
@@ -589,6 +1108,19 @@
         const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
         if (row.action === 'delete') {
           delete byId[id];
+          return;
+        }
+        if (row.action === 'confirm') {
+          if (byId[id]) {
+            byId[id].confirmation = {
+              confirmedBy: row.confirmedBy || '',
+              signatureData: row.signatureData || '',
+              confirmNote: row.confirmNote || '',
+              confirmTimestamp: row.confirmTimestamp || row.timeStamp || '',
+            };
+            const t = (byId[id].type || 'delivery').toLowerCase();
+            byId[id].status = t === 'pickup' ? 'picked_up' : 'delivered';
+          }
           return;
         }
         if (row.action === 'status') {
@@ -839,53 +1371,55 @@
       totalsBySkuList.innerHTML = weeklyHtml + dailyHtml;
     }
 
-    function renderOneDelivery(row) {
+    function renderDeliveryCard(row) {
       const type = (row.type || 'delivery').toLowerCase();
       const typeKey = type === 'pickup' ? 'pickup' : 'delivery';
       const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
-      const dateLabel = formatScheduleDateLabel(row.date || '—');
       const customer = row.customer || row.location || '—';
       const status = row.status || 'scheduled';
+      const id = escapeHtml(row.deliveryId || '');
       const statusOpts = STATUS_OPTIONS[typeKey] || STATUS_OPTIONS.delivery;
       const statusOptionsHtml = statusOpts.map((o) =>
         `<option value="${escapeHtml(o.value)}"${o.value === status ? ' selected' : ''}>${escapeHtml(o.label)}</option>`
       ).join('');
-      let lineItemsHtml = '';
+      let pillsHtml = '';
+      let items = [];
       if (row.lineItems) {
-        try {
-          const items = JSON.parse(row.lineItems);
-          if (Array.isArray(items) && items.length) {
-            lineItemsHtml = '<div class="line-items">' + items.map((it) =>
-              `<span class="line-item">${escapeHtml(it.sku || '—')} × ${escapeHtml(String(it.quantity || 0))}</span>`
-            ).join(', ') + '</div>';
-          }
-        } catch (_) { /* ignore */ }
+        try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) { items = []; }
+      } else if (row.sku && row.volume != null) {
+        items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }];
       }
-      if (!lineItemsHtml && (row.sku || row.volume)) {
-        lineItemsHtml = `<div class="line-items"><span class="line-item">${escapeHtml(row.sku || '—')} × ${escapeHtml(String(row.volume || '—'))}</span></div>`;
+      if (items.length) {
+        pillsHtml = '<div class="card-items">' + items.map((it) =>
+          `<span class="item-pill">${escapeHtml(it.sku || '—')} ×${escapeHtml(String(it.quantity || 0))}</span>`
+        ).join('') + '</div>';
       }
-      if (!lineItemsHtml) lineItemsHtml = '<div class="line-items"><span class="line-item">—</span></div>';
-      const id = escapeHtml(row.deliveryId || '');
+      const showConfirm = status === 'ready_deliver' || status === 'ready_pickup';
+      const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
+      const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
       return `
-        <li data-delivery-id="${id}" class="status-${escapeHtml(status)}">
-          <div class="record-content">
-            <div class="record-main">
-              <span class="type-badge ${type}">${typeLabel}</span>
-              <strong>${escapeHtml(customer)}</strong>
-              <span class="meta">${escapeHtml(dateLabel)}</span>
-              ${lineItemsHtml}
-              <div class="record-actions">
-                <button type="button" class="btn btn-icon btn-edit" data-action="edit" data-delivery-id="${id}">Edit</button>
-                <button type="button" class="btn btn-icon btn-duplicate" data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
-                <button type="button" class="btn btn-icon btn-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
+        <div class="delivery-card status-${escapeHtml(status)}" data-delivery-id="${id}">
+          <div class="card-customer">
+            <span><span class="type-badge ${type}">${typeLabel}</span> ${escapeHtml(customer)}${recurrenceHtml}</span>
+            <div class="overflow-wrap">
+              <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
+              <div class="overflow-menu">
+                ${showConfirm ? `<button class="menu-confirm" data-action="confirm" data-delivery-id="${id}">Confirm delivery</button>` : ''}
+                <button data-action="edit" data-delivery-id="${id}">Edit</button>
+                <button data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
+                <button data-action="save-template" data-delivery-id="${id}">Save as template</button>
+                <button class="menu-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
               </div>
             </div>
-            <select class="status-select" data-delivery-id="${id}" data-action="status" aria-label="Delivery status">
+          </div>
+          ${pillsHtml}
+          <div class="card-status-row">
+            <select class="status-select" data-delivery-id="${id}" data-action="status" aria-label="Status">
               ${statusOptionsHtml}
             </select>
           </div>
-        </li>
-      `;
+          ${confirmedHtml}
+        </div>`;
     }
 
     function getLastTypeForCustomer(customerName) {
@@ -910,49 +1444,73 @@
       if (type) form.type.value = type;
     }
 
-    /** Filter deliveries to the currently selected week and render. */
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    /** Render week as a 7-column grid (Mon–Sun). */
     function renderScheduleForWeek() {
-      const { start, end } = getWeekRange(weekOffset);
-      const startStr = toDateStr(start);
-      const endStr = toDateStr(end);
-
-      const weekDeliveries = currentDeliveries.filter((row) => {
-        const d = (row.date || '').trim();
-        return d >= startStr && d <= endStr;
-      });
-
-      if (weekDeliveries.length === 0) {
-        recordsList.innerHTML = '<li class="week-empty">No deliveries or pickups this week.</li>';
-        return;
-      }
-
+      const { start } = getWeekRange(weekOffset);
+      const todayStr = toDateStr(new Date());
       const byDate = {};
-      weekDeliveries.forEach((row) => {
-        const dateStr = (row.date && String(row.date).trim()) || '—';
-        if (!byDate[dateStr]) byDate[dateStr] = [];
-        byDate[dateStr].push(row);
+      currentDeliveries.forEach((row) => {
+        const d = (row.date || '').trim();
+        if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(row); }
       });
-      const sortedDates = Object.keys(byDate).sort();
-      recordsList.innerHTML = sortedDates.map((dateStr) => {
-        const dateLabel = formatScheduleDateLabel(dateStr);
-        const rows = byDate[dateStr].map((row) => renderOneDelivery(row)).join('');
-        return `<li class="schedule-date-group"><h3 class="schedule-date-heading">${escapeHtml(dateLabel)}</h3><ul class="schedule-date-items">${rows}</ul></li>`;
-      }).join('');
 
-      bindRecordActions();
+      let html = '';
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(start);
+        dayDate.setDate(dayDate.getDate() + i);
+        const dateStr = toDateStr(dayDate);
+        const isToday = dateStr === todayStr;
+        const dayDeliveries = byDate[dateStr] || [];
+        const count = dayDeliveries.length;
+        const countLabel = count === 0 ? 'none' : count === 1 ? '1 order' : `${count} orders`;
+        const emptyClass = count === 0 ? ' day-empty' : '';
+        html += `<div class="day-column${isToday ? ' today' : ''}${emptyClass}">
+          <div class="day-column-header">
+            <span class="day-name">${DAY_NAMES[dayDate.getDay()]}</span>
+            <span class="day-date">${dayDate.getDate()}</span>
+            <span class="delivery-count">${countLabel}</span>
+          </div>
+          ${dayDeliveries.map((row) => renderDeliveryCard(row)).join('')}
+        </div>`;
+      }
+      weekGrid.innerHTML = html;
+      bindGridActions();
     }
 
-    function bindRecordActions() {
-      recordsList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+    function bindGridActions() {
+      // Overflow menu toggles
+      weekGrid.querySelectorAll('[data-overflow-toggle]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = btn.nextElementSibling;
+          // Close all other menus
+          weekGrid.querySelectorAll('.overflow-menu.open').forEach((m) => { if (m !== menu) m.classList.remove('open'); });
+          menu.classList.toggle('open');
+        });
+      });
+      // Close menus on outside click
+      document.addEventListener('click', () => {
+        weekGrid.querySelectorAll('.overflow-menu.open').forEach((m) => m.classList.remove('open'));
+      }, { once: false });
+
+      weekGrid.querySelectorAll('[data-action="edit"]').forEach((btn) => {
         btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId, currentDeliveries));
       });
-      recordsList.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
+      weekGrid.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
         btn.addEventListener('click', () => startDuplicate(btn.dataset.deliveryId, currentDeliveries));
       });
-      recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
+      weekGrid.querySelectorAll('[data-action="delete"]').forEach((btn) => {
         btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
       });
-      recordsList.querySelectorAll('.status-select').forEach((sel) => {
+      weekGrid.querySelectorAll('[data-action="confirm"]').forEach((btn) => {
+        btn.addEventListener('click', () => openConfirmModal(btn.dataset.deliveryId));
+      });
+      weekGrid.querySelectorAll('[data-action="save-template"]').forEach((btn) => {
+        btn.addEventListener('click', () => saveTemplateFromDelivery(btn.dataset.deliveryId));
+      });
+      weekGrid.querySelectorAll('.status-select').forEach((sel) => {
         sel.addEventListener('change', () => updateDeliveryStatus(sel.dataset.deliveryId, sel.value));
       });
     }
@@ -962,19 +1520,12 @@
         const logs = await fetchLog(LOG_PATH);
         const deliveries = resolveDeliveriesFromLogs(logs);
         currentDeliveries = deliveries;
-        if (deliveries.length === 0) {
-          currentDeliveries = [];
-          recordsList.innerHTML = '<li class="week-empty">No scheduled deliveries or pickups yet.</li>';
-          updateCustomerDatalist([]);
-          renderTotalsBySku([]);
-          return;
-        }
         updateCustomerDatalist(deliveries);
         renderTotalsBySku(deliveries);
         renderScheduleForWeek();
       } catch (e) {
         currentDeliveries = [];
-        recordsList.innerHTML = '<li class="empty">Could not load records. Check console.</li>';
+        weekGrid.innerHTML = '<div class="week-empty">Could not load records. Check console.</div>';
         totalsBySkuList.innerHTML = '<p class="empty">—</p>';
         console.error('fetchLog error', e);
       }
@@ -1092,6 +1643,468 @@
 
     addRowBtn.addEventListener('click', addLineRow);
 
+    // ── Phase 2: Signature pad & confirmation modal ──
+    class SignaturePad {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.drawing = false;
+        this.points = [];
+        this.hasStrokes = false;
+        this._resize();
+        canvas.addEventListener('pointerdown', (e) => this._start(e));
+        canvas.addEventListener('pointermove', (e) => this._move(e));
+        canvas.addEventListener('pointerup', () => this._end());
+        canvas.addEventListener('pointerleave', () => this._end());
+        window.addEventListener('resize', () => this._resize());
+      }
+      _resize() {
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        this.canvas.width = rect.width;
+        this.canvas.height = 150;
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        this.ctx.strokeStyle = '#1A1A1A';
+      }
+      _getPos(e) {
+        const r = this.canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+      _start(e) {
+        e.preventDefault();
+        this.drawing = true;
+        this.points = [this._getPos(e)];
+        document.getElementById('sig-placeholder').style.display = 'none';
+      }
+      _move(e) {
+        if (!this.drawing) return;
+        e.preventDefault();
+        const p = this._getPos(e);
+        this.points.push(p);
+        this.hasStrokes = true;
+        this.ctx.beginPath();
+        if (this.points.length > 1) {
+          const prev = this.points[this.points.length - 2];
+          this.ctx.moveTo(prev.x, prev.y);
+          this.ctx.lineTo(p.x, p.y);
+        }
+        this.ctx.stroke();
+      }
+      _end() { this.drawing = false; }
+      clear() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.hasStrokes = false;
+        this.points = [];
+        document.getElementById('sig-placeholder').style.display = '';
+      }
+      isEmpty() { return !this.hasStrokes; }
+      toDataURL() { return this.canvas.toDataURL('image/png'); }
+    }
+
+    let sigPad = null;
+    let confirmDeliveryId = null;
+
+    function openConfirmModal(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      confirmDeliveryId = deliveryId;
+      const summary = document.getElementById('confirm-summary');
+      const customer = row.customer || row.location || '—';
+      let itemsHtml = '';
+      try {
+        const items = JSON.parse(row.lineItems || '[]');
+        itemsHtml = items.map((it) => `${escapeHtml(it.sku)} x${it.quantity}`).join(', ');
+      } catch (_) { itemsHtml = '—'; }
+      summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>`;
+      document.getElementById('confirm-receiver').value = '';
+      document.getElementById('confirm-note').value = '';
+      document.getElementById('confirm-error').hidden = true;
+      document.getElementById('sig-section').style.display = '';
+      document.getElementById('note-section').classList.remove('active');
+      document.getElementById('sig-toggle').textContent = 'Add a note instead';
+      if (!sigPad) sigPad = new SignaturePad(document.getElementById('sig-canvas'));
+      sigPad.clear();
+      document.getElementById('confirm-overlay').classList.add('open');
+    }
+
+    document.getElementById('sig-clear').addEventListener('click', () => { if (sigPad) sigPad.clear(); });
+
+    document.getElementById('sig-toggle').addEventListener('click', () => {
+      const sigSec = document.getElementById('sig-section');
+      const noteSec = document.getElementById('note-section');
+      const toggle = document.getElementById('sig-toggle');
+      if (noteSec.classList.contains('active')) {
+        noteSec.classList.remove('active');
+        sigSec.style.display = '';
+        toggle.textContent = 'Add a note instead';
+      } else {
+        noteSec.classList.add('active');
+        sigSec.style.display = 'none';
+        toggle.textContent = 'Use signature instead';
+      }
+    });
+
+    document.getElementById('confirm-cancel').addEventListener('click', () => {
+      document.getElementById('confirm-overlay').classList.remove('open');
+      confirmDeliveryId = null;
+    });
+
+    document.getElementById('confirm-submit').addEventListener('click', async () => {
+      const errEl = document.getElementById('confirm-error');
+      errEl.hidden = true;
+      const receiver = document.getElementById('confirm-receiver').value.trim();
+      if (!receiver) { errEl.textContent = 'Please enter who received the delivery.'; errEl.hidden = false; return; }
+      const useSignature = document.getElementById('sig-section').style.display !== 'none';
+      const note = document.getElementById('confirm-note').value.trim();
+      if (useSignature && sigPad.isEmpty() && !note) {
+        errEl.textContent = 'Please provide a signature or add a note.'; errEl.hidden = false; return;
+      }
+      if (!useSignature && !note) {
+        errEl.textContent = 'Please add a delivery note.'; errEl.hidden = false; return;
+      }
+      const btn = document.getElementById('confirm-submit');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      const data = {
+        action: 'confirm',
+        deliveryId: confirmDeliveryId,
+        confirmedBy: receiver,
+        signatureData: useSignature && !sigPad.isEmpty() ? sigPad.toDataURL() : '',
+        confirmNote: note,
+        confirmTimestamp: new Date().toISOString(),
+        timeStamp: new Date().toISOString(),
+      };
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await appendLog(LOG_PATH, data);
+          break;
+        } catch (err) {
+          retries--;
+          if (retries === 0) {
+            errEl.textContent = 'Failed to save. Check your connection and try again.';
+            errEl.hidden = false;
+            btn.disabled = false;
+            btn.textContent = 'Confirm Delivery';
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+      btn.disabled = false;
+      btn.textContent = 'Confirm Delivery';
+      document.getElementById('confirm-overlay').classList.remove('open');
+      confirmDeliveryId = null;
+      await loadRecords();
+    });
+
+    // ── Phase 3: Templates ──
+    const TEMPLATE_LOG_PATH = '/dangpretz/delivery-templates';
+    let currentTemplates = [];
+    let currentRecurrences = [];
+
+    function resolveTemplatesFromLogs(logs) {
+      const byId = {};
+      if (!Array.isArray(logs)) return [];
+      logs.forEach((row) => {
+        if (row.action === 'delete_template') { delete byId[row.templateId]; return; }
+        if (row.action === 'create_template' || row.action === 'update_template') {
+          byId[row.templateId] = { ...row };
+        }
+      });
+      return Object.values(byId);
+    }
+
+    function resolveRecurrencesFromLogs(logs) {
+      const byId = {};
+      const generated = {};
+      if (!Array.isArray(logs)) return { recurrences: [], generated };
+      logs.forEach((row) => {
+        if (row.action === 'delete_recurrence') { delete byId[row.recurrenceId]; return; }
+        if (row.action === 'create_recurrence' || row.action === 'update_recurrence') {
+          byId[row.recurrenceId] = { ...row };
+        }
+        if (row.action === 'recurrence_generated') {
+          const key = row.recurrenceId + ':' + row.generatedDate;
+          generated[key] = true;
+        }
+      });
+      return { recurrences: Object.values(byId), generated };
+    }
+
+    async function loadTemplatesAndRecurrences() {
+      try {
+        const logs = await fetchLog(TEMPLATE_LOG_PATH);
+        currentTemplates = resolveTemplatesFromLogs(logs);
+        const recData = resolveRecurrencesFromLogs(logs);
+        currentRecurrences = recData.recurrences;
+        renderTemplateDropdown();
+        renderTemplatesList();
+        renderRecurrencesList();
+        await generateRecurringDeliveries(recData);
+      } catch (e) {
+        console.error('Template log error', e);
+        currentTemplates = [];
+        currentRecurrences = [];
+      }
+    }
+
+    function renderTemplateDropdown() {
+      const dropdown = document.getElementById('template-dropdown');
+      if (currentTemplates.length === 0) {
+        dropdown.innerHTML = '<div class="tpl-empty">No templates yet. Save one from a delivery.</div>';
+        return;
+      }
+      dropdown.innerHTML = currentTemplates.map((t) => {
+        let summary = '';
+        try {
+          const items = JSON.parse(t.lineItems || '[]');
+          summary = items.map((it) => `${it.sku} x${it.quantity}`).join(', ');
+        } catch (_) {}
+        return `<button type="button" class="tpl-item" data-template-id="${escapeHtml(t.templateId)}">
+          <span class="tpl-name">${escapeHtml(t.templateName || t.customer || '—')}</span>
+          <span class="tpl-summary">${escapeHtml(summary)}</span>
+        </button>`;
+      }).join('');
+      dropdown.querySelectorAll('.tpl-item').forEach((btn) => {
+        btn.addEventListener('click', () => loadTemplate(btn.dataset.templateId));
+      });
+    }
+
+    document.getElementById('template-picker-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dd = document.getElementById('template-dropdown');
+      dd.classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      document.getElementById('template-dropdown').classList.remove('open');
+    });
+
+    function loadTemplate(templateId) {
+      const tpl = currentTemplates.find((t) => t.templateId === templateId);
+      if (!tpl) return;
+      expandForm();
+      form.customer.value = tpl.customer || '';
+      form.type.value = (tpl.type || 'delivery').toLowerCase();
+      lineItemsEmpty.hidden = true;
+      lineItemsContainer.querySelectorAll('.line-item-row').forEach((r) => r.remove());
+      let items = [];
+      try { items = JSON.parse(tpl.lineItems || '[]'); } catch (_) {}
+      items.forEach((it) => {
+        const lineRow = document.createElement('div');
+        lineRow.className = 'line-item-row';
+        const skuSelect = buildSkuSelect();
+        skuSelect.value = it.sku || '';
+        const qtySelect = buildQuantitySelect(it.quantity || 0);
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn remove-row';
+        removeBtn.setAttribute('aria-label', 'Remove row');
+        removeBtn.textContent = '−';
+        removeBtn.addEventListener('click', () => { lineRow.remove(); if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false; });
+        lineRow.append(skuSelect, qtySelect, removeBtn);
+        lineItemsContainer.insertBefore(lineRow, lineItemsEmpty);
+      });
+      document.getElementById('template-dropdown').classList.remove('open');
+      deliveryIdInput.value = '';
+      submitBtn.textContent = 'Schedule';
+      cancelEditBtn.hidden = true;
+      showError('');
+    }
+
+    async function saveTemplateFromDelivery(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      try {
+        await appendLog(TEMPLATE_LOG_PATH, {
+          action: 'create_template',
+          templateId: generateDeliveryId(),
+          customer: row.customer || row.location || '',
+          type: row.type || 'delivery',
+          lineItems: row.lineItems || '[]',
+          templateName: row.customer || row.location || 'Template',
+          timeStamp: new Date().toISOString(),
+        });
+        await loadTemplatesAndRecurrences();
+      } catch (err) {
+        console.error('Save template error', err);
+      }
+    }
+
+    function renderTemplatesList() {
+      const list = document.getElementById('tpl-list');
+      if (currentTemplates.length === 0) {
+        list.innerHTML = '<li class="mgmt-empty">No templates saved yet.</li>';
+        return;
+      }
+      list.innerHTML = currentTemplates.map((t) => {
+        let summary = '';
+        try {
+          const items = JSON.parse(t.lineItems || '[]');
+          summary = items.map((it) => `${it.sku} x${it.quantity}`).join(', ');
+        } catch (_) {}
+        return `<li>
+          <div class="tpl-info">
+            <div class="tpl-name">${escapeHtml(t.templateName || t.customer || '—')}</div>
+            <div class="tpl-items-summary">${escapeHtml(summary)}</div>
+          </div>
+          <div class="tpl-actions">
+            <button style="background:#C41E1E;color:#fff" data-tpl-use="${escapeHtml(t.templateId)}">Use</button>
+            <button style="background:#8B0000;color:#fff" data-tpl-delete="${escapeHtml(t.templateId)}">Delete</button>
+          </div>
+        </li>`;
+      }).join('');
+      list.querySelectorAll('[data-tpl-use]').forEach((btn) => {
+        btn.addEventListener('click', () => { loadTemplate(btn.dataset.tplUse); formCard.scrollIntoView({ behavior: 'smooth' }); });
+      });
+      list.querySelectorAll('[data-tpl-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!window.confirm('Delete this template?')) return;
+          await appendLog(TEMPLATE_LOG_PATH, { action: 'delete_template', templateId: btn.dataset.tplDelete, timeStamp: new Date().toISOString() });
+          await loadTemplatesAndRecurrences();
+        });
+      });
+    }
+
+    // Management section tabs
+    document.querySelectorAll('.mgmt-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.mgmt-tab').forEach((t) => t.classList.remove('active'));
+        document.querySelectorAll('.mgmt-panel').forEach((p) => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Collapsible management section
+    const mgmtToggle = document.getElementById('mgmt-toggle');
+    const mgmtBody = document.getElementById('mgmt-body');
+    const mgmtCard = document.getElementById('mgmt-card');
+    mgmtToggle.addEventListener('click', () => {
+      const isOpen = mgmtBody.classList.toggle('expanded');
+      mgmtCard.classList.toggle('open', isOpen);
+    });
+
+    // Save as template on form submit
+    const origSubmitHandler = form.onsubmit;
+
+    // ── Phase 4: Recurring deliveries ──
+    const recurringCheck = document.getElementById('recurring-check');
+    const recurringFields = document.getElementById('recurring-fields');
+    recurringCheck.addEventListener('change', () => {
+      recurringFields.classList.toggle('active', recurringCheck.checked);
+    });
+
+    // Auto-set day of week from date field
+    document.getElementById('date').addEventListener('change', () => {
+      if (recurringCheck.checked) {
+        const d = new Date(document.getElementById('date').value + 'T12:00:00');
+        if (!Number.isNaN(d.getTime())) {
+          document.getElementById('day-of-week').value = String(d.getDay());
+        }
+      }
+    });
+
+    async function generateRecurringDeliveries(recData) {
+      const { recurrences, generated } = recData;
+      if (!recurrences.length) return;
+      const horizon = new Date();
+      horizon.setDate(horizon.getDate() + 28);
+      const horizonStr = toDateStr(horizon);
+      const todayStr = toDateStr(new Date());
+      let didGenerate = false;
+
+      for (const rec of recurrences) {
+        const freq = rec.frequency === 'biweekly' ? 14 : 7;
+        const startDate = rec.startDate || todayStr;
+        const endDate = rec.endDate || null;
+        const dayOfWeek = Number(rec.dayOfWeek);
+        // Find the first occurrence on or after startDate
+        let cursor = new Date(startDate + 'T12:00:00');
+        // Align to the correct day of week
+        while (cursor.getDay() !== dayOfWeek) cursor.setDate(cursor.getDate() + 1);
+
+        while (toDateStr(cursor) <= horizonStr) {
+          const dateStr = toDateStr(cursor);
+          if (endDate && dateStr > endDate) break;
+          if (dateStr >= todayStr) {
+            const genKey = rec.recurrenceId + ':' + dateStr;
+            if (!generated[genKey]) {
+              const newId = generateDeliveryId();
+              try {
+                await appendLog(LOG_PATH, {
+                  action: 'create',
+                  deliveryId: newId,
+                  customer: rec.customer || '',
+                  date: dateStr,
+                  type: rec.type || 'delivery',
+                  lineItems: rec.lineItems || '[]',
+                  status: 'scheduled',
+                  recurrenceId: rec.recurrenceId,
+                  timeStamp: new Date().toISOString(),
+                });
+                await appendLog(TEMPLATE_LOG_PATH, {
+                  action: 'recurrence_generated',
+                  recurrenceId: rec.recurrenceId,
+                  generatedDate: dateStr,
+                  deliveryId: newId,
+                  timeStamp: new Date().toISOString(),
+                });
+                generated[genKey] = true;
+                didGenerate = true;
+              } catch (err) {
+                console.error('Recurrence generation error', err);
+              }
+            }
+          }
+          cursor.setDate(cursor.getDate() + freq);
+        }
+      }
+      if (didGenerate) {
+        // Reload deliveries to show newly generated ones
+        const logs = await fetchLog(LOG_PATH);
+        currentDeliveries = resolveDeliveriesFromLogs(logs);
+        renderScheduleForWeek();
+        renderTotalsBySku(currentDeliveries);
+      }
+    }
+
+    function renderRecurrencesList() {
+      const list = document.getElementById('rec-list');
+      if (currentRecurrences.length === 0) {
+        list.innerHTML = '<li class="mgmt-empty">No recurring orders set up yet.</li>';
+        return;
+      }
+      const freqLabel = { weekly: 'Weekly', biweekly: 'Every 2 weeks' };
+      list.innerHTML = currentRecurrences.map((rec) => {
+        const day = DAY_NAMES[Number(rec.dayOfWeek)] || '?';
+        let summary = '';
+        try {
+          const items = JSON.parse(rec.lineItems || '[]');
+          summary = items.map((it) => `${it.sku} x${it.quantity}`).join(', ');
+        } catch (_) {}
+        return `<li>
+          <div class="rec-info">
+            <div class="rec-customer">${escapeHtml(rec.customer || '—')}</div>
+            <div class="rec-detail">${escapeHtml(freqLabel[rec.frequency] || rec.frequency)} on ${escapeHtml(day)}${rec.endDate ? ' until ' + escapeHtml(rec.endDate) : ''}</div>
+            <div class="rec-detail">${escapeHtml(summary)}</div>
+          </div>
+          <div class="rec-actions">
+            <button style="background:#8B0000;color:#fff" data-rec-delete="${escapeHtml(rec.recurrenceId)}">Delete</button>
+          </div>
+        </li>`;
+      }).join('');
+      list.querySelectorAll('[data-rec-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!window.confirm('Delete this recurring order?')) return;
+          await appendLog(TEMPLATE_LOG_PATH, { action: 'delete_recurrence', recurrenceId: btn.dataset.recDelete, timeStamp: new Date().toISOString() });
+          await loadTemplatesAndRecurrences();
+        });
+      });
+    }
+
+    // ── Enhanced form submit (templates + recurrences) ──
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       showError('');
@@ -1118,35 +2131,49 @@
       submitBtn.disabled = true;
       const editingId = deliveryIdInput.value.trim();
       const timeStamp = new Date().toISOString();
+      const lineItemsJson = JSON.stringify(lineItems);
       try {
         if (editingId) {
           await appendLog(LOG_PATH, {
-            action: 'update',
-            deliveryId: editingId,
-            customer,
-            date,
-            type,
-            lineItems: JSON.stringify(lineItems),
-            status: 'scheduled',
-            timeStamp,
+            action: 'update', deliveryId: editingId, customer, date, type,
+            lineItems: lineItemsJson, status: 'scheduled', timeStamp,
           });
         } else {
           await appendLog(LOG_PATH, {
-            action: 'create',
-            deliveryId: generateDeliveryId(),
-            customer,
-            date,
-            type,
-            lineItems: JSON.stringify(lineItems),
-            status: 'scheduled',
+            action: 'create', deliveryId: generateDeliveryId(), customer, date, type,
+            lineItems: lineItemsJson, status: 'scheduled', timeStamp,
+          });
+        }
+        // Save as template if checked
+        if (document.getElementById('save-template-check').checked && !editingId) {
+          await appendLog(TEMPLATE_LOG_PATH, {
+            action: 'create_template',
+            templateId: generateDeliveryId(),
+            customer, type, lineItems: lineItemsJson,
+            templateName: customer, timeStamp,
+          });
+        }
+        // Create recurrence if checked
+        if (recurringCheck.checked && !editingId) {
+          await appendLog(TEMPLATE_LOG_PATH, {
+            action: 'create_recurrence',
+            recurrenceId: generateDeliveryId(),
+            customer, type, lineItems: lineItemsJson,
+            frequency: document.getElementById('frequency').value,
+            dayOfWeek: document.getElementById('day-of-week').value,
+            startDate: date,
+            endDate: document.getElementById('recurrence-end').value || '',
             timeStamp,
           });
         }
         clearEditState();
-        // Collapse form after successful submission
+        recurringCheck.checked = false;
+        recurringFields.classList.remove('active');
+        document.getElementById('save-template-check').checked = false;
         formBody.classList.remove('expanded');
         formCard.classList.remove('open');
         await loadRecords();
+        await loadTemplatesAndRecurrences();
       } catch (err) {
         showError('Failed to save. Try again.');
         console.error('appendLog error', err);
@@ -1165,7 +2192,8 @@
 
     (async () => {
       await loadSkus();
-      loadRecords();
+      await loadRecords();
+      await loadTemplatesAndRecurrences();
     })();
   </script>
 </body>
