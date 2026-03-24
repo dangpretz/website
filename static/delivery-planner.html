@@ -72,6 +72,57 @@
       margin-bottom: 24px;
     }
     .section-cream .card { box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+
+    /* ── Collapsible form ── */
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .card-header h2 {
+      font: 700 20px 'Paytone One', sans-serif;
+      color: #1A1A1A;
+      margin: 0;
+    }
+    .toggle-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #F5F0E8;
+      border: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.3s;
+      flex-shrink: 0;
+    }
+    .toggle-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: #1A1A1A;
+      transition: transform 0.3s;
+    }
+    .card-header:hover .toggle-icon { background: #e8e0d5; }
+    .card-body {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin 0.3s ease;
+      margin-top: 0;
+    }
+    .card-body.expanded {
+      max-height: 2000px;
+      opacity: 1;
+      margin-top: 20px;
+    }
+    .card-body.expanded ~ .card-header .toggle-icon svg,
+    .card.open .toggle-icon svg {
+      transform: rotate(180deg);
+    }
+
     .card h2 {
       font: 700 20px 'Paytone One', sans-serif;
       color: #1A1A1A;
@@ -145,6 +196,60 @@
     #line-items-container { margin-top: 8px; }
     .line-items-empty { color: #666; font-size: 0.9rem; margin-bottom: 12px; }
     .error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
+
+    /* ── Week navigator ── */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .week-nav-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+    .week-nav-btn:hover { background: #C41E1E; border-color: #C41E1E; }
+    .week-nav-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+    .week-nav-label {
+      font: 700 16px 'Manrope', sans-serif;
+      color: #fff;
+      text-align: center;
+      min-width: 220px;
+    }
+    .week-nav-label .week-dates {
+      display: block;
+      font: 400 12px 'Manrope', sans-serif;
+      color: #999;
+      margin-top: 2px;
+    }
+    .week-nav-today {
+      font: 600 12px 'Manrope', sans-serif;
+      color: #999;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .week-nav-today:hover { background: #444; color: #fff; border-color: #555; }
+    .week-empty {
+      text-align: center;
+      color: #666;
+      padding: 40px 20px;
+      font: 400 15px 'Manrope', sans-serif;
+    }
 
     #records-list { list-style: none; margin: 0; padding: 0; }
     #records-list > li:not(.schedule-date-group) {
@@ -300,8 +405,14 @@
   </section>
   <section class="section-cream">
     <div class="max-1100">
-      <div class="card">
-        <h2>Schedule a delivery or pickup</h2>
+      <div class="card" id="form-card">
+        <div class="card-header" id="form-toggle">
+          <h2>Schedule a delivery or pickup</h2>
+          <span class="toggle-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="card-body" id="form-body">
       <form id="delivery-form" class="form-grid">
         <div>
           <label for="customer">Customer</label>
@@ -336,12 +447,26 @@
         </div>
         <input type="hidden" id="delivery-id" name="deliveryId" value="">
       </form>
+        </div>
       </div>
     </div>
   </section>
   <section class="section-dark">
     <div class="max-1100">
       <h2>SCHEDULED DELIVERIES &amp; PICKUPS</h2>
+      <div class="week-nav" id="week-nav">
+        <button class="week-nav-btn" id="week-prev" aria-label="Previous week">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="week-nav-label" id="week-label">
+          This Week
+          <span class="week-dates" id="week-dates"></span>
+        </div>
+        <button class="week-nav-btn" id="week-next" aria-label="Next week">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+        </button>
+        <button class="week-nav-today" id="week-today">Today</button>
+      </div>
       <ul id="records-list">
         <li class="empty">Loading…</li>
       </ul>
@@ -373,6 +498,71 @@
 
     let skus = [];
     let currentDeliveries = [];
+
+    // ── Collapsible form ──
+    const formToggle = document.getElementById('form-toggle');
+    const formBody = document.getElementById('form-body');
+    const formCard = document.getElementById('form-card');
+
+    formToggle.addEventListener('click', () => {
+      const isOpen = formBody.classList.toggle('expanded');
+      formCard.classList.toggle('open', isOpen);
+    });
+
+    function expandForm() {
+      formBody.classList.add('expanded');
+      formCard.classList.add('open');
+    }
+
+    // ── Week navigation ──
+    let weekOffset = 0; // 0 = current week
+
+    function getMonday(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = (day + 6) % 7;
+      date.setDate(date.getDate() - diff);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+
+    function getWeekRange(offset) {
+      const now = new Date();
+      const monday = getMonday(now);
+      monday.setDate(monday.getDate() + offset * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      return { start: monday, end: sunday };
+    }
+
+    function formatShortDate(d) {
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    function toDateStr(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function updateWeekLabel() {
+      const weekLabel = document.getElementById('week-label');
+      const weekDates = document.getElementById('week-dates');
+      const { start, end } = getWeekRange(weekOffset);
+      let title;
+      if (weekOffset === 0) title = 'This Week';
+      else if (weekOffset === -1) title = 'Last Week';
+      else if (weekOffset === 1) title = 'Next Week';
+      else {
+        title = 'Week of ' + formatShortDate(start);
+      }
+      weekLabel.childNodes[0].textContent = title + ' ';
+      weekDates.textContent = formatShortDate(start) + ' – ' + formatShortDate(end);
+    }
+
+    document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; updateWeekLabel(); renderScheduleForWeek(); });
+    document.getElementById('week-next').addEventListener('click', () => { weekOffset++; updateWeekLabel(); renderScheduleForWeek(); });
+    document.getElementById('week-today').addEventListener('click', () => { weekOffset = 0; updateWeekLabel(); renderScheduleForWeek(); });
+
+    updateWeekLabel();
 
     function generateDeliveryId() {
       return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `del-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -720,6 +910,53 @@
       if (type) form.type.value = type;
     }
 
+    /** Filter deliveries to the currently selected week and render. */
+    function renderScheduleForWeek() {
+      const { start, end } = getWeekRange(weekOffset);
+      const startStr = toDateStr(start);
+      const endStr = toDateStr(end);
+
+      const weekDeliveries = currentDeliveries.filter((row) => {
+        const d = (row.date || '').trim();
+        return d >= startStr && d <= endStr;
+      });
+
+      if (weekDeliveries.length === 0) {
+        recordsList.innerHTML = '<li class="week-empty">No deliveries or pickups this week.</li>';
+        return;
+      }
+
+      const byDate = {};
+      weekDeliveries.forEach((row) => {
+        const dateStr = (row.date && String(row.date).trim()) || '—';
+        if (!byDate[dateStr]) byDate[dateStr] = [];
+        byDate[dateStr].push(row);
+      });
+      const sortedDates = Object.keys(byDate).sort();
+      recordsList.innerHTML = sortedDates.map((dateStr) => {
+        const dateLabel = formatScheduleDateLabel(dateStr);
+        const rows = byDate[dateStr].map((row) => renderOneDelivery(row)).join('');
+        return `<li class="schedule-date-group"><h3 class="schedule-date-heading">${escapeHtml(dateLabel)}</h3><ul class="schedule-date-items">${rows}</ul></li>`;
+      }).join('');
+
+      bindRecordActions();
+    }
+
+    function bindRecordActions() {
+      recordsList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+        btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId, currentDeliveries));
+      });
+      recordsList.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
+        btn.addEventListener('click', () => startDuplicate(btn.dataset.deliveryId, currentDeliveries));
+      });
+      recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
+        btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
+      });
+      recordsList.querySelectorAll('.status-select').forEach((sel) => {
+        sel.addEventListener('change', () => updateDeliveryStatus(sel.dataset.deliveryId, sel.value));
+      });
+    }
+
     async function loadRecords() {
       try {
         const logs = await fetchLog(LOG_PATH);
@@ -727,37 +964,14 @@
         currentDeliveries = deliveries;
         if (deliveries.length === 0) {
           currentDeliveries = [];
-          recordsList.innerHTML = '<li class="empty">No scheduled deliveries or pickups yet.</li>';
+          recordsList.innerHTML = '<li class="week-empty">No scheduled deliveries or pickups yet.</li>';
           updateCustomerDatalist([]);
           renderTotalsBySku([]);
           return;
         }
-        const byDate = {};
-        deliveries.forEach((row) => {
-          const dateStr = (row.date && String(row.date).trim()) || '—';
-          if (!byDate[dateStr]) byDate[dateStr] = [];
-          byDate[dateStr].push(row);
-        });
-        const sortedDates = Object.keys(byDate).sort();
-        recordsList.innerHTML = sortedDates.map((dateStr) => {
-          const dateLabel = formatScheduleDateLabel(dateStr);
-          const rows = byDate[dateStr].map((row) => renderOneDelivery(row)).join('');
-          return `<li class="schedule-date-group"><h3 class="schedule-date-heading">${escapeHtml(dateLabel)}</h3><ul class="schedule-date-items">${rows}</ul></li>`;
-        }).join('');
-        recordsList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
-          btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId, deliveries));
-        });
-        recordsList.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
-          btn.addEventListener('click', () => startDuplicate(btn.dataset.deliveryId, deliveries));
-        });
-        recordsList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
-          btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
-        });
-        recordsList.querySelectorAll('.status-select').forEach((sel) => {
-          sel.addEventListener('change', () => updateDeliveryStatus(sel.dataset.deliveryId, sel.value));
-        });
         updateCustomerDatalist(deliveries);
         renderTotalsBySku(deliveries);
+        renderScheduleForWeek();
       } catch (e) {
         currentDeliveries = [];
         recordsList.innerHTML = '<li class="empty">Could not load records. Check console.</li>';
@@ -808,22 +1022,26 @@
       const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
       const row = map[deliveryId];
       if (!row) return;
+      expandForm();
       fillFormFromDelivery(row);
       deliveryIdInput.value = deliveryId;
       submitBtn.textContent = 'Update delivery';
       cancelEditBtn.hidden = false;
       showError('');
+      formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function startDuplicate(deliveryId, deliveries) {
       const map = Object.fromEntries((deliveries || []).map((d) => [d.deliveryId, d]));
       const row = map[deliveryId];
       if (!row) return;
+      expandForm();
       fillFormFromDelivery(row);
       deliveryIdInput.value = '';
       submitBtn.textContent = 'Schedule';
       cancelEditBtn.hidden = true;
       showError('');
+      formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function clearEditState() {
@@ -925,6 +1143,9 @@
           });
         }
         clearEditState();
+        // Collapse form after successful submission
+        formBody.classList.remove('expanded');
+        formCard.classList.remove('open');
         await loadRecords();
       } catch (err) {
         showError('Failed to save. Try again.');
