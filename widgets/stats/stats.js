@@ -63,7 +63,7 @@ export default async function decorate(widget) {
     if (slug === 'stats') return;
     const u = new URL(window.location);
     u.searchParams.set('range', slug);
-    history.pushState({}, '', u.pathname + u.search);
+    window.history.pushState({}, '', u.pathname + u.search);
   };
 
   const applyRangeFromParam = (param) => {
@@ -126,8 +126,9 @@ export default async function decorate(widget) {
   const renderChart = (timeSeries, allPretzels, maxTotal) => {
     const chartEl = widget.querySelector('.stats-chart');
     chartEl.innerHTML = '';
-    widget.querySelector('.stats-legend').innerHTML = allPretzels.map((pretzel, index) =>
-      `<span class="stats-legend-item stats-color-${index + 1}">${pretzel}</span>`).join('');
+    widget.querySelector('.stats-legend').innerHTML = allPretzels
+      .map((pretzel, index) => `<span class="stats-legend-item stats-color-${index + 1}">${pretzel}</span>`)
+      .join('');
 
     Object.entries(timeSeries).forEach(([, data]) => {
       const humanDate = data.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -204,8 +205,8 @@ export default async function decorate(widget) {
     const exportBtn = widget.querySelector('.stats-export');
 
     try {
-      for (let i = 0; i < dates.length; i += 1) {
-        const date = dates[i];
+      await dates.reduce(async (previousPromise, date, i) => {
+        await previousPromise;
         const formattedDate = formatDate(date);
         statusEl.textContent = `Loading ${i + 1} of ${totalDays}…`;
         let statsData;
@@ -226,7 +227,7 @@ export default async function decorate(widget) {
           periodSlug: getPeriodSlug(),
         };
         exportBtn.disabled = false;
-      }
+      }, Promise.resolve());
     } finally {
       statusEl.textContent = '';
     }

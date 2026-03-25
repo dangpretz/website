@@ -6,6 +6,45 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+async function sendOrderAlert({
+  customer,
+  fulfillment,
+  itemSummary,
+  orderId,
+}) {
+  const formData = new FormData();
+  formData.append('_subject', `New Catering Order — ${customer.name}`);
+  formData.append('Customer', customer.name);
+  formData.append('Email', customer.email);
+  formData.append('Phone', customer.phone);
+  formData.append('Items', itemSummary);
+  formData.append('Fulfillment', fulfillment.type.toUpperCase());
+  formData.append('Date/Time', `${fulfillment.date} at ${fulfillment.time}`);
+  if (fulfillment.type === 'delivery' && fulfillment.address) {
+    formData.append('Delivery Address', fulfillment.address);
+  }
+  if (customer.notes) {
+    formData.append('Notes', customer.notes);
+  }
+  formData.append('Order ID', orderId);
+  formData.append('_template', 'table');
+
+  await fetch('https://formsubmit.co/ajax/info@dangerouspretzel.com', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -29,7 +68,7 @@ export default {
       }
 
       // Build order line items from catalog variation IDs
-      const lineItems = items.map(item => ({
+      const lineItems = items.map((item) => ({
         catalog_object_id: item.variationId,
         quantity: String(item.quantity),
       }));
@@ -57,9 +96,14 @@ export default {
 
       // Normalize phone to E.164 format for Square
       const phoneDigits = customer.phone.replace(/\D/g, '');
-      const e164Phone = phoneDigits.length === 10 ? `+1${phoneDigits}` :
-                         phoneDigits.length === 11 && phoneDigits.startsWith('1') ? `+${phoneDigits}` :
-                         `+${phoneDigits}`;
+      let e164Phone;
+      if (phoneDigits.length === 10) {
+        e164Phone = `+1${phoneDigits}`;
+      } else if (phoneDigits.length === 11 && phoneDigits.startsWith('1')) {
+        e164Phone = `+${phoneDigits}`;
+      } else {
+        e164Phone = `+${phoneDigits}`;
+      }
 
       // Create Square Payment Link
       const idempotencyKey = crypto.randomUUID();
@@ -91,7 +135,7 @@ export default {
         method: 'POST',
         headers: {
           'Square-Version': '2025-01-23',
-          'Authorization': `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+          Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(paymentLinkBody),
@@ -100,6 +144,7 @@ export default {
       const sqData = await sqRes.json();
 
       if (!sqRes.ok) {
+        // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Square API error:', JSON.stringify(sqData));
         return json({ error: 'Failed to create checkout', details: sqData.errors }, 500);
       }
@@ -109,57 +154,25 @@ export default {
       const orderId = typeof rawOrder === 'string' ? rawOrder : rawOrder?.id || null;
 
       // Send email alert to the team (fire-and-forget)
-      const itemSummary = items.map(i => `${i.name || i.variationId} x${i.quantity}`).join(', ');
+      const itemSummary = items.map((i) => `${i.name || i.variationId} x${i.quantity}`).join(', ');
       sendOrderAlert({
         customer,
         fulfillment,
         itemSummary,
-        checkoutUrl: sqData.payment_link.url,
         orderId: orderId || 'N/A',
-      }).catch(err => console.error('Email alert failed:', err));
+      }).catch((err) => {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('Email alert failed:', err);
+      });
 
       return json({
         checkout_url: sqData.payment_link.url,
         order_id: orderId,
       });
-
     } catch (err) {
+      // eslint-disable-next-line no-console -- worker diagnostics
       console.error('Worker error:', err);
       return json({ error: 'Internal server error' }, 500);
     }
   },
 };
-
-async function sendOrderAlert({ customer, fulfillment, itemSummary, checkoutUrl, orderId }) {
-  const formData = new FormData();
-  formData.append('_subject', `New Catering Order — ${customer.name}`);
-  formData.append('Customer', customer.name);
-  formData.append('Email', customer.email);
-  formData.append('Phone', customer.phone);
-  formData.append('Items', itemSummary);
-  formData.append('Fulfillment', fulfillment.type.toUpperCase());
-  formData.append('Date/Time', `${fulfillment.date} at ${fulfillment.time}`);
-  if (fulfillment.type === 'delivery' && fulfillment.address) {
-    formData.append('Delivery Address', fulfillment.address);
-  }
-  if (customer.notes) {
-    formData.append('Notes', customer.notes);
-  }
-  formData.append('Order ID', orderId);
-  formData.append('_template', 'table');
-
-  await fetch('https://formsubmit.co/ajax/info@dangerouspretzel.com', {
-    method: 'POST',
-    body: formData,
-  });
-}
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...CORS_HEADERS,
-    },
-  });
-}
