@@ -56,7 +56,7 @@ function formatShortDate(d) {
 }
 
 function toDateStr(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function updateWeekLabel() {
@@ -68,10 +68,10 @@ function updateWeekLabel() {
   else if (weekOffset === -1) title = 'Last Week';
   else if (weekOffset === 1) title = 'Next Week';
   else {
-    title = 'Week of ' + formatShortDate(start);
+    title = `Week of ${formatShortDate(start)}`;
   }
-  weekLabel.childNodes[0].textContent = title + ' ';
-  weekDates.textContent = formatShortDate(start) + ' – ' + formatShortDate(end);
+  weekLabel.childNodes[0].textContent = `${title} `;
+  weekDates.textContent = `${formatShortDate(start)} – ${formatShortDate(end)}`;
 }
 
 document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; updateWeekLabel(); renderScheduleForWeek(); });
@@ -145,7 +145,7 @@ async function loadSkus() {
 }
 
 const QUANTITY_OPTIONS = [];
-for (let n = 12; n <= 1200; n += 12) QUANTITY_OPTIONS.push(n);
+for (let n = 12; n <= 2400; n += 12) QUANTITY_OPTIONS.push(n);
 
 function buildSkuSelect() {
   const select = document.createElement('select');
@@ -231,7 +231,7 @@ function totalsByDateFromDeliveries(deliveries) {
   const byDate = {};
   if (!Array.isArray(deliveries)) return byDate;
   deliveries.forEach((row) => {
-    const dateStr = row.date && String(row.date).trim() || '—';
+    const dateStr = (row.date && String(row.date).trim()) || '—';
     const totals = byDate[dateStr] || (byDate[dateStr] = {});
     if (row.lineItems) {
       try {
@@ -256,27 +256,12 @@ function totalsByDateFromDeliveries(deliveries) {
 function formatDateLabel(dateStr) {
   if (!dateStr || dateStr === '—') return dateStr;
   try {
-    const d = new Date(dateStr + 'T12:00:00');
-    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-  } catch (_) {}
-  return dateStr;
-}
-
-/** For schedule list: "Today (Wed, Mar 15)", "Tomorrow (Thu, Mar 16)", or "Wed, Mar 15". */
-function formatScheduleDateLabel(dateStr) {
-  if (!dateStr || dateStr === '—') return dateStr;
-  try {
-    const d = new Date(dateStr + 'T12:00:00');
-    if (Number.isNaN(d.getTime())) return dateStr;
-    const datePart = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const today = new Date();
-    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
-    if (dateStr === todayStr) return 'Today (' + datePart + ')';
-    if (dateStr === tomorrowStr) return 'Tomorrow (' + datePart + ')';
-    return datePart;
+    const d = new Date(`${dateStr}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString(undefined, {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      });
+    }
   } catch (_) {}
   return dateStr;
 }
@@ -285,7 +270,7 @@ function formatScheduleDateLabel(dateStr) {
 function getWeekKey(dateStr) {
   if (!dateStr || dateStr === '—') return null;
   try {
-    const d = new Date(dateStr + 'T12:00:00');
+    const d = new Date(`${dateStr}T12:00:00`);
     if (Number.isNaN(d.getTime())) return null;
     const day = d.getDay();
     const daysSinceMonday = (day + 6) % 7;
@@ -298,8 +283,8 @@ function getWeekKey(dateStr) {
 function formatWeekLabel(weekKey) {
   if (!weekKey) return weekKey;
   try {
-    const d = new Date(weekKey + 'T12:00:00');
-    if (!Number.isNaN(d.getTime())) return 'Week of ' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const d = new Date(`${weekKey}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) return `Week of ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
   } catch (_) {}
   return weekKey;
 }
@@ -328,7 +313,8 @@ function renderTotalsBySku(deliveries) {
     return;
   }
   function summarizePretzelsBombsDips(totals) {
-    let pretzels = 0, bombs = 0, dips = 0;
+    let pretzels = 0; let bombs = 0; let
+      dips = 0;
     Object.entries(totals || {}).forEach(([sku, qty]) => {
       const s = sku.toLowerCase();
       const n = Number(qty) || 0;
@@ -348,24 +334,25 @@ function renderTotalsBySku(deliveries) {
   }
   const byWeek = totalsByWeekFromDeliveries(deliveries);
   const weekKeys = Object.keys(byWeek).sort();
-  const weeklyHtml = weekKeys.length === 0 ? '' : '<div class="totals-weekly-section"><h3>Weekly totals</h3>' + weekKeys.map((weekKey) => {
+  const weeklyHtml = weekKeys.length === 0 ? '' : `<div class="totals-weekly-section"><h3>Weekly totals</h3>${weekKeys.map((weekKey) => {
     const totals = byWeek[weekKey];
     const summaryLine = formatWeekSummaryLine(totals);
     const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
-    const rows = entries.map(([sku, qty]) =>
-      `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`
-    ).join('');
+    const rows = entries.map(([sku, qty]) => `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`).join('');
     return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatWeekLabel(weekKey))}</h3><p class="totals-week-summary">${summaryLine}</p><ul class="totals-date-sku-list">${rows}</ul></div>`;
-  }).join('') + '</div>';
-  const dailyHtml = '<div class="totals-by-day-section"><h3>By day</h3>' + dates.map((dateStr) => {
+  }).join('')}</div>`;
+  const dailyHtml = `<div class="totals-by-day-section"><h3>By day</h3>${dates.map((dateStr) => {
     const totals = byDate[dateStr];
     const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
-    const rows = entries.map(([sku, qty]) =>
-      `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`
-    ).join('');
+    const rows = entries.map(([sku, qty]) => `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${escapeHtml(String(qty))}</span></li>`).join('');
     return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatDateLabel(dateStr))}</h3><ul class="totals-date-sku-list">${rows}</ul></div>`;
-  }).join('') + '</div>';
+  }).join('')}</div>`;
   totalsBySkuList.innerHTML = weeklyHtml + dailyHtml;
+}
+
+/** Maps stored status (e.g. ready_deliver) to a CSS class token (ready-deliver). */
+function statusToCssClassSuffix(status) {
+  return String(status || 'scheduled').replace(/_/g, '-');
 }
 
 function renderDeliveryCard(row) {
@@ -376,26 +363,32 @@ function renderDeliveryCard(row) {
   const status = row.status || 'scheduled';
   const id = escapeHtml(row.deliveryId || '');
   const statusOpts = STATUS_OPTIONS[typeKey] || STATUS_OPTIONS.delivery;
-  const statusOptionsHtml = statusOpts.map((o) =>
-    `<option value="${escapeHtml(o.value)}"${o.value === status ? ' selected' : ''}>${escapeHtml(o.label)}</option>`
-  ).join('');
+  const statusOptionsHtml = statusOpts
+    .map((o) => {
+      const sel = o.value === status ? ' selected' : '';
+      return `<option value="${escapeHtml(o.value)}"${sel}>${escapeHtml(o.label)}</option>`;
+    })
+    .join('');
   let pillsHtml = '';
   let items = [];
   if (row.lineItems) {
-    try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) { items = []; }
+    try {
+      items = JSON.parse(row.lineItems);
+      if (!Array.isArray(items)) items = [];
+    } catch (_) {
+      items = [];
+    }
   } else if (row.sku && row.volume != null) {
     items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }];
   }
   if (items.length) {
-    pillsHtml = '<div class="card-items">' + items.map((it) =>
-      `<span class="item-pill">${escapeHtml(it.sku || '—')} ×${escapeHtml(String(it.quantity || 0))}</span>`
-    ).join('') + '</div>';
+    pillsHtml = `<div class="card-items">${items.map((it) => `<span class="item-pill">${escapeHtml(it.sku || '—')} ×${escapeHtml(String(it.quantity || 0))}</span>`).join('')}</div>`;
   }
   const showConfirm = status === 'ready_deliver' || status === 'ready_pickup';
   const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
   const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
   return `
-    <div class="delivery-card status-${escapeHtml(status)}" data-delivery-id="${id}">
+    <div class="delivery-card status-${escapeHtml(statusToCssClassSuffix(status))}" data-delivery-id="${id}">
       <div class="card-customer">
         <span><span class="type-badge ${type}">${typeLabel}</span> ${escapeHtml(customer)}${recurrenceHtml}</span>
         <div class="overflow-wrap">
@@ -461,7 +454,9 @@ function renderScheduleForWeek() {
     const isToday = dateStr === todayStr;
     const dayDeliveries = byDate[dateStr] || [];
     const count = dayDeliveries.length;
-    const countLabel = count === 0 ? 'none' : count === 1 ? '1 order' : `${count} orders`;
+    let countLabel = `${count} orders`;
+    if (count === 0) countLabel = 'none';
+    else if (count === 1) countLabel = '1 order';
     const emptyClass = count === 0 ? ' day-empty' : '';
     html += `<div class="day-column${isToday ? ' today' : ''}${emptyClass}">
       <div class="day-column-header">
@@ -655,6 +650,7 @@ class SignaturePad {
     canvas.addEventListener('pointerleave', () => this._end());
     window.addEventListener('resize', () => this._resize());
   }
+
   _resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     this.canvas.width = rect.width;
@@ -664,16 +660,19 @@ class SignaturePad {
     this.ctx.lineJoin = 'round';
     this.ctx.strokeStyle = '#1A1A1A';
   }
+
   _getPos(e) {
     const r = this.canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
+
   _start(e) {
     e.preventDefault();
     this.drawing = true;
     this.points = [this._getPos(e)];
     document.getElementById('sig-placeholder').style.display = 'none';
   }
+
   _move(e) {
     if (!this.drawing) return;
     e.preventDefault();
@@ -688,14 +687,18 @@ class SignaturePad {
     }
     this.ctx.stroke();
   }
+
   _end() { this.drawing = false; }
+
   clear() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.hasStrokes = false;
     this.points = [];
     document.getElementById('sig-placeholder').style.display = '';
   }
+
   isEmpty() { return !this.hasStrokes; }
+
   toDataURL() { return this.canvas.toDataURL('image/png'); }
 }
 
@@ -823,7 +826,7 @@ function resolveRecurrencesFromLogs(logs) {
       byId[row.recurrenceId] = { ...row };
     }
     if (row.action === 'recurrence_generated') {
-      const key = row.recurrenceId + ':' + row.generatedDate;
+      const key = `${row.recurrenceId}:${row.generatedDate}`;
       generated[key] = true;
     }
   });
@@ -970,7 +973,7 @@ document.querySelectorAll('.mgmt-tab').forEach((tab) => {
     document.querySelectorAll('.mgmt-tab').forEach((t) => t.classList.remove('active'));
     document.querySelectorAll('.mgmt-panel').forEach((p) => p.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
   });
 });
 
@@ -983,9 +986,6 @@ mgmtToggle.addEventListener('click', () => {
   mgmtCard.classList.toggle('open', isOpen);
 });
 
-// Save as template on form submit
-const origSubmitHandler = form.onsubmit;
-
 // ── Phase 4: Recurring deliveries ──
 const recurringCheck = document.getElementById('recurring-check');
 const recurringFields = document.getElementById('recurring-fields');
@@ -996,7 +996,7 @@ recurringCheck.addEventListener('change', () => {
 // Auto-set day of week from date field
 document.getElementById('date').addEventListener('change', () => {
   if (recurringCheck.checked) {
-    const d = new Date(document.getElementById('date').value + 'T12:00:00');
+    const d = new Date(`${document.getElementById('date').value}T12:00:00`);
     if (!Number.isNaN(d.getTime())) {
       document.getElementById('day-of-week').value = String(d.getDay());
     }
@@ -1018,7 +1018,7 @@ async function generateRecurringDeliveries(recData) {
     const endDate = rec.endDate || null;
     const dayOfWeek = Number(rec.dayOfWeek);
     // Find the first occurrence on or after startDate
-    let cursor = new Date(startDate + 'T12:00:00');
+    const cursor = new Date(`${startDate}T12:00:00`);
     // Align to the correct day of week
     while (cursor.getDay() !== dayOfWeek) cursor.setDate(cursor.getDate() + 1);
 
@@ -1026,7 +1026,7 @@ async function generateRecurringDeliveries(recData) {
       const dateStr = toDateStr(cursor);
       if (endDate && dateStr > endDate) break;
       if (dateStr >= todayStr) {
-        const genKey = rec.recurrenceId + ':' + dateStr;
+        const genKey = `${rec.recurrenceId}:${dateStr}`;
         if (!generated[genKey]) {
           const newId = generateDeliveryId();
           try {
@@ -1084,7 +1084,7 @@ function renderRecurrencesList() {
     return `<li>
       <div class="rec-info">
         <div class="rec-customer">${escapeHtml(rec.customer || '—')}</div>
-        <div class="rec-detail">${escapeHtml(freqLabel[rec.frequency] || rec.frequency)} on ${escapeHtml(day)}${rec.endDate ? ' until ' + escapeHtml(rec.endDate) : ''}</div>
+        <div class="rec-detail">${escapeHtml(freqLabel[rec.frequency] || rec.frequency)} on ${escapeHtml(day)}${rec.endDate ? ` until ${escapeHtml(rec.endDate)}` : ''}</div>
         <div class="rec-detail">${escapeHtml(summary)}</div>
       </div>
       <div class="rec-actions">
@@ -1132,13 +1132,25 @@ form.addEventListener('submit', async (e) => {
   try {
     if (editingId) {
       await appendLog(LOG_PATH, {
-        action: 'update', deliveryId: editingId, customer, date, type,
-        lineItems: lineItemsJson, status: 'scheduled', timeStamp,
+        action: 'update',
+        deliveryId: editingId,
+        customer,
+        date,
+        type,
+        lineItems: lineItemsJson,
+        status: 'scheduled',
+        timeStamp,
       });
     } else {
       await appendLog(LOG_PATH, {
-        action: 'create', deliveryId: generateDeliveryId(), customer, date, type,
-        lineItems: lineItemsJson, status: 'scheduled', timeStamp,
+        action: 'create',
+        deliveryId: generateDeliveryId(),
+        customer,
+        date,
+        type,
+        lineItems: lineItemsJson,
+        status: 'scheduled',
+        timeStamp,
       });
     }
     // Save as template if checked
@@ -1146,8 +1158,11 @@ form.addEventListener('submit', async (e) => {
       await appendLog(TEMPLATE_LOG_PATH, {
         action: 'create_template',
         templateId: generateDeliveryId(),
-        customer, type, lineItems: lineItemsJson,
-        templateName: customer, timeStamp,
+        customer,
+        type,
+        lineItems: lineItemsJson,
+        templateName: customer,
+        timeStamp,
       });
     }
     // Create recurrence if checked
@@ -1155,7 +1170,9 @@ form.addEventListener('submit', async (e) => {
       await appendLog(TEMPLATE_LOG_PATH, {
         action: 'create_recurrence',
         recurrenceId: generateDeliveryId(),
-        customer, type, lineItems: lineItemsJson,
+        customer,
+        type,
+        lineItems: lineItemsJson,
         frequency: document.getElementById('frequency').value,
         dayOfWeek: document.getElementById('day-of-week').value,
         startDate: date,
