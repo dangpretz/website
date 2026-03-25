@@ -1290,6 +1290,8 @@
       if (!sigPad) sigPad = new SignaturePad(document.getElementById('sig-canvas'));
       sigPad.clear();
       document.getElementById('confirm-overlay').classList.add('open');
+      // Resize canvas after modal is visible so it gets proper dimensions
+      requestAnimationFrame(() => { if (sigPad) sigPad._resize(); });
     }
 
     document.getElementById('sig-clear').addEventListener('click', () => { if (sigPad) sigPad.clear(); });
@@ -1302,11 +1304,15 @@
     });
     document.getElementById('confirm-cancel').addEventListener('click', () => { document.getElementById('confirm-overlay').classList.remove('open'); confirmDeliveryId = null; });
 
+    // Let Enter key in received-by field trigger confirm
+    document.getElementById('confirm-receiver').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('confirm-submit').click(); }
+    });
+
     document.getElementById('confirm-submit').addEventListener('click', async () => {
       const errEl = document.getElementById('confirm-error');
       errEl.hidden = true;
       const receiver = document.getElementById('confirm-receiver').value.trim();
-      if (!receiver) { errEl.textContent = 'Please enter who received the delivery.'; errEl.hidden = false; return; }
       const useSignature = document.getElementById('sig-section').style.display !== 'none';
       const note = document.getElementById('confirm-note').value.trim();
       if (useSignature && sigPad.isEmpty() && !note) { errEl.textContent = 'Please provide a signature or add a note.'; errEl.hidden = false; return; }
