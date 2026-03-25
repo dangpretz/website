@@ -1,8 +1,1478 @@
 <!DOCTYPE html>
-<html><head>
-<meta http-equiv="refresh" content="0;url=/static/delivery-planner.html">
-<link rel="canonical" href="/static/delivery-planner.html">
-<title>Redirecting…</title>
-</head><body>
-<p>Redirecting to <a href="/static/delivery-planner.html">delivery planner</a>…</p>
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Planner | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* v2 design system: #C41E1E red, #F5F0E8 cream, #1A1A1A dark */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    .site-nav {
+      background: #1A1A1A;
+      padding: 14px 5%;
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      border-bottom: 1px solid #333;
+    }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    .hero {
+      background: #1A1A1A;
+      text-align: center;
+      padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px);
+    }
+    .hero h1 {
+      font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif;
+      color: #fff;
+      margin: 0;
+    }
+
+    .section-cream {
+      background: #F5F0E8;
+      padding: clamp(32px, 5vw, 60px) 5%;
+    }
+    .section-cream h2 {
+      font: 900 italic clamp(22px, 3vw, 32px)/1.1 Georgia, serif;
+      color: #1A1A1A;
+      margin: 0 0 20px;
+    }
+    .section-dark {
+      background: #1A1A1A;
+      padding: clamp(32px, 5vw, 60px) 5%;
+    }
+    .section-dark h2 {
+      font: 900 italic clamp(22px, 3vw, 32px)/1.1 Georgia, serif;
+      color: #fff;
+      text-align: center;
+      margin: 0 0 24px;
+    }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .section-cream .card { box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+
+    /* ── Collapsible card (recurring orders) ── */
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header h2 { font: 700 20px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0; }
+    .toggle-icon {
+      width: 36px; height: 36px; border-radius: 50%; background: #F5F0E8;
+      border: 1px solid #ddd; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .toggle-icon svg { width: 18px; height: 18px; stroke: #1A1A1A; transition: transform 0.3s; }
+    .card-header:hover .toggle-icon { background: #e8e0d5; }
+    .card-body {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin 0.3s ease;
+      margin-top: 0;
+    }
+    .card-body.expanded { max-height: 2000px; opacity: 1; margin-top: 20px; }
+    .card.open .toggle-icon svg { transform: rotate(180deg); }
+
+    .card h2 { font: 700 20px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0 0 16px; }
+    .form-grid { display: grid; gap: 16px; }
+    label {
+      display: block; font: 700 12px 'Manrope', sans-serif; color: #555;
+      letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    input, select, textarea {
+      width: 100%; padding: 12px; font: 400 15px 'Manrope', sans-serif;
+      border: 1px solid #ddd; border-radius: 4px; background: #fff;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: #C41E1E;
+      box-shadow: 0 0 0 2px rgba(196, 30, 30, 0.15);
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+
+    .btn {
+      display: inline-block; padding: 14px 32px; border-radius: 4px;
+      font: 700 16px 'Manrope', sans-serif; border: none; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-red { background: #C41E1E; color: #fff; }
+    .btn-secondary { background: #ddd; color: #1A1A1A; }
+    .btn-secondary:hover { background: #ccc; }
+    .form-edit-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .form-edit-bar .cancel-edit { background: #ddd; color: #1A1A1A; }
+
+    .line-items-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .line-items-head label { margin-bottom: 0; }
+    .line-item-row {
+      display: grid; grid-template-columns: 1fr 100px 40px; gap: 12px;
+      align-items: end; margin-bottom: 12px;
+    }
+    .line-item-row .remove-row {
+      padding: 10px; min-width: 40px; background: #ddd; color: #555;
+      font-size: 1.2rem; line-height: 1; border: none; border-radius: 4px; cursor: pointer;
+    }
+    .line-item-row .remove-row:hover { background: #C41E1E; color: #fff; }
+    #line-items-container { margin-top: 8px; }
+    .line-items-empty { color: #666; font-size: 0.9rem; margin-bottom: 12px; }
+    .error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
+    .prefill-notice {
+      font: 400 12px 'Manrope', sans-serif; color: #888; background: #F5F0E8;
+      padding: 6px 12px; border-radius: 4px; align-items: center;
+      justify-content: space-between; gap: 8px;
+    }
+    .prefill-notice[hidden] { display: none; }
+    .prefill-notice:not([hidden]) { display: flex; }
+    .prefill-notice button {
+      background: none; border: none; color: #C41E1E; cursor: pointer;
+      font: 600 12px 'Manrope', sans-serif; padding: 0;
+    }
+
+    /* ── Schedule section header ── */
+    .schedule-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+    }
+    .schedule-header h2 { margin: 0; }
+    .new-order-btn {
+      padding: 10px 24px; border-radius: 4px; font: 700 14px 'Manrope', sans-serif;
+      border: none; cursor: pointer; background: #C41E1E; color: #fff;
+      transition: opacity 0.2s;
+    }
+    .new-order-btn:hover { opacity: 0.9; }
+
+    /* ── Week / Day navigator ── */
+    .week-nav {
+      display: flex; align-items: center; justify-content: center;
+      gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .week-nav-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid #444; background: #2a2a2a; color: #fff;
+      cursor: pointer; transition: background 0.2s, border-color 0.2s; flex-shrink: 0;
+    }
+    .week-nav-btn:hover { background: #C41E1E; border-color: #C41E1E; }
+    .week-nav-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+    .week-nav-label {
+      font: 700 16px 'Manrope', sans-serif; color: #fff;
+      text-align: center; min-width: 220px;
+    }
+    .week-nav-label .week-dates {
+      display: block; font: 400 12px 'Manrope', sans-serif; color: #999; margin-top: 2px;
+    }
+    .week-nav-today {
+      font: 600 12px 'Manrope', sans-serif; color: #999; background: #2a2a2a;
+      border: 1px solid #444; border-radius: 4px; padding: 6px 14px;
+      cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .week-nav-today:hover { background: #444; color: #fff; border-color: #555; }
+
+    /* View toggle */
+    .view-toggle {
+      display: flex; gap: 0; border: 1px solid #444; border-radius: 4px; overflow: hidden;
+    }
+    .view-toggle-btn {
+      padding: 6px 14px; font: 600 12px 'Manrope', sans-serif; color: #999;
+      background: #2a2a2a; border: none; cursor: pointer;
+      transition: background 0.2s, color 0.2s; display: flex; align-items: center; gap: 5px;
+    }
+    .view-toggle-btn:not(:last-child) { border-right: 1px solid #444; }
+    .view-toggle-btn:hover { color: #fff; background: #333; }
+    .view-toggle-btn.active { color: #fff; background: #C41E1E; }
+    .view-toggle-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+
+    .week-empty {
+      text-align: center; color: #666; padding: 40px 20px;
+      font: 400 15px 'Manrope', sans-serif;
+    }
+
+    /* ── Week grid view ── */
+    .week-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+    }
+    .day-column {
+      background: #2a2a2a; border-radius: 8px; padding: 10px 8px; min-height: 180px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .day-column:hover { background: #333; }
+    .day-column.today { background: #333; border-top: 3px solid #C41E1E; }
+    .day-column-header {
+      text-align: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #444;
+    }
+    .day-column-header .day-name {
+      font: 700 11px 'Manrope', sans-serif; color: #999; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .day-column-header .day-date { display: block; font: 700 20px 'Paytone One', sans-serif; color: #fff; }
+    .day-column-header .delivery-count {
+      display: block; font: 400 11px 'Manrope', sans-serif; color: #666; margin-top: 2px;
+    }
+    .delivery-card {
+      background: #1A1A1A; border-radius: 6px; padding: 10px; margin-bottom: 6px;
+      border-left: 3px solid #444; position: relative;
+    }
+    .delivery-card.status-scheduled { border-left-color: #666; }
+    .delivery-card.status-delivered,
+    .delivery-card.status-picked_up { opacity: 0.5; border-left-color: #4a4; }
+    .delivery-card .card-customer {
+      font: 700 13px 'Manrope', sans-serif; color: #fff; margin-bottom: 4px;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    }
+    .delivery-card > .type-badge { margin: 4px 0 2px; }
+    .delivery-card .card-items { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+    .delivery-card .item-pill {
+      font: 400 10px 'Manrope', sans-serif; background: #333; color: #ccc;
+      padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+    }
+    .delivery-card .card-actions-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px;
+    }
+    .delivery-card .confirm-btn {
+      padding: 4px 10px; font: 700 10px 'Manrope', sans-serif; color: #C41E1E;
+      background: none; border: 1px solid #C41E1E; border-radius: 3px; cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .delivery-card .confirm-btn:hover { background: #C41E1E; color: #fff; }
+    .delivery-card .card-confirmed {
+      font: 400 10px 'Manrope', sans-serif; color: #4a4; margin-top: 4px;
+    }
+    .delivery-card .recurrence-icon {
+      display: inline-block; width: 12px; height: 12px; vertical-align: middle;
+      margin-left: 4px; opacity: 0.6;
+    }
+
+    /* Overflow menu */
+    .overflow-wrap { position: relative; }
+    .overflow-btn {
+      background: none; border: none; color: #999; cursor: pointer;
+      font: 700 16px 'Manrope', sans-serif; padding: 2px 6px; border-radius: 4px; line-height: 1;
+    }
+    .overflow-btn:hover { background: #333; color: #fff; }
+    .overflow-menu {
+      display: none; position: absolute; right: 0; top: 100%; background: #2a2a2a;
+      border: 1px solid #444; border-radius: 6px; z-index: 100; min-width: 140px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4); overflow: hidden;
+    }
+    .overflow-menu.open { display: block; }
+    .overflow-menu button {
+      display: block; width: 100%; text-align: left; padding: 10px 14px;
+      font: 400 13px 'Manrope', sans-serif; background: none; border: none; color: #ccc; cursor: pointer;
+    }
+    .overflow-menu button:hover { background: #444; color: #fff; }
+    .overflow-menu button.menu-delete { color: #f88; }
+    .overflow-menu button.menu-delete:hover { background: #8B0000; color: #fff; }
+
+    @media (max-width: 768px) {
+      .week-grid { grid-template-columns: 1fr; gap: 12px; }
+      .day-column { min-height: auto; }
+      .day-column:empty, .day-column.day-empty { display: none; }
+      .day-column-header { text-align: left; padding-left: 4px; }
+      .delivery-card { padding: 12px; }
+      .delivery-card .card-customer { font-size: 14px; }
+      .delivery-card .item-pill { font-size: 11px; }
+      .delivery-card .confirm-btn { padding: 6px 14px; font-size: 12px; }
+      .schedule-header { flex-direction: column; align-items: stretch; }
+      .schedule-header h2 { text-align: center; }
+      .new-order-btn { width: 100%; text-align: center; padding: 14px; font-size: 16px; }
+      .week-nav { gap: 8px; }
+      .week-nav-label { min-width: 160px; font-size: 14px; }
+      .week-nav-label .week-dates { font-size: 11px; }
+      .view-toggle { width: 100%; order: 10; }
+      .view-toggle-btn { flex: 1; justify-content: center; padding: 10px 12px; font-size: 13px; }
+      .week-nav-today { padding: 8px 16px; }
+      /* Modal full-screen on mobile */
+      .modal-content { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0;
+        min-height: 60vh; padding: 24px 20px; align-self: flex-end; }
+      .confirm-modal { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0;
+        min-height: 50vh; padding: 24px 20px; }
+      .modal-overlay.open, .confirm-overlay.open { align-items: flex-end; }
+      /* Daily view mobile */
+      .daily-card { flex-direction: column; gap: 12px; padding: 16px; }
+      .daily-card .daily-customer { font-size: 15px; }
+      .daily-card .daily-actions { width: 100%; justify-content: space-between; }
+      .daily-card .confirm-btn { padding: 10px 20px; font-size: 14px; }
+      .daily-totals { padding: 14px; }
+      /* Hero compact */
+      .hero { padding: 20px 5% 12px; }
+      .hero h1 { font-size: 28px; }
+    }
+
+    /* ── Daily view ── */
+    .daily-list { list-style: none; margin: 0; padding: 0; }
+    .daily-card {
+      background: #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 10px;
+      border-left: 4px solid #444; display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 16px;
+    }
+    .daily-card.status-scheduled { border-left-color: #666; }
+    .daily-card.status-delivered,
+    .daily-card.status-picked_up { opacity: 0.5; border-left-color: #4a4; }
+    .daily-card .daily-main { flex: 1; min-width: 0; }
+    .daily-card .daily-customer {
+      font: 700 16px 'Manrope', sans-serif; color: #fff; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .daily-card .daily-items { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .daily-card .item-pill {
+      font: 400 12px 'Manrope', sans-serif; background: #333; color: #ccc;
+      padding: 4px 10px; border-radius: 4px;
+    }
+    .daily-card .daily-actions {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .daily-card .confirm-btn {
+      padding: 8px 16px; font: 700 13px 'Manrope', sans-serif; color: #C41E1E;
+      background: none; border: 1px solid #C41E1E; border-radius: 4px; cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .daily-card .confirm-btn:hover { background: #C41E1E; color: #fff; }
+    .daily-card .card-confirmed { font: 400 12px 'Manrope', sans-serif; color: #4a4; }
+    .daily-totals {
+      background: #2a2a2a; border-radius: 8px; padding: 16px; margin-top: 20px;
+    }
+    .daily-totals h3 {
+      font: 700 14px 'Manrope', sans-serif; color: #999; margin: 0 0 10px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .daily-totals-list { list-style: none; margin: 0; padding: 0; }
+    .daily-totals-list li {
+      display: flex; justify-content: space-between; padding: 4px 0;
+      font: 400 14px 'Manrope', sans-serif; color: #ccc;
+    }
+    .daily-totals-list .sku-qty { font-weight: 700; color: #C41E1E; }
+
+    /* ── Modal overlay (form + confirmation) ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      z-index: 10000; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .modal-content {
+      background: #fff; border-radius: 12px; width: 95%; max-width: 520px;
+      margin: 20px auto; padding: 28px 24px; position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 12px; right: 16px; background: none; border: none;
+      font-size: 24px; color: #999; cursor: pointer; padding: 4px 8px; line-height: 1;
+    }
+    .modal-close:hover { color: #1A1A1A; }
+    .modal-content h2 {
+      font: 700 22px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0 0 16px;
+    }
+
+    /* Confirmation modal specifics */
+    .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10001; overflow-y: auto; }
+    .confirm-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .confirm-modal {
+      background: #fff; border-radius: 12px; width: 95%; max-width: 480px;
+      margin: 20px auto; padding: 28px 24px;
+    }
+    .confirm-modal h2 { font: 700 22px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0 0 4px; }
+    .confirm-modal .confirm-sub { font: 400 14px 'Manrope', sans-serif; color: #666; margin: 0 0 20px; }
+    .confirm-modal .confirm-order-summary {
+      background: #F5F0E8; border-radius: 6px; padding: 14px; margin-bottom: 20px;
+    }
+    .confirm-modal .confirm-order-summary strong { display: block; font: 700 15px 'Manrope', sans-serif; color: #1A1A1A; margin-bottom: 6px; }
+    .confirm-modal .confirm-order-summary .summary-items { font: 400 13px 'Manrope', sans-serif; color: #555; }
+    .confirm-modal label { font: 700 12px 'Manrope', sans-serif; color: #555; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .confirm-modal input { width: 100%; padding: 12px; font: 400 15px 'Manrope', sans-serif; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 16px; }
+    .confirm-modal input:focus { outline: none; border-color: #C41E1E; box-shadow: 0 0 0 2px rgba(196, 30, 30, 0.15); }
+    .sig-section { margin-bottom: 16px; }
+    .sig-section .sig-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .sig-section .sig-label-row label { margin-bottom: 0; }
+    .sig-section .sig-clear-btn { font: 600 12px 'Manrope', sans-serif; color: #C41E1E; background: none; border: none; cursor: pointer; padding: 2px 8px; }
+    .sig-canvas-wrap { border: 2px dashed #ddd; border-radius: 6px; position: relative; background: #fafafa; }
+    .sig-canvas-wrap canvas { display: block; width: 100%; cursor: crosshair; touch-action: none; }
+    .sig-canvas-wrap .sig-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font: 400 14px 'Manrope', sans-serif; color: #bbb; pointer-events: none; }
+    .sig-toggle-link { font: 600 13px 'Manrope', sans-serif; color: #C41E1E; background: none; border: none; cursor: pointer; padding: 0; margin-bottom: 12px; display: block; }
+    .note-section { display: none; margin-bottom: 16px; }
+    .note-section.active { display: block; }
+    .confirm-modal .confirm-actions { display: flex; gap: 12px; margin-top: 8px; }
+    .confirm-modal .confirm-actions .btn { flex: 1; text-align: center; }
+    .confirm-modal .confirm-error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
+
+    /* ── Totals section ── */
+    #totals-by-sku { margin: 0; padding: 0; }
+    #totals-by-sku .empty { padding: 32px; text-align: center; color: #666; }
+    .totals-date-group { margin-bottom: 20px; }
+    .totals-date-group:last-child { margin-bottom: 0; }
+    .totals-date { font: 700 16px 'Paytone One', sans-serif; color: #999; margin: 0 0 8px; padding-bottom: 4px; border-bottom: 2px solid #333; }
+    .totals-date-sku-list { list-style: none; margin: 0; padding: 0; }
+    .totals-date-sku-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #333; font: 400 15px 'Manrope', sans-serif; color: #ccc; }
+    .totals-date-sku-list li:last-child { border-bottom: none; }
+    .totals-date-sku-list .sku-name { font-weight: 700; color: #fff; }
+    .totals-date-sku-list .sku-qty { font-weight: 700; color: #C41E1E; }
+    .totals-week-summary { font: 700 15px 'Manrope', sans-serif; color: #fff; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #333; }
+    .totals-week-summary .sep { color: #999; font-weight: 400; margin: 0 6px; }
+    .totals-weekly-section { margin-bottom: 24px; }
+    .totals-weekly-section h3, .totals-by-day-section h3 { font: 700 12px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; margin: 0 0 12px; }
+
+    /* ── Recurring management ── */
+    .rec-list { list-style: none; margin: 0; padding: 0; }
+    .rec-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #eee; }
+    .rec-list li:last-child { border-bottom: none; }
+    .rec-info { flex: 1; min-width: 0; }
+    .rec-info .rec-customer { font: 700 14px 'Manrope', sans-serif; color: #1A1A1A; }
+    .rec-info .rec-detail { font: 400 12px 'Manrope', sans-serif; color: #888; margin-top: 2px; }
+    .rec-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .rec-actions button { padding: 5px 10px; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 4px; cursor: pointer; }
+    .mgmt-empty { text-align: center; color: #999; padding: 24px; font: 400 14px 'Manrope', sans-serif; }
+
+    /* ── Recurring form fields ── */
+    .recurring-fields { display: none; margin-top: 12px; padding: 12px; background: #F5F0E8; border-radius: 6px; }
+    .recurring-fields.active { display: block; }
+    .recurring-check-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .recurring-check-row input[type="checkbox"] { width: auto; }
+    .recurring-check-row label { margin-bottom: 0; font-size: 13px; color: #555; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+      </div>
+    </div>
+  </nav>
+  <section class="hero">
+    <h1>DELIVERY PLANNER.</h1>
+  </section>
+
+  <!-- Schedule section (cream) -->
+  <section class="section-cream">
+    <div class="max-1100">
+      <div class="schedule-header">
+        <h2>SCHEDULED DELIVERIES &amp; PICKUPS</h2>
+        <button class="new-order-btn" id="new-order-btn">+ New Order</button>
+      </div>
+      <div class="week-nav" id="week-nav">
+        <button class="week-nav-btn" id="week-prev" aria-label="Previous">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="week-nav-label" id="week-label">
+          This Week
+          <span class="week-dates" id="week-dates"></span>
+        </div>
+        <button class="week-nav-btn" id="week-next" aria-label="Next">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+        </button>
+        <button class="week-nav-today" id="week-today">Today</button>
+        <div class="view-toggle">
+          <button class="view-toggle-btn active" id="view-weekly" aria-label="Weekly view">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            Week
+          </button>
+          <button class="view-toggle-btn" id="view-daily" aria-label="Daily view">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Day
+          </button>
+        </div>
+      </div>
+      <div id="schedule-container">
+        <div class="week-grid" id="week-grid">
+          <div class="week-empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Totals section (dark) -->
+  <section class="section-dark">
+    <div class="max-1100">
+      <h2>TOTALS</h2>
+      <div id="totals-by-sku">
+        <p class="empty" style="color:#999">No data yet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Recurring Orders section -->
+  <section class="section-cream" style="border-top: 1px solid #ddd;">
+    <div class="max-1100">
+      <div class="card" id="rec-card">
+        <div class="card-header" id="rec-toggle">
+          <h2>Recurring Orders</h2>
+          <span class="toggle-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="card-body" id="rec-body">
+          <ul class="rec-list" id="rec-list">
+            <li class="mgmt-empty">No recurring orders set up yet.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Order form modal -->
+  <div class="modal-overlay" id="form-overlay">
+    <div class="modal-content">
+      <button class="modal-close" id="form-modal-close">&times;</button>
+      <h2 id="form-modal-title">New Order</h2>
+      <div id="prefill-notice" class="prefill-notice" hidden>
+        <span>Pre-filled from last order</span>
+        <button type="button" id="prefill-dismiss">Clear</button>
+      </div>
+      <form id="delivery-form" class="form-grid" style="margin-top:12px">
+        <div>
+          <label for="customer">Customer</label>
+          <input type="text" id="customer" name="customer" required placeholder="Customer name or location" list="customer-list" autocomplete="off">
+          <datalist id="customer-list"></datalist>
+        </div>
+        <div class="row">
+          <div>
+            <label for="date">Date</label>
+            <input type="date" id="date" name="date" required>
+          </div>
+          <div>
+            <label for="type">Type</label>
+            <select id="type" name="type" required>
+              <option value="">Select…</option>
+              <option value="delivery">Delivery</option>
+              <option value="pickup">Pickup</option>
+            </select>
+          </div>
+        </div>
+        <div class="line-items-head">
+          <label>Line items (SKU + quantity)</label>
+          <button type="button" class="btn btn-secondary" id="add-row-btn" style="padding:8px 16px;font-size:13px">+ Add row</button>
+        </div>
+        <div id="line-items-container">
+          <p class="line-items-empty" id="line-items-empty">Add at least one SKU and quantity.</p>
+        </div>
+        <div class="recurring-check-row">
+          <input type="checkbox" id="recurring-check">
+          <label for="recurring-check">Make recurring</label>
+        </div>
+        <div class="recurring-fields" id="recurring-fields">
+          <div class="row">
+            <div>
+              <label for="frequency">Frequency</label>
+              <select id="frequency" name="frequency">
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+              </select>
+            </div>
+            <div>
+              <label for="day-of-week">Day of week</label>
+              <select id="day-of-week" name="dayOfWeek">
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+                <option value="0">Sunday</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label for="recurrence-end">End date (optional)</label>
+            <input type="date" id="recurrence-end" name="recurrenceEnd">
+          </div>
+        </div>
+        <div id="form-error" class="error" role="alert" hidden></div>
+        <div class="form-edit-bar">
+          <button type="submit" class="btn btn-red" id="submit-btn">Schedule</button>
+          <button type="button" class="btn cancel-edit" id="cancel-edit-btn" hidden>Cancel edit</button>
+        </div>
+        <input type="hidden" id="delivery-id" name="deliveryId" value="">
+      </form>
+    </div>
+  </div>
+
+  <!-- Delivery confirmation modal -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-modal" id="confirm-modal">
+      <h2>Confirm Delivery</h2>
+      <p class="confirm-sub">Capture proof of delivery below.</p>
+      <div class="confirm-order-summary" id="confirm-summary"></div>
+      <label for="confirm-receiver">Received by</label>
+      <input type="text" id="confirm-receiver" placeholder="Name of person receiving" autocomplete="off">
+      <div class="sig-section" id="sig-section">
+        <div class="sig-label-row">
+          <label>Signature</label>
+          <button type="button" class="sig-clear-btn" id="sig-clear">Clear</button>
+        </div>
+        <div class="sig-canvas-wrap">
+          <canvas id="sig-canvas" height="150"></canvas>
+          <span class="sig-placeholder" id="sig-placeholder">Sign here</span>
+        </div>
+      </div>
+      <button type="button" class="sig-toggle-link" id="sig-toggle">Add a note instead</button>
+      <div class="note-section" id="note-section">
+        <label for="confirm-note">Delivery note</label>
+        <textarea id="confirm-note" placeholder="Describe the delivery (e.g. left at front door)"></textarea>
+      </div>
+      <div id="confirm-error" class="confirm-error" hidden></div>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-red" id="confirm-submit">Confirm Delivery</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../scripts/sheet-logger.js';
+
+    const LOG_PATH = '/dangpretz/delivery-planner';
+    const TEMPLATE_LOG_PATH = '/dangpretz/delivery-templates';
+    const form = document.getElementById('delivery-form');
+    const scheduleContainer = document.getElementById('schedule-container');
+    const totalsBySkuList = document.getElementById('totals-by-sku');
+    const lineItemsContainer = document.getElementById('line-items-container');
+    const lineItemsEmpty = document.getElementById('line-items-empty');
+    const addRowBtn = document.getElementById('add-row-btn');
+    const formError = document.getElementById('form-error');
+    const submitBtn = document.getElementById('submit-btn');
+    const deliveryIdInput = document.getElementById('delivery-id');
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+    let skus = [];
+    let currentDeliveries = [];
+    let currentRecurrences = [];
+
+    // ── Form modal ──
+    const formOverlay = document.getElementById('form-overlay');
+    const formModalTitle = document.getElementById('form-modal-title');
+
+    function openFormModal(title = 'New Order') {
+      formModalTitle.textContent = title;
+      formOverlay.classList.add('open');
+    }
+    function closeFormModal() {
+      formOverlay.classList.remove('open');
+      clearEditState();
+    }
+
+    document.getElementById('new-order-btn').addEventListener('click', () => openFormModal());
+    document.getElementById('form-modal-close').addEventListener('click', closeFormModal);
+    formOverlay.addEventListener('click', (e) => { if (e.target === formOverlay) closeFormModal(); });
+
+    // ── View mode ──
+    let viewMode = 'weekly'; // 'weekly' | 'daily'
+    let weekOffset = 0;
+    let currentDay = new Date();
+
+    const viewWeeklyBtn = document.getElementById('view-weekly');
+    const viewDailyBtn = document.getElementById('view-daily');
+
+    viewWeeklyBtn.addEventListener('click', () => { if (viewMode !== 'weekly') { viewMode = 'weekly'; updateViewToggle(); updateNavLabel(); renderView(); } });
+    viewDailyBtn.addEventListener('click', () => { if (viewMode !== 'daily') { viewMode = 'daily'; updateViewToggle(); updateNavLabel(); renderView(); } });
+
+    function updateViewToggle() {
+      viewWeeklyBtn.classList.toggle('active', viewMode === 'weekly');
+      viewDailyBtn.classList.toggle('active', viewMode === 'daily');
+    }
+
+    // ── Navigation ──
+    function getMonday(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = (day + 6) % 7;
+      date.setDate(date.getDate() - diff);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+
+    function getWeekRange(offset) {
+      const now = new Date();
+      const monday = getMonday(now);
+      monday.setDate(monday.getDate() + offset * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      return { start: monday, end: sunday };
+    }
+
+    function formatShortDate(d) { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    function toDateStr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+    function updateNavLabel() {
+      const weekLabel = document.getElementById('week-label');
+      const weekDates = document.getElementById('week-dates');
+      if (viewMode === 'weekly') {
+        const { start, end } = getWeekRange(weekOffset);
+        let title;
+        if (weekOffset === 0) title = 'This Week';
+        else if (weekOffset === -1) title = 'Last Week';
+        else if (weekOffset === 1) title = 'Next Week';
+        else title = 'Week of ' + formatShortDate(start);
+        weekLabel.childNodes[0].textContent = title + ' ';
+        weekDates.textContent = formatShortDate(start) + ' – ' + formatShortDate(end);
+      } else {
+        const d = currentDay;
+        const todayStr = toDateStr(new Date());
+        const dayStr = toDateStr(d);
+        let title;
+        if (dayStr === todayStr) title = 'Today';
+        else {
+          const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+          if (dayStr === toDateStr(tomorrow)) title = 'Tomorrow';
+          else title = d.toLocaleDateString(undefined, { weekday: 'long' });
+        }
+        weekLabel.childNodes[0].textContent = title + ' ';
+        weekDates.textContent = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    }
+
+    document.getElementById('week-prev').addEventListener('click', () => {
+      if (viewMode === 'weekly') { weekOffset--; } else { currentDay.setDate(currentDay.getDate() - 1); }
+      updateNavLabel(); renderView();
+    });
+    document.getElementById('week-next').addEventListener('click', () => {
+      if (viewMode === 'weekly') { weekOffset++; } else { currentDay.setDate(currentDay.getDate() + 1); }
+      updateNavLabel(); renderView();
+    });
+    document.getElementById('week-today').addEventListener('click', () => {
+      if (viewMode === 'weekly') { weekOffset = 0; } else { currentDay = new Date(); }
+      updateNavLabel(); renderView();
+    });
+
+    updateNavLabel();
+
+    function generateDeliveryId() {
+      return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `del-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    /** Resolve deliveries from logs. Normalizes old ready states to scheduled. */
+    function resolveDeliveriesFromLogs(logs) {
+      const byId = {};
+      if (!Array.isArray(logs)) return [];
+      logs.forEach((row, idx) => {
+        const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
+        if (row.action === 'delete') { delete byId[id]; return; }
+        if (row.action === 'confirm') {
+          if (byId[id]) {
+            byId[id].confirmation = {
+              confirmedBy: row.confirmedBy || '',
+              signatureData: row.signatureData || '',
+              confirmNote: row.confirmNote || '',
+              confirmTimestamp: row.confirmTimestamp || row.timeStamp || '',
+            };
+            const t = (byId[id].type || 'delivery').toLowerCase();
+            byId[id].status = t === 'pickup' ? 'picked_up' : 'delivered';
+          }
+          return;
+        }
+        if (row.action === 'status') {
+          if (byId[id]) {
+            let s = row.status || 'scheduled';
+            // Normalize old ready states
+            if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
+            byId[id].status = s;
+          }
+          return;
+        }
+        if (row.action === 'update') {
+          byId[id] = { ...row, deliveryId: id };
+          let s = row.status || 'scheduled';
+          if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
+          byId[id].status = s;
+          return;
+        }
+        byId[id] = { ...row, deliveryId: id };
+        let s = byId[id].status || 'scheduled';
+        if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
+        byId[id].status = s;
+      });
+      return Object.values(byId).sort((a, b) => {
+        const d = (a.date || '').localeCompare(b.date || '');
+        return d !== 0 ? d : (a.timeStamp || '').localeCompare(b.timeStamp || '');
+      });
+    }
+
+    async function loadSkus() {
+      const res = await fetch('skus.json');
+      skus = await res.json();
+    }
+
+    const QUANTITY_OPTIONS = [];
+    for (let n = 12; n <= 1200; n += 12) QUANTITY_OPTIONS.push(n);
+
+    function buildSkuSelect() {
+      const select = document.createElement('select');
+      select.name = 'sku';
+      select.setAttribute('data-line-sku', '');
+      select.innerHTML = '<option value="">Select SKU…</option>';
+      skus.forEach((sku) => { const opt = document.createElement('option'); opt.value = sku; opt.textContent = sku; select.appendChild(opt); });
+      return select;
+    }
+
+    function buildQuantitySelect(initialValue) {
+      const select = document.createElement('select');
+      select.name = 'quantity';
+      select.setAttribute('data-line-qty', '');
+      select.innerHTML = '<option value="">Qty</option>';
+      const valueNum = Number(initialValue) || 0;
+      const hasCustom = valueNum > 0 && !QUANTITY_OPTIONS.includes(valueNum);
+      if (hasCustom) { const opt = document.createElement('option'); opt.value = String(valueNum); opt.textContent = valueNum; select.appendChild(opt); }
+      QUANTITY_OPTIONS.forEach((n) => { const opt = document.createElement('option'); opt.value = String(n); opt.textContent = n; select.appendChild(opt); });
+      if (valueNum > 0) select.value = String(valueNum);
+      return select;
+    }
+
+    function addLineRow(skuVal, qtyVal) {
+      lineItemsEmpty.hidden = true;
+      const row = document.createElement('div');
+      row.className = 'line-item-row';
+      const skuSelect = buildSkuSelect();
+      if (skuVal) skuSelect.value = skuVal;
+      const qtySelect = buildQuantitySelect(qtyVal || '');
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn remove-row';
+      removeBtn.setAttribute('aria-label', 'Remove row');
+      removeBtn.textContent = '−';
+      removeBtn.addEventListener('click', () => { row.remove(); if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false; });
+      row.append(skuSelect, qtySelect, removeBtn);
+      lineItemsContainer.insertBefore(row, lineItemsEmpty);
+    }
+
+    function clearLineItems() {
+      lineItemsContainer.querySelectorAll('.line-item-row').forEach((r) => r.remove());
+      lineItemsEmpty.hidden = false;
+    }
+
+    function updateCustomerDatalist(deliveries) {
+      const list = document.getElementById('customer-list');
+      list.innerHTML = '';
+      const names = new Set();
+      if (Array.isArray(deliveries)) {
+        deliveries.forEach((row) => { const name = (row.customer || row.location || '').trim(); if (name) names.add(name); });
+      }
+      [...names].sort().forEach((name) => { const opt = document.createElement('option'); opt.value = name; list.appendChild(opt); });
+    }
+
+    function showError(msg) { formError.textContent = msg || ''; formError.hidden = !msg; }
+
+    // ── Customer order memory ──
+    function getLastOrderForCustomer(customerName) {
+      const name = (customerName || '').trim().toLowerCase();
+      if (!name || !currentDeliveries.length) return null;
+      const forCustomer = currentDeliveries.filter((row) => {
+        const c = (row.customer || row.location || '').trim().toLowerCase();
+        return c === name;
+      });
+      if (forCustomer.length === 0) return null;
+      forCustomer.sort((a, b) => {
+        const d = (b.date || '').localeCompare(a.date || '');
+        return d !== 0 ? d : (b.timeStamp || '').localeCompare(a.timeStamp || '');
+      });
+      const lastOrder = forCustomer[0];
+      let items = [];
+      if (lastOrder.lineItems) {
+        try { items = JSON.parse(lastOrder.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {}
+      } else if (lastOrder.sku && lastOrder.volume != null) {
+        items = [{ sku: lastOrder.sku, quantity: Number(lastOrder.volume) || 0 }];
+      }
+      const type = (lastOrder.type || 'delivery').toLowerCase();
+      return { type: type === 'pickup' ? 'pickup' : 'delivery', lineItems: items };
+    }
+
+    let prefillDebounce = null;
+    function onCustomerInput() {
+      if (deliveryIdInput.value) return; // don't prefill during edit
+      clearTimeout(prefillDebounce);
+      prefillDebounce = setTimeout(() => {
+        const lastOrder = getLastOrderForCustomer(form.customer.value);
+        if (lastOrder && lastOrder.lineItems.length > 0) {
+          form.type.value = lastOrder.type;
+          clearLineItems();
+          lastOrder.lineItems.forEach((it) => addLineRow(it.sku, it.quantity));
+          document.getElementById('prefill-notice').hidden = false;
+        }
+      }, 300);
+    }
+
+    form.customer.addEventListener('change', onCustomerInput);
+
+    document.getElementById('prefill-dismiss').addEventListener('click', () => {
+      clearLineItems();
+      form.type.value = '';
+      document.getElementById('prefill-notice').hidden = true;
+    });
+
+    // ── Totals ──
+    function totalsByDateFromDeliveries(deliveries) {
+      const byDate = {};
+      if (!Array.isArray(deliveries)) return byDate;
+      deliveries.forEach((row) => {
+        const dateStr = row.date && String(row.date).trim() || '—';
+        const totals = byDate[dateStr] || (byDate[dateStr] = {});
+        if (row.lineItems) {
+          try {
+            const items = JSON.parse(row.lineItems);
+            if (Array.isArray(items)) {
+              items.forEach((it) => { const sku = it.sku && String(it.sku).trim(); const qty = Number(it.quantity) || 0; if (sku && qty > 0) totals[sku] = (totals[sku] || 0) + qty; });
+            }
+          } catch (_) {}
+        } else if (row.sku && (row.volume != null)) {
+          const sku = String(row.sku).trim(); const qty = Number(row.volume) || 0;
+          if (sku && qty > 0) totals[sku] = (totals[sku] || 0) + qty;
+        }
+      });
+      return byDate;
+    }
+
+    function formatDateLabel(dateStr) {
+      if (!dateStr || dateStr === '—') return dateStr;
+      try { const d = new Date(dateStr + 'T12:00:00'); if (!Number.isNaN(d.getTime())) return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }); } catch (_) {}
+      return dateStr;
+    }
+
+    function getWeekKey(dateStr) {
+      if (!dateStr || dateStr === '—') return null;
+      try { const d = new Date(dateStr + 'T12:00:00'); if (Number.isNaN(d.getTime())) return null; const day = d.getDay(); d.setDate(d.getDate() - ((day + 6) % 7)); return d.toISOString().slice(0, 10); } catch (_) {}
+      return null;
+    }
+    function formatWeekLabel(weekKey) {
+      if (!weekKey) return weekKey;
+      try { const d = new Date(weekKey + 'T12:00:00'); if (!Number.isNaN(d.getTime())) return 'Week of ' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch (_) {}
+      return weekKey;
+    }
+
+    /** Render totals scoped to current week only. */
+    function renderTotalsBySku(deliveries) {
+      const { start, end } = getWeekRange(weekOffset);
+      const startStr = toDateStr(start);
+      const endStr = toDateStr(end);
+      const weekDeliveries = deliveries.filter((r) => { const d = (r.date || '').trim(); return d >= startStr && d <= endStr; });
+      const byDate = totalsByDateFromDeliveries(weekDeliveries);
+      const dates = Object.keys(byDate).sort();
+      if (dates.length === 0) { totalsBySkuList.innerHTML = '<p class="empty" style="color:#999">No data for this week.</p>'; return; }
+      function summarize(totals) {
+        let pretzels = 0, bombs = 0, dips = 0;
+        Object.entries(totals || {}).forEach(([sku, qty]) => { const s = sku.toLowerCase(); if (s.includes('dip')) dips += qty; else if (s.includes('bomb')) bombs += qty; else pretzels += qty; });
+        return { pretzels, bombs, dips };
+      }
+      // Week total
+      const weekTotals = {};
+      dates.forEach((d) => { Object.entries(byDate[d]).forEach(([sku, qty]) => { weekTotals[sku] = (weekTotals[sku] || 0) + qty; }); });
+      const { pretzels, bombs, dips } = summarize(weekTotals);
+      const parts = [];
+      if (pretzels > 0) parts.push(`Pretzels ${pretzels}`);
+      if (bombs > 0) parts.push(`Bombs ${bombs}`);
+      if (dips > 0) parts.push(`Dips ${dips}`);
+      const summaryLine = parts.length ? parts.join('<span class="sep"> · </span>') : '—';
+      const weekEntries = Object.entries(weekTotals).sort((a, b) => a[0].localeCompare(b[0]));
+      let html = `<div class="totals-weekly-section"><h3>Week totals</h3><p class="totals-week-summary">${summaryLine}</p><ul class="totals-date-sku-list">${weekEntries.map(([sku, qty]) => `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${qty}</span></li>`).join('')}</ul></div>`;
+      html += '<div class="totals-by-day-section"><h3>By day</h3>' + dates.map((dateStr) => {
+        const totals = byDate[dateStr];
+        const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
+        return `<div class="totals-date-group"><h3 class="totals-date">${escapeHtml(formatDateLabel(dateStr))}</h3><ul class="totals-date-sku-list">${entries.map(([sku, qty]) => `<li><span class="sku-name">${escapeHtml(sku)}</span><span class="sku-qty">${qty}</span></li>`).join('')}</ul></div>`;
+      }).join('') + '</div>';
+      totalsBySkuList.innerHTML = html;
+    }
+
+    // ── Rendering ──
+    function escapeHtml(s) { const div = document.createElement('div'); div.textContent = s; return div.innerHTML; }
+
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function renderDeliveryCard(row) {
+      const type = (row.type || 'delivery').toLowerCase();
+      const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
+      const customer = row.customer || row.location || '—';
+      const status = row.status || 'scheduled';
+      const id = escapeHtml(row.deliveryId || '');
+      let pillsHtml = '';
+      let items = [];
+      if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) { items = []; } }
+      else if (row.sku && row.volume != null) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
+      if (items.length) {
+        pillsHtml = '<div class="card-items">' + items.map((it) => `<span class="item-pill">${escapeHtml(it.sku || '—')} ×${escapeHtml(String(it.quantity || 0))}</span>`).join('') + '</div>';
+      }
+      const isConfirmed = status === 'delivered' || status === 'picked_up';
+      const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : '';
+      const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
+      const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
+      return `
+        <div class="delivery-card status-${escapeHtml(status)}" data-delivery-id="${id}">
+          <div class="card-customer">
+            <span>${escapeHtml(customer)}${recurrenceHtml}</span>
+            <div class="overflow-wrap">
+              <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
+              <div class="overflow-menu">
+                <button data-action="edit" data-delivery-id="${id}">Edit</button>
+                <button data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
+                <button class="menu-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
+              </div>
+            </div>
+          </div>
+          <span class="type-badge ${type}">${typeLabel}</span>
+          ${pillsHtml}
+          <div class="card-actions-row">
+            ${confirmBtnHtml}
+          </div>
+          ${confirmedHtml}
+        </div>`;
+    }
+
+    function renderDailyCard(row) {
+      const type = (row.type || 'delivery').toLowerCase();
+      const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
+      const customer = row.customer || row.location || '—';
+      const status = row.status || 'scheduled';
+      const id = escapeHtml(row.deliveryId || '');
+      let items = [];
+      if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
+      else if (row.sku && row.volume != null) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
+      const pillsHtml = items.length ? '<div class="daily-items">' + items.map((it) => `<span class="item-pill">${escapeHtml(it.sku || '—')} × ${escapeHtml(String(it.quantity || 0))}</span>`).join('') + '</div>' : '';
+      const isConfirmed = status === 'delivered' || status === 'picked_up';
+      const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
+      const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
+      return `
+        <div class="daily-card status-${escapeHtml(status)}" data-delivery-id="${id}">
+          <div class="daily-main">
+            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}</div>
+            <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>
+            ${pillsHtml}
+            ${confirmedHtml}
+          </div>
+          <div class="daily-actions">
+            ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : ''}
+            <div class="overflow-wrap">
+              <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
+              <div class="overflow-menu">
+                <button data-action="edit" data-delivery-id="${id}">Edit</button>
+                <button data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
+                <button class="menu-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderView() {
+      if (viewMode === 'weekly') renderWeeklyView();
+      else renderDailyView();
+    }
+
+    function renderWeeklyView() {
+      const { start } = getWeekRange(weekOffset);
+      const todayStr = toDateStr(new Date());
+      const byDate = {};
+      currentDeliveries.forEach((row) => { const d = (row.date || '').trim(); if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(row); } });
+      let html = '<div class="week-grid" id="week-grid">';
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(start);
+        dayDate.setDate(dayDate.getDate() + i);
+        const dateStr = toDateStr(dayDate);
+        const isToday = dateStr === todayStr;
+        const dayDeliveries = byDate[dateStr] || [];
+        const count = dayDeliveries.length;
+        const countLabel = count === 0 ? 'none' : count === 1 ? '1 order' : `${count} orders`;
+        const emptyClass = count === 0 ? ' day-empty' : '';
+        html += `<div class="day-column${isToday ? ' today' : ''}${emptyClass}" data-day-click="${dateStr}">
+          <div class="day-column-header">
+            <span class="day-name">${DAY_NAMES[dayDate.getDay()]}</span>
+            <span class="day-date">${dayDate.getDate()}</span>
+            <span class="delivery-count">${countLabel}</span>
+          </div>
+          ${dayDeliveries.map((row) => renderDeliveryCard(row)).join('')}
+        </div>`;
+      }
+      html += '</div>';
+      scheduleContainer.innerHTML = html;
+      bindActions(scheduleContainer);
+      // Click day header to switch to daily view
+      scheduleContainer.querySelectorAll('[data-day-click]').forEach((col) => {
+        col.querySelector('.day-column-header').addEventListener('click', (e) => {
+          if (e.target.closest('.delivery-card') || e.target.closest('.overflow-wrap')) return;
+          viewMode = 'daily';
+          currentDay = new Date(col.dataset.dayClick + 'T12:00:00');
+          updateViewToggle();
+          updateNavLabel();
+          renderView();
+        });
+      });
+    }
+
+    function renderDailyView() {
+      const dateStr = toDateStr(currentDay);
+      const dayDeliveries = currentDeliveries.filter((r) => (r.date || '').trim() === dateStr);
+      let html = '';
+      if (dayDeliveries.length === 0) {
+        html = '<div class="week-empty">No deliveries or pickups for this day.</div>';
+      } else {
+        html = '<div class="daily-list">' + dayDeliveries.map((row) => renderDailyCard(row)).join('') + '</div>';
+      }
+      // Inline daily totals
+      const byDate = totalsByDateFromDeliveries(dayDeliveries);
+      const totals = byDate[dateStr] || {};
+      const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
+      if (entries.length) {
+        html += `<div class="daily-totals"><h3>Day totals</h3><ul class="daily-totals-list">${entries.map(([sku, qty]) => `<li><span>${escapeHtml(sku)}</span><span class="sku-qty">${qty}</span></li>`).join('')}</ul></div>`;
+      }
+      scheduleContainer.innerHTML = html;
+      bindActions(scheduleContainer);
+    }
+
+    function bindActions(container) {
+      container.querySelectorAll('[data-overflow-toggle]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = btn.nextElementSibling;
+          container.querySelectorAll('.overflow-menu.open').forEach((m) => { if (m !== menu) m.classList.remove('open'); });
+          menu.classList.toggle('open');
+        });
+      });
+      document.addEventListener('click', () => {
+        container.querySelectorAll('.overflow-menu.open').forEach((m) => m.classList.remove('open'));
+      }, { once: false });
+      container.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+        btn.addEventListener('click', () => startEdit(btn.dataset.deliveryId));
+      });
+      container.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
+        btn.addEventListener('click', () => startDuplicate(btn.dataset.deliveryId));
+      });
+      container.querySelectorAll('[data-action="delete"]').forEach((btn) => {
+        btn.addEventListener('click', () => confirmDelete(btn.dataset.deliveryId));
+      });
+      container.querySelectorAll('[data-action="confirm"]').forEach((btn) => {
+        btn.addEventListener('click', () => openConfirmModal(btn.dataset.deliveryId));
+      });
+    }
+
+    async function loadRecords() {
+      try {
+        const logs = await fetchLog(LOG_PATH);
+        const deliveries = resolveDeliveriesFromLogs(logs);
+        currentDeliveries = deliveries;
+        updateCustomerDatalist(deliveries);
+        renderTotalsBySku(deliveries);
+        renderView();
+      } catch (e) {
+        currentDeliveries = [];
+        scheduleContainer.innerHTML = '<div class="week-empty">Could not load records. Check console.</div>';
+        totalsBySkuList.innerHTML = '<p class="empty" style="color:#999">—</p>';
+        console.error('fetchLog error', e);
+      }
+    }
+
+    function fillFormFromDelivery(row) {
+      form.customer.value = row.customer || row.location || '';
+      form.date.value = row.date || '';
+      form.type.value = (row.type || 'delivery').toLowerCase();
+      clearLineItems();
+      let items = [];
+      if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
+      else if (row.sku && (row.volume != null)) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
+      items.forEach((it) => addLineRow(it.sku, it.quantity));
+    }
+
+    function startEdit(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      fillFormFromDelivery(row);
+      deliveryIdInput.value = deliveryId;
+      submitBtn.textContent = 'Update delivery';
+      cancelEditBtn.hidden = false;
+      showError('');
+      document.getElementById('prefill-notice').hidden = true;
+      openFormModal('Edit Order');
+    }
+
+    function startDuplicate(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      fillFormFromDelivery(row);
+      deliveryIdInput.value = '';
+      submitBtn.textContent = 'Schedule';
+      cancelEditBtn.hidden = true;
+      showError('');
+      document.getElementById('prefill-notice').hidden = true;
+      openFormModal('Duplicate Order');
+    }
+
+    function clearEditState() {
+      deliveryIdInput.value = '';
+      submitBtn.textContent = 'Schedule';
+      cancelEditBtn.hidden = true;
+      form.reset();
+      document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+      clearLineItems();
+      document.getElementById('prefill-notice').hidden = true;
+      document.getElementById('recurring-check').checked = false;
+      document.getElementById('recurring-fields').classList.remove('active');
+    }
+
+    function confirmDelete(deliveryId) {
+      if (!deliveryId) return;
+      if (!window.confirm('Delete this delivery?')) return;
+      (async () => {
+        try {
+          await appendLog(LOG_PATH, { action: 'delete', deliveryId, timeStamp: new Date().toISOString() });
+          await loadRecords();
+        } catch (err) { showError('Failed to delete.'); console.error(err); }
+      })();
+    }
+
+    addRowBtn.addEventListener('click', () => addLineRow());
+
+    // ── Signature pad & confirmation modal ──
+    class SignaturePad {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.drawing = false;
+        this.points = [];
+        this.hasStrokes = false;
+        this._resize();
+        canvas.addEventListener('pointerdown', (e) => this._start(e));
+        canvas.addEventListener('pointermove', (e) => this._move(e));
+        canvas.addEventListener('pointerup', () => this._end());
+        canvas.addEventListener('pointerleave', () => this._end());
+        window.addEventListener('resize', () => this._resize());
+      }
+      _resize() {
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        this.canvas.width = rect.width; this.canvas.height = 150;
+        this.ctx.lineWidth = 2; this.ctx.lineCap = 'round'; this.ctx.lineJoin = 'round'; this.ctx.strokeStyle = '#1A1A1A';
+      }
+      _getPos(e) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+      _start(e) { e.preventDefault(); this.drawing = true; this.points = [this._getPos(e)]; document.getElementById('sig-placeholder').style.display = 'none'; }
+      _move(e) {
+        if (!this.drawing) return; e.preventDefault();
+        const p = this._getPos(e); this.points.push(p); this.hasStrokes = true;
+        this.ctx.beginPath();
+        if (this.points.length > 1) { const prev = this.points[this.points.length - 2]; this.ctx.moveTo(prev.x, prev.y); this.ctx.lineTo(p.x, p.y); }
+        this.ctx.stroke();
+      }
+      _end() { this.drawing = false; }
+      clear() { this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.hasStrokes = false; this.points = []; document.getElementById('sig-placeholder').style.display = ''; }
+      isEmpty() { return !this.hasStrokes; }
+      toDataURL() { return this.canvas.toDataURL('image/png'); }
+    }
+
+    let sigPad = null;
+    let confirmDeliveryId = null;
+
+    function openConfirmModal(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      confirmDeliveryId = deliveryId;
+      const summary = document.getElementById('confirm-summary');
+      const customer = row.customer || row.location || '—';
+      let itemsHtml = '';
+      try { const items = JSON.parse(row.lineItems || '[]'); itemsHtml = items.map((it) => `${escapeHtml(it.sku)} x${it.quantity}`).join(', '); } catch (_) { itemsHtml = '—'; }
+      summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>`;
+      document.getElementById('confirm-receiver').value = '';
+      document.getElementById('confirm-note').value = '';
+      document.getElementById('confirm-error').hidden = true;
+      document.getElementById('sig-section').style.display = '';
+      document.getElementById('note-section').classList.remove('active');
+      document.getElementById('sig-toggle').textContent = 'Add a note instead';
+      if (!sigPad) sigPad = new SignaturePad(document.getElementById('sig-canvas'));
+      sigPad.clear();
+      document.getElementById('confirm-overlay').classList.add('open');
+    }
+
+    document.getElementById('sig-clear').addEventListener('click', () => { if (sigPad) sigPad.clear(); });
+    document.getElementById('sig-toggle').addEventListener('click', () => {
+      const sigSec = document.getElementById('sig-section');
+      const noteSec = document.getElementById('note-section');
+      const toggle = document.getElementById('sig-toggle');
+      if (noteSec.classList.contains('active')) { noteSec.classList.remove('active'); sigSec.style.display = ''; toggle.textContent = 'Add a note instead'; }
+      else { noteSec.classList.add('active'); sigSec.style.display = 'none'; toggle.textContent = 'Use signature instead'; }
+    });
+    document.getElementById('confirm-cancel').addEventListener('click', () => { document.getElementById('confirm-overlay').classList.remove('open'); confirmDeliveryId = null; });
+
+    document.getElementById('confirm-submit').addEventListener('click', async () => {
+      const errEl = document.getElementById('confirm-error');
+      errEl.hidden = true;
+      const receiver = document.getElementById('confirm-receiver').value.trim();
+      if (!receiver) { errEl.textContent = 'Please enter who received the delivery.'; errEl.hidden = false; return; }
+      const useSignature = document.getElementById('sig-section').style.display !== 'none';
+      const note = document.getElementById('confirm-note').value.trim();
+      if (useSignature && sigPad.isEmpty() && !note) { errEl.textContent = 'Please provide a signature or add a note.'; errEl.hidden = false; return; }
+      if (!useSignature && !note) { errEl.textContent = 'Please add a delivery note.'; errEl.hidden = false; return; }
+      const btn = document.getElementById('confirm-submit');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      const data = {
+        action: 'confirm', deliveryId: confirmDeliveryId, confirmedBy: receiver,
+        signatureData: useSignature && !sigPad.isEmpty() ? sigPad.toDataURL() : '',
+        confirmNote: note, confirmTimestamp: new Date().toISOString(), timeStamp: new Date().toISOString(),
+      };
+      let retries = 3;
+      while (retries > 0) {
+        try { await appendLog(LOG_PATH, data); break; }
+        catch (err) { retries--; if (retries === 0) { errEl.textContent = 'Failed to save. Try again.'; errEl.hidden = false; btn.disabled = false; btn.textContent = 'Confirm Delivery'; return; } await new Promise((r) => setTimeout(r, 1000)); }
+      }
+      btn.disabled = false; btn.textContent = 'Confirm Delivery';
+      document.getElementById('confirm-overlay').classList.remove('open');
+      confirmDeliveryId = null;
+      await loadRecords();
+    });
+
+    // ── Recurring orders ──
+    function resolveRecurrencesFromLogs(logs) {
+      const byId = {};
+      const generated = {};
+      if (!Array.isArray(logs)) return { recurrences: [], generated };
+      logs.forEach((row) => {
+        if (row.action === 'delete_recurrence') { delete byId[row.recurrenceId]; return; }
+        if (row.action === 'create_recurrence' || row.action === 'update_recurrence') { byId[row.recurrenceId] = { ...row }; }
+        if (row.action === 'recurrence_generated') { generated[row.recurrenceId + ':' + row.generatedDate] = true; }
+      });
+      return { recurrences: Object.values(byId), generated };
+    }
+
+    async function loadRecurrences() {
+      try {
+        const logs = await fetchLog(TEMPLATE_LOG_PATH);
+        const recData = resolveRecurrencesFromLogs(logs);
+        currentRecurrences = recData.recurrences;
+        renderRecurrencesList();
+        await generateRecurringDeliveries(recData);
+      } catch (e) { console.error('Recurrence log error', e); currentRecurrences = []; }
+    }
+
+    async function generateRecurringDeliveries(recData) {
+      const { recurrences, generated } = recData;
+      if (!recurrences.length) return;
+      const horizon = new Date(); horizon.setDate(horizon.getDate() + 28);
+      const horizonStr = toDateStr(horizon);
+      const todayStr = toDateStr(new Date());
+      let didGenerate = false;
+      for (const rec of recurrences) {
+        const freq = rec.frequency === 'biweekly' ? 14 : 7;
+        const startDate = rec.startDate || todayStr;
+        const endDate = rec.endDate || null;
+        const dayOfWeek = Number(rec.dayOfWeek);
+        let cursor = new Date(startDate + 'T12:00:00');
+        while (cursor.getDay() !== dayOfWeek) cursor.setDate(cursor.getDate() + 1);
+        while (toDateStr(cursor) <= horizonStr) {
+          const dateStr = toDateStr(cursor);
+          if (endDate && dateStr > endDate) break;
+          if (dateStr >= todayStr) {
+            const genKey = rec.recurrenceId + ':' + dateStr;
+            if (!generated[genKey]) {
+              const newId = generateDeliveryId();
+              try {
+                await appendLog(LOG_PATH, { action: 'create', deliveryId: newId, customer: rec.customer || '', date: dateStr, type: rec.type || 'delivery', lineItems: rec.lineItems || '[]', status: 'scheduled', recurrenceId: rec.recurrenceId, timeStamp: new Date().toISOString() });
+                await appendLog(TEMPLATE_LOG_PATH, { action: 'recurrence_generated', recurrenceId: rec.recurrenceId, generatedDate: dateStr, deliveryId: newId, timeStamp: new Date().toISOString() });
+                generated[genKey] = true; didGenerate = true;
+              } catch (err) { console.error('Recurrence generation error', err); }
+            }
+          }
+          cursor.setDate(cursor.getDate() + freq);
+        }
+      }
+      if (didGenerate) {
+        const logs = await fetchLog(LOG_PATH);
+        currentDeliveries = resolveDeliveriesFromLogs(logs);
+        renderView();
+        renderTotalsBySku(currentDeliveries);
+      }
+    }
+
+    function renderRecurrencesList() {
+      const list = document.getElementById('rec-list');
+      if (currentRecurrences.length === 0) { list.innerHTML = '<li class="mgmt-empty">No recurring orders set up yet.</li>'; return; }
+      const freqLabel = { weekly: 'Weekly', biweekly: 'Every 2 weeks' };
+      list.innerHTML = currentRecurrences.map((rec) => {
+        const day = DAY_NAMES[Number(rec.dayOfWeek)] || '?';
+        let summary = '';
+        try { const items = JSON.parse(rec.lineItems || '[]'); summary = items.map((it) => `${it.sku} x${it.quantity}`).join(', '); } catch (_) {}
+        return `<li><div class="rec-info"><div class="rec-customer">${escapeHtml(rec.customer || '—')}</div><div class="rec-detail">${escapeHtml(freqLabel[rec.frequency] || rec.frequency)} on ${escapeHtml(day)}${rec.endDate ? ' until ' + escapeHtml(rec.endDate) : ''}</div><div class="rec-detail">${escapeHtml(summary)}</div></div><div class="rec-actions"><button style="background:#8B0000;color:#fff" data-rec-delete="${escapeHtml(rec.recurrenceId)}">Delete</button></div></li>`;
+      }).join('');
+      list.querySelectorAll('[data-rec-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!window.confirm('Delete this recurring order?')) return;
+          await appendLog(TEMPLATE_LOG_PATH, { action: 'delete_recurrence', recurrenceId: btn.dataset.recDelete, timeStamp: new Date().toISOString() });
+          await loadRecurrences();
+        });
+      });
+    }
+
+    // Collapsible recurring section
+    const recToggle = document.getElementById('rec-toggle');
+    const recBody = document.getElementById('rec-body');
+    const recCard = document.getElementById('rec-card');
+    recToggle.addEventListener('click', () => { const isOpen = recBody.classList.toggle('expanded'); recCard.classList.toggle('open', isOpen); });
+
+    // ── Recurring form fields ──
+    const recurringCheck = document.getElementById('recurring-check');
+    const recurringFields = document.getElementById('recurring-fields');
+    recurringCheck.addEventListener('change', () => { recurringFields.classList.toggle('active', recurringCheck.checked); });
+    document.getElementById('date').addEventListener('change', () => {
+      if (recurringCheck.checked) {
+        const d = new Date(document.getElementById('date').value + 'T12:00:00');
+        if (!Number.isNaN(d.getTime())) document.getElementById('day-of-week').value = String(d.getDay());
+      }
+    });
+
+    // ── Form submit ──
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError('');
+      const customer = form.customer.value.trim();
+      const date = form.date.value.trim();
+      const type = form.type.value;
+      const rows = lineItemsContainer.querySelectorAll('.line-item-row');
+      const lineItems = [];
+      rows.forEach((row) => { const sku = row.querySelector('[data-line-sku]').value; const qty = row.querySelector('[data-line-qty]').value.trim(); if (sku && qty && Number(qty) > 0) lineItems.push({ sku, quantity: Number(qty) }); });
+      if (!customer || !date || !type) { showError('Please fill in customer, date, and type.'); return; }
+      if (lineItems.length === 0) { showError('Add at least one line item (SKU + quantity).'); return; }
+      submitBtn.disabled = true;
+      const editingId = deliveryIdInput.value.trim();
+      const timeStamp = new Date().toISOString();
+      const lineItemsJson = JSON.stringify(lineItems);
+      try {
+        if (editingId) {
+          await appendLog(LOG_PATH, { action: 'update', deliveryId: editingId, customer, date, type, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
+        } else {
+          await appendLog(LOG_PATH, { action: 'create', deliveryId: generateDeliveryId(), customer, date, type, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
+        }
+        if (recurringCheck.checked && !editingId) {
+          await appendLog(TEMPLATE_LOG_PATH, {
+            action: 'create_recurrence', recurrenceId: generateDeliveryId(), customer, type, lineItems: lineItemsJson,
+            frequency: document.getElementById('frequency').value, dayOfWeek: document.getElementById('day-of-week').value,
+            startDate: date, endDate: document.getElementById('recurrence-end').value || '', timeStamp,
+          });
+        }
+        closeFormModal();
+        await loadRecords();
+        await loadRecurrences();
+      } catch (err) { showError('Failed to save. Try again.'); console.error('appendLog error', err); }
+      finally { submitBtn.disabled = false; }
+    });
+
+    cancelEditBtn.addEventListener('click', closeFormModal);
+
+    const today = new Date();
+    document.getElementById('date').value = today.toISOString().slice(0, 10);
+
+    (async () => {
+      await loadSkus();
+      await loadRecords();
+      await loadRecurrences();
+    })();
+  </script>
+</body>
+</html>
