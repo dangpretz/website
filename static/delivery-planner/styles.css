@@ -377,24 +377,29 @@ input:focus, select:focus, textarea:focus {
   margin: 0 0 12px;
 }
 
-/* ── Phase 1: Week grid view ── */
+/* ── Phase 1: Week grid view (<1600px: single-column “mobile”; 1600+: 7 columns, full width) ── */
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 .day-column {
   background: #2a2a2a;
   border-radius: 8px;
   padding: 10px 8px;
-  min-height: 180px;
+  min-height: auto;
+}
+.day-column:empty,
+.day-column.day-empty {
+  display: none;
 }
 .day-column.today {
   background: #333;
   border-top: 3px solid #C41E1E;
 }
 .day-column-header {
-  text-align: center;
+  text-align: left;
+  padding-left: 4px;
   margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid #444;
@@ -419,7 +424,7 @@ input:focus, select:focus, textarea:focus {
 .delivery-card {
   background: #1A1A1A;
   border-radius: 6px;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 6px;
   border-left: 3px solid #444;
   position: relative;
@@ -436,7 +441,7 @@ input:focus, select:focus, textarea:focus {
   border-left-color: #4a4;
 }
 .delivery-card .card-customer {
-  font: 700 13px 'Manrope', sans-serif;
+  font: 700 14px 'Manrope', sans-serif;
   color: #fff;
   margin-bottom: 4px;
   display: flex;
@@ -451,7 +456,7 @@ input:focus, select:focus, textarea:focus {
   margin: 4px 0;
 }
 .delivery-card .item-pill {
-  font: 400 10px 'Manrope', sans-serif;
+  font: 400 11px 'Manrope', sans-serif;
   background: #333;
   color: #ccc;
   padding: 2px 6px;
@@ -468,13 +473,13 @@ input:focus, select:focus, textarea:focus {
 .delivery-card .status-select {
   flex-shrink: 0;
   padding: 3px 4px;
-  font: 400 10px 'Manrope', sans-serif;
+  font: 400 11px 'Manrope', sans-serif;
   background: #2a2a2a;
   color: #fff;
   border: 1px solid #444;
   border-radius: 3px;
   width: auto;
-  max-width: 120px;
+  max-width: 150px;
 }
 .delivery-card .status-select:focus { outline: none; border-color: #C41E1E; }
 .delivery-card .card-confirmed {
@@ -534,18 +539,39 @@ input:focus, select:focus, textarea:focus {
 .overflow-menu button.menu-delete:hover { background: #8B0000; color: #fff; }
 .overflow-menu button.menu-confirm { color: #C41E1E; font-weight: 700; }
 
-@media (max-width: 768px) {
-  .week-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
+@media (min-width: 1600px) {
+  .section-dark .max-1100 {
+    max-width: none;
+    width: 100%;
   }
-  .day-column { min-height: auto; }
-  .day-column:empty, .day-column.day-empty { display: none; }
-  .day-column-header { text-align: left; padding-left: 4px; }
-  .delivery-card { padding: 12px; }
-  .delivery-card .card-customer { font-size: 14px; }
-  .delivery-card .item-pill { font-size: 11px; }
-  .delivery-card .status-select { max-width: 150px; font-size: 11px; }
+  .week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .day-column {
+    min-height: 180px;
+  }
+  .day-column:empty,
+  .day-column.day-empty {
+    display: block;
+  }
+  .day-column-header {
+    text-align: center;
+    padding-left: 0;
+  }
+  .delivery-card {
+    padding: 10px;
+  }
+  .delivery-card .card-customer {
+    font-size: 13px;
+  }
+  .delivery-card .item-pill {
+    font-size: 10px;
+  }
+  .delivery-card .status-select {
+    max-width: 120px;
+    font-size: 10px;
+  }
 }
 
 /* ── Phase 2: Confirmation modal ── */
