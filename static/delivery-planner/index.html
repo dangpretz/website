@@ -1452,7 +1452,7 @@
       try {
         if (editingId) {
           await appendLog(LOG_PATH, { action: 'update', deliveryId: editingId, customer, date, type, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
-        } else {
+        } else if (!recurringCheck.checked) {
           await appendLog(LOG_PATH, { action: 'create', deliveryId: generateDeliveryId(), customer, date, type, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
         }
         if (recurringCheck.checked && !editingId) {
