@@ -311,6 +311,10 @@
       .daily-card .daily-customer { font-size: 15px; }
       .daily-card .daily-actions { width: 100%; justify-content: space-between; }
       .daily-card .confirm-btn { padding: 10px 20px; font-size: 14px; }
+      .scan-btn { min-height: 44px; padding: 8px 14px; font-size: 12px; }
+      .daily-card .scan-btn { padding: 10px 20px; font-size: 14px; }
+      .barcode-pill { font-size: 13px; padding: 6px 10px; }
+      .barcode-input-wrap input { font-size: 20px; padding: 16px; }
       .daily-totals { padding: 14px; }
       /* Hero compact */
       .hero { padding: 20px 5% 12px; }
@@ -410,6 +414,51 @@
     .confirm-modal .confirm-actions { display: flex; gap: 12px; margin-top: 8px; }
     .confirm-modal .confirm-actions .btn { flex: 1; text-align: center; }
     .confirm-modal .confirm-error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
+
+    /* ── Barcode scanning ── */
+    .scan-btn {
+      padding: 4px 10px; font: 700 10px 'Manrope', sans-serif; color: #f0ad4e;
+      background: none; border: 1px solid #f0ad4e; border-radius: 3px; cursor: pointer;
+      transition: background 0.2s, color 0.2s; min-height: 44px; min-width: 44px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .scan-btn:hover { background: #f0ad4e; color: #1A1A1A; }
+    .scan-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+    .barcode-count {
+      font: 600 10px 'Manrope', sans-serif; color: #f0ad4e; background: rgba(240,173,78,0.15);
+      padding: 2px 8px; border-radius: 3px; display: inline-block; cursor: pointer;
+    }
+    .barcode-count:hover { background: rgba(240,173,78,0.25); }
+    .daily-card .scan-btn {
+      padding: 8px 16px; font: 700 13px 'Manrope', sans-serif; min-height: 44px;
+    }
+    .daily-card .scan-btn svg { width: 16px; height: 16px; }
+    .daily-card .barcode-count {
+      font-size: 12px; padding: 4px 10px; border-radius: 4px;
+    }
+    .barcode-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; min-height: 20px; }
+    .barcode-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font: 600 14px 'Manrope', monospace; color: #1A1A1A; background: #F5F0E8;
+      padding: 8px 12px; border-radius: 6px; min-height: 44px;
+    }
+    .barcode-pill .barcode-remove {
+      background: none; border: none; color: #999; cursor: pointer;
+      font-size: 18px; line-height: 1; padding: 0 2px; min-width: 24px; min-height: 24px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .barcode-pill .barcode-remove:hover { color: #C41E1E; }
+    .barcode-input-wrap { position: relative; }
+    .barcode-input-wrap input {
+      width: 100%; padding: 14px 16px; font: 400 18px 'Manrope', monospace;
+      border: 2px solid #ddd; border-radius: 6px; margin-bottom: 4px;
+    }
+    .barcode-input-wrap input:focus {
+      outline: none; border-color: #f0ad4e; box-shadow: 0 0 0 3px rgba(240,173,78,0.2);
+    }
+    .barcode-scan-count {
+      font: 600 13px 'Manrope', sans-serif; color: #666; margin: 4px 0 8px;
+    }
 
     /* ── Totals section ── */
     #totals-by-sku { margin: 0; padding: 0; }
@@ -636,6 +685,25 @@
     </div>
   </div>
 
+  <!-- Barcode scanning modal -->
+  <div class="confirm-overlay" id="barcode-overlay">
+    <div class="confirm-modal" id="barcode-modal">
+      <h2>Scan Barcodes</h2>
+      <p class="confirm-sub" id="barcode-summary"></p>
+      <div class="barcode-input-wrap">
+        <label for="barcode-input">Scan or type a batch code</label>
+        <input type="text" id="barcode-input" placeholder="Scan barcode..." autocomplete="off" inputmode="none">
+      </div>
+      <div class="barcode-scan-count" id="barcode-scan-count"></div>
+      <div class="barcode-list" id="barcode-list"></div>
+      <div id="barcode-error" class="confirm-error" hidden></div>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-secondary" id="barcode-cancel">Cancel</button>
+        <button type="button" class="btn btn-red" id="barcode-save">Save Barcodes</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
@@ -765,6 +833,12 @@
       logs.forEach((row, idx) => {
         const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
         if (row.action === 'delete') { delete byId[id]; return; }
+        if (row.action === 'barcodes') {
+          if (byId[id]) {
+            try { byId[id].barcodes = JSON.parse(row.barcodes || '[]'); } catch (_) { byId[id].barcodes = []; }
+          }
+          return;
+        }
         if (row.action === 'confirm') {
           if (byId[id]) {
             byId[id].confirmation = {
@@ -1010,6 +1084,11 @@
       const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : '';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
+      const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
+      const barcodeHtml = barcodeCount > 0
+        ? `<span class="barcode-count" data-action="scan" data-delivery-id="${id}">${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</span>`
+        : '';
+      const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
       return `
         <div class="delivery-card status-${escapeHtml(status)}" data-delivery-id="${id}">
           <div class="card-customer">
@@ -1025,7 +1104,9 @@
           </div>
           <span class="type-badge ${type}">${typeLabel}</span>
           ${pillsHtml}
+          ${barcodeHtml}
           <div class="card-actions-row">
+            ${scanBtnHtml}
             ${confirmBtnHtml}
           </div>
           ${confirmedHtml}
@@ -1045,15 +1126,22 @@
       const isConfirmed = status === 'delivered' || status === 'picked_up';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
+      const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
+      const barcodeHtml = barcodeCount > 0
+        ? `<div style="margin:6px 0"><span class="barcode-count" data-action="scan" data-delivery-id="${id}">${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</span></div>`
+        : '';
+      const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
       return `
         <div class="daily-card status-${escapeHtml(status)}" data-delivery-id="${id}">
           <div class="daily-main">
             <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}</div>
             <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>
             ${pillsHtml}
+            ${barcodeHtml}
             ${confirmedHtml}
           </div>
           <div class="daily-actions">
+            ${scanBtnHtml}
             ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : ''}
             <div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
@@ -1155,6 +1243,9 @@
       });
       container.querySelectorAll('[data-action="confirm"]').forEach((btn) => {
         btn.addEventListener('click', () => openConfirmModal(btn.dataset.deliveryId));
+      });
+      container.querySelectorAll('[data-action="scan"]').forEach((btn) => {
+        btn.addEventListener('click', () => openBarcodeModal(btn.dataset.deliveryId));
       });
     }
 
@@ -1333,6 +1424,102 @@
       document.getElementById('confirm-overlay').classList.remove('open');
       confirmDeliveryId = null;
       await loadRecords();
+    });
+
+    // ── Barcode scanning modal ──
+    let barcodeDeliveryId = null;
+    let scannedBarcodes = [];
+
+    function openBarcodeModal(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      barcodeDeliveryId = deliveryId;
+      const customer = row.customer || row.location || '—';
+      let itemsHtml = '';
+      try { const items = JSON.parse(row.lineItems || '[]'); itemsHtml = items.map((it) => `${escapeHtml(it.sku)} x${it.quantity}`).join(', '); } catch (_) { itemsHtml = '—'; }
+      document.getElementById('barcode-summary').innerHTML = `<strong>${escapeHtml(customer)}</strong> — ${itemsHtml}`;
+      // Load existing barcodes
+      scannedBarcodes = Array.isArray(row.barcodes) ? [...row.barcodes] : [];
+      renderBarcodeList();
+      document.getElementById('barcode-error').hidden = true;
+      document.getElementById('barcode-overlay').classList.add('open');
+      const input = document.getElementById('barcode-input');
+      input.value = '';
+      requestAnimationFrame(() => input.focus());
+    }
+
+    function renderBarcodeList() {
+      const list = document.getElementById('barcode-list');
+      const countEl = document.getElementById('barcode-scan-count');
+      if (scannedBarcodes.length === 0) {
+        list.innerHTML = '';
+        countEl.textContent = '';
+        return;
+      }
+      countEl.textContent = `${scannedBarcodes.length} barcode${scannedBarcodes.length !== 1 ? 's' : ''} scanned`;
+      list.innerHTML = scannedBarcodes.map((code, i) =>
+        `<div class="barcode-pill"><span>${escapeHtml(code)}</span><button class="barcode-remove" data-barcode-idx="${i}" aria-label="Remove">&times;</button></div>`
+      ).join('');
+      list.querySelectorAll('.barcode-remove').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          scannedBarcodes.splice(Number(btn.dataset.barcodeIdx), 1);
+          renderBarcodeList();
+        });
+      });
+    }
+
+    function addBarcode(code) {
+      if (!code) return;
+      if (scannedBarcodes.includes(code)) {
+        const errEl = document.getElementById('barcode-error');
+        errEl.textContent = 'Duplicate — already scanned.';
+        errEl.hidden = false;
+        setTimeout(() => { errEl.hidden = true; }, 2000);
+        return;
+      }
+      scannedBarcodes.push(code);
+      renderBarcodeList();
+    }
+
+    document.getElementById('barcode-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const input = document.getElementById('barcode-input');
+        addBarcode(input.value.trim());
+        input.value = '';
+        input.focus();
+      }
+    });
+
+    document.getElementById('barcode-cancel').addEventListener('click', () => {
+      document.getElementById('barcode-overlay').classList.remove('open');
+      barcodeDeliveryId = null;
+      scannedBarcodes = [];
+    });
+
+    document.getElementById('barcode-save').addEventListener('click', async () => {
+      if (!barcodeDeliveryId) return;
+      const btn = document.getElementById('barcode-save');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        await appendLog(LOG_PATH, {
+          action: 'barcodes',
+          deliveryId: barcodeDeliveryId,
+          barcodes: JSON.stringify(scannedBarcodes),
+          timeStamp: new Date().toISOString(),
+        });
+        btn.disabled = false; btn.textContent = 'Save Barcodes';
+        document.getElementById('barcode-overlay').classList.remove('open');
+        barcodeDeliveryId = null;
+        scannedBarcodes = [];
+        await loadRecords();
+      } catch (err) {
+        const errEl = document.getElementById('barcode-error');
+        errEl.textContent = 'Failed to save. Try again.';
+        errEl.hidden = false;
+        btn.disabled = false; btn.textContent = 'Save Barcodes';
+        console.error('Barcode save error', err);
+      }
     });
 
     // ── Recurring orders ──
