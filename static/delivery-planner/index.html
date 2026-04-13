@@ -424,18 +424,31 @@
     }
     .scan-btn:hover { background: #f0ad4e; color: #1A1A1A; }
     .scan-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
-    .barcode-count {
+    .barcode-details { margin: 4px 0; }
+    .barcode-details summary {
       font: 600 10px 'Manrope', sans-serif; color: #f0ad4e; background: rgba(240,173,78,0.15);
-      padding: 2px 8px; border-radius: 3px; display: inline-block; cursor: pointer;
+      padding: 2px 8px; border-radius: 3px; display: inline-flex; align-items: center; gap: 4px;
+      cursor: pointer; list-style: none; user-select: none;
     }
-    .barcode-count:hover { background: rgba(240,173,78,0.25); }
+    .barcode-details summary::-webkit-details-marker { display: none; }
+    .barcode-details summary::after { content: '▾'; font-size: 9px; }
+    .barcode-details[open] summary::after { content: '▴'; }
+    .barcode-details summary:hover { background: rgba(240,173,78,0.25); }
+    .barcode-codes {
+      margin-top: 5px; display: flex; flex-direction: column; gap: 2px;
+    }
+    .barcode-codes code {
+      font: 500 10px 'Manrope', monospace; color: #ccc; background: rgba(255,255,255,0.07);
+      padding: 2px 6px; border-radius: 3px; display: block;
+    }
+    .daily-card .barcode-details summary {
+      font-size: 12px; padding: 4px 10px; border-radius: 4px;
+    }
+    .daily-card .barcode-codes code { font-size: 11px; color: #555; background: #f5f5f5; }
     .daily-card .scan-btn {
       padding: 8px 16px; font: 700 13px 'Manrope', sans-serif; min-height: 44px;
     }
     .daily-card .scan-btn svg { width: 16px; height: 16px; }
-    .daily-card .barcode-count {
-      font-size: 12px; padding: 4px 10px; border-radius: 4px;
-    }
     .barcode-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; min-height: 20px; }
     .barcode-pill {
       display: inline-flex; align-items: center; gap: 6px;
@@ -588,9 +601,12 @@
       </div>
       <form id="delivery-form" class="form-grid" style="margin-top:12px">
         <div>
-          <label for="customer">Customer</label>
-          <input type="text" id="customer" name="customer" required placeholder="Customer name or location" list="customer-list" autocomplete="off">
-          <datalist id="customer-list"></datalist>
+          <label for="customer-select">Customer</label>
+          <select id="customer-select">
+            <option value="">Select customer…</option>
+            <option value="__new__">＋ New customer</option>
+          </select>
+          <input type="text" id="customer" name="customer" placeholder="Enter customer name" autocomplete="off" style="display:none; margin-top:8px">
         </div>
         <div class="row">
           <div>
@@ -709,6 +725,19 @@
 
     const LOG_PATH = '/dangpretz/delivery-planner';
     const TEMPLATE_LOG_PATH = '/dangpretz/delivery-templates';
+
+    // Maps known aliases (lowercase) → canonical name. null = exclude from customer list.
+    const CUSTOMER_ALIASES = {
+      'bees': 'The Bees',
+      'handle bar': 'Handle Bar',
+      'test': null,
+    };
+    function normalizeCustomer(name) {
+      if (!name) return null;
+      const key = name.trim().toLowerCase();
+      if (key in CUSTOMER_ALIASES) return CUSTOMER_ALIASES[key]; // null = excluded
+      return name.trim();
+    }
     const form = document.getElementById('delivery-form');
     const scheduleContainer = document.getElementById('schedule-container');
     const totalsBySkuList = document.getElementById('totals-by-sku');
@@ -719,6 +748,7 @@
     const submitBtn = document.getElementById('submit-btn');
     const deliveryIdInput = document.getElementById('delivery-id');
     const cancelEditBtn = document.getElementById('cancel-edit-btn');
+    const customerInput = document.getElementById('customer');
 
     let skus = [];
     let currentDeliveries = [];
@@ -884,9 +914,6 @@
       skus = await res.json();
     }
 
-    const QUANTITY_OPTIONS = [];
-    for (let n = 12; n <= 1200; n += 12) QUANTITY_OPTIONS.push(n);
-
     function buildSkuSelect() {
       const select = document.createElement('select');
       select.name = 'sku';
@@ -896,17 +923,16 @@
       return select;
     }
 
-    function buildQuantitySelect(initialValue) {
-      const select = document.createElement('select');
-      select.name = 'quantity';
-      select.setAttribute('data-line-qty', '');
-      select.innerHTML = '<option value="">Qty</option>';
+    function buildQuantityInput(initialValue) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.name = 'quantity';
+      input.min = '1';
+      input.placeholder = 'Qty';
+      input.setAttribute('data-line-qty', '');
       const valueNum = Number(initialValue) || 0;
-      const hasCustom = valueNum > 0 && !QUANTITY_OPTIONS.includes(valueNum);
-      if (hasCustom) { const opt = document.createElement('option'); opt.value = String(valueNum); opt.textContent = valueNum; select.appendChild(opt); }
-      QUANTITY_OPTIONS.forEach((n) => { const opt = document.createElement('option'); opt.value = String(n); opt.textContent = n; select.appendChild(opt); });
-      if (valueNum > 0) select.value = String(valueNum);
-      return select;
+      if (valueNum > 0) input.value = String(valueNum);
+      return input;
     }
 
     function addLineRow(skuVal, qtyVal) {
@@ -915,7 +941,7 @@
       row.className = 'line-item-row';
       const skuSelect = buildSkuSelect();
       if (skuVal) skuSelect.value = skuVal;
-      const qtySelect = buildQuantitySelect(qtyVal || '');
+      const qtySelect = buildQuantityInput(qtyVal || '');
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'btn remove-row';
@@ -931,14 +957,29 @@
       lineItemsEmpty.hidden = false;
     }
 
-    function updateCustomerDatalist(deliveries) {
-      const list = document.getElementById('customer-list');
-      list.innerHTML = '';
-      const names = new Set();
+    function updateCustomerSelect(deliveries) {
+      const select = document.getElementById('customer-select');
+      const prevVal = customerInput.style.display === 'none' ? select.value : customerInput.value;
+      // Keep placeholder + new-customer option, remove existing customer options
+      [...select.options].filter((o) => o.value !== '' && o.value !== '__new__').forEach((o) => o.remove());
+      const normalized = new Map();
       if (Array.isArray(deliveries)) {
-        deliveries.forEach((row) => { const name = (row.customer || row.location || '').trim(); if (name) names.add(name); });
+        deliveries.forEach((row) => {
+          const name = normalizeCustomer(row.customer || row.location || '');
+          if (name) { const key = name.toLowerCase(); if (!normalized.has(key)) normalized.set(key, name); }
+        });
       }
-      [...names].sort().forEach((name) => { const opt = document.createElement('option'); opt.value = name; list.appendChild(opt); });
+      const newOpt = select.querySelector('option[value="__new__"]');
+      [...normalized.values()].sort((a, b) => a.localeCompare(b)).forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.insertBefore(opt, newOpt);
+      });
+      // Restore previous selection
+      if (prevVal && [...select.options].some((o) => o.value === prevVal)) {
+        select.value = prevVal;
+      }
     }
 
     function showError(msg) { formError.textContent = msg || ''; formError.hidden = !msg; }
@@ -948,7 +989,7 @@
       const name = (customerName || '').trim().toLowerCase();
       if (!name || !currentDeliveries.length) return null;
       const forCustomer = currentDeliveries.filter((row) => {
-        const c = (row.customer || row.location || '').trim().toLowerCase();
+        const c = (normalizeCustomer(row.customer || row.location || '') || '').toLowerCase();
         return c === name;
       });
       if (forCustomer.length === 0) return null;
@@ -982,7 +1023,19 @@
       }, 300);
     }
 
-    form.customer.addEventListener('change', onCustomerInput);
+    const customerSelect = document.getElementById('customer-select');
+    customerSelect.addEventListener('change', () => {
+      if (customerSelect.value === '__new__') {
+        customerInput.style.display = '';
+        customerInput.value = '';
+        customerInput.focus();
+      } else {
+        customerInput.style.display = 'none';
+        customerInput.value = customerSelect.value;
+        onCustomerInput();
+      }
+    });
+    customerInput.addEventListener('input', onCustomerInput);
 
     document.getElementById('prefill-dismiss').addEventListener('click', () => {
       clearLineItems();
@@ -1085,8 +1138,9 @@
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
       const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
+      const barcodeCodes = barcodeCount > 0 ? row.barcodes.map((b) => `<code>${escapeHtml(b)}</code>`).join('') : '';
       const barcodeHtml = barcodeCount > 0
-        ? `<span class="barcode-count" data-action="scan" data-delivery-id="${id}">${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</span>`
+        ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
       return `
@@ -1127,8 +1181,9 @@
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
       const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
+      const barcodeCodes = barcodeCount > 0 ? row.barcodes.map((b) => `<code>${escapeHtml(b)}</code>`).join('') : '';
       const barcodeHtml = barcodeCount > 0
-        ? `<div style="margin:6px 0"><span class="barcode-count" data-action="scan" data-delivery-id="${id}">${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</span></div>`
+        ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
       return `
@@ -1254,7 +1309,7 @@
         const logs = await fetchLog(LOG_PATH);
         const deliveries = resolveDeliveriesFromLogs(logs);
         currentDeliveries = deliveries;
-        updateCustomerDatalist(deliveries);
+        updateCustomerSelect(deliveries);
         renderTotalsBySku(deliveries);
         renderView();
       } catch (e) {
@@ -1266,7 +1321,21 @@
     }
 
     function fillFormFromDelivery(row) {
-      form.customer.value = row.customer || row.location || '';
+      const customerName = (row.customer || row.location || '').trim();
+      const matchOpt = customerName && [...customerSelect.options].find((o) => o.value.toLowerCase() === customerName.toLowerCase());
+      if (matchOpt) {
+        customerSelect.value = matchOpt.value;
+        customerInput.style.display = 'none';
+        customerInput.value = matchOpt.value;
+      } else if (customerName) {
+        customerSelect.value = '__new__';
+        customerInput.style.display = '';
+        customerInput.value = customerName;
+      } else {
+        customerSelect.value = '';
+        customerInput.style.display = 'none';
+        customerInput.value = '';
+      }
       form.date.value = row.date || '';
       form.type.value = (row.type || 'delivery').toLowerCase();
       clearLineItems();
