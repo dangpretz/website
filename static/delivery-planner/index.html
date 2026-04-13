@@ -892,13 +892,19 @@
           return;
         }
         if (row.action === 'update') {
+          const prevBarcodes = byId[id] ? byId[id].barcodes : undefined;
+          const prevConfirmation = byId[id] ? byId[id].confirmation : undefined;
           byId[id] = { ...row, deliveryId: id };
+          if (prevBarcodes) byId[id].barcodes = prevBarcodes;
+          if (prevConfirmation) byId[id].confirmation = prevConfirmation;
           let s = row.status || 'scheduled';
           if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
           byId[id].status = s;
           return;
         }
+        const prevBarcodes = byId[id] ? byId[id].barcodes : undefined;
         byId[id] = { ...row, deliveryId: id };
+        if (prevBarcodes) byId[id].barcodes = prevBarcodes;
         let s = byId[id].status || 'scheduled';
         if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
         byId[id].status = s;
