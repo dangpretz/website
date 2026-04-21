@@ -287,6 +287,25 @@
     .overflow-menu button.menu-delete:hover { background: #8B0000; color: #fff; }
 
     @media (max-width: 768px) {
+      /* ── CRITICAL: prevent iOS Safari auto-zoom on input focus ── */
+      input, select, textarea { font-size: 16px !important; }
+
+      /* ── Touch targets: 44px minimum ── */
+      .toggle-icon { width: 44px; height: 44px; }
+      .week-nav-btn { width: 44px; height: 44px; }
+      .week-nav-today { min-height: 44px; padding: 10px 16px; }
+      .view-toggle-btn { flex: 1; justify-content: center; padding: 12px; font-size: 14px; min-height: 44px; }
+      .delivery-card .confirm-btn { min-height: 44px; padding: 10px 14px; font-size: 13px; }
+      .daily-card .confirm-btn { min-height: 44px; padding: 12px 20px; font-size: 15px; }
+      .scan-btn { min-height: 44px; padding: 10px 14px; font-size: 13px; }
+      .daily-card .scan-btn { padding: 12px 20px; font-size: 15px; }
+      .line-item-row .remove-row { min-height: 44px; min-width: 44px; }
+      .overflow-menu button { padding: 12px 16px; min-height: 44px; }
+
+      /* ── Line item row: tighter qty column on small screens ── */
+      .line-item-row { grid-template-columns: 1fr 76px 44px; gap: 8px; }
+
+      /* ── Week grid ── */
       .week-grid { grid-template-columns: 1fr; gap: 12px; }
       .day-column { min-height: auto; }
       .day-column:empty, .day-column.day-empty { display: none; }
@@ -294,7 +313,8 @@
       .delivery-card { padding: 12px; }
       .delivery-card .card-customer { font-size: 14px; }
       .delivery-card .item-pill { font-size: 11px; }
-      .delivery-card .confirm-btn { padding: 6px 14px; font-size: 12px; }
+
+      /* ── Schedule header ── */
       .schedule-header { flex-direction: column; align-items: stretch; }
       .schedule-header h2 { text-align: center; }
       .new-order-btn { width: 100%; text-align: center; padding: 14px; font-size: 16px; }
@@ -302,25 +322,34 @@
       .week-nav-label { min-width: 160px; font-size: 14px; }
       .week-nav-label .week-dates { font-size: 11px; }
       .view-toggle { width: 100%; order: 10; }
-      .view-toggle-btn { flex: 1; justify-content: center; padding: 10px 12px; font-size: 13px; }
-      .week-nav-today { padding: 8px 16px; }
-      /* Modal full-screen on mobile */
+
+      /* ── Modals: slide up from bottom ── */
       .modal-content { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0;
-        min-height: 60vh; padding: 24px 20px; align-self: flex-end; }
+        min-height: 60vh; padding: 20px 16px; align-self: flex-end; }
       .confirm-modal { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0;
-        min-height: 50vh; padding: 24px 20px; }
+        min-height: 50vh; padding: 20px 16px; }
       .modal-overlay.open, .confirm-overlay.open { align-items: flex-end; }
-      /* Daily view mobile */
+
+      /* ── Daily view ── */
       .daily-card { flex-direction: column; gap: 12px; padding: 16px; }
       .daily-card .daily-customer { font-size: 15px; }
       .daily-card .daily-actions { width: 100%; justify-content: space-between; }
-      .daily-card .confirm-btn { padding: 10px 20px; font-size: 14px; }
-      .scan-btn { min-height: 44px; padding: 8px 14px; font-size: 12px; }
-      .daily-card .scan-btn { padding: 10px 20px; font-size: 14px; }
+
+      /* ── Barcode modal ── */
       .barcode-pill { font-size: 13px; padding: 6px 10px; }
-      .barcode-input-wrap input { font-size: 20px; padding: 16px; }
+      .barcode-pill .barcode-remove { min-width: 32px; min-height: 32px; }
+      .barcode-input-wrap input { font-size: 20px; padding: 16px; min-height: 56px; }
+
+      /* ── Confirm modal ── */
+      .confirm-actions { flex-direction: column; gap: 8px; }
+      .confirm-actions .btn { width: 100%; min-height: 48px; }
+      .sig-clear-btn { font-size: 14px; padding: 8px 16px; min-height: 44px; }
+      textarea { min-height: 100px; }
+
+      /* ── Daily totals ── */
       .daily-totals { padding: 14px; }
-      /* Hero compact */
+
+      /* ── Hero compact ── */
       .hero { padding: 20px 5% 12px; }
       .hero h1 { font-size: 28px; }
     }
@@ -712,7 +741,7 @@
       <p class="confirm-sub" id="barcode-summary"></p>
       <div class="barcode-input-wrap">
         <label for="barcode-input">Scan or type a batch code</label>
-        <input type="text" id="barcode-input" placeholder="Scan barcode..." autocomplete="off" inputmode="none">
+        <input type="text" id="barcode-input" placeholder="Scan barcode..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       </div>
       <div class="barcode-scan-count" id="barcode-scan-count"></div>
       <div class="barcode-list" id="barcode-list"></div>
