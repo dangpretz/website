@@ -135,6 +135,10 @@
     .line-item-row .remove-row:hover { background: #C41E1E; color: #fff; }
     #line-items-container { margin-top: 8px; }
     .line-items-empty { color: #666; font-size: 0.9rem; margin-bottom: 12px; }
+    .line-item-row input[data-line-sku] {
+      width: 100%; padding: 8px 10px; font: 400 14px 'Manrope', sans-serif;
+      border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
     .error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
     .prefill-notice {
       font: 400 12px 'Manrope', sans-serif; color: #888; background: #F5F0E8;
@@ -923,9 +927,12 @@
     function buildSkuSelect() {
       const select = document.createElement('select');
       select.name = 'sku';
-      select.setAttribute('data-line-sku', '');
       select.innerHTML = '<option value="">Select SKU…</option>';
       skus.forEach((sku) => { const opt = document.createElement('option'); opt.value = sku; opt.textContent = sku; select.appendChild(opt); });
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = '＋ Custom SKU';
+      select.appendChild(customOpt);
       return select;
     }
 
@@ -945,16 +952,43 @@
       lineItemsEmpty.hidden = true;
       const row = document.createElement('div');
       row.className = 'line-item-row';
+
+      // SKU wrapper: select + optional custom text input
+      const skuWrapper = document.createElement('div');
+      skuWrapper.style.cssText = 'display:flex; flex-direction:column; gap:4px';
       const skuSelect = buildSkuSelect();
-      if (skuVal) skuSelect.value = skuVal;
-      const qtySelect = buildQuantityInput(qtyVal || '');
+      const skuCustomInput = document.createElement('input');
+      skuCustomInput.type = 'text';
+      skuCustomInput.setAttribute('data-line-sku', '');
+      skuCustomInput.placeholder = 'Type SKU name…';
+      skuCustomInput.style.display = 'none';
+
+      const isKnown = skuVal && skus.includes(skuVal);
+      const isCustom = skuVal && !isKnown;
+      if (isKnown) { skuSelect.value = skuVal; skuCustomInput.value = skuVal; }
+      else if (isCustom) { skuSelect.value = '__custom__'; skuCustomInput.value = skuVal; skuCustomInput.style.display = ''; }
+
+      skuSelect.addEventListener('change', () => {
+        if (skuSelect.value === '__custom__') {
+          skuCustomInput.style.display = '';
+          skuCustomInput.value = '';
+          skuCustomInput.focus();
+        } else {
+          skuCustomInput.style.display = 'none';
+          skuCustomInput.value = skuSelect.value;
+        }
+      });
+
+      skuWrapper.append(skuSelect, skuCustomInput);
+
+      const qtyInput = buildQuantityInput(qtyVal || '');
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'btn remove-row';
       removeBtn.setAttribute('aria-label', 'Remove row');
       removeBtn.textContent = '−';
       removeBtn.addEventListener('click', () => { row.remove(); if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false; });
-      row.append(skuSelect, qtySelect, removeBtn);
+      row.append(skuWrapper, qtyInput, removeBtn);
       lineItemsContainer.insertBefore(row, lineItemsEmpty);
     }
 
