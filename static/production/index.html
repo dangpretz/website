@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production Schedule | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #1A1A1A; color: #1A1A1A; font-family: 'Manrope', sans-serif; }
+
+    /* ── Hero ── */
+    .hero { background: #1A1A1A; padding: 24px 5% 16px; text-align: center; }
+    .hero h1 { font: 700 32px 'Paytone One', sans-serif; color: #fff; margin: 0 0 6px; }
+    .hero-sub { margin: 0; }
+    .hero-sub a { color: #f0ad4e; font: 600 13px 'Manrope', sans-serif; text-decoration: none; }
+    .hero-sub a:hover { text-decoration: underline; }
+
+    /* ── Page ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 0 5% 60px; }
+
+    /* ── Schedule header ── */
+    .schedule-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; padding: 20px 0 16px; flex-wrap: wrap;
+    }
+    .schedule-header h2 { font: 700 22px 'Paytone One', sans-serif; color: #fff; margin: 0; }
+    .week-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .week-nav-btn {
+      width: 40px; height: 40px; border-radius: 50%; border: none; background: #2a2a2a;
+      color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: background 0.2s;
+    }
+    .week-nav-btn:hover { background: #C41E1E; }
+    .week-nav-label { font: 700 14px 'Manrope', sans-serif; color: #ccc; min-width: 180px; text-align: center; }
+    .week-nav-today {
+      padding: 8px 16px; background: #2a2a2a; border: none; color: #ccc;
+      font: 600 12px 'Manrope', sans-serif; border-radius: 4px; cursor: pointer; transition: background 0.2s;
+    }
+    .week-nav-today:hover { background: #3a3a3a; color: #fff; }
+
+    /* ── Day card ── */
+    .day-card {
+      background: #fff; border-radius: 10px; margin-bottom: 20px;
+      overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .day-header {
+      background: #1A1A1A; color: #f0ad4e; padding: 10px 20px;
+      font: 700 14px 'Paytone One', sans-serif; letter-spacing: 0.5px;
+      border-bottom: 2px solid #C41E1E;
+    }
+    .day-empty .day-header { border-bottom-color: #333; }
+    .day-empty-msg { padding: 16px 20px; color: #999; font: 400 13px 'Manrope', sans-serif; }
+    .day-panels { display: grid; grid-template-columns: 1fr 1fr; }
+
+    /* ── Panel ── */
+    .panel { padding: 18px 20px; border-right: 1px solid #eee; }
+    .panel:last-child { border-right: none; }
+    .panel-over { background: #fff8f8; }
+    .panel-title {
+      font: 700 13px 'Paytone One', sans-serif; color: #1A1A1A;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
+    }
+
+    /* ── Worker row ── */
+    .worker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .worker-row label { font: 700 11px 'Manrope', sans-serif; color: #888; letter-spacing: 0.5px; text-transform: uppercase; margin: 0; }
+    .worker-input {
+      width: 60px; padding: 6px 8px; font: 700 15px 'Manrope', sans-serif;
+      border: 1px solid #ddd; border-radius: 4px; text-align: center;
+    }
+    .capacity-label { font: 400 12px 'Manrope', sans-serif; color: #888; }
+
+    /* ── Section label ── */
+    .section-label { font: 700 10px 'Manrope', sans-serif; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 6px; }
+    .completed-label { color: #4a8a4a; }
+
+    /* ── Demand list ── */
+    .demand-list { margin-bottom: 8px; }
+    .demand-row {
+      display: flex; flex-direction: column; gap: 1px;
+      padding: 6px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .demand-row:last-child { border-bottom: none; }
+    .demand-sku { font: 700 13px 'Manrope', sans-serif; color: #1A1A1A; }
+    .demand-detail { font: 400 12px 'Manrope', sans-serif; color: #555; }
+    .demand-detail strong { color: #C41E1E; }
+    .demand-orders { font: 400 11px 'Manrope', sans-serif; color: #999; }
+    .inv-badge {
+      display: inline-block; font: 600 10px 'Manrope', sans-serif;
+      color: #2a7a2a; background: #e8f5e8; padding: 1px 6px; border-radius: 3px; margin-top: 2px;
+    }
+    .demand-total {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 10px; border-radius: 6px; margin: 8px 0;
+      font: 700 13px 'Manrope', sans-serif;
+    }
+    .demand-total.ok { background: #f0f8f0; color: #1A1A1A; }
+    .demand-total.over { background: #fff0f0; color: #1A1A1A; }
+    .capacity-status { font: 600 12px 'Manrope', sans-serif; }
+    .capacity-status.ok { color: #4a8a4a; }
+    .capacity-status.over { color: #C41E1E; }
+    .rollover-badge {
+      font: 600 10px 'Manrope', sans-serif; background: #fff3cd;
+      color: #856404; padding: 2px 6px; border-radius: 3px; border: 1px solid #ffc107;
+    }
+    .no-demand { font: 400 12px 'Manrope', sans-serif; color: #bbb; padding: 8px 0; }
+
+    /* ── Inventory section ── */
+    .inv-section { margin: 10px 0; padding: 8px 10px; background: #f9f9f9; border-radius: 6px; }
+    .inv-section .section-label { margin: 0 0 4px; display: block; }
+    .inv-item { font: 600 11px 'Manrope', sans-serif; color: #555; margin-right: 8px; }
+    .inv-empty { font: 400 11px 'Manrope', sans-serif; color: #bbb; }
+    .btn-link {
+      background: none; border: none; color: #C41E1E; font: 600 11px 'Manrope', sans-serif;
+      cursor: pointer; padding: 0; margin-left: 8px; text-decoration: underline;
+    }
+    .btn-link:hover { color: #8B0000; }
+
+    /* ── Completed ── */
+    .completed-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+    .completed-item {
+      font: 600 11px 'Manrope', sans-serif; background: #e8f5e8; color: #2a7a2a;
+      padding: 2px 8px; border-radius: 4px;
+    }
+
+    /* ── Checkoff details ── */
+    .checkoff-details { margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; }
+    .checkoff-details summary {
+      font: 600 12px 'Manrope', sans-serif; color: #888; cursor: pointer;
+      list-style: none; user-select: none;
+    }
+    .checkoff-details summary::-webkit-details-marker { display: none; }
+    .checkoff-details summary::before { content: '▸ '; font-size: 10px; }
+    .checkoff-details[open] summary::before { content: '▾ '; }
+    .checkoff-details summary:hover { color: #1A1A1A; }
+    .checkoff-form { margin-top: 10px; }
+    .checkoff-rows { margin-bottom: 10px; }
+    .checkoff-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .checkoff-sku { font: 600 12px 'Manrope', sans-serif; color: #333; flex: 1; min-width: 100px; }
+    .checkoff-input {
+      width: 60px; padding: 6px 8px; font: 700 14px 'Manrope', sans-serif;
+      border: 1px solid #ddd; border-radius: 4px; text-align: center;
+    }
+    .checkoff-unit { font: 400 11px 'Manrope', sans-serif; color: #888; }
+    .checkoff-actions { display: flex; align-items: center; gap: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; flex-wrap: wrap; }
+    .worker-input-inline {
+      width: 55px; padding: 6px 8px; font: 600 13px 'Manrope', sans-serif;
+      border: 1px solid #ddd; border-radius: 4px; text-align: center;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-block; padding: 10px 20px; border-radius: 4px;
+      font: 700 13px 'Manrope', sans-serif; border: none; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-sm { padding: 7px 14px; font-size: 12px; }
+    .btn-red { background: #C41E1E; color: #fff; }
+    .btn-secondary { background: #eee; color: #333; }
+
+    /* ── Inventory modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-content {
+      background: #fff; border-radius: 10px; padding: 28px 24px;
+      width: 95%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .modal-header h2 { font: 700 18px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0; }
+    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #888; padding: 4px 8px; }
+    .modal-close:hover { color: #C41E1E; }
+    .modal-sub { font: 400 13px 'Manrope', sans-serif; color: #888; margin: 0 0 18px; }
+    .inv-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .inv-row label { flex: 1; font: 600 13px 'Manrope', sans-serif; color: #333; min-width: 0; margin: 0; }
+    .inv-row input { width: 80px; padding: 8px 10px; font: 600 14px 'Manrope', sans-serif; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
+    .inv-unit { font: 400 12px 'Manrope', sans-serif; color: #999; white-space: nowrap; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions .btn { flex: 1; text-align: center; min-height: 44px; }
+
+    /* ── Loading / error ── */
+    .loading { color: #888; font: 400 14px 'Manrope', sans-serif; padding: 40px 0; text-align: center; }
+    .load-error { color: #C41E1E; font: 600 14px 'Manrope', sans-serif; padding: 20px 0; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      input, select { font-size: 16px !important; }
+      .day-panels { grid-template-columns: 1fr; }
+      .panel { border-right: none; border-bottom: 1px solid #eee; }
+      .panel:last-child { border-bottom: none; }
+      .schedule-header { flex-direction: column; align-items: stretch; }
+      .schedule-header h2 { text-align: center; }
+      .week-nav { justify-content: center; }
+      .week-nav-btn { width: 44px; height: 44px; }
+      .week-nav-today { min-height: 44px; padding: 10px 16px; }
+      .worker-input, .checkoff-input, .worker-input-inline { font-size: 16px !important; }
+      .btn { min-height: 44px; }
+      .modal-content { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0; align-self: flex-end; }
+      .modal-overlay.open { align-items: flex-end; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Production Schedule</h1>
+  <p class="hero-sub"><a href="../delivery-planner/">← Delivery Planner</a></p>
+</div>
+
+<div class="page">
+  <div class="schedule-header">
+    <h2>Weekly Production</h2>
+    <div class="week-nav">
+      <button class="week-nav-btn" id="week-prev" title="Previous week">&#8249;</button>
+      <div class="week-nav-label" id="week-label"></div>
+      <button class="week-nav-btn" id="week-next" title="Next week">&#8250;</button>
+      <button class="week-nav-today" id="week-today">Today</button>
+    </div>
+  </div>
+  <div id="schedule-container"><div class="loading">Loading production schedule…</div></div>
+</div>
+
+<!-- Inventory modal -->
+<div class="modal-overlay" id="inventory-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>On-Hand Inventory</h2>
+      <button class="modal-close" id="inventory-close">✕</button>
+    </div>
+    <p class="modal-sub" id="inventory-modal-label"></p>
+    <div id="inventory-form-rows"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="inventory-cancel">Cancel</button>
+      <button class="btn btn-red" id="inventory-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+
+  // ── Config ────────────────────────────────────────────────────────────────
+  const DELIVERY_LOG    = '/dangpretz/delivery-planner';
+  const PRODUCTION_LOG  = '/dangpretz/production';
+
+  // Pretzels per batch for each SKU (edit as needed)
+  const BATCH_SIZES = {
+    '21oz mammoth pretzel': 24,
+    '10oz mustache':        48,
+    '10oz plain':           48,
+    '10oz bbk':             48,
+    '10oz spicy bee':       48,
+    '6.5oz plain':          72,
+    '6.5oz bbk':            72,
+    '6.5oz spicy bee':      72,
+    'plain bombs':          72,
+    'bees bats':            72,
+  };
+
+  // Units per case for each SKU — TODO: update with actual case sizes
+  const CASE_SIZES = {
+    '21oz mammoth pretzel': 12,
+    '10oz mustache':        24,
+    '10oz plain':           24,
+    '10oz bbk':             24,
+    '10oz spicy bee':       24,
+    '6.5oz plain':          48,
+    '6.5oz bbk':            48,
+    '6.5oz spicy bee':      48,
+    'plain bombs':          48,
+    'bees bats':            48,
+  };
+
+  const BATCHES_PER_WORKER = 5;   // per 8-hour shift
+  const SHAPE_LEAD = 2;           // shape pretzels N days before delivery
+  const BFP_LEAD   = 1;           // bake/freeze/pack N days before delivery
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let weekOffset = 0;
+  let allDeliveries = [];
+  let productionState = {};
+  let invModalDate = null;
+  let invModalType = null;
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // ── Date helpers ──────────────────────────────────────────────────────────
+  const toDateStr  = d => d.toISOString().slice(0, 10);
+  const parseDate  = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+  const addDays    = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const fmtDate    = d => `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+  const esc        = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function getWeekDays(offset) {
+    const today = new Date();
+    const dow = today.getDay();
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + offset * 7);
+    return Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  }
+
+  // ── Resolve deliveries ────────────────────────────────────────────────────
+  function resolveDeliveries(logs) {
+    const byId = {};
+    if (!Array.isArray(logs)) return [];
+    logs.forEach((row, idx) => {
+      const id = row.deliveryId || `legacy-${idx}`;
+      if (row.action === 'delete') { delete byId[id]; return; }
+      if (row.action === 'barcodes') return;
+      if (row.action === 'confirm') {
+        if (byId[id]) byId[id].status = (byId[id].type||'delivery').toLowerCase() === 'pickup' ? 'picked_up' : 'delivered';
+        return;
+      }
+      if (row.action === 'status') { if (byId[id]) byId[id].status = row.status || 'scheduled'; return; }
+      if (row.action === 'update') {
+        const prev = byId[id];
+        byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
+        if (prev?.barcodes) byId[id].barcodes = prev.barcodes;
+        return;
+      }
+      byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
+    });
+    return Object.values(byId);
+  }
+
+  // ── Resolve production logs ───────────────────────────────────────────────
+  function resolveProductionLogs(logs) {
+    const state = {};
+    if (!Array.isArray(logs)) return state;
+    logs.forEach(row => {
+      const { date, action } = row;
+      if (!date || !action) return;
+      if (!state[date]) state[date] = {};
+      if (action === 'inventory') {
+        try {
+          const snaps = JSON.parse(row.snapshots || '[]');
+          const cf = {}, fr = {};
+          snaps.forEach(s => {
+            if (s.coldFerment > 0) cf[s.sku] = Number(s.coldFerment);
+            if (s.frozen > 0)      fr[s.sku] = Number(s.frozen);
+          });
+          state[date].coldFerment = cf;
+          state[date].frozen = fr;
+        } catch {}
+      }
+      if (action === 'shape_done') {
+        try {
+          state[date].shapeDone    = JSON.parse(row.completions || '[]');
+          state[date].shapeWorkers = Number(row.workers) || 1;
+          state[date].shapeTime    = row.timeStamp;
+        } catch {}
+      }
+      if (action === 'bfp_done') {
+        try {
+          state[date].bfpDone    = JSON.parse(row.completions || '[]');
+          state[date].bfpWorkers = Number(row.workers) || 1;
+          state[date].bfpTime    = row.timeStamp;
+        } catch {}
+      }
+    });
+    return state;
+  }
+
+  // ── Build demand for a delivery date ──────────────────────────────────────
+  function buildDemand(deliveryDateStr) {
+    const skuMap = {};
+    allDeliveries
+      .filter(d => d.date === deliveryDateStr && !['delivered','picked_up','cancelled'].includes(d.status))
+      .forEach(delivery => {
+        let items = [];
+        try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+        items.forEach(({ sku, quantity }) => {
+          if (!BATCH_SIZES[sku]) return;
+          if (!skuMap[sku]) skuMap[sku] = { sku, pretzels: 0, orders: [] };
+          skuMap[sku].pretzels += Number(quantity) || 0;
+          const cust = delivery.customer || delivery.location || '?';
+          if (!skuMap[sku].orders.includes(cust)) skuMap[sku].orders.push(cust);
+        });
+      });
+    return Object.values(skuMap).map(item => ({
+      sku:      item.sku,
+      pretzels: item.pretzels,
+      batches:  Math.ceil(item.pretzels / BATCH_SIZES[item.sku]),
+      cases:    CASE_SIZES[item.sku] ? Math.ceil(item.pretzels / CASE_SIZES[item.sku]) : null,
+      orders:   item.orders,
+    }));
+  }
+
+  // ── Worker count ──────────────────────────────────────────────────────────
+  const getWorkers = (type, date) => Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
+  const setWorkers = (type, date, n) => localStorage.setItem(`prod-${type}-workers-${date}`, String(Math.max(1, n)));
+
+  // ── Rollover ──────────────────────────────────────────────────────────────
+  function getRollover(type, dateStr) {
+    const yesterdayStr = toDateStr(addDays(parseDate(dateStr), -1));
+    // Yesterday's demand drove deliveries one lead-day further from yesterday
+    const yDeliveryDate = toDateStr(addDays(parseDate(dateStr), type === 'shape' ? SHAPE_LEAD - 1 : BFP_LEAD - 1));
+    const yDemand = buildDemand(yDeliveryDate);
+    const yTotal = yDemand.reduce((s, d) => s + d.batches, 0);
+    const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const yDone = ((productionState[yesterdayStr] || {})[doneKey] || []).reduce((s, c) => s + (Number(c.batches)||0), 0);
+    return Math.max(0, yTotal - yDone);
+  }
+
+  // ── Render panel ──────────────────────────────────────────────────────────
+  function renderPanel(type, dateStr, demand, dayState) {
+    const isBFP    = type === 'bfp';
+    const title    = isBFP ? 'Bake / Freeze / Pack' : 'Shape & Cold Ferment';
+    const workers  = getWorkers(type, dateStr);
+    const capacity = workers * BATCHES_PER_WORKER;
+    const needed   = demand.reduce((s, d) => s + d.batches, 0);
+    const rollover = getRollover(type, dateStr);
+    const total    = needed + rollover;
+    const isOver   = total > capacity && needed > 0;
+    const spare    = capacity - total;
+    const doneKey  = isBFP ? 'bfpDone' : 'shapeDone';
+    const timeKey  = isBFP ? 'bfpTime' : 'shapeTime';
+    const invKey   = isBFP ? 'frozen' : 'coldFerment';
+    const completed  = dayState[doneKey] || [];
+    const doneTotal  = completed.reduce((s, c) => s + (Number(c.batches)||0), 0);
+    const inventory  = dayState[invKey] || {};
+    const leadDate   = toDateStr(addDays(parseDate(dateStr), isBFP ? BFP_LEAD : SHAPE_LEAD));
+
+    // Demand rows
+    let demandHtml = '';
+    if (demand.length === 0) {
+      demandHtml = `<div class="no-demand">No deliveries on ${esc(leadDate)}</div>`;
+    } else {
+      const rows = demand.map(d => {
+        const inv = inventory[d.sku] || 0;
+        const caseStr = d.cases != null ? ` → ${d.cases} case${d.cases !== 1 ? 's' : ''}` : '';
+        return `<div class="demand-row">
+          <span class="demand-sku">${esc(d.sku)}</span>
+          <span class="demand-detail">${d.pretzels} units = <strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong>${esc(caseStr)}</span>
+          ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
+          <span class="demand-orders">${d.orders.map(esc).join(' · ')}</span>
+        </div>`;
+      }).join('');
+      const statusHtml = isOver
+        ? `<span class="capacity-status over">🔴 +${total - capacity} over</span>`
+        : `<span class="capacity-status ok">✅ ${spare} spare</span>`;
+      const rollHtml = rollover > 0
+        ? `<span class="rollover-badge">+${rollover} from yesterday</span>` : '';
+      demandHtml = `
+        <div class="section-label">For ${esc(leadDate)} deliveries</div>
+        <div class="demand-list">${rows}</div>
+        <div class="demand-total ${isOver ? 'over' : 'ok'}">
+          ${total} batch${total !== 1 ? 'es' : ''} needed ${rollHtml} ${statusHtml}
+        </div>`;
+    }
+
+    // Inventory strip
+    const invItems = Object.entries(inventory).filter(([,v]) => v > 0)
+      .map(([sku, n]) => `<span class="inv-item">${esc(sku)}: ${n}</span>`).join('');
+    const invHtml = `<div class="inv-section">
+      <span class="section-label">${isBFP ? 'Frozen' : 'Cold ferment'} on hand</span>
+      ${invItems || '<span class="inv-empty">None set</span>'}
+      <button class="btn-link" data-inv-btn data-date="${esc(dateStr)}" data-inv-type="${esc(type)}">Update ▸</button>
+    </div>`;
+
+    // Completed strip
+    let completedHtml = '';
+    if (completed.length > 0) {
+      const timeStr = dayState[timeKey] ? new Date(dayState[timeKey]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '';
+      const pills = completed.map(c => `<span class="completed-item">${esc(c.sku)} ×${c.batches}</span>`).join('');
+      completedHtml = `
+        <div class="section-label completed-label">✅ Logged${timeStr ? ' at ' + timeStr : ''} (${doneTotal} batch${doneTotal !== 1 ? 'es' : ''})</div>
+        <div class="completed-list">${pills}</div>`;
+    }
+
+    // Check-off form (pre-filled with demand)
+    let checkoffHtml = '';
+    if (demand.length > 0) {
+      const rows = demand.map(d => `
+        <div class="checkoff-row">
+          <span class="checkoff-sku">${esc(d.sku)}</span>
+          <input type="number" class="checkoff-input" min="0" max="99"
+            data-sku="${esc(d.sku)}" value="${d.batches}">
+          <span class="checkoff-unit">batch${d.batches !== 1 ? 'es' : ''}</span>
+        </div>`).join('');
+      checkoffHtml = `
+        <details class="checkoff-details">
+          <summary>Log completions</summary>
+          <div class="checkoff-form" data-checkoff-type="${esc(type)}" data-checkoff-date="${esc(dateStr)}">
+            <div class="checkoff-rows">${rows}</div>
+            <div class="checkoff-actions">
+              <input type="number" class="worker-input-inline" min="1" max="20"
+                value="${workers}" placeholder="Workers">
+              <span class="checkoff-unit">workers</span>
+              <button class="btn btn-sm btn-red save-checkoff"
+                data-type="${esc(type)}" data-date="${esc(dateStr)}">Save check-off</button>
+            </div>
+          </div>
+        </details>`;
+    }
+
+    return `<div class="panel panel-${esc(type)}${isOver ? ' panel-over' : ''}">
+      <div class="panel-title">${esc(title)}</div>
+      <div class="worker-row">
+        <label>Workers</label>
+        <input type="number" min="1" max="20" class="worker-input"
+          data-type="${esc(type)}" data-date="${esc(dateStr)}" value="${workers}">
+        <span class="capacity-label">${capacity} batch${capacity !== 1 ? 'es' : ''} capacity</span>
+      </div>
+      ${demandHtml}
+      ${invHtml}
+      ${completedHtml}
+      ${checkoffHtml}
+    </div>`;
+  }
+
+  // ── Render day ────────────────────────────────────────────────────────────
+  function renderDay(dayDate) {
+    const dateStr       = toDateStr(dayDate);
+    const shapeDemand   = buildDemand(toDateStr(addDays(dayDate, SHAPE_LEAD)));
+    const bfpDemand     = buildDemand(toDateStr(addDays(dayDate, BFP_LEAD)));
+    const dayState      = productionState[dateStr] || {};
+
+    if (shapeDemand.length === 0 && bfpDemand.length === 0) {
+      return `<div class="day-card day-empty">
+        <div class="day-header">${esc(fmtDate(dayDate))}</div>
+        <div class="day-empty-msg">No production scheduled</div>
+      </div>`;
+    }
+
+    return `<div class="day-card">
+      <div class="day-header">${esc(fmtDate(dayDate))}</div>
+      <div class="day-panels">
+        ${renderPanel('shape', dateStr, shapeDemand, dayState)}
+        ${renderPanel('bfp',   dateStr, bfpDemand,   dayState)}
+      </div>
+    </div>`;
+  }
+
+  // ── Render week ───────────────────────────────────────────────────────────
+  function render() {
+    const days = getWeekDays(weekOffset);
+    const html = days.map(renderDay).join('');
+    document.getElementById('schedule-container').innerHTML = html || '<div class="loading">No deliveries found.</div>';
+    bindActions();
+  }
+
+  function updateWeekLabel() {
+    const days = getWeekDays(weekOffset);
+    const a = days[0], b = days[6];
+    document.getElementById('week-label').textContent =
+      `${MONTH_NAMES[a.getMonth()]} ${a.getDate()} – ${MONTH_NAMES[b.getMonth()]} ${b.getDate()}, ${b.getFullYear()}`;
+  }
+
+  // ── Event binding ─────────────────────────────────────────────────────────
+  function bindActions() {
+    // Worker count change
+    document.querySelectorAll('.worker-input').forEach(inp => {
+      inp.addEventListener('change', () => {
+        setWorkers(inp.dataset.type, inp.dataset.date, parseInt(inp.value, 10) || 1);
+        render();
+      });
+    });
+
+    // Open inventory modal
+    document.querySelectorAll('[data-inv-btn]').forEach(btn => {
+      btn.addEventListener('click', () => openInventoryModal(btn.dataset.date, btn.dataset.invType));
+    });
+
+    // Save check-off
+    document.querySelectorAll('.save-checkoff').forEach(btn => {
+      btn.addEventListener('click', () => saveCheckoff(btn.dataset.type, btn.dataset.date, btn));
+    });
+  }
+
+  // ── Save check-off ────────────────────────────────────────────────────────
+  async function saveCheckoff(type, date, btn) {
+    const form = btn.closest('.checkoff-form');
+    const completions = [];
+    form.querySelectorAll('.checkoff-input').forEach(inp => {
+      const n = parseInt(inp.value, 10);
+      if (n > 0) completions.push({ sku: inp.dataset.sku, batches: n });
+    });
+    if (!completions.length) return;
+    const workers = parseInt(form.querySelector('.worker-input-inline')?.value, 10) || getWorkers(type, date);
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action: type === 'shape' ? 'shape_done' : 'bfp_done',
+        date,
+        completions: JSON.stringify(completions),
+        workers,
+        timeStamp: new Date().toISOString(),
+      });
+      setWorkers(type, date, workers);
+      await loadProduction();
+      render();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Save check-off';
+      alert('Error saving: ' + e.message);
+    }
+  }
+
+  // ── Inventory modal ───────────────────────────────────────────────────────
+  function openInventoryModal(date, type) {
+    invModalDate = date; invModalType = type;
+    const isBFP = type === 'bfp';
+    document.getElementById('inventory-modal-label').textContent =
+      `${isBFP ? 'Frozen pretzels' : 'Cold-ferment pretzels'} on hand as of ${date}`;
+    const invKey = isBFP ? 'frozen' : 'coldFerment';
+    const existing = (productionState[date] || {})[invKey] || {};
+    document.getElementById('inventory-form-rows').innerHTML = Object.keys(BATCH_SIZES).map(sku => `
+      <div class="inv-row">
+        <label>${esc(sku)}</label>
+        <input type="number" min="0" data-sku="${esc(sku)}" value="${existing[sku] || 0}">
+        <span class="inv-unit">pretzels</span>
+      </div>`).join('');
+    document.getElementById('inventory-overlay').classList.add('open');
+  }
+
+  async function saveInventory() {
+    const date   = invModalDate;
+    const type   = invModalType;
+    const isBFP  = type === 'bfp';
+    const invKey = isBFP ? 'frozen' : 'coldFerment';
+    const otherKey = isBFP ? 'coldFerment' : 'frozen';
+    const dayState = productionState[date] || {};
+    const otherInv = dayState[otherKey] || {};
+
+    const snaps = [];
+    Object.keys(BATCH_SIZES).forEach(sku => {
+      const inp = document.querySelector(`#inventory-form-rows [data-sku="${CSS.escape(sku)}"]`);
+      const count = parseInt(inp?.value, 10) || 0;
+      const other = otherInv[sku] || 0;
+      if (count > 0 || other > 0) {
+        snaps.push({
+          sku,
+          coldFerment: isBFP ? other : count,
+          frozen:      isBFP ? count : other,
+        });
+      }
+    });
+
+    const saveBtn = document.getElementById('inventory-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action: 'inventory',
+        date,
+        snapshots: JSON.stringify(snaps),
+        timeStamp: new Date().toISOString(),
+      });
+      document.getElementById('inventory-overlay').classList.remove('open');
+      await loadProduction();
+      render();
+    } catch (e) {
+      alert('Error saving inventory: ' + e.message);
+    } finally {
+      saveBtn.disabled = false; saveBtn.textContent = 'Save';
+    }
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+  async function loadDeliveries() {
+    const logs = await fetchLog(DELIVERY_LOG);
+    allDeliveries = resolveDeliveries(logs);
+  }
+
+  async function loadProduction() {
+    const logs = await fetchLog(PRODUCTION_LOG);
+    productionState = resolveProductionLogs(logs);
+  }
+
+  // ── Nav wiring ────────────────────────────────────────────────────────────
+  document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; updateWeekLabel(); render(); });
+  document.getElementById('week-next').addEventListener('click', () => { weekOffset++; updateWeekLabel(); render(); });
+  document.getElementById('week-today').addEventListener('click', () => { weekOffset = 0; updateWeekLabel(); render(); });
+  document.getElementById('inventory-close').addEventListener('click',  () => document.getElementById('inventory-overlay').classList.remove('open'));
+  document.getElementById('inventory-cancel').addEventListener('click', () => document.getElementById('inventory-overlay').classList.remove('open'));
+  document.getElementById('inventory-save').addEventListener('click', saveInventory);
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  updateWeekLabel();
+  (async () => {
+    try {
+      await Promise.all([loadDeliveries(), loadProduction()]);
+      render();
+    } catch (e) {
+      document.getElementById('schedule-container').innerHTML =
+        `<div class="load-error">Error loading data: ${esc(e.message)}</div>`;
+    }
+  })();
+</script>
+</body>
+</html>
