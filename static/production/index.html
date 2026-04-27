@@ -648,8 +648,10 @@
           const snaps = JSON.parse(row.snapshots || '[]');
           const cf = {}, fr = {};
           snaps.forEach(sn => {
-            if (sn.coldFerment > 0) cf[sn.sku] = Number(sn.coldFerment);
-            if (sn.frozen > 0)      fr[sn.sku] = Number(sn.frozen);
+            const k = (sn.sku || '').trim(); // normalize keys to match delivery line items
+            if (!k) return;
+            if (sn.coldFerment > 0) cf[k] = Number(sn.coldFerment);
+            if (sn.frozen > 0)      fr[k] = Number(sn.frozen);
           });
           s.coldFerment = cf; s.frozen = fr;
         } catch {}
@@ -1056,6 +1058,19 @@
         </div>
       </div>` : '';
 
+    // Spare-capacity hint — explain why there's spare (window constraint, not workers)
+    let spareHint = '';
+    if (needed > 0 && !isOver && spare >= 4) {
+      const tomorrowStr = toDateStr(addDays(parseDate(dateStr), 1));
+      const tomorrowItems = schedule[type][tomorrowStr] || [];
+      const tomorrowTotal = tomorrowItems.reduce((s, d) => s + d.batches, 0);
+      if (tomorrowTotal > 0) {
+        spareHint = `<div class="foh-note" style="border-top:none;padding-top:6px;margin-top:0">
+          ${tomorrowTotal} batch${tomorrowTotal !== 1 ? 'es' : ''} scheduled tomorrow — earliest item not yet in production window
+        </div>`;
+      }
+    }
+
     // Inventory is now in the Stock tab — no inline strip needed
 
     // Completed strip
@@ -1103,6 +1118,7 @@
         ${workersHtml}
         ${skuHtml}
         ${batchTotalHtml}
+        ${spareHint}
         ${completedHtml}
         ${fohHtml}
         ${logBtnHtml}
@@ -1180,7 +1196,7 @@
       </div>`;
     }).join('');
 
-    return `<div>
+    return `<div class="team-card"><div class="team-body">
       <div class="stock-tab-header">
         <div>
           <div class="stock-tab-title">Stock Count</div>
@@ -1194,14 +1210,16 @@
       </div>
       ${rows}
       <button class="btn-primary" id="stock-save" style="margin-top:20px">Save Stock Count</button>
-    </div>`;
+    </div></div>`;
   }
 
   async function saveStock() {
     const snaps = {};
     document.querySelectorAll('[data-stock-section]').forEach(inp => {
-      const sku = inp.dataset.sku, section = inp.dataset.stockSection;
+      const sku = (inp.dataset.sku || '').trim(); // defense in depth — match read path
+      const section = inp.dataset.stockSection;
       const n   = parseInt(inp.value, 10) || 0;
+      if (!sku) return;
       if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0 };
       if (section === 'shape')  snaps[sku].coldFerment = n;
       if (section === 'frozen') snaps[sku].frozen      = n;
@@ -1297,16 +1315,22 @@
   function render() {
     updateNav();
 
-    // Consolidated overdue panel (one block instead of N banners)
+    // Consolidated overdue panel (one block, merged by SKU)
     let overdueHtml = '';
     if (schedule.overdue.length > 0) {
+      const mergeBySku = (items) => {
+        const m = {};
+        items.forEach(o => { m[o.sku] = (m[o.sku] || 0) + o.batches; });
+        return Object.entries(m).map(([sku, n]) => `${esc(sku)} ×${n}`).join(' · ');
+      };
       const shapeOver = schedule.overdue.filter(o => o.team === 'shape');
       const bfpOver   = schedule.overdue.filter(o => o.team === 'bfp');
       const groupHtml = (items, label) => items.length === 0 ? '' :
-        `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ` +
-        items.map(o => `${esc(o.sku)} ×${o.batches}`).join(' · ') + '</div>';
+        `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ${mergeBySku(items)}</div>`;
+      // Count distinct SKU×team groups so the headline isn't inflated by per-delivery rows
+      const distinctCount = new Set(schedule.overdue.map(o => `${o.team}:${o.sku}`)).size;
       overdueHtml = `<div class="overdue-banner">
-        <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${schedule.overdue.length} overdue — production window${schedule.overdue.length > 1 ? 's have' : ' has'} closed</div>
+        <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${distinctCount} overdue — production window${distinctCount > 1 ? 's have' : ' has'} closed</div>
         ${groupHtml(shapeOver, 'Shape')}
         ${groupHtml(bfpOver, 'BFP')}
       </div>`;
