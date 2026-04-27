@@ -88,6 +88,7 @@
     .demand-detail { font: 400 12px 'Manrope', sans-serif; color: #555; }
     .demand-detail strong { color: #C41E1E; }
     .demand-orders { font: 400 11px 'Manrope', sans-serif; color: #999; }
+    .demand-row-warn { border-left: 3px solid #C41E1E; padding-left: 6px; }
     .inv-badge {
       display: inline-block; font: 600 10px 'Manrope', sans-serif;
       color: #2a7a2a; background: #e8f5e8; padding: 1px 6px; border-radius: 3px; margin-top: 2px;
@@ -273,6 +274,13 @@
     'bees bats':            72,
   };
 
+  // SKUs handled by FOH — never show in production schedule.
+  // Add any dips, retail-only items, etc. here.
+  const FOH_SKUS = new Set([
+    '3oz cheese dip',
+    'bulk dangerous dip (25 srv)',
+  ]);
+
   // Units per case for each SKU — ⚠️ UPDATE THESE WITH ACTUAL CASE SIZES
   // Set to 0 to suppress case counts until you've confirmed the numbers.
   const CASE_SIZES = {
@@ -382,28 +390,38 @@
   // ── Build demand for a delivery date ──────────────────────────────────────
   function buildDemand(deliveryDateStr) {
     const skuMap = {};
-    const skippedSet = new Set();
+    const fohSet = new Set();
     allDeliveries
       .filter(d => d.date === deliveryDateStr && !['delivered','picked_up','cancelled'].includes(d.status))
       .forEach(delivery => {
         let items = [];
         try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
         items.forEach(({ sku, quantity }) => {
-          if (!BATCH_SIZES[sku]) { if (sku) skippedSet.add(sku); return; }
-          if (!skuMap[sku]) skuMap[sku] = { sku, pretzels: 0, orders: [] };
-          skuMap[sku].pretzels += Number(quantity) || 0;
+          if (!sku) return;
+          const skuNorm = sku.trim();
+          // Explicitly-excluded FOH items
+          if (FOH_SKUS.has(skuNorm.toLowerCase()) || FOH_SKUS.has(skuNorm)) {
+            fohSet.add(skuNorm); return;
+          }
+          if (!skuMap[skuNorm]) skuMap[skuNorm] = { sku: skuNorm, pretzels: 0, orders: [] };
+          skuMap[skuNorm].pretzels += Number(quantity) || 0;
           const cust = delivery.customer || delivery.location || '?';
-          if (!skuMap[sku].orders.includes(cust)) skuMap[sku].orders.push(cust);
+          if (!skuMap[skuNorm].orders.includes(cust)) skuMap[skuNorm].orders.push(cust);
         });
       });
-    const demand = Object.values(skuMap).map(item => ({
-      sku:      item.sku,
-      pretzels: item.pretzels,
-      batches:  Math.ceil(item.pretzels / BATCH_SIZES[item.sku]),
-      cases:    CASE_SIZES[item.sku] ? Math.ceil(item.pretzels / CASE_SIZES[item.sku]) : null,
-      orders:   item.orders,
-    }));
-    return { demand, skipped: [...skippedSet] };
+    const demand = Object.values(skuMap).map(item => {
+      const batchSize = BATCH_SIZES[item.sku];
+      const caseSize  = CASE_SIZES[item.sku];
+      return {
+        sku:          item.sku,
+        pretzels:     item.pretzels,
+        batches:      batchSize ? Math.ceil(item.pretzels / batchSize) : null,
+        cases:        caseSize  ? Math.ceil(item.pretzels / caseSize)  : null,
+        orders:       item.orders,
+        needsConfig:  !batchSize,   // true = batch size not yet configured
+      };
+    });
+    return { demand, foh: [...fohSet] };
   }
 
   // ── Worker count ──────────────────────────────────────────────────────────
@@ -416,19 +434,19 @@
     // Yesterday's demand drove deliveries one lead-day further from yesterday
     const yDeliveryDate = toDateStr(addDays(parseDate(dateStr), type === 'shape' ? SHAPE_LEAD - 1 : BFP_LEAD - 1));
     const { demand: yDemand } = buildDemand(yDeliveryDate);
-    const yTotal = yDemand.reduce((s, d) => s + d.batches, 0);
+    const yTotal = yDemand.reduce((s, d) => s + (d.batches || 0), 0);
     const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
     const yDone = ((productionState[yesterdayStr] || {})[doneKey] || []).reduce((s, c) => s + (Number(c.batches)||0), 0);
     return Math.max(0, yTotal - yDone);
   }
 
   // ── Render panel ──────────────────────────────────────────────────────────
-  function renderPanel(type, dateStr, demand, dayState, skipped = []) {
+  function renderPanel(type, dateStr, demand, dayState, foh = []) {
     const isBFP    = type === 'bfp';
     const title    = isBFP ? 'Bake / Freeze / Pack' : 'Shape & Cold Ferment';
     const workers  = getWorkers(type, dateStr);
     const capacity = workers * BATCHES_PER_WORKER;
-    const needed   = demand.reduce((s, d) => s + d.batches, 0);
+    const needed   = demand.reduce((s, d) => s + (d.batches || 0), 0);
     const rollover = getRollover(type, dateStr);
     const total    = needed + rollover;
     const isOver   = total > capacity && needed > 0;
@@ -449,9 +467,12 @@
       const rows = demand.map(d => {
         const inv = inventory[d.sku] || 0;
         const caseStr = d.cases != null ? ` → ${d.cases} case${d.cases !== 1 ? 's' : ''}` : '';
-        return `<div class="demand-row">
+        const batchDetail = d.needsConfig
+          ? `<span style="color:#C41E1E;font-weight:700">⚠️ batch size not configured — add to BATCH_SIZES</span>`
+          : `<strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong>${esc(caseStr)}`;
+        return `<div class="demand-row${d.needsConfig ? ' demand-row-warn' : ''}">
           <span class="demand-sku">${esc(d.sku)}</span>
-          <span class="demand-detail">${d.pretzels} units = <strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong>${esc(caseStr)}</span>
+          <span class="demand-detail">${d.pretzels} units = ${batchDetail}</span>
           ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
           <span class="demand-orders">${d.orders.map(esc).join(' · ')}</span>
         </div>`;
@@ -461,8 +482,8 @@
         : `<span class="capacity-status ok">✅ ${spare} spare</span>`;
       const rollHtml = rollover > 0
         ? `<span class="rollover-badge">+${rollover} from yesterday</span>` : '';
-      const skippedHtml = skipped.length > 0
-        ? `<div class="section-label" style="color:#aaa;margin-top:4px">FOH only (not scheduled): ${skipped.map(esc).join(', ')}</div>`
+      const skippedHtml = foh.length > 0
+        ? `<div class="section-label" style="color:#aaa;margin-top:4px">FOH only (not scheduled): ${foh.map(esc).join(', ')}</div>`
         : '';
       demandHtml = `
         <div class="section-label">For ${esc(leadDate)} deliveries</div>
@@ -501,13 +522,20 @@
     // Check-off form (pre-filled with demand)
     let checkoffHtml = '';
     if (demand.length > 0) {
-      const rows = demand.map(d => `
-        <div class="checkoff-row">
+      const rows = demand.map(d => {
+        if (d.needsConfig) {
+          return `<div class="checkoff-row">
+            <span class="checkoff-sku" style="color:#C41E1E">${esc(d.sku)}</span>
+            <span class="checkoff-unit" style="color:#aaa">add batch size to config first</span>
+          </div>`;
+        }
+        return `<div class="checkoff-row">
           <span class="checkoff-sku">${esc(d.sku)}</span>
           <input type="number" class="checkoff-input" min="0" max="99"
             data-sku="${esc(d.sku)}" value="${d.batches}">
           <span class="checkoff-unit">batch${d.batches !== 1 ? 'es' : ''}</span>
-        </div>`).join('');
+        </div>`;
+      }).join('');
       checkoffHtml = `
         <details class="checkoff-details">
           <summary>Log completions</summary>
@@ -543,8 +571,8 @@
   function renderDay(dayDate) {
     const dateStr             = toDateStr(dayDate);
     const isToday             = dateStr === toDateStr(new Date());
-    const { demand: shapeDemand, skipped: shapeSkipped } = buildDemand(toDateStr(addDays(dayDate, SHAPE_LEAD)));
-    const { demand: bfpDemand,   skipped: bfpSkipped   } = buildDemand(toDateStr(addDays(dayDate, BFP_LEAD)));
+    const { demand: shapeDemand, foh: shapeFoh } = buildDemand(toDateStr(addDays(dayDate, SHAPE_LEAD)));
+    const { demand: bfpDemand,   foh: bfpFoh   } = buildDemand(toDateStr(addDays(dayDate, BFP_LEAD)));
     const dayState            = productionState[dateStr] || {};
 
     if (shapeDemand.length === 0 && bfpDemand.length === 0) {
@@ -556,8 +584,8 @@
     return `<div class="day-card${isToday ? ' day-today' : ''}">
       <div class="day-header">${esc(fmtDate(dayDate))}${isToday ? ' — TODAY' : ''}</div>
       <div class="day-panels">
-        ${renderPanel('shape', dateStr, shapeDemand, dayState, shapeSkipped)}
-        ${renderPanel('bfp',   dateStr, bfpDemand,   dayState, bfpSkipped)}
+        ${renderPanel('shape', dateStr, shapeDemand, dayState, shapeFoh)}
+        ${renderPanel('bfp',   dateStr, bfpDemand,   dayState, bfpFoh)}
       </div>
     </div>`;
   }
