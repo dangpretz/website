@@ -482,16 +482,33 @@
       <div class="sheet-sub" id="cfg-sku-display"></div>
     </div>
     <div class="sheet-body" style="padding:20px 20px 4px">
-      <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
-        Pretzels per batch
-      </label>
-      <input type="number" id="cfg-batch-size" min="1"
-        placeholder="e.g. 48"
-        style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:20px">
-      <div style="font:700 14px 'Manrope',sans-serif;color:var(--dark);margin-bottom:10px">Production type</div>
-      <button class="cfg-type-btn selected" data-cfg-type="standard">Standard pretzel</button>
-      <button class="cfg-type-btn" data-cfg-type="coating">+ Coating step (BBK / Spicy Bee)</button>
-      <button class="cfg-type-btn" data-cfg-type="foh">Front of house only — don't schedule</button>
+      <div id="cfg-mode-bar" style="display:flex;background:var(--gray-1);border-radius:10px;padding:3px;gap:3px;margin-bottom:16px">
+        <button class="cfg-mode-btn active" data-cfg-mode="config" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:var(--white);font:700 13px 'Manrope',sans-serif;color:var(--dark);box-shadow:0 1px 4px rgba(0,0,0,0.10);cursor:pointer">New SKU</button>
+        <button class="cfg-mode-btn" data-cfg-mode="alias" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:none;font:700 13px 'Manrope',sans-serif;color:var(--gray-4);cursor:pointer">Map to existing</button>
+      </div>
+
+      <div id="cfg-config-panel">
+        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
+          Pretzels per batch
+        </label>
+        <input type="number" id="cfg-batch-size" min="1"
+          placeholder="e.g. 48"
+          style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:20px">
+        <div style="font:700 14px 'Manrope',sans-serif;color:var(--dark);margin-bottom:10px">Production type</div>
+        <button class="cfg-type-btn selected" data-cfg-type="standard">Standard pretzel</button>
+        <button class="cfg-type-btn" data-cfg-type="coating">+ Coating step (BBK / Spicy Bee)</button>
+        <button class="cfg-type-btn" data-cfg-type="foh">Front of house only — don't schedule</button>
+      </div>
+
+      <div id="cfg-alias-panel" style="display:none">
+        <p style="font:400 13px 'Manrope',sans-serif;color:var(--gray-4);margin-bottom:12px">
+          Map this SKU name to an existing canonical SKU. All deliveries using this name will be redirected.
+        </p>
+        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
+          Map to canonical SKU
+        </label>
+        <select id="cfg-alias-target" class="extra-sku-select" style="margin-bottom:8px"></select>
+      </div>
     </div>
     <div class="sheet-footer">
       <button class="btn-primary" id="cfg-save">Save</button>
@@ -569,6 +586,7 @@
   let allSkus         = []; // master list from delivery-planner/skus.json
   let productionState = {};
   let skuConfig       = {}; // { sku: { batchSize, type } } — from sku_config log entries
+  let skuAliases      = {}; // { oldSku: canonicalSku } — from sku_alias log entries
   let schedule        = { shape: {}, bfp: {}, overdue: [], foh: [], unconfigured: [] };
   let currentDate     = new Date();
   let viewMode        = 'day';
@@ -624,7 +642,8 @@
 
   function resolveProductionLogs(logs) {
     const state = {};
-    skuConfig = {}; // reset before repopulating from log
+    skuConfig  = {}; // reset before repopulating from log
+    skuAliases = {};
     if (!Array.isArray(logs)) return state;
     logs.forEach(row => {
       const { date, action } = row;
@@ -636,6 +655,14 @@
           batchSize: Number(row.batchSize) || 0,
           type: row.type || 'standard',
         };
+        return;
+      }
+
+      // SKU alias: maps an old/alternate SKU name to a canonical one
+      if (action === 'sku_alias') {
+        const from = (row.from || '').trim();
+        const to   = (row.to   || '').trim();
+        if (from && to) skuAliases[from] = to;
         return;
       }
 
@@ -735,7 +762,8 @@
           try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
           items.forEach(({ sku, quantity }) => {
             if (!sku) return;
-            const key = sku.trim();
+            let key = sku.trim();
+            if (skuAliases[key]) key = skuAliases[key]; // resolve old → canonical name
             if (isFOH(key)) { fohSeen.add(key); return; }
             if (!skuMap[key]) skuMap[key] = { pretzels: 0, orders: [] };
             skuMap[key].pretzels += Number(quantity) || 0;
@@ -811,29 +839,37 @@
           let items = [];
           try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
           items.forEach(({ sku, quantity }) => {
-            const key = sku?.trim();
-            if (!key || latestInv.frozen[key] == null) return;
+            let key = sku?.trim();
+            if (!key) return;
+            if (skuAliases[key]) key = skuAliases[key]; // resolve to canonical
+            if (latestInv.frozen[key] == null) return;
             latestInv.frozen[key] = Math.max(0, (latestInv.frozen[key] || 0) - (Number(quantity) || 0));
           });
         });
     }
 
-    Object.entries(latestInv.coldFerment).forEach(([sku, pretzels]) => {
-      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftBatches = pretzels / getBatchSize(sku); // fractional OK for deduction
-      for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.shapeLeft, leftBatches);
-        item.shapeLeft -= take; leftBatches -= take;
-        if (leftBatches <= 0) break;
-      }
-    });
-
+    // Frozen runs first: finished pretzels in freezer satisfy BOTH shape and BFP
+    // demand (they're already done — no shaping or baking needed)
     Object.entries(latestInv.frozen).forEach(([sku, pretzels]) => {
       if (!bySkuItems[sku] || !getBatchSize(sku)) return;
       let leftBatches = pretzels / getBatchSize(sku);
       for (const item of bySkuItems[sku]) {
         const take = Math.min(item.bfpLeft, leftBatches);
-        item.bfpLeft -= take; leftBatches -= take;
+        item.bfpLeft  -= take;
+        item.shapeLeft = Math.max(0, item.shapeLeft - take); // frozen also covers shape
+        leftBatches   -= take;
+        if (leftBatches <= 0) break;
+      }
+    });
+
+    // Cold-ferment runs second: shaped dough only satisfies shape demand
+    // (BFP still needed because the dough still has to be baked)
+    Object.entries(latestInv.coldFerment).forEach(([sku, pretzels]) => {
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftBatches = pretzels / getBatchSize(sku);
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.shapeLeft, leftBatches);
+        item.shapeLeft -= take; leftBatches -= take;
         if (leftBatches <= 0) break;
       }
     });
@@ -1566,7 +1602,20 @@
   // Lets you set batch size + type for any SKU that appears in delivery orders
   // but isn't in the hardcoded BATCH_SIZES. Config saved to production log.
 
-  let cfgSku = null, cfgType = 'standard';
+  let cfgSku = null, cfgType = 'standard', cfgMode = 'config';
+
+  function setCfgMode(mode) {
+    cfgMode = mode;
+    document.querySelectorAll('.cfg-mode-btn').forEach(btn => {
+      const isActive = btn.dataset.cfgMode === mode;
+      btn.classList.toggle('active', isActive);
+      btn.style.background = isActive ? 'var(--white)' : 'none';
+      btn.style.color = isActive ? 'var(--dark)' : 'var(--gray-4)';
+      btn.style.boxShadow = isActive ? '0 1px 4px rgba(0,0,0,0.10)' : 'none';
+    });
+    document.getElementById('cfg-config-panel').style.display = mode === 'config' ? '' : 'none';
+    document.getElementById('cfg-alias-panel').style.display  = mode === 'alias'  ? '' : 'none';
+  }
 
   function openCfgSheet(sku) {
     cfgSku = sku;
@@ -1575,26 +1624,43 @@
     document.getElementById('cfg-batch-size').value = skuConfig[sku]?.batchSize || '';
     document.querySelectorAll('.cfg-type-btn').forEach(btn =>
       btn.classList.toggle('selected', btn.dataset.cfgType === cfgType));
+
+    // Populate alias dropdown with all canonical SKUs from skus.json
+    const target = document.getElementById('cfg-alias-target');
+    target.innerHTML = allSkus
+      .filter(s => s !== sku) // can't alias to self
+      .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+
+    setCfgMode('config'); // default to config tab
     document.getElementById('cfg-overlay').classList.add('open');
   }
 
   async function saveCfg() {
-    const batchSize = parseInt(document.getElementById('cfg-batch-size').value, 10);
-    if (!batchSize || batchSize < 1) { alert('Enter a batch size first'); return; }
     const saveBtn = document.getElementById('cfg-save');
     saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
     try {
-      await appendLog(PRODUCTION_LOG, {
-        action: 'sku_config', sku: cfgSku,
-        batchSize: String(batchSize), type: cfgType,
-        timeStamp: new Date().toISOString(),
-      });
+      if (cfgMode === 'alias') {
+        const target = document.getElementById('cfg-alias-target').value;
+        if (!target) { alert('Pick a target SKU first'); throw new Error('No target'); }
+        await appendLog(PRODUCTION_LOG, {
+          action: 'sku_alias', from: cfgSku, to: target,
+          timeStamp: new Date().toISOString(),
+        });
+      } else {
+        const batchSize = parseInt(document.getElementById('cfg-batch-size').value, 10);
+        if (!batchSize || batchSize < 1) { alert('Enter a batch size first'); throw new Error('No size'); }
+        await appendLog(PRODUCTION_LOG, {
+          action: 'sku_config', sku: cfgSku,
+          batchSize: String(batchSize), type: cfgType,
+          timeStamp: new Date().toISOString(),
+        });
+      }
       document.getElementById('cfg-overlay').classList.remove('open');
       await loadProduction();
       schedule = buildOptimalSchedule();
       render();
     } catch (e) {
-      alert('Error saving: ' + e.message);
+      if (!['No target', 'No size'].includes(e.message)) alert('Error saving: ' + e.message);
     } finally {
       saveBtn.disabled = false; saveBtn.textContent = 'Save';
     }
@@ -1682,6 +1748,9 @@
       document.querySelectorAll('.cfg-type-btn').forEach(b =>
         b.classList.toggle('selected', b === btn));
     });
+  });
+  document.querySelectorAll('.cfg-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => setCfgMode(btn.dataset.cfgMode));
   });
 
   // Tab buttons
