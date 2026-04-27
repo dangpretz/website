@@ -51,12 +51,46 @@
       -webkit-tap-highlight-color: transparent; flex-shrink: 0;
     }
     .week-toggle.active { color: var(--amber); }
-    .stock-count-btn {
-      width: 48px; height: 60px; border: none; background: none;
-      color: var(--gray-3); font-size: 20px; cursor: pointer;
-      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+    /* ── Day tab bar ───────────────────────────── */
+    .tab-bar {
+      display: flex; background: var(--gray-1);
+      border-radius: 10px; padding: 3px; margin-bottom: 12px; gap: 3px;
     }
-    .stock-count-btn:active { background: rgba(255,255,255,0.08); }
+    .tab-btn {
+      flex: 1; padding: 10px 6px; border: none; border-radius: 8px;
+      background: none; font: 700 13px 'Manrope', sans-serif;
+      color: var(--gray-4); cursor: pointer; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-btn.active { background: var(--white); color: var(--dark); box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
+
+    /* ── Stock tab ─────────────────────────────── */
+    .stock-tab-header {
+      padding: 6px 0 14px; border-bottom: 2px solid var(--gray-2); margin-bottom: 6px;
+    }
+    .stock-tab-title { font-family: 'Paytone One', sans-serif; font-size: 18px; color: var(--dark); }
+    .stock-tab-note  { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 2px; }
+    .stock-col-head  {
+      display: grid; grid-template-columns: 1fr 76px 76px;
+      gap: 8px; padding: 8px 0 6px;
+      font: 700 11px 'Manrope', sans-serif; color: var(--gray-3);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--gray-2);
+    }
+    .stock-row {
+      display: grid; grid-template-columns: 1fr 76px 76px;
+      gap: 8px; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--gray-2);
+    }
+    .stock-row:last-of-type { border-bottom: none; }
+    .stock-sku   { font: 600 14px 'Manrope', sans-serif; color: var(--dark); }
+    .stock-input {
+      width: 100%; padding: 9px 6px; text-align: center;
+      border: 1.5px solid var(--gray-2); border-radius: 8px;
+      font: 700 15px 'Manrope', sans-serif !important; color: var(--dark);
+    }
+    .stock-na    { font: 400 13px 'Manrope', sans-serif; color: var(--gray-3); text-align: center; }
+    .stock-deduct { font: 400 11px 'Manrope', sans-serif; color: var(--green); }
 
     /* ── Page content ──────────────────────────── */
     .content { padding: 12px 12px 100px; max-width: 640px; margin: 0 auto; }
@@ -384,11 +418,15 @@
   </div>
   <button class="nav-arrow" id="nav-next" aria-label="Next day">›</button>
   <button class="week-toggle" id="week-toggle">Week</button>
-  <button class="stock-count-btn" id="stock-count-btn" aria-label="Stock Count">📦</button>
 </nav>
 
 <div class="content">
   <div id="alert-area"></div>
+  <div class="tab-bar" id="tab-bar" style="display:none">
+    <button class="tab-btn active" data-tab="shape">🥨 Shape</button>
+    <button class="tab-btn" data-tab="bfp">🔥 BFP</button>
+    <button class="tab-btn" data-tab="stock">📦 Stock</button>
+  </div>
   <div id="main-view"><div class="no-prod">Loading…</div></div>
 </div>
 
@@ -434,26 +472,6 @@
   </div>
 </div>
 
-<!-- Stock count sheet -->
-<div class="sheet-overlay" id="inv-overlay" role="dialog" aria-modal="true">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <div class="sheet-title">Stock Count</div>
-      <div class="sheet-sub">Updates the schedule immediately on save</div>
-    </div>
-    <div class="sheet-body">
-      <div class="section-label" style="margin:16px 0 4px">🧊 Dough in fridge (cold-ferment)</div>
-      <div id="inv-shape-body"></div>
-      <div class="section-label" style="margin:16px 0 4px">❄️ Frozen pretzels</div>
-      <div id="inv-frozen-body"></div>
-    </div>
-    <div class="sheet-footer">
-      <button class="btn-primary" id="inv-save">Save Stock Count</button>
-      <button class="btn-secondary" id="inv-cancel">Cancel</button>
-    </div>
-  </div>
-</div>
 
 <!-- Configure SKU sheet -->
 <div class="sheet-overlay" id="cfg-overlay" role="dialog" aria-modal="true">
@@ -557,6 +575,7 @@
 
   let logType = null, logDate = null, logItems = [], logWorkers = 1;
   let extraType = null, extraDate = null, extraValue = 1;
+  let dayTab = 'shape'; // active tab in day view: 'shape' | 'bfp' | 'stock'
 
   // ─── DATE HELPERS ─────────────────────────────────────────────────────────
 
@@ -776,9 +795,30 @@
     // cold-ferment dough → reduces shape demand; frozen pretzels → reduces BFP demand
     const latestInv = getLatestInventory();
 
+    // Auto-deduct quantities from fulfilled deliveries on/after the last inventory snapshot
+    // so confirming a delivery in the planner automatically reduces frozen counts here
+    const latestInvDate = Object.keys(productionState)
+      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
+                    Object.keys(productionState[ds].frozen      || {}).length > 0)
+      .sort().pop() || null;
+
+    if (latestInvDate) {
+      allDeliveries
+        .filter(d => ['delivered','picked_up'].includes(d.status) && d.date >= latestInvDate)
+        .forEach(delivery => {
+          let items = [];
+          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+          items.forEach(({ sku, quantity }) => {
+            const key = sku?.trim();
+            if (!key || latestInv.frozen[key] == null) return;
+            latestInv.frozen[key] = Math.max(0, (latestInv.frozen[key] || 0) - (Number(quantity) || 0));
+          });
+        });
+    }
+
     Object.entries(latestInv.coldFerment).forEach(([sku, pretzels]) => {
-      if (!bySkuItems[sku] || !BATCH_SIZES[sku]) return;
-      let leftBatches = pretzels / BATCH_SIZES[sku]; // fractional OK for deduction
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftBatches = pretzels / getBatchSize(sku); // fractional OK for deduction
       for (const item of bySkuItems[sku]) {
         const take = Math.min(item.shapeLeft, leftBatches);
         item.shapeLeft -= take; leftBatches -= take;
@@ -787,13 +827,20 @@
     });
 
     Object.entries(latestInv.frozen).forEach(([sku, pretzels]) => {
-      if (!bySkuItems[sku] || !BATCH_SIZES[sku]) return;
-      let leftBatches = pretzels / BATCH_SIZES[sku];
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftBatches = pretzels / getBatchSize(sku);
       for (const item of bySkuItems[sku]) {
         const take = Math.min(item.bfpLeft, leftBatches);
         item.bfpLeft -= take; leftBatches -= take;
         if (leftBatches <= 0) break;
       }
+    });
+
+    // Round remaining demand up to whole batches (inventory deduction is fractional
+    // but workers can only make whole batches — prevents "×4.625" display)
+    Object.values(bySkuItems).flat().forEach(item => {
+      item.shapeLeft = item.shapeLeft > 0 ? Math.ceil(item.shapeLeft) : 0;
+      item.bfpLeft   = item.bfpLeft   > 0 ? Math.ceil(item.bfpLeft)   : 0;
     });
 
     // Separate overdue items (window already closed, work not done)
@@ -1009,17 +1056,7 @@
         </div>
       </div>` : '';
 
-    // Inventory strip
-    const invItems = Object.entries(inventory).filter(([,v]) => v > 0)
-      .map(([sku, n]) => `${esc(sku)}: ${n}`).join(' · ');
-    const invHtml = `
-      <div class="inv-strip">
-        <div class="inv-strip-header">
-          <span class="section-label" style="margin:0">${isBFP ? 'Frozen on hand' : 'Cold ferment on hand'}</span>
-          <button class="btn-link" data-inv-btn>Update</button>
-        </div>
-        ${invItems ? `<span class="inv-strip-items">${invItems}</span>` : `<span class="inv-strip-empty">None entered</span>`}
-      </div>`;
+    // Inventory is now in the Stock tab — no inline strip needed
 
     // Completed strip
     let completedHtml = '';
@@ -1066,7 +1103,6 @@
         ${workersHtml}
         ${skuHtml}
         ${batchTotalHtml}
-        ${invHtml}
         ${completedHtml}
         ${fohHtml}
         ${logBtnHtml}
@@ -1077,7 +1113,10 @@
   // ─── RENDER DAY VIEW ──────────────────────────────────────────────────────
 
   function renderDayView() {
-    const dateStr   = toDateStr(currentDate);
+    const dateStr    = toDateStr(currentDate);
+    if (dayTab === 'stock') return renderStockTab();
+
+    const type       = dayTab; // 'shape' or 'bfp'
     const shapeItems = schedule.shape[dateStr] || [];
     const bfpItems   = schedule.bfp[dateStr]   || [];
 
@@ -1086,7 +1125,102 @@
         <span style="font-size:13px;color:var(--gray-3)">All upcoming orders covered, or no deliveries within production windows.</span>
       </div>`;
     }
-    return renderTeamCard('shape', dateStr) + renderTeamCard('bfp', dateStr);
+    const items = schedule[type][dateStr] || [];
+    if (items.length === 0) {
+      const other = type === 'shape' ? 'BFP' : 'Shape';
+      return `<div class="no-prod" style="padding:32px 20px">Nothing for ${type === 'shape' ? 'Shape' : 'BFP'} today.<br>
+        <span style="font-size:13px;color:var(--gray-3)">Check the ${other} tab.</span>
+      </div>`;
+    }
+    return renderTeamCard(type, dateStr);
+  }
+
+  // ─── RENDER STOCK TAB ─────────────────────────────────────────────────────
+
+  function renderStockTab() {
+    const inv = getLatestInventory();
+
+    // Compute auto-deducted amounts for display (fulfilled deliveries since last snapshot)
+    const latestInvDate = Object.keys(productionState)
+      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
+                    Object.keys(productionState[ds].frozen      || {}).length > 0)
+      .sort().pop() || null;
+
+    const deducted = {}; // sku → pretzel count auto-deducted
+    if (latestInvDate) {
+      allDeliveries
+        .filter(d => ['delivered','picked_up'].includes(d.status) && d.date >= latestInvDate)
+        .forEach(delivery => {
+          let items = [];
+          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+          items.forEach(({ sku, quantity }) => {
+            const key = sku?.trim();
+            if (key) deducted[key] = (deducted[key] || 0) + (Number(quantity) || 0);
+          });
+        });
+    }
+
+    const lastSavedStr = latestInvDate ? `Last count: ${fmtShort(parseDate(latestInvDate))}` : 'No count saved yet';
+    const deductCount  = Object.values(deducted).filter(n => n > 0).length;
+    const deductNote   = deductCount > 0
+      ? ` · ${deductCount} SKU${deductCount > 1 ? 's' : ''} adjusted for confirmed deliveries` : '';
+
+    const rows = allSkus.map(sku => {
+      const isFohSku  = isFOH(sku);
+      const doughVal  = inv.coldFerment[sku] || 0;
+      const frozenVal = inv.frozen[sku] || 0;
+      const dedAmt    = deducted[sku] || 0;
+      const dedStr    = dedAmt > 0 ? `<div class="stock-deduct">−${dedAmt} delivered</div>` : '';
+      return `<div class="stock-row">
+        <div><span class="stock-sku">${esc(sku)}</span>${dedStr}</div>
+        ${isFohSku
+          ? `<span class="stock-na">—</span>`
+          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughVal}" placeholder="0">`}
+        <input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenVal}" placeholder="0">
+      </div>`;
+    }).join('');
+
+    return `<div>
+      <div class="stock-tab-header">
+        <div>
+          <div class="stock-tab-title">Stock Count</div>
+          <div class="stock-tab-note">${esc(lastSavedStr)}${esc(deductNote)}</div>
+        </div>
+      </div>
+      <div class="stock-col-head">
+        <span>SKU</span>
+        <span style="text-align:center">🧊 Dough</span>
+        <span style="text-align:center">❄️ Frozen</span>
+      </div>
+      ${rows}
+      <button class="btn-primary" id="stock-save" style="margin-top:20px">Save Stock Count</button>
+    </div>`;
+  }
+
+  async function saveStock() {
+    const snaps = {};
+    document.querySelectorAll('[data-stock-section]').forEach(inp => {
+      const sku = inp.dataset.sku, section = inp.dataset.stockSection;
+      const n   = parseInt(inp.value, 10) || 0;
+      if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0 };
+      if (section === 'shape')  snaps[sku].coldFerment = n;
+      if (section === 'frozen') snaps[sku].frozen      = n;
+    });
+    const snapArr = Object.values(snaps).filter(s => s.coldFerment > 0 || s.frozen > 0);
+    const saveBtn = document.getElementById('stock-save');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action: 'inventory', date: toDateStr(new Date()),
+        snapshots: JSON.stringify(snapArr), timeStamp: new Date().toISOString(),
+      });
+      await loadProduction();
+      schedule = buildOptimalSchedule();
+      render();
+    } catch (e) {
+      alert('Error saving: ' + e.message);
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Stock Count'; }
+    }
   }
 
   // ─── RENDER WEEK VIEW ─────────────────────────────────────────────────────
@@ -1163,10 +1297,20 @@
   function render() {
     updateNav();
 
-    // Overdue banner
-    const overdueHtml = schedule.overdue.map(o =>
-      `<div class="overdue-banner">🚨 Overdue (${o.team === 'shape' ? 'Shape' : 'BFP'}): ${esc(o.sku)} ×${o.batches} — window closed ${esc(o.windowEnd)}, needed for ${esc(o.deliveryDate)} delivery</div>`
-    ).join('');
+    // Consolidated overdue panel (one block instead of N banners)
+    let overdueHtml = '';
+    if (schedule.overdue.length > 0) {
+      const shapeOver = schedule.overdue.filter(o => o.team === 'shape');
+      const bfpOver   = schedule.overdue.filter(o => o.team === 'bfp');
+      const groupHtml = (items, label) => items.length === 0 ? '' :
+        `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ` +
+        items.map(o => `${esc(o.sku)} ×${o.batches}`).join(' · ') + '</div>';
+      overdueHtml = `<div class="overdue-banner">
+        <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${schedule.overdue.length} overdue — production window${schedule.overdue.length > 1 ? 's have' : ' has'} closed</div>
+        ${groupHtml(shapeOver, 'Shape')}
+        ${groupHtml(bfpOver, 'BFP')}
+      </div>`;
+    }
 
     // Unconfigured SKU warnings
     const unconfigHtml = (schedule.unconfigured || []).map(sku =>
@@ -1186,6 +1330,13 @@
       : '';
 
     document.getElementById('alert-area').innerHTML = overdueHtml + unconfigHtml + unconfirmedHtml;
+
+    // Tab bar — only shown in day view; update active state
+    const tabBar = document.getElementById('tab-bar');
+    tabBar.style.display = viewMode === 'week' ? 'none' : 'flex';
+    document.querySelectorAll('.tab-btn').forEach(btn =>
+      btn.classList.toggle('active', btn.dataset.tab === dayTab));
+
     document.getElementById('main-view').innerHTML  =
       viewMode === 'week' ? renderWeekView() : renderDayView();
 
@@ -1219,12 +1370,11 @@
     document.querySelectorAll('[data-extra-btn]').forEach(btn => {
       btn.addEventListener('click', () => openExtraSheet(btn.dataset.type, btn.dataset.date));
     });
-    document.querySelectorAll('[data-inv-btn]').forEach(btn => {
-      btn.addEventListener('click', openInvSheet);
-    });
     document.querySelectorAll('[data-cfg-btn]').forEach(btn => {
       btn.addEventListener('click', () => openCfgSheet(btn.dataset.sku));
     });
+    const stockSaveBtn = document.getElementById('stock-save');
+    if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
     document.querySelectorAll('[data-goto]').forEach(row => {
       row.addEventListener('click', () => {
         currentDate = parseDate(row.dataset.goto);
@@ -1388,54 +1538,6 @@
     }
   }
 
-  // ─── STOCK COUNT SHEET ────────────────────────────────────────────────────
-  // Unified sheet for cold-ferment (dough in fridge) and frozen (finished product).
-  // Always saves to today's date. Scheduler reads the latest snapshot per SKU.
-
-  function openInvSheet() {
-    const inv = getLatestInventory();
-    // Use master SKU list from skus.json so inventory always matches delivery planner
-    const mkRows = (section, invData) => allSkus.map(sku => `
-      <div class="inv-input-row">
-        <label class="inv-input-lbl">${esc(sku)}</label>
-        <input class="inv-input" type="number" min="0"
-          data-inv-section="${section}" data-sku="${esc(sku)}"
-          value="${invData[sku] || 0}">
-        <span class="inv-input-unit">pretzels</span>
-      </div>`).join('');
-    document.getElementById('inv-shape-body').innerHTML  = mkRows('shape',  inv.coldFerment);
-    document.getElementById('inv-frozen-body').innerHTML = mkRows('frozen', inv.frozen);
-    document.getElementById('inv-overlay').classList.add('open');
-  }
-
-  async function saveInv() {
-    const snaps = {};
-    document.querySelectorAll('[data-inv-section]').forEach(inp => {
-      const sku = inp.dataset.sku, section = inp.dataset.invSection;
-      const n   = parseInt(inp.value, 10) || 0;
-      if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0 };
-      if (section === 'shape')  snaps[sku].coldFerment = n;
-      if (section === 'frozen') snaps[sku].frozen      = n;
-    });
-    const snapArr = Object.values(snaps).filter(s => s.coldFerment > 0 || s.frozen > 0);
-    const saveBtn = document.getElementById('inv-save');
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
-    try {
-      await appendLog(PRODUCTION_LOG, {
-        action: 'inventory', date: toDateStr(new Date()),
-        snapshots: JSON.stringify(snapArr), timeStamp: new Date().toISOString(),
-      });
-      document.getElementById('inv-overlay').classList.remove('open');
-      await loadProduction();
-      schedule = buildOptimalSchedule();
-      render();
-    } catch (e) {
-      alert('Error saving: ' + e.message);
-    } finally {
-      saveBtn.disabled = false; saveBtn.textContent = 'Save Stock Count';
-    }
-  }
-
   // ─── CONFIGURE SKU SHEET ─────────────────────────────────────────────────
   // Lets you set batch size + type for any SKU that appears in delivery orders
   // but isn't in the hardcoded BATCH_SIZES. Config saved to production log.
@@ -1558,14 +1660,9 @@
     });
   });
 
-  // Stock count sheet
-  document.getElementById('stock-count-btn').addEventListener('click', openInvSheet);
-  document.getElementById('inv-save').addEventListener('click', saveInv);
-  document.getElementById('inv-cancel').addEventListener('click', () =>
-    document.getElementById('inv-overlay').classList.remove('open'));
-  document.getElementById('inv-overlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('inv-overlay'))
-      document.getElementById('inv-overlay').classList.remove('open');
+  // Tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => { dayTab = btn.dataset.tab; render(); });
   });
 
   // ─── BOOT ─────────────────────────────────────────────────────────────────
