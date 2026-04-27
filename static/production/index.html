@@ -548,6 +548,7 @@
   // ─── STATE ────────────────────────────────────────────────────────────────
 
   let allDeliveries   = [];
+  let allSkus         = []; // master list from delivery-planner/skus.json
   let productionState = {};
   let skuConfig       = {}; // { sku: { batchSize, type } } — from sku_config log entries
   let schedule        = { shape: {}, bfp: {}, overdue: [], foh: [], unconfigured: [] };
@@ -1393,7 +1394,8 @@
 
   function openInvSheet() {
     const inv = getLatestInventory();
-    const mkRows = (section, invData) => allProductionSkus().map(sku => `
+    // Use master SKU list from skus.json so inventory always matches delivery planner
+    const mkRows = (section, invData) => allSkus.map(sku => `
       <div class="inv-input-row">
         <label class="inv-input-lbl">${esc(sku)}</label>
         <input class="inv-input" type="number" min="0"
@@ -1484,6 +1486,13 @@
     productionState = resolveProductionLogs(logs);
   }
 
+  async function loadSkus() {
+    try {
+      const r = await fetch('../delivery-planner/skus.json');
+      allSkus = await r.json();
+    } catch { allSkus = Object.keys(BATCH_SIZES); } // fallback to hardcoded list
+  }
+
   // ─── NAV WIRING ───────────────────────────────────────────────────────────
 
   document.getElementById('nav-prev').addEventListener('click', () => {
@@ -1563,7 +1572,7 @@
 
   (async () => {
     try {
-      await Promise.all([loadDeliveries(), loadProduction()]);
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus()]);
       schedule = buildOptimalSchedule();
       render();
     } catch (e) {
