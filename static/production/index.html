@@ -55,13 +55,18 @@
     /* ── Page content ──────────────────────────── */
     .content { padding: 12px 12px 100px; max-width: 640px; margin: 0 auto; }
 
-    /* ── Alert banner ──────────────────────────── */
+    /* ── Banners ───────────────────────────────── */
     .alert-banner {
       background: #fff3cd; color: #856404;
       border-radius: 10px; padding: 12px 16px;
-      font: 600 14px 'Manrope', sans-serif; margin-bottom: 12px;
+      font: 600 14px 'Manrope', sans-serif; margin-bottom: 10px;
     }
     .alert-banner a { color: #856404; }
+    .overdue-banner {
+      background: #fff0f0; color: var(--red); border: 1px solid #ffcccc;
+      border-radius: 10px; padding: 12px 16px;
+      font: 600 14px 'Manrope', sans-serif; margin-bottom: 10px;
+    }
 
     /* ── Team card ─────────────────────────────── */
     .team-card {
@@ -118,19 +123,27 @@
     }
     .sku-row {
       padding: 10px 0; border-bottom: 1px solid var(--gray-2);
-      display: flex; flex-direction: column; gap: 2px;
+      display: flex; flex-direction: column; gap: 3px;
     }
     .sku-row:last-child { border-bottom: none; }
     .sku-name { font: 700 17px 'Manrope', sans-serif; color: var(--dark); }
     .sku-detail { font: 400 14px 'Manrope', sans-serif; color: var(--gray-4); }
     .sku-detail strong { color: var(--dark); font-weight: 800; }
+    .sku-delivery { font: 400 12px 'Manrope', sans-serif; color: var(--gray-3); }
     .sku-customers { font: 400 12px 'Manrope', sans-serif; color: var(--gray-3); }
-    .sku-warn { color: var(--red); font: 600 13px 'Manrope', sans-serif; }
     .inv-badge {
       display: inline-block; font: 600 11px 'Manrope', sans-serif;
       color: var(--green); background: #e8f5e8;
-      padding: 2px 7px; border-radius: 4px; margin-top: 2px;
+      padding: 2px 7px; border-radius: 4px; margin-top: 1px;
     }
+
+    /* ── Urgency tags ──────────────────────────── */
+    .sku-tag {
+      display: inline-block; font: 700 11px 'Manrope', sans-serif;
+      padding: 2px 7px; border-radius: 4px; margin-top: 1px;
+    }
+    .sku-tag-urgent { background: #fff0f0; color: var(--red); }
+    .sku-tag-ahead  { background: #fff3cd; color: #856404; }
 
     /* ── Group label (BFP coating) ─────────────── */
     .group-label {
@@ -150,11 +163,6 @@
     .batch-total-left { display: flex; flex-direction: column; gap: 2px; }
     .batch-total-num { font: 800 28px 'Manrope', sans-serif; color: var(--dark); line-height: 1; }
     .batch-total-lbl { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); }
-    .rollover-pill {
-      display: inline-block; font: 600 11px 'Manrope', sans-serif;
-      background: #fff3cd; color: #856404;
-      padding: 2px 7px; border-radius: 6px; margin-top: 2px;
-    }
     .batch-status { font: 700 14px 'Manrope', sans-serif; }
     .status-ok   { color: var(--green); }
     .status-over { color: var(--red); }
@@ -198,7 +206,7 @@
       margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gray-2);
     }
 
-    /* ── Log button ────────────────────────────── */
+    /* ── Log & extra buttons ───────────────────── */
     .log-btn {
       display: block; width: 100%; min-height: 54px;
       background: var(--red); color: var(--white); border: none;
@@ -208,6 +216,14 @@
     .log-btn:active { background: var(--red-dk); }
     .log-btn.logged { background: var(--green); }
     .log-btn.logged:active { background: #1e5c1e; }
+    .log-btn-extra {
+      display: block; width: 100%; min-height: 44px;
+      background: none; border: 1.5px solid var(--gray-2);
+      border-radius: 10px; font: 600 14px 'Manrope', sans-serif;
+      color: var(--dark); cursor: pointer; margin-top: 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .log-btn-extra:active { background: var(--gray-1); }
 
     /* ── Week view ─────────────────────────────── */
     .week-section-lbl {
@@ -226,10 +242,10 @@
     .week-row.is-empty { opacity: 0.45; }
     .week-row-date { flex: 1; }
     .week-row-day { font: 700 17px 'Manrope', sans-serif; color: var(--dark); }
-    .week-row-full { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 2px; }
-    .week-row-icons { display: flex; gap: 4px; align-items: center; }
-    .week-icon { font-size: 20px; line-height: 1; }
-    .week-chevron { font: 400 18px 'Manrope', sans-serif; color: var(--gray-3); margin-left: 4px; }
+    .week-row-sub { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 3px; }
+    .week-row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+    .week-team-line { font: 600 12px 'Manrope', sans-serif; color: var(--gray-4); }
+    .week-chevron { font: 400 20px 'Manrope', sans-serif; color: var(--gray-3); margin-top: 2px; }
 
     /* ── No production ─────────────────────────── */
     .no-prod {
@@ -273,7 +289,7 @@
     .sheet-workers-lbl { font: 700 16px 'Manrope', sans-serif; color: var(--dark); }
     .sheet-workers-sub { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); display: block; margin-top: 2px; }
 
-    /* ── Sheet stepper (large) ─────────────────── */
+    /* ── Sheet steppers ────────────────────────── */
     .stepper-lg { display: flex; align-items: center; }
     .step-btn {
       width: 48px; height: 48px; border: 1.5px solid var(--gray-2); border-radius: 8px;
@@ -287,7 +303,7 @@
       font: 800 22px 'Manrope', sans-serif; color: var(--dark);
     }
 
-    /* ── Sheet SKU row ─────────────────────────── */
+    /* ── Sheet SKU rows ────────────────────────── */
     .log-sku-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 0; border-bottom: 1px solid var(--gray-2); gap: 12px;
@@ -296,6 +312,14 @@
     .log-sku-info { flex: 1; min-width: 0; }
     .log-sku-name { font: 700 16px 'Manrope', sans-serif; color: var(--dark); }
     .log-sku-demand { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 2px; }
+
+    /* ── Extra sheet select ────────────────────── */
+    .extra-sku-select {
+      width: 100%; padding: 14px; margin-bottom: 20px;
+      border: 1.5px solid var(--gray-2); border-radius: 10px;
+      font: 600 16px 'Manrope', sans-serif; color: var(--dark);
+      background: var(--white); appearance: none; -webkit-appearance: none;
+    }
 
     /* ── Sheet inv input row ───────────────────── */
     .inv-input-row {
@@ -366,6 +390,32 @@
   </div>
 </div>
 
+<!-- Extra / unscheduled batch sheet -->
+<div class="sheet-overlay" id="extra-overlay" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="extra-title">Add Unscheduled Batch</div>
+      <div class="sheet-sub" id="extra-sub">Last-minute order or walk-in</div>
+    </div>
+    <div class="sheet-body" style="padding:20px">
+      <select class="extra-sku-select" id="extra-sku-select"></select>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+        <span style="font:700 16px 'Manrope',sans-serif;color:var(--dark)">Batches</span>
+        <div class="stepper-lg">
+          <button class="step-btn" id="extra-dec">−</button>
+          <span class="step-val" id="extra-val">1</span>
+          <button class="step-btn" id="extra-inc">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn-primary" id="extra-save">Save Batch</button>
+      <button class="btn-secondary" id="extra-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Inventory sheet -->
 <div class="sheet-overlay" id="inv-overlay" role="dialog" aria-modal="true">
   <div class="sheet">
@@ -390,7 +440,6 @@
   const DELIVERY_LOG   = '/dangpretz/delivery-planner';
   const PRODUCTION_LOG = '/dangpretz/production';
 
-  // Pretzels per batch — used to convert order qty → batches needed
   const BATCH_SIZES = {
     '21oz mammoth pretzel': 24,
     '10oz mustache':        48,
@@ -404,7 +453,7 @@
     'bees bats':            72,
   };
 
-  // Units per case — ⚠️ SET TO 0 UNTIL CONFIRMED, suppresses case count display
+  // Units per case — ⚠️ SET TO 0 UNTIL CONFIRMED
   const CASE_SIZES = {
     '21oz mammoth pretzel': 0,  // ← update
     '10oz mustache':        0,  // ← update
@@ -418,50 +467,47 @@
     'bees bats':            0,  // ← update
   };
 
-  // FOH-only items — excluded from production schedule entirely
   const FOH_SKUS = new Set([
     '3oz cheese dip',
     'bulk dangerous dip (25 srv)',
   ]);
 
-  // BFP bake groups — coating SKUs get a separate section in the BFP card
   const BAKE_GROUPS = {
     coating: ['10oz bbk', '10oz spicy bee', '6.5oz bbk', '6.5oz spicy bee'],
   };
 
-  const BATCHES_PER_WORKER = 5;  // batches a single worker can complete per shift
-  const SHAPE_LEAD = 2;          // shape team works N days before delivery date
-  const BFP_LEAD   = 1;          // BFP team works N days before delivery date
-  const WEEK_RANGE = 14;         // days shown in week view
+  const BATCHES_PER_WORKER  = 6;   // soft cap per worker per shift
+  const SHAPE_MIN_LEAD      = 2;   // shape must happen at least N days before delivery
+  const SHAPE_MAX_LEAD      = 7;   // shape can happen up to N days before delivery
+  const BFP_MIN_LEAD        = 1;   // BFP must happen at least N days before delivery
+  const BFP_MAX_LEAD        = 3;   // BFP can happen up to N days before delivery
+  const SCHEDULE_LOOKAHEAD  = 14;  // days of deliveries to scan
 
   // ─── STATE ────────────────────────────────────────────────────────────────
 
   let allDeliveries   = [];
   let productionState = {};
+  let schedule        = { shape: {}, bfp: {}, overdue: [], foh: [] };
   let currentDate     = new Date();
-  let viewMode        = 'day'; // 'day' | 'week'
+  let viewMode        = 'day';
 
-  // Log sheet
-  let logType    = null;
-  let logDate    = null;
-  let logItems   = [];  // [{ sku, demand, value }]
-  let logWorkers = 1;
-
-  // Inv sheet
-  let invDate = null;
-  let invType = null;
+  let logType = null, logDate = null, logItems = [], logWorkers = 1;
+  let invDate = null, invType = null;
+  let extraType = null, extraDate = null, extraValue = 1;
 
   // ─── DATE HELPERS ─────────────────────────────────────────────────────────
 
   const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  const toDateStr = d => d.toISOString().slice(0, 10);
-  const parseDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
-  const addDays   = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-  const fmtShort  = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const fmtFull   = d => `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const esc       = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const toDateStr   = d => d.toISOString().slice(0, 10);
+  const parseDate   = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+  const addDays     = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
+  const fmtShort    = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const fmtFull     = d => `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const fmtDay      = d => DAYS[d.getDay()];
+  const esc         = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // ─── RESOLVE DELIVERIES ───────────────────────────────────────────────────
 
@@ -479,10 +525,7 @@
         }
         return;
       }
-      if (row.action === 'status') {
-        if (byId[id]) byId[id].status = row.status || 'scheduled';
-        return;
-      }
+      if (row.action === 'status') { if (byId[id]) byId[id].status = row.status || 'scheduled'; return; }
       if (row.action === 'update') {
         const prev = byId[id];
         byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
@@ -494,9 +537,8 @@
     return Object.values(byId);
   }
 
-  // ─── RESOLVE PRODUCTION LOGS (accumulation fix) ───────────────────────────
-  // Each shape_done / bfp_done entry is merged (summed) into the daily total.
-  // Previously the last log entry overwrote earlier ones.
+  // ─── RESOLVE PRODUCTION LOGS ──────────────────────────────────────────────
+  // Accumulation fix: merges all entries per date instead of last-write-wins.
 
   function resolveProductionLogs(logs) {
     const state = {};
@@ -515,12 +557,10 @@
             if (sn.coldFerment > 0) cf[sn.sku] = Number(sn.coldFerment);
             if (sn.frozen > 0)      fr[sn.sku] = Number(sn.frozen);
           });
-          s.coldFerment = cf;
-          s.frozen = fr;
+          s.coldFerment = cf; s.frozen = fr;
         } catch {}
         return;
       }
-
       if (action === 'shape_done') {
         try {
           const incoming = JSON.parse(row.completions || '[]');
@@ -533,7 +573,6 @@
         } catch {}
         return;
       }
-
       if (action === 'bfp_done') {
         try {
           const incoming = JSON.parse(row.completions || '[]');
@@ -550,94 +589,225 @@
     return state;
   }
 
-  // ─── BUILD DEMAND ─────────────────────────────────────────────────────────
-  // All non-FOH SKUs from deliveries on deliveryDateStr are included.
-  // SKUs not in BATCH_SIZES get needsConfig:true (shown with a warning).
-
-  function buildDemand(deliveryDateStr) {
-    const skuMap = {};
-    const fohSet = new Set();
-
-    allDeliveries
-      .filter(d => d.date === deliveryDateStr && !['delivered','picked_up','cancelled'].includes(d.status))
-      .forEach(delivery => {
-        let items = [];
-        try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
-        items.forEach(({ sku, quantity }) => {
-          if (!sku) return;
-          const key  = sku.trim();
-          const norm = key.toLowerCase();
-          if (FOH_SKUS.has(norm) || FOH_SKUS.has(key)) { fohSet.add(key); return; }
-          if (!skuMap[key]) skuMap[key] = { sku: key, pretzels: 0, orders: [] };
-          skuMap[key].pretzels += Number(quantity) || 0;
-          const cust = delivery.customer || delivery.location || '?';
-          if (!skuMap[key].orders.includes(cust)) skuMap[key].orders.push(cust);
-        });
-      });
-
-    const demand = Object.values(skuMap).map(item => {
-      const batchSize = BATCH_SIZES[item.sku];
-      const caseSize  = CASE_SIZES[item.sku];
-      return {
-        sku:         item.sku,
-        pretzels:    item.pretzels,
-        batches:     batchSize ? Math.ceil(item.pretzels / batchSize) : null,
-        cases:       caseSize  ? Math.ceil(item.pretzels / caseSize)  : null,
-        orders:      item.orders,
-        needsConfig: !batchSize,
-      };
-    });
-
-    return { demand, foh: [...fohSet] };
-  }
-
   // ─── WORKER PERSISTENCE ───────────────────────────────────────────────────
 
   const getWorkers  = (type, date) => Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
   const saveWorkers = (type, date, n) => localStorage.setItem(`prod-${type}-workers-${date}`, String(Math.max(1, n)));
 
-  // ─── ROLLOVER ─────────────────────────────────────────────────────────────
+  // ─── BUILD OPTIMAL SCHEDULE ───────────────────────────────────────────────
+  // Greedy rolling-window scheduler. Runs on every data load.
+  //
+  // Priority sort per day:
+  //   1. daysLeft = 0 (must do today — last day in window)
+  //   2. daysLeft ASC (most urgent next)
+  //   3. totalSkuRunSize DESC (consolidate large runs)
+  //   4. deliveryDate ASC (earlier delivery breaks ties)
 
-  function getRollover(type, dateStr) {
-    const lead = type === 'shape' ? SHAPE_LEAD : BFP_LEAD;
-    const prevDeliveryDate   = toDateStr(addDays(parseDate(dateStr), lead - 1));
-    const prevProductionDate = toDateStr(addDays(parseDate(dateStr), -1));
-    const { demand: prevDemand } = buildDemand(prevDeliveryDate);
-    const prevTotal = prevDemand.reduce((s, d) => s + (d.batches || 0), 0);
-    const doneKey   = type === 'shape' ? 'shapeDone' : 'bfpDone';
-    const prevDone  = ((productionState[prevProductionDate] || {})[doneKey] || [])
-      .reduce((s, c) => s + (Number(c.batches) || 0), 0);
-    return Math.max(0, prevTotal - prevDone);
+  function buildOptimalSchedule() {
+    const today    = new Date();
+    const todayStr = toDateStr(today);
+
+    // Step 1: Collect all pending demand across the lookahead window
+    // bySkuItems: sku -> [{deliveryDate, batches, pretzels, shapeWindow, bfpWindow, orders, shapeLeft, bfpLeft}]
+    const bySkuItems = {};
+    const fohSeen   = new Set();
+
+    for (let i = 0; i <= SCHEDULE_LOOKAHEAD; i++) {
+      const delivDate = toDateStr(addDays(today, i));
+      const dd        = parseDate(delivDate);
+      const skuMap    = {};
+
+      allDeliveries
+        .filter(d => d.date === delivDate && !['delivered','picked_up','cancelled'].includes(d.status))
+        .forEach(delivery => {
+          let items = [];
+          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+          items.forEach(({ sku, quantity }) => {
+            if (!sku) return;
+            const key  = sku.trim();
+            const norm = key.toLowerCase();
+            if (FOH_SKUS.has(norm) || FOH_SKUS.has(key)) { fohSeen.add(key); return; }
+            if (!skuMap[key]) skuMap[key] = { pretzels: 0, orders: [] };
+            skuMap[key].pretzels += Number(quantity) || 0;
+            const cust = delivery.customer || delivery.location || '?';
+            if (!skuMap[key].orders.includes(cust)) skuMap[key].orders.push(cust);
+          });
+        });
+
+      Object.entries(skuMap).forEach(([sku, data]) => {
+        const batchSize = BATCH_SIZES[sku];
+        if (!batchSize) return; // skip unconfigured SKUs from scheduling
+        const batches = Math.ceil(data.pretzels / batchSize);
+        if (!bySkuItems[sku]) bySkuItems[sku] = [];
+        bySkuItems[sku].push({
+          sku, batches, pretzels: data.pretzels, deliveryDate: delivDate,
+          orders: data.orders,
+          shapeWindow: { start: toDateStr(addDays(dd, -SHAPE_MAX_LEAD)), end: toDateStr(addDays(dd, -SHAPE_MIN_LEAD)) },
+          bfpWindow:   { start: toDateStr(addDays(dd, -BFP_MAX_LEAD)),   end: toDateStr(addDays(dd, -BFP_MIN_LEAD))   },
+          shapeLeft: batches,
+          bfpLeft:   batches,
+        });
+      });
+    }
+
+    // Sort each SKU's items by delivery date (FIFO for completion attribution)
+    Object.values(bySkuItems).forEach(arr => arr.sort((a,b) => a.deliveryDate.localeCompare(b.deliveryDate)));
+
+    // Step 2: Subtract completed work (FIFO — earliest delivery cleared first)
+    const doneSku = { shape: {}, bfp: {} };
+    Object.values(productionState).forEach(state => {
+      (state.shapeDone || []).forEach(c => {
+        doneSku.shape[c.sku] = (doneSku.shape[c.sku] || 0) + (Number(c.batches) || 0);
+      });
+      (state.bfpDone || []).forEach(c => {
+        doneSku.bfp[c.sku] = (doneSku.bfp[c.sku] || 0) + (Number(c.batches) || 0);
+      });
+    });
+
+    Object.entries(doneSku.shape).forEach(([sku, total]) => {
+      if (!bySkuItems[sku]) return;
+      let left = total;
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.shapeLeft, left);
+        item.shapeLeft -= take; left -= take;
+        if (left <= 0) break;
+      }
+    });
+    Object.entries(doneSku.bfp).forEach(([sku, total]) => {
+      if (!bySkuItems[sku]) return;
+      let left = total;
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.bfpLeft, left);
+        item.bfpLeft -= take; left -= take;
+        if (left <= 0) break;
+      }
+    });
+
+    // Separate overdue items (window already closed, work not done)
+    const overdue = [];
+    const shapePool = [], bfpPool = [];
+    Object.values(bySkuItems).flat().forEach(item => {
+      if (item.shapeLeft > 0) {
+        if (item.shapeWindow.end < todayStr) {
+          overdue.push({ team: 'shape', sku: item.sku, batches: item.shapeLeft, windowEnd: item.shapeWindow.end, deliveryDate: item.deliveryDate });
+        } else {
+          shapePool.push({ sku: item.sku, left: item.shapeLeft, deliveryDate: item.deliveryDate, window: item.shapeWindow, orders: item.orders, pretzels: item.pretzels });
+        }
+      }
+      if (item.bfpLeft > 0) {
+        if (item.bfpWindow.end < todayStr) {
+          overdue.push({ team: 'bfp', sku: item.sku, batches: item.bfpLeft, windowEnd: item.bfpWindow.end, deliveryDate: item.deliveryDate });
+        } else {
+          bfpPool.push({ sku: item.sku, left: item.bfpLeft, deliveryDate: item.deliveryDate, window: item.bfpWindow, orders: item.orders, pretzels: item.pretzels });
+        }
+      }
+    });
+
+    // Step 3: Greedy schedule each pool
+    function schedulePool(pool, type) {
+      const sched   = {};
+      const lookahead = type === 'shape'
+        ? SCHEDULE_LOOKAHEAD + SHAPE_MAX_LEAD
+        : SCHEDULE_LOOKAHEAD + BFP_MAX_LEAD;
+
+      for (let i = 0; i < lookahead; i++) {
+        const dayStr  = toDateStr(addDays(today, i));
+        const workers  = getWorkers(type, dayStr);
+        const capacity = workers * BATCHES_PER_WORKER;
+
+        // Eligible items: window includes today and still have work left
+        const eligible = pool.filter(p =>
+          p.left > 0 && dayStr >= p.window.start && dayStr <= p.window.end
+        );
+        if (eligible.length === 0) continue;
+
+        // Compute current run sizes per SKU across remaining pool
+        const runSizes = {};
+        pool.forEach(p => { if (p.left > 0) runSizes[p.sku] = (runSizes[p.sku] || 0) + p.left; });
+
+        // Annotate and sort
+        const annotated = eligible
+          .map(p => ({ ...p, daysLeft: daysBetween(dayStr, p.window.end), runSize: runSizes[p.sku] || 0 }))
+          .sort((a, b) => {
+            if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;  // urgent first
+            if (b.runSize  !== a.runSize)  return b.runSize  - a.runSize;   // large run first (consolidate)
+            return a.deliveryDate.localeCompare(b.deliveryDate);             // earliest delivery tiebreak
+          });
+
+        // Always fit must-do items even if over capacity
+        const mustDoTotal = annotated.filter(a => a.daysLeft === 0).reduce((s, a) => s + a.left, 0);
+        const effectiveCap = Math.max(capacity, mustDoTotal);
+        const isOverloaded = mustDoTotal > capacity;
+
+        let cap = effectiveCap;
+        const dayItems = [];
+
+        for (const a of annotated) {
+          if (cap <= 0) break;
+          const take = Math.min(a.left, cap);
+
+          // Mutate pool item
+          const poolItem = pool.find(p => p.sku === a.sku && p.deliveryDate === a.deliveryDate);
+          if (poolItem) poolItem.left -= take;
+
+          // Merge same-SKU into day's item list
+          const existing = dayItems.find(d => d.sku === a.sku);
+          if (existing) {
+            existing.batches += take;
+            if (!existing.deliveryDates.includes(a.deliveryDate)) existing.deliveryDates.push(a.deliveryDate);
+            existing.urgent = existing.urgent || a.daysLeft === 0;
+            a.orders.forEach(o => { if (!existing.orders.includes(o)) existing.orders.push(o); });
+          } else {
+            dayItems.push({
+              sku: a.sku, batches: take,
+              deliveryDates: [a.deliveryDate],
+              urgent: a.daysLeft === 0,
+              overloaded: isOverloaded,
+              orders: [...a.orders],
+            });
+          }
+          cap -= take;
+        }
+
+        if (dayItems.length > 0) sched[dayStr] = dayItems;
+      }
+      return sched;
+    }
+
+    return {
+      shape:  schedulePool(shapePool, 'shape'),
+      bfp:    schedulePool(bfpPool,   'bfp'),
+      overdue,
+      foh: [...fohSeen],
+    };
   }
 
-  // ─── TEAM STATUS (for week view icons) ────────────────────────────────────
+  // ─── TEAM STATUS ──────────────────────────────────────────────────────────
 
-  function getTeamStatus(type, dateStr, demand) {
-    const needed   = demand.reduce((s, d) => s + (d.batches || 0), 0);
-    const rollover = getRollover(type, dateStr);
-    const total    = needed + rollover;
-    if (total === 0) return 'none';
+  function getTeamStatus(type, dateStr) {
+    const items  = schedule[type][dateStr] || [];
+    const needed = items.reduce((s, d) => s + d.batches, 0);
+    if (needed === 0) return 'none';
     const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
     const done    = ((productionState[dateStr] || {})[doneKey] || [])
       .reduce((s, c) => s + (Number(c.batches) || 0), 0);
     if (done === 0) return 'todo';
-    if (done >= total) return 'done';
+    if (done >= needed) return 'done';
     return 'partial';
   }
 
   // ─── RENDER TEAM CARD ─────────────────────────────────────────────────────
 
-  function renderTeamCard(type, dateStr, demand, dayState, foh) {
+  function renderTeamCard(type, dateStr) {
     const isBFP    = type === 'bfp';
     const title    = isBFP ? 'Bake · Freeze · Pack' : 'Shape & Cold Ferment';
-    const leadStr  = toDateStr(addDays(parseDate(dateStr), isBFP ? BFP_LEAD : SHAPE_LEAD));
+    const items    = schedule[type][dateStr] || [];
+    const dayState = productionState[dateStr] || {};
     const workers  = getWorkers(type, dateStr);
     const capacity = workers * BATCHES_PER_WORKER;
-    const needed   = demand.reduce((s, d) => s + (d.batches || 0), 0);
-    const rollover = getRollover(type, dateStr);
-    const total    = needed + rollover;
-    const isOver   = total > capacity && needed > 0;
-    const spare    = capacity - total;
+    const needed   = items.reduce((s, d) => s + d.batches, 0);
+    const isOver   = needed > capacity;
+    const spare    = capacity - needed;
 
     const doneKey   = isBFP ? 'bfpDone'   : 'shapeDone';
     const timeKey   = isBFP ? 'bfpTime'   : 'shapeTime';
@@ -648,19 +818,24 @@
 
     // Status badge
     let badgeClass, badgeText;
-    if (demand.length === 0 || total === 0) {
+    if (needed === 0) {
       badgeClass = 'badge-none'; badgeText = 'No orders';
     } else if (doneTotal === 0) {
       badgeClass = 'badge-none'; badgeText = 'Not started';
-    } else if (doneTotal > total) {
-      badgeClass = 'badge-over'; badgeText = `✅ Done +${doneTotal - total}`;
-    } else if (doneTotal >= total) {
+    } else if (doneTotal > needed) {
+      badgeClass = 'badge-over'; badgeText = `✅ Done +${doneTotal - needed}`;
+    } else if (doneTotal >= needed) {
       badgeClass = 'badge-done'; badgeText = '✅ Done';
     } else {
-      badgeClass = 'badge-partial'; badgeText = `⏳ ${doneTotal}/${total}`;
+      badgeClass = 'badge-partial'; badgeText = `⏳ ${doneTotal}/${needed}`;
     }
 
-    // Workers row
+    // Delivery dates context for header
+    const allDelivDates = [...new Set(items.flatMap(d => d.deliveryDates))].sort();
+    const delivContext = allDelivDates.length === 0 ? ''
+      : allDelivDates.map(ds => fmtShort(parseDate(ds))).join(' + ') + ' deliver' + (allDelivDates.length > 1 ? 'ies' : 'y');
+
+    // Workers stepper
     const workersHtml = `
       <div class="workers-row">
         <div>
@@ -674,49 +849,47 @@
         </div>
       </div>`;
 
-    // SKU rows
+    // SKU rows — render function handles BFP coating split
     const renderRows = rows => rows.map(d => {
-      const inv      = inventory[d.sku] || 0;
-      const caseStr  = d.cases ? ` · ${d.cases} case${d.cases !== 1 ? 's' : ''}` : '';
-      const batchInfo = d.needsConfig
-        ? `<span class="sku-warn">⚠️ Add to BATCH_SIZES config</span>`
-        : `<span class="sku-detail"><strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong>${esc(caseStr)} — ${d.pretzels} units</span>`;
+      const inv     = inventory[d.sku] || 0;
+      const caseSize = CASE_SIZES[d.sku];
+      const caseStr  = caseSize ? ` · ${Math.ceil(d.batches * (BATCH_SIZES[d.sku]||0) / caseSize)} cases` : '';
+      const urgTag   = d.urgent
+        ? `<span class="sku-tag sku-tag-urgent">🔴 Must do today</span>`
+        : `<span class="sku-tag sku-tag-ahead">🟡 Pulling ahead</span>`;
+      const delivStr = d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ');
       return `<div class="sku-row">
         <span class="sku-name">${esc(d.sku)}</span>
-        ${batchInfo}
+        ${urgTag}
+        <span class="sku-detail"><strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong> — ${d.batches * (BATCH_SIZES[d.sku]||0)} units${esc(caseStr)}</span>
+        <span class="sku-delivery">For ${esc(delivStr)} delivery</span>
         ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
         <span class="sku-customers">${d.orders.map(esc).join(' · ')}</span>
       </div>`;
     }).join('');
 
     let skuHtml = '';
-    if (demand.length === 0) {
-      skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">No deliveries for ${esc(leadStr)}</div>`;
+    if (items.length === 0) {
+      skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">Nothing scheduled — all orders covered or no upcoming deliveries in range.</div>`;
     } else if (isBFP) {
-      const coating  = demand.filter(d => BAKE_GROUPS.coating.includes(d.sku));
-      const standard = demand.filter(d => !BAKE_GROUPS.coating.includes(d.sku));
-      if (standard.length > 0) {
-        skuHtml += coating.length > 0 ? `<div class="group-label">Standard</div>` : '';
-        skuHtml += renderRows(standard);
-      }
-      if (coating.length > 0) {
-        skuHtml += `<div class="group-label">+ Coating step</div>${renderRows(coating)}`;
-      }
+      const coating  = items.filter(d => BAKE_GROUPS.coating.includes(d.sku));
+      const standard = items.filter(d => !BAKE_GROUPS.coating.includes(d.sku));
+      if (standard.length > 0) { skuHtml += coating.length > 0 ? `<div class="group-label">Standard</div>` : ''; skuHtml += renderRows(standard); }
+      if (coating.length > 0)  { skuHtml += `<div class="group-label">+ Coating step</div>${renderRows(coating)}`; }
     } else {
-      skuHtml = renderRows(demand);
+      skuHtml = renderRows(items);
     }
 
     // Batch total
-    const batchTotalHtml = demand.length > 0 ? `
-      <div class="batch-total ${isOver ? 'over' : (needed > 0 ? 'ok' : 'zero')}">
+    const batchTotalHtml = needed > 0 ? `
+      <div class="batch-total ${isOver ? 'over' : 'ok'}">
         <div class="batch-total-left">
-          <span class="batch-total-num">${total}</span>
-          <span class="batch-total-lbl">batch${total !== 1 ? 'es' : ''} needed</span>
-          ${rollover > 0 ? `<span class="rollover-pill">+${rollover} rollover</span>` : ''}
+          <span class="batch-total-num">${needed}</span>
+          <span class="batch-total-lbl">batch${needed !== 1 ? 'es' : ''} today</span>
         </div>
         <div style="text-align:right">
           <span class="batch-status ${isOver ? 'status-over' : 'status-ok'}">
-            ${isOver ? `🔴 +${total - capacity} over` : `✅ ${spare} spare`}
+            ${isOver ? `🔴 +${needed - capacity} over` : `✅ ${spare} spare`}
           </span>
           <div class="workers-cap">${workers} worker${workers !== 1 ? 's' : ''} · ${capacity} cap</div>
         </div>
@@ -731,9 +904,7 @@
           <span class="section-label" style="margin:0">${isBFP ? 'Frozen on hand' : 'Cold ferment on hand'}</span>
           <button class="btn-link" data-inv-btn data-date="${esc(dateStr)}" data-inv-type="${esc(type)}">Update</button>
         </div>
-        ${invItems
-          ? `<span class="inv-strip-items">${invItems}</span>`
-          : `<span class="inv-strip-empty">None entered</span>`}
+        ${invItems ? `<span class="inv-strip-items">${invItems}</span>` : `<span class="inv-strip-empty">None entered</span>`}
       </div>`;
 
     // Completed strip
@@ -742,8 +913,8 @@
       const timeStr = dayState[timeKey]
         ? new Date(dayState[timeKey]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : '';
-      const delta = doneTotal - total;
-      const progressHtml = total > 0
+      const delta = doneTotal - needed;
+      const progressHtml = needed > 0
         ? (delta >= 0
           ? `<span class="progress-done">✅ Done${delta > 0 ? ` (+${delta})` : '!'}</span>`
           : `<span class="progress-short">⚠️ ${Math.abs(delta)} short</span>`)
@@ -759,22 +930,21 @@
         </div>`;
     }
 
-    // FOH note
-    const fohHtml = foh.length > 0
-      ? `<div class="foh-note">FOH only (not in schedule): ${foh.map(esc).join(', ')}</div>` : '';
+    // FOH note (shape card only, once)
+    const fohHtml = (!isBFP && schedule.foh.length > 0)
+      ? `<div class="foh-note">FOH only (not scheduled): ${schedule.foh.map(esc).join(', ')}</div>` : '';
 
-    // Log button
-    const logBtnClass = (doneTotal >= total && total > 0) ? 'log-btn logged' : 'log-btn';
-    const logBtnText  = (doneTotal >= total && total > 0) ? '✅ Log More' : 'Log Completions';
-    const logBtnHtml  = demand.length > 0
-      ? `<button class="${logBtnClass}" data-log-btn data-type="${esc(type)}" data-date="${esc(dateStr)}">${logBtnText}</button>`
-      : '';
+    // Buttons
+    const logBtnClass = (doneTotal >= needed && needed > 0) ? 'log-btn logged' : 'log-btn';
+    const logBtnText  = (doneTotal >= needed && needed > 0) ? '✅ Log More' : 'Log Completions';
+    const logBtnHtml  = `<button class="${logBtnClass}" data-log-btn data-type="${esc(type)}" data-date="${esc(dateStr)}">${logBtnText}</button>
+      <button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}">+ Add Unscheduled Batch</button>`;
 
     return `<div class="team-card">
       <div class="team-header">
         <div>
           <div class="team-name">${esc(title)}</div>
-          <div class="team-date">For ${esc(leadStr)} deliveries</div>
+          ${delivContext ? `<div class="team-date">${esc(delivContext)}</div>` : ''}
         </div>
         <span class="status-badge ${badgeClass}">${badgeText}</span>
       </div>
@@ -793,20 +963,16 @@
   // ─── RENDER DAY VIEW ──────────────────────────────────────────────────────
 
   function renderDayView() {
-    const dateStr  = toDateStr(currentDate);
-    const shapeLead = toDateStr(addDays(currentDate, SHAPE_LEAD));
-    const bfpLead   = toDateStr(addDays(currentDate, BFP_LEAD));
-    const { demand: shapeDemand, foh: shapeFoh } = buildDemand(shapeLead);
-    const { demand: bfpDemand,   foh: bfpFoh   } = buildDemand(bfpLead);
-    const dayState = productionState[dateStr] || {};
+    const dateStr   = toDateStr(currentDate);
+    const shapeItems = schedule.shape[dateStr] || [];
+    const bfpItems   = schedule.bfp[dateStr]   || [];
 
-    if (shapeDemand.length === 0 && bfpDemand.length === 0) {
-      return `<div class="no-prod">No production scheduled.<br>
-        <span style="font-size:13px">Shape: no ${shapeLead} deliveries · BFP: no ${bfpLead} deliveries</span></div>`;
+    if (shapeItems.length === 0 && bfpItems.length === 0) {
+      return `<div class="no-prod">Nothing scheduled today.<br>
+        <span style="font-size:13px;color:var(--gray-3)">All upcoming orders covered, or no deliveries within production windows.</span>
+      </div>`;
     }
-
-    return renderTeamCard('shape', dateStr, shapeDemand, dayState, shapeFoh)
-         + renderTeamCard('bfp',   dateStr, bfpDemand,   dayState, bfpFoh);
+    return renderTeamCard('shape', dateStr) + renderTeamCard('bfp', dateStr);
   }
 
   // ─── RENDER WEEK VIEW ─────────────────────────────────────────────────────
@@ -817,38 +983,39 @@
     const statusIcon = s => s === 'done' ? '✅' : s === 'partial' ? '⏳' : s === 'todo' ? '⬜' : '—';
     let html = '';
 
-    for (let i = 0; i < WEEK_RANGE; i++) {
+    for (let i = 0; i < SCHEDULE_LOOKAHEAD; i++) {
       const d  = addDays(today, i);
       const ds = toDateStr(d);
 
-      const { demand: sDemand } = buildDemand(toDateStr(addDays(d, SHAPE_LEAD)));
-      const { demand: bDemand } = buildDemand(toDateStr(addDays(d, BFP_LEAD)));
-      const isEmpty = sDemand.length === 0 && bDemand.length === 0;
-      const sStatus = getTeamStatus('shape', ds, sDemand);
-      const bStatus = getTeamStatus('bfp', ds, bDemand);
+      const sItems   = schedule.shape[ds] || [];
+      const bItems   = schedule.bfp[ds]   || [];
+      const sTotal   = sItems.reduce((s, x) => s + x.batches, 0);
+      const bTotal   = bItems.reduce((s, x) => s + x.batches, 0);
+      const isEmpty  = sTotal === 0 && bTotal === 0;
+      const sStatus  = getTeamStatus('shape', ds);
+      const bStatus  = getTeamStatus('bfp', ds);
 
-      // Week section headers
-      if (i === 0)                  html += `<div class="week-section-lbl">This week</div>`;
-      else if (i === 7)             html += `<div class="week-section-lbl">Next week</div>`;
+      if (i === 0) html += `<div class="week-section-lbl">This week</div>`;
+      else if (i === 7) html += `<div class="week-section-lbl">Next week</div>`;
 
-      const dayLabel = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : DAYS[d.getDay()];
-      const dateLabel = (i === 0 || i === 1) ? fmtShort(d) : fmtShort(d);
+      const dayLabel  = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : DAYS[d.getDay()];
+      const shapeText = sTotal > 0 ? `${statusIcon(sStatus)} Shape: ${sTotal}` : `${statusIcon(sStatus)} Shape`;
+      const bfpText   = bTotal > 0 ? `${statusIcon(bStatus)} BFP: ${bTotal}` : `${statusIcon(bStatus)} BFP`;
 
       html += `<div class="week-row${ds === todayStr ? ' is-today' : ''}${isEmpty ? ' is-empty' : ''}"
         data-goto="${esc(ds)}" role="button" tabindex="0">
         <div class="week-row-date">
           <div class="week-row-day">${esc(dayLabel)}</div>
-          <div class="week-row-full">${esc(dateLabel)}${isEmpty ? ' — no production' : ''}</div>
+          <div class="week-row-sub">${esc(fmtShort(d))}${isEmpty ? ' — no production' : ''}</div>
         </div>
-        <div class="week-row-icons">
-          <span class="week-icon" title="Shape">${statusIcon(sStatus)}</span>
-          <span class="week-icon" title="BFP">${statusIcon(bStatus)}</span>
+        <div class="week-row-right">
+          <span class="week-team-line">${shapeText}</span>
+          <span class="week-team-line">${bfpText}</span>
           <span class="week-chevron">›</span>
         </div>
       </div>`;
     }
-
-    return html || `<div class="no-prod">No upcoming deliveries in the next ${WEEK_RANGE} days.</div>`;
+    return html || `<div class="no-prod">No production scheduled in the next ${SCHEDULE_LOOKAHEAD} days.</div>`;
   }
 
   // ─── UPDATE NAV BAR ───────────────────────────────────────────────────────
@@ -863,7 +1030,7 @@
     if (viewMode === 'week') {
       label.textContent = 'Week View';
       label.classList.remove('is-today');
-      sub.textContent = `Next ${WEEK_RANGE} days`;
+      sub.textContent = `Next ${SCHEDULE_LOOKAHEAD} days`;
       wt.classList.add('active');
     } else {
       const diff = Math.round((parseDate(curStr) - parseDate(todayStr)) / 86400000);
@@ -882,16 +1049,22 @@
   function render() {
     updateNav();
 
-    // Unconfirmed banner (show in both views)
+    // Overdue banner
+    const overdueHtml = schedule.overdue.map(o =>
+      `<div class="overdue-banner">🚨 Overdue (${o.team === 'shape' ? 'Shape' : 'BFP'}): ${esc(o.sku)} ×${o.batches} — window closed ${esc(o.windowEnd)}, needed for ${esc(o.deliveryDate)} delivery</div>`
+    ).join('');
+
+    // Unconfirmed deliveries today
     const todayStr = toDateStr(new Date());
     const unconfirmed = allDeliveries.filter(d =>
       d.date === todayStr && !['delivered','picked_up','cancelled'].includes(d.status)
     );
-    document.getElementById('alert-area').innerHTML = unconfirmed.length > 0
+    const unconfirmedHtml = unconfirmed.length > 0
       ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length !== 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
       : '';
 
-    document.getElementById('main-view').innerHTML =
+    document.getElementById('alert-area').innerHTML = overdueHtml + unconfirmedHtml;
+    document.getElementById('main-view').innerHTML  =
       viewMode === 'week' ? renderWeekView() : renderDayView();
 
     bindActions();
@@ -900,37 +1073,33 @@
   // ─── BIND ACTIONS ─────────────────────────────────────────────────────────
 
   function bindActions() {
-    // Worker stepper: decrement
     document.querySelectorAll('[data-worker-dec]').forEach(btn => {
       btn.addEventListener('click', () => {
         const { type, date } = btn.dataset;
         const cur = getWorkers(type, date);
         if (cur <= 1) return;
         saveWorkers(type, date, cur - 1);
+        schedule = buildOptimalSchedule();
         render();
       });
     });
-
-    // Worker stepper: increment
     document.querySelectorAll('[data-worker-inc]').forEach(btn => {
       btn.addEventListener('click', () => {
         const { type, date } = btn.dataset;
         saveWorkers(type, date, getWorkers(type, date) + 1);
+        schedule = buildOptimalSchedule();
         render();
       });
     });
-
-    // Open log completions sheet
     document.querySelectorAll('[data-log-btn]').forEach(btn => {
       btn.addEventListener('click', () => openLogSheet(btn.dataset.type, btn.dataset.date));
     });
-
-    // Open inventory sheet
+    document.querySelectorAll('[data-extra-btn]').forEach(btn => {
+      btn.addEventListener('click', () => openExtraSheet(btn.dataset.type, btn.dataset.date));
+    });
     document.querySelectorAll('[data-inv-btn]').forEach(btn => {
       btn.addEventListener('click', () => openInvSheet(btn.dataset.date, btn.dataset.invType));
     });
-
-    // Week row → drill into day
     document.querySelectorAll('[data-goto]').forEach(row => {
       row.addEventListener('click', () => {
         currentDate = parseDate(row.dataset.goto);
@@ -947,16 +1116,13 @@
     logDate    = dateStr;
     logWorkers = getWorkers(type, dateStr);
 
-    const leadStr       = toDateStr(addDays(parseDate(dateStr), type === 'shape' ? SHAPE_LEAD : BFP_LEAD));
-    const { demand }    = buildDemand(leadStr);
-    const dayState      = productionState[dateStr] || {};
-    const doneKey       = type === 'shape' ? 'shapeDone' : 'bfpDone';
-    const prevDone      = dayState[doneKey] || [];
+    const items    = schedule[type][dateStr] || [];
+    const dayState = productionState[dateStr] || {};
+    const doneKey  = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const prevDone = dayState[doneKey] || [];
 
-    // Only configurable SKUs in the log sheet (unconfigured ones can't be logged)
-    logItems = demand
-      .filter(d => !d.needsConfig)
-      .map(d => ({ sku: d.sku, demand: d.batches, value: 0 }));
+    // Pre-fill with scheduled amounts so workers confirm (or adjust) what they made
+    logItems = items.map(d => ({ sku: d.sku, demand: d.batches, value: d.batches }));
 
     document.getElementById('log-title').textContent =
       type === 'shape' ? 'Shape & Cold Ferment' : 'Bake · Freeze · Pack';
@@ -969,7 +1135,6 @@
 
   function renderLogBody() {
     const capacity = logWorkers * BATCHES_PER_WORKER;
-
     let html = `
       <div class="sheet-workers-row">
         <div>
@@ -987,7 +1152,7 @@
       <div class="log-sku-row">
         <div class="log-sku-info">
           <div class="log-sku-name">${esc(item.sku)}</div>
-          <div class="log-sku-demand">Demand: ${item.demand} batch${item.demand !== 1 ? 'es' : ''}</div>
+          <div class="log-sku-demand">Scheduled: ${item.demand} batch${item.demand !== 1 ? 'es' : ''}</div>
         </div>
         <div class="stepper-lg">
           <button class="step-btn" data-ldec="${i}">−</button>
@@ -998,7 +1163,6 @@
 
     document.getElementById('log-body').innerHTML = html;
 
-    // Worker stepper bindings
     document.getElementById('log-w-dec').addEventListener('click', () => {
       if (logWorkers <= 1) return;
       logWorkers--;
@@ -1010,8 +1174,6 @@
       document.getElementById('log-w-val').textContent = logWorkers;
       document.getElementById('log-cap-lbl').textContent = `${logWorkers * BATCHES_PER_WORKER} batch capacity`;
     });
-
-    // Item stepper bindings
     document.querySelectorAll('[data-ldec]').forEach(btn => {
       const i = parseInt(btn.dataset.ldec, 10);
       btn.addEventListener('click', () => {
@@ -1032,7 +1194,6 @@
   async function saveLog() {
     const completions = logItems.filter(i => i.value > 0).map(i => ({ sku: i.sku, batches: i.value }));
     if (!completions.length) { alert('Enter at least one completed batch.'); return; }
-
     const summary = completions.map(c => `${c.sku} ×${c.batches}`).join('\n');
     if (!confirm(`Log completions for ${logDate}?\n\n${summary}`)) return;
 
@@ -1049,9 +1210,55 @@
       saveWorkers(logType, logDate, logWorkers);
       document.getElementById('log-overlay').classList.remove('open');
       await loadProduction();
+      schedule = buildOptimalSchedule();
       render();
     } catch (e) {
       saveBtn.disabled = false; saveBtn.textContent = 'Save Completions';
+      alert('Error saving: ' + e.message);
+    }
+  }
+
+  // ─── EXTRA / UNSCHEDULED BATCH SHEET ─────────────────────────────────────
+
+  function openExtraSheet(type, dateStr) {
+    extraType  = type;
+    extraDate  = dateStr;
+    extraValue = 1;
+
+    document.getElementById('extra-title').textContent =
+      `${type === 'shape' ? 'Shape' : 'BFP'} — Unscheduled Batch`;
+    document.getElementById('extra-sub').textContent =
+      `${dateStr} · Last-minute or walk-in order`;
+    document.getElementById('extra-val').textContent = '1';
+
+    // Populate SKU dropdown
+    document.getElementById('extra-sku-select').innerHTML =
+      Object.keys(BATCH_SIZES).map(sku => `<option value="${esc(sku)}">${esc(sku)}</option>`).join('');
+
+    document.getElementById('extra-overlay').classList.add('open');
+  }
+
+  async function saveExtra() {
+    const sku = document.getElementById('extra-sku-select').value;
+    if (!sku || extraValue <= 0) { alert('Select a SKU and quantity.'); return; }
+    if (!confirm(`Log ${extraValue} extra batch${extraValue !== 1 ? 'es' : ''} of ${sku} for ${extraDate}?`)) return;
+
+    const saveBtn = document.getElementById('extra-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action:      extraType === 'shape' ? 'shape_done' : 'bfp_done',
+        date:        extraDate,
+        completions: JSON.stringify([{ sku, batches: extraValue }]),
+        workers:     getWorkers(extraType, extraDate),
+        timeStamp:   new Date().toISOString(),
+      });
+      document.getElementById('extra-overlay').classList.remove('open');
+      await loadProduction();
+      schedule = buildOptimalSchedule();
+      render();
+    } catch (e) {
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Batch';
       alert('Error saving: ' + e.message);
     }
   }
@@ -1060,10 +1267,9 @@
 
   function openInvSheet(dateStr, type) {
     invDate = dateStr; invType = type;
-    const isBFP  = type === 'bfp';
-    const invKey = isBFP ? 'frozen' : 'coldFerment';
+    const isBFP    = type === 'bfp';
+    const invKey   = isBFP ? 'frozen' : 'coldFerment';
     const existing = (productionState[dateStr] || {})[invKey] || {};
-
     document.getElementById('inv-title').textContent = isBFP ? 'Frozen on Hand' : 'Cold Ferment on Hand';
     document.getElementById('inv-sub').textContent   = `As of ${dateStr}`;
     document.getElementById('inv-body').innerHTML    = Object.keys(BATCH_SIZES).map(sku => `
@@ -1072,7 +1278,6 @@
         <input class="inv-input" type="number" min="0" id="ii-${esc(sku)}" data-sku="${esc(sku)}" value="${existing[sku] || 0}">
         <span class="inv-input-unit">pretzels</span>
       </div>`).join('');
-
     document.getElementById('inv-overlay').classList.add('open');
   }
 
@@ -1081,32 +1286,25 @@
     const invKey   = isBFP ? 'frozen' : 'coldFerment';
     const otherKey = isBFP ? 'coldFerment' : 'frozen';
     const otherInv = (productionState[invDate] || {})[otherKey] || {};
-
-    const snaps = [];
+    const snaps    = [];
     Object.keys(BATCH_SIZES).forEach(sku => {
       const inp   = document.querySelector(`#inv-body [data-sku="${CSS.escape(sku)}"]`);
       const count = parseInt(inp?.value, 10) || 0;
       const other = otherInv[sku] || 0;
       if (count > 0 || other > 0) {
-        snaps.push({
-          sku,
-          coldFerment: isBFP ? other : count,
-          frozen:      isBFP ? count : other,
-        });
+        snaps.push({ sku, coldFerment: isBFP ? other : count, frozen: isBFP ? count : other });
       }
     });
-
     const saveBtn = document.getElementById('inv-save');
     saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
     try {
       await appendLog(PRODUCTION_LOG, {
-        action:    'inventory',
-        date:      invDate,
-        snapshots: JSON.stringify(snaps),
-        timeStamp: new Date().toISOString(),
+        action: 'inventory', date: invDate,
+        snapshots: JSON.stringify(snaps), timeStamp: new Date().toISOString(),
       });
       document.getElementById('inv-overlay').classList.remove('open');
       await loadProduction();
+      schedule = buildOptimalSchedule();
       render();
     } catch (e) {
       alert('Error saving inventory: ' + e.message);
@@ -1134,19 +1332,16 @@
     else { currentDate = addDays(currentDate, -1); }
     render();
   });
-
   document.getElementById('nav-next').addEventListener('click', () => {
     if (viewMode === 'week') return;
     currentDate = addDays(currentDate, 1);
     render();
   });
-
   document.getElementById('date-display').addEventListener('click', () => {
     currentDate = new Date();
     viewMode = 'day';
     render();
   });
-
   document.getElementById('week-toggle').addEventListener('click', () => {
     viewMode = viewMode === 'week' ? 'day' : 'week';
     render();
@@ -1159,6 +1354,24 @@
   document.getElementById('log-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('log-overlay'))
       document.getElementById('log-overlay').classList.remove('open');
+  });
+
+  // Extra sheet
+  document.getElementById('extra-save').addEventListener('click', saveExtra);
+  document.getElementById('extra-cancel').addEventListener('click', () =>
+    document.getElementById('extra-overlay').classList.remove('open'));
+  document.getElementById('extra-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('extra-overlay'))
+      document.getElementById('extra-overlay').classList.remove('open');
+  });
+  document.getElementById('extra-dec').addEventListener('click', () => {
+    if (extraValue <= 1) return;
+    extraValue--;
+    document.getElementById('extra-val').textContent = extraValue;
+  });
+  document.getElementById('extra-inc').addEventListener('click', () => {
+    extraValue++;
+    document.getElementById('extra-val').textContent = extraValue;
   });
 
   // Inv sheet
@@ -1175,6 +1388,7 @@
   (async () => {
     try {
       await Promise.all([loadDeliveries(), loadProduction()]);
+      schedule = buildOptimalSchedule();
       render();
     } catch (e) {
       document.getElementById('main-view').innerHTML = `
