@@ -1389,7 +1389,30 @@
       ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length !== 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
       : '';
 
-    document.getElementById('alert-area').innerHTML = overdueHtml + unconfigHtml + unconfirmedHtml;
+    // Possible-duplicate deliveries — multiple ACTIVE deliveries to same customer
+    // on same date. Usually means an Edit went through as a Duplicate by mistake.
+    const dupGroups = {};
+    allDeliveries.forEach(d => {
+      if (['delivered','picked_up','cancelled'].includes(d.status)) return;
+      if (!d.date || d.date < todayStr) return;
+      const cust = d.customer || d.location || '?';
+      const key = `${d.date}|${cust}`;
+      if (!dupGroups[key]) dupGroups[key] = [];
+      dupGroups[key].push(d);
+    });
+    const dups = Object.entries(dupGroups).filter(([,arr]) => arr.length >= 2);
+    const dupHtml = dups.length > 0
+      ? `<div class="alert-banner" style="background:#fff3cd;color:#856404">
+          ⚠️ ${dups.length} possible duplicate delivery${dups.length > 1 ? 's' : ''} —
+          ${dups.map(([key,arr]) => {
+            const [date, cust] = key.split('|');
+            return `<strong>${esc(cust)}</strong> on ${esc(date)} (${arr.length}×)`;
+          }).join(', ')} —
+          <a href="../delivery-planner/index.html">Review →</a>
+        </div>`
+      : '';
+
+    document.getElementById('alert-area').innerHTML = overdueHtml + unconfigHtml + dupHtml + unconfirmedHtml;
 
     // Tab bar — only shown in day view; update active state
     const tabBar = document.getElementById('tab-bar');
