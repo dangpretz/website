@@ -51,6 +51,12 @@
       -webkit-tap-highlight-color: transparent; flex-shrink: 0;
     }
     .week-toggle.active { color: var(--amber); }
+    .stock-count-btn {
+      width: 48px; height: 60px; border: none; background: none;
+      color: var(--gray-3); font-size: 20px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+    }
+    .stock-count-btn:active { background: rgba(255,255,255,0.08); }
 
     /* ── Page content ──────────────────────────── */
     .content { padding: 12px 12px 100px; max-width: 640px; margin: 0 auto; }
@@ -367,6 +373,7 @@
   </div>
   <button class="nav-arrow" id="nav-next" aria-label="Next day">›</button>
   <button class="week-toggle" id="week-toggle">Week</button>
+  <button class="stock-count-btn" id="stock-count-btn" aria-label="Stock Count">📦</button>
 </nav>
 
 <div class="content">
@@ -416,17 +423,22 @@
   </div>
 </div>
 
-<!-- Inventory sheet -->
+<!-- Stock count sheet -->
 <div class="sheet-overlay" id="inv-overlay" role="dialog" aria-modal="true">
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <div class="sheet-title" id="inv-title">On-Hand Inventory</div>
-      <div class="sheet-sub" id="inv-sub"></div>
+      <div class="sheet-title">Stock Count</div>
+      <div class="sheet-sub">Updates the schedule immediately on save</div>
     </div>
-    <div class="sheet-body" id="inv-body"></div>
+    <div class="sheet-body">
+      <div class="section-label" style="margin:16px 0 4px">🧊 Dough in fridge (cold-ferment)</div>
+      <div id="inv-shape-body"></div>
+      <div class="section-label" style="margin:16px 0 4px">❄️ Frozen pretzels</div>
+      <div id="inv-frozen-body"></div>
+    </div>
     <div class="sheet-footer">
-      <button class="btn-primary" id="inv-save">Save Inventory</button>
+      <button class="btn-primary" id="inv-save">Save Stock Count</button>
       <button class="btn-secondary" id="inv-cancel">Cancel</button>
     </div>
   </div>
@@ -492,7 +504,6 @@
   let viewMode        = 'day';
 
   let logType = null, logDate = null, logItems = [], logWorkers = 1;
-  let invDate = null, invType = null;
   let extraType = null, extraDate = null, extraValue = 1;
 
   // ─── DATE HELPERS ─────────────────────────────────────────────────────────
@@ -594,6 +605,20 @@
   const getWorkers  = (type, date) => Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
   const saveWorkers = (type, date, n) => localStorage.setItem(`prod-${type}-workers-${date}`, String(Math.max(1, n)));
 
+  // ─── LATEST INVENTORY SNAPSHOT ───────────────────────────────────────────
+  // Returns the most recent cold-ferment and frozen counts per SKU across all
+  // logged dates (ascending sort → latest date wins per SKU).
+
+  function getLatestInventory() {
+    const cf = {}, fr = {};
+    Object.keys(productionState).sort().forEach(ds => {
+      const s = productionState[ds];
+      Object.entries(s.coldFerment || {}).forEach(([sku, n]) => { if (n > 0) cf[sku] = n; });
+      Object.entries(s.frozen      || {}).forEach(([sku, n]) => { if (n > 0) fr[sku] = n; });
+    });
+    return { coldFerment: cf, frozen: fr };
+  }
+
   // ─── BUILD OPTIMAL SCHEDULE ───────────────────────────────────────────────
   // Greedy rolling-window scheduler. Runs on every data load.
   //
@@ -680,6 +705,30 @@
         const take = Math.min(item.bfpLeft, left);
         item.bfpLeft -= take; left -= take;
         if (left <= 0) break;
+      }
+    });
+
+    // Step 2b: Subtract on-hand inventory (FIFO, same logic as completions)
+    // cold-ferment dough → reduces shape demand; frozen pretzels → reduces BFP demand
+    const latestInv = getLatestInventory();
+
+    Object.entries(latestInv.coldFerment).forEach(([sku, pretzels]) => {
+      if (!bySkuItems[sku] || !BATCH_SIZES[sku]) return;
+      let leftBatches = pretzels / BATCH_SIZES[sku]; // fractional OK for deduction
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.shapeLeft, leftBatches);
+        item.shapeLeft -= take; leftBatches -= take;
+        if (leftBatches <= 0) break;
+      }
+    });
+
+    Object.entries(latestInv.frozen).forEach(([sku, pretzels]) => {
+      if (!bySkuItems[sku] || !BATCH_SIZES[sku]) return;
+      let leftBatches = pretzels / BATCH_SIZES[sku];
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.bfpLeft, leftBatches);
+        item.bfpLeft -= take; leftBatches -= take;
+        if (leftBatches <= 0) break;
       }
     });
 
@@ -814,7 +863,7 @@
     const invKey    = isBFP ? 'frozen'     : 'coldFerment';
     const completed = dayState[doneKey] || [];
     const doneTotal = completed.reduce((s, c) => s + (Number(c.batches) || 0), 0);
-    const inventory = dayState[invKey] || {};
+    const inventory = getLatestInventory()[invKey]; // always use most recent snapshot
 
     // Status badge
     let badgeClass, badgeText;
@@ -902,7 +951,7 @@
       <div class="inv-strip">
         <div class="inv-strip-header">
           <span class="section-label" style="margin:0">${isBFP ? 'Frozen on hand' : 'Cold ferment on hand'}</span>
-          <button class="btn-link" data-inv-btn data-date="${esc(dateStr)}" data-inv-type="${esc(type)}">Update</button>
+          <button class="btn-link" data-inv-btn>Update</button>
         </div>
         ${invItems ? `<span class="inv-strip-items">${invItems}</span>` : `<span class="inv-strip-empty">None entered</span>`}
       </div>`;
@@ -1098,7 +1147,7 @@
       btn.addEventListener('click', () => openExtraSheet(btn.dataset.type, btn.dataset.date));
     });
     document.querySelectorAll('[data-inv-btn]').forEach(btn => {
-      btn.addEventListener('click', () => openInvSheet(btn.dataset.date, btn.dataset.invType));
+      btn.addEventListener('click', openInvSheet);
     });
     document.querySelectorAll('[data-goto]').forEach(row => {
       row.addEventListener('click', () => {
@@ -1263,53 +1312,50 @@
     }
   }
 
-  // ─── INVENTORY SHEET ──────────────────────────────────────────────────────
+  // ─── STOCK COUNT SHEET ────────────────────────────────────────────────────
+  // Unified sheet for cold-ferment (dough in fridge) and frozen (finished product).
+  // Always saves to today's date. Scheduler reads the latest snapshot per SKU.
 
-  function openInvSheet(dateStr, type) {
-    invDate = dateStr; invType = type;
-    const isBFP    = type === 'bfp';
-    const invKey   = isBFP ? 'frozen' : 'coldFerment';
-    const existing = (productionState[dateStr] || {})[invKey] || {};
-    document.getElementById('inv-title').textContent = isBFP ? 'Frozen on Hand' : 'Cold Ferment on Hand';
-    document.getElementById('inv-sub').textContent   = `As of ${dateStr}`;
-    document.getElementById('inv-body').innerHTML    = Object.keys(BATCH_SIZES).map(sku => `
+  function openInvSheet() {
+    const inv = getLatestInventory();
+    const mkRows = (section, invData) => Object.keys(BATCH_SIZES).map(sku => `
       <div class="inv-input-row">
-        <label class="inv-input-lbl" for="ii-${esc(sku)}">${esc(sku)}</label>
-        <input class="inv-input" type="number" min="0" id="ii-${esc(sku)}" data-sku="${esc(sku)}" value="${existing[sku] || 0}">
+        <label class="inv-input-lbl">${esc(sku)}</label>
+        <input class="inv-input" type="number" min="0"
+          data-inv-section="${section}" data-sku="${esc(sku)}"
+          value="${invData[sku] || 0}">
         <span class="inv-input-unit">pretzels</span>
       </div>`).join('');
+    document.getElementById('inv-shape-body').innerHTML  = mkRows('shape',  inv.coldFerment);
+    document.getElementById('inv-frozen-body').innerHTML = mkRows('frozen', inv.frozen);
     document.getElementById('inv-overlay').classList.add('open');
   }
 
   async function saveInv() {
-    const isBFP    = invType === 'bfp';
-    const invKey   = isBFP ? 'frozen' : 'coldFerment';
-    const otherKey = isBFP ? 'coldFerment' : 'frozen';
-    const otherInv = (productionState[invDate] || {})[otherKey] || {};
-    const snaps    = [];
-    Object.keys(BATCH_SIZES).forEach(sku => {
-      const inp   = document.querySelector(`#inv-body [data-sku="${CSS.escape(sku)}"]`);
-      const count = parseInt(inp?.value, 10) || 0;
-      const other = otherInv[sku] || 0;
-      if (count > 0 || other > 0) {
-        snaps.push({ sku, coldFerment: isBFP ? other : count, frozen: isBFP ? count : other });
-      }
+    const snaps = {};
+    document.querySelectorAll('[data-inv-section]').forEach(inp => {
+      const sku = inp.dataset.sku, section = inp.dataset.invSection;
+      const n   = parseInt(inp.value, 10) || 0;
+      if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0 };
+      if (section === 'shape')  snaps[sku].coldFerment = n;
+      if (section === 'frozen') snaps[sku].frozen      = n;
     });
+    const snapArr = Object.values(snaps).filter(s => s.coldFerment > 0 || s.frozen > 0);
     const saveBtn = document.getElementById('inv-save');
     saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
     try {
       await appendLog(PRODUCTION_LOG, {
-        action: 'inventory', date: invDate,
-        snapshots: JSON.stringify(snaps), timeStamp: new Date().toISOString(),
+        action: 'inventory', date: toDateStr(new Date()),
+        snapshots: JSON.stringify(snapArr), timeStamp: new Date().toISOString(),
       });
       document.getElementById('inv-overlay').classList.remove('open');
       await loadProduction();
       schedule = buildOptimalSchedule();
       render();
     } catch (e) {
-      alert('Error saving inventory: ' + e.message);
+      alert('Error saving: ' + e.message);
     } finally {
-      saveBtn.disabled = false; saveBtn.textContent = 'Save Inventory';
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Stock Count';
     }
   }
 
@@ -1374,7 +1420,8 @@
     document.getElementById('extra-val').textContent = extraValue;
   });
 
-  // Inv sheet
+  // Stock count sheet
+  document.getElementById('stock-count-btn').addEventListener('click', openInvSheet);
   document.getElementById('inv-save').addEventListener('click', saveInv);
   document.getElementById('inv-cancel').addEventListener('click', () =>
     document.getElementById('inv-overlay').classList.remove('open'));
