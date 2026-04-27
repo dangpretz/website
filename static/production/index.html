@@ -187,6 +187,17 @@
     .loading { color: #888; font: 400 14px 'Manrope', sans-serif; padding: 40px 0; text-align: center; }
     .load-error { color: #C41E1E; font: 600 14px 'Manrope', sans-serif; padding: 20px 0; }
 
+    /* ── Today highlight ── */
+    .day-card.day-today .day-header { background: #C41E1E; color: #fff; }
+
+    /* ── Unconfirmed banner ── */
+    .alert-banner {
+      background: #fff3cd; color: #856404; border: 1px solid #ffc107;
+      border-radius: 8px; padding: 12px 20px; margin-bottom: 16px;
+      font: 600 13px 'Manrope', sans-serif; display: flex; align-items: center; gap: 8px;
+    }
+    .alert-banner a { color: #856404; text-decoration: underline; }
+
     /* ── Mobile ── */
     @media (max-width: 768px) {
       input, select { font-size: 16px !important; }
@@ -262,18 +273,19 @@
     'bees bats':            72,
   };
 
-  // Units per case for each SKU — TODO: update with actual case sizes
+  // Units per case for each SKU — ⚠️ UPDATE THESE WITH ACTUAL CASE SIZES
+  // Set to 0 to suppress case counts until you've confirmed the numbers.
   const CASE_SIZES = {
-    '21oz mammoth pretzel': 12,
-    '10oz mustache':        24,
-    '10oz plain':           24,
-    '10oz bbk':             24,
-    '10oz spicy bee':       24,
-    '6.5oz plain':          48,
-    '6.5oz bbk':            48,
-    '6.5oz spicy bee':      48,
-    'plain bombs':          48,
-    'bees bats':            48,
+    '21oz mammoth pretzel': 0,  // ← update
+    '10oz mustache':        0,  // ← update
+    '10oz plain':           0,  // ← update
+    '10oz bbk':             0,  // ← update
+    '10oz spicy bee':       0,  // ← update
+    '6.5oz plain':          0,  // ← update
+    '6.5oz bbk':            0,  // ← update
+    '6.5oz spicy bee':      0,  // ← update
+    'plain bombs':          0,  // ← update
+    'bees bats':            0,  // ← update
   };
 
   const BATCHES_PER_WORKER = 5;   // per 8-hour shift
@@ -370,26 +382,28 @@
   // ── Build demand for a delivery date ──────────────────────────────────────
   function buildDemand(deliveryDateStr) {
     const skuMap = {};
+    const skippedSet = new Set();
     allDeliveries
       .filter(d => d.date === deliveryDateStr && !['delivered','picked_up','cancelled'].includes(d.status))
       .forEach(delivery => {
         let items = [];
         try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
         items.forEach(({ sku, quantity }) => {
-          if (!BATCH_SIZES[sku]) return;
+          if (!BATCH_SIZES[sku]) { if (sku) skippedSet.add(sku); return; }
           if (!skuMap[sku]) skuMap[sku] = { sku, pretzels: 0, orders: [] };
           skuMap[sku].pretzels += Number(quantity) || 0;
           const cust = delivery.customer || delivery.location || '?';
           if (!skuMap[sku].orders.includes(cust)) skuMap[sku].orders.push(cust);
         });
       });
-    return Object.values(skuMap).map(item => ({
+    const demand = Object.values(skuMap).map(item => ({
       sku:      item.sku,
       pretzels: item.pretzels,
       batches:  Math.ceil(item.pretzels / BATCH_SIZES[item.sku]),
       cases:    CASE_SIZES[item.sku] ? Math.ceil(item.pretzels / CASE_SIZES[item.sku]) : null,
       orders:   item.orders,
     }));
+    return { demand, skipped: [...skippedSet] };
   }
 
   // ── Worker count ──────────────────────────────────────────────────────────
@@ -401,7 +415,7 @@
     const yesterdayStr = toDateStr(addDays(parseDate(dateStr), -1));
     // Yesterday's demand drove deliveries one lead-day further from yesterday
     const yDeliveryDate = toDateStr(addDays(parseDate(dateStr), type === 'shape' ? SHAPE_LEAD - 1 : BFP_LEAD - 1));
-    const yDemand = buildDemand(yDeliveryDate);
+    const { demand: yDemand } = buildDemand(yDeliveryDate);
     const yTotal = yDemand.reduce((s, d) => s + d.batches, 0);
     const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
     const yDone = ((productionState[yesterdayStr] || {})[doneKey] || []).reduce((s, c) => s + (Number(c.batches)||0), 0);
@@ -409,7 +423,7 @@
   }
 
   // ── Render panel ──────────────────────────────────────────────────────────
-  function renderPanel(type, dateStr, demand, dayState) {
+  function renderPanel(type, dateStr, demand, dayState, skipped = []) {
     const isBFP    = type === 'bfp';
     const title    = isBFP ? 'Bake / Freeze / Pack' : 'Shape & Cold Ferment';
     const workers  = getWorkers(type, dateStr);
@@ -447,12 +461,16 @@
         : `<span class="capacity-status ok">✅ ${spare} spare</span>`;
       const rollHtml = rollover > 0
         ? `<span class="rollover-badge">+${rollover} from yesterday</span>` : '';
+      const skippedHtml = skipped.length > 0
+        ? `<div class="section-label" style="color:#aaa;margin-top:4px">FOH only (not scheduled): ${skipped.map(esc).join(', ')}</div>`
+        : '';
       demandHtml = `
         <div class="section-label">For ${esc(leadDate)} deliveries</div>
         <div class="demand-list">${rows}</div>
         <div class="demand-total ${isOver ? 'over' : 'ok'}">
           ${total} batch${total !== 1 ? 'es' : ''} needed ${rollHtml} ${statusHtml}
-        </div>`;
+        </div>
+        ${skippedHtml}`;
     }
 
     // Inventory strip
@@ -469,8 +487,14 @@
     if (completed.length > 0) {
       const timeStr = dayState[timeKey] ? new Date(dayState[timeKey]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '';
       const pills = completed.map(c => `<span class="completed-item">${esc(c.sku)} ×${c.batches}</span>`).join('');
+      const delta = doneTotal - total;
+      const progressStr = total > 0
+        ? (delta >= 0
+          ? `<span style="color:#2a7a2a;font-weight:700"> — ✅ Done${delta > 0 ? ` (+${delta} extra)` : '!'}</span>`
+          : `<span style="color:#C41E1E;font-weight:700"> — ⚠️ ${Math.abs(delta)} short</span>`)
+        : '';
       completedHtml = `
-        <div class="section-label completed-label">✅ Logged${timeStr ? ' at ' + timeStr : ''} (${doneTotal} batch${doneTotal !== 1 ? 'es' : ''})</div>
+        <div class="section-label completed-label">✅ Logged${timeStr ? ' at ' + timeStr : ''} (${doneTotal} batch${doneTotal !== 1 ? 'es' : ''}${progressStr})</div>
         <div class="completed-list">${pills}</div>`;
     }
 
@@ -517,23 +541,23 @@
 
   // ── Render day ────────────────────────────────────────────────────────────
   function renderDay(dayDate) {
-    const dateStr       = toDateStr(dayDate);
-    const shapeDemand   = buildDemand(toDateStr(addDays(dayDate, SHAPE_LEAD)));
-    const bfpDemand     = buildDemand(toDateStr(addDays(dayDate, BFP_LEAD)));
-    const dayState      = productionState[dateStr] || {};
+    const dateStr             = toDateStr(dayDate);
+    const isToday             = dateStr === toDateStr(new Date());
+    const { demand: shapeDemand, skipped: shapeSkipped } = buildDemand(toDateStr(addDays(dayDate, SHAPE_LEAD)));
+    const { demand: bfpDemand,   skipped: bfpSkipped   } = buildDemand(toDateStr(addDays(dayDate, BFP_LEAD)));
+    const dayState            = productionState[dateStr] || {};
 
     if (shapeDemand.length === 0 && bfpDemand.length === 0) {
-      return `<div class="day-card day-empty">
-        <div class="day-header">${esc(fmtDate(dayDate))}</div>
-        <div class="day-empty-msg">No production scheduled</div>
-      </div>`;
+      return `<details class="day-card day-empty">
+        <summary class="day-header">${esc(fmtDate(dayDate))} — No production</summary>
+      </details>`;
     }
 
-    return `<div class="day-card">
-      <div class="day-header">${esc(fmtDate(dayDate))}</div>
+    return `<div class="day-card${isToday ? ' day-today' : ''}">
+      <div class="day-header">${esc(fmtDate(dayDate))}${isToday ? ' — TODAY' : ''}</div>
       <div class="day-panels">
-        ${renderPanel('shape', dateStr, shapeDemand, dayState)}
-        ${renderPanel('bfp',   dateStr, bfpDemand,   dayState)}
+        ${renderPanel('shape', dateStr, shapeDemand, dayState, shapeSkipped)}
+        ${renderPanel('bfp',   dateStr, bfpDemand,   dayState, bfpSkipped)}
       </div>
     </div>`;
   }
@@ -541,8 +565,18 @@
   // ── Render week ───────────────────────────────────────────────────────────
   function render() {
     const days = getWeekDays(weekOffset);
-    const html = days.map(renderDay).join('');
-    document.getElementById('schedule-container').innerHTML = html || '<div class="loading">No deliveries found.</div>';
+    const schedHtml = days.map(renderDay).join('') || '<div class="loading">No deliveries found.</div>';
+
+    // Unconfirmed deliveries today
+    const todayStr = toDateStr(new Date());
+    const unconfirmed = allDeliveries.filter(d =>
+      d.date === todayStr && !['delivered','picked_up','cancelled'].includes(d.status)
+    );
+    const bannerHtml = unconfirmed.length > 0
+      ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length > 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
+      : '';
+
+    document.getElementById('schedule-container').innerHTML = bannerHtml + schedHtml;
     bindActions();
   }
 
@@ -584,6 +618,8 @@
     });
     if (!completions.length) return;
     const workers = parseInt(form.querySelector('.worker-input-inline')?.value, 10) || getWorkers(type, date);
+    const confirmSummary = completions.map(c => `${c.sku} ×${c.batches}`).join('\n');
+    if (!confirm(`Log completions for ${date}?\n\n${confirmSummary}`)) return;
 
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
@@ -689,7 +725,9 @@
       render();
     } catch (e) {
       document.getElementById('schedule-container').innerHTML =
-        `<div class="load-error">Error loading data: ${esc(e.message)}</div>`;
+        `<div class="load-error">⚠️ Error loading data: ${esc(e.message)}
+          <button onclick="window.location.reload()" style="margin-left:12px;padding:8px 16px;background:#C41E1E;color:#fff;border:none;border-radius:4px;font:700 13px 'Manrope',sans-serif;cursor:pointer;">Retry</button>
+        </div>`;
     }
   })();
 </script>

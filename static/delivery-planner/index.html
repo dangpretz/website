@@ -522,6 +522,18 @@
     .totals-weekly-section { margin-bottom: 24px; }
     .totals-weekly-section h3, .totals-by-day-section h3 { font: 700 12px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; margin: 0 0 12px; }
 
+    /* ── Success / error notification ── */
+    .notif {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 12px 24px; border-radius: 6px; font: 700 14px 'Manrope', sans-serif;
+      color: #fff; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+      pointer-events: none; opacity: 1; transition: opacity 0.4s ease;
+      white-space: nowrap;
+    }
+    .notif.success { background: #2a7a2a; }
+    .notif.error   { background: #C41E1E; }
+    .notif.fade    { opacity: 0; }
+
     /* ── Recurring management ── */
     .rec-list { list-style: none; margin: 0; padding: 0; }
     .rec-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #eee; }
@@ -806,15 +818,15 @@
     formOverlay.addEventListener('click', (e) => { if (e.target === formOverlay) closeFormModal(); });
 
     // ── View mode ──
-    let viewMode = 'weekly'; // 'weekly' | 'daily'
+    let viewMode = localStorage.getItem('dp-view-mode') || 'weekly'; // 'weekly' | 'daily'
     let weekOffset = 0;
     let currentDay = new Date();
 
     const viewWeeklyBtn = document.getElementById('view-weekly');
     const viewDailyBtn = document.getElementById('view-daily');
 
-    viewWeeklyBtn.addEventListener('click', () => { if (viewMode !== 'weekly') { viewMode = 'weekly'; updateViewToggle(); updateNavLabel(); renderView(); } });
-    viewDailyBtn.addEventListener('click', () => { if (viewMode !== 'daily') { viewMode = 'daily'; updateViewToggle(); updateNavLabel(); renderView(); } });
+    viewWeeklyBtn.addEventListener('click', () => { if (viewMode !== 'weekly') { viewMode = 'weekly'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
+    viewDailyBtn.addEventListener('click', () => { if (viewMode !== 'daily') { viewMode = 'daily'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
 
     function updateViewToggle() {
       viewWeeklyBtn.classList.toggle('active', viewMode === 'weekly');
@@ -884,6 +896,7 @@
       updateNavLabel(); renderView();
     });
 
+    updateViewToggle();
     updateNavLabel();
 
     function generateDeliveryId() {
@@ -1053,6 +1066,17 @@
     }
 
     function showError(msg) { formError.textContent = msg || ''; formError.hidden = !msg; }
+
+    // ── Success / error notification pill ──
+    let notifTimer = null;
+    function showNotification(msg, type = 'success') {
+      let el = document.getElementById('app-notif');
+      if (!el) { el = document.createElement('div'); el.id = 'app-notif'; el.className = 'notif'; document.body.appendChild(el); }
+      el.textContent = msg;
+      el.className = `notif ${type}`;
+      if (notifTimer) clearTimeout(notifTimer);
+      notifTimer = setTimeout(() => { el.classList.add('fade'); setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); notifTimer = null; }, 400); }, 3000);
+    }
 
     // ── Customer order memory ──
     function getLastOrderForCustomer(customerName) {
@@ -1384,7 +1408,10 @@
         renderView();
       } catch (e) {
         currentDeliveries = [];
-        scheduleContainer.innerHTML = '<div class="week-empty">Could not load records. Check console.</div>';
+        scheduleContainer.innerHTML = `<div class="week-empty" style="color:#C41E1E">
+          ⚠️ Could not load deliveries.
+          <button onclick="window.location.reload()" style="margin-left:12px;padding:8px 16px;background:#C41E1E;color:#fff;border:none;border-radius:4px;font:700 13px 'Manrope',sans-serif;cursor:pointer;">Retry</button>
+        </div>`;
         totalsBySkuList.innerHTML = '<p class="empty" style="color:#999">—</p>';
         console.error('fetchLog error', e);
       }
@@ -1511,7 +1538,7 @@
       let itemsHtml = '';
       try { const items = JSON.parse(row.lineItems || '[]'); itemsHtml = items.map((it) => `${escapeHtml(it.sku)} x${it.quantity}`).join(', '); } catch (_) { itemsHtml = '—'; }
       summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>`;
-      document.getElementById('confirm-receiver').value = '';
+      document.getElementById('confirm-receiver').value = row.customer || row.location || '';
       document.getElementById('confirm-note').value = '';
       document.getElementById('confirm-error').hidden = true;
       document.getElementById('sig-section').style.display = '';
@@ -1562,6 +1589,7 @@
       btn.disabled = false; btn.textContent = 'Confirm Delivery';
       document.getElementById('confirm-overlay').classList.remove('open');
       confirmDeliveryId = null;
+      showNotification('✅ Delivery confirmed!');
       await loadRecords();
     });
 
@@ -1651,6 +1679,7 @@
         document.getElementById('barcode-overlay').classList.remove('open');
         barcodeDeliveryId = null;
         scannedBarcodes = [];
+        showNotification('✅ Barcodes saved!');
         await loadRecords();
       } catch (err) {
         const errEl = document.getElementById('barcode-error');
@@ -1768,8 +1797,15 @@
       const type = form.type.value;
       const rows = lineItemsContainer.querySelectorAll('.line-item-row');
       const lineItems = [];
-      rows.forEach((row) => { const sku = row.querySelector('[data-line-sku]').value; const qty = row.querySelector('[data-line-qty]').value.trim(); if (sku && qty && Number(qty) > 0) lineItems.push({ sku, quantity: Number(qty) }); });
+      let hasZeroQty = false;
+      rows.forEach((row) => {
+        const sku = row.querySelector('[data-line-sku]').value.trim();
+        const qty = row.querySelector('[data-line-qty]').value.trim();
+        if (sku && (!qty || Number(qty) <= 0)) { hasZeroQty = true; return; }
+        if (sku && qty && Number(qty) > 0) lineItems.push({ sku, quantity: Number(qty) });
+      });
       if (!customer || !date || !type) { showError('Please fill in customer, date, and type.'); return; }
+      if (hasZeroQty) { showError('Enter a quantity > 0 for each SKU.'); return; }
       if (lineItems.length === 0) { showError('Add at least one line item (SKU + quantity).'); return; }
       submitBtn.disabled = true;
       const editingId = deliveryIdInput.value.trim();
@@ -1789,6 +1825,7 @@
           });
         }
         closeFormModal();
+        showNotification(editingId ? '✅ Order updated!' : '✅ Order scheduled!');
         await loadRecords();
         await loadRecurrences();
       } catch (err) { showError('Failed to save. Try again.'); console.error('appendLog error', err); }
