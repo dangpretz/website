@@ -3,252 +3,381 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Production Schedule | Dangerous Pretzel Co.</title>
+  <title>Production | DPC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Paytone+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; background: #1A1A1A; color: #1A1A1A; font-family: 'Manrope', sans-serif; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red: #C41E1E; --red-dk: #8B0000;
+      --dark: #1A1A1A; --amber: #f0ad4e; --green: #2a7a2a;
+      --white: #ffffff;
+      --gray-1: #f5f5f5; --gray-2: #e8e8e8; --gray-3: #999999; --gray-4: #666666;
+    }
+    html { background: var(--dark); }
+    body { font-family: 'Manrope', sans-serif; background: var(--dark); color: var(--dark); min-height: 100vh; }
 
-    /* ── Hero ── */
-    .hero { background: #1A1A1A; padding: 24px 5% 16px; text-align: center; }
-    .hero h1 { font: 700 32px 'Paytone One', sans-serif; color: #fff; margin: 0 0 6px; }
-    .hero-sub { margin: 0; }
-    .hero-sub a { color: #f0ad4e; font: 600 13px 'Manrope', sans-serif; text-decoration: none; }
-    .hero-sub a:hover { text-decoration: underline; }
+    /* iOS zoom fix */
+    input, select, textarea { font-size: 16px !important; }
 
-    /* ── Page ── */
-    .page { max-width: 1100px; margin: 0 auto; padding: 0 5% 60px; }
+    /* ── Top nav ─────────────────────────────────── */
+    .topnav {
+      position: sticky; top: 0; z-index: 100; background: var(--dark);
+      border-bottom: 2px solid var(--red);
+      display: flex; align-items: center; height: 60px;
+    }
+    .nav-arrow {
+      width: 56px; height: 60px; border: none; background: none;
+      color: var(--white); font-size: 32px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+    }
+    .nav-arrow:active { background: rgba(255,255,255,0.08); }
+    .date-display {
+      flex: 1; text-align: center; cursor: pointer; padding: 4px 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .date-label {
+      display: block; font-family: 'Paytone One', sans-serif;
+      font-size: 17px; color: var(--white); line-height: 1.2;
+    }
+    .date-label.is-today { color: var(--amber); }
+    .date-sub { display: block; font-size: 12px; color: var(--gray-3); margin-top: 1px; }
+    .week-toggle {
+      height: 60px; padding: 0 16px; border: none; background: none;
+      color: var(--gray-3); font: 700 12px 'Manrope', sans-serif;
+      text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+    }
+    .week-toggle.active { color: var(--amber); }
 
-    /* ── Schedule header ── */
-    .schedule-header {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 16px; padding: 20px 0 16px; flex-wrap: wrap;
-    }
-    .schedule-header h2 { font: 700 22px 'Paytone One', sans-serif; color: #fff; margin: 0; }
-    .week-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .week-nav-btn {
-      width: 40px; height: 40px; border-radius: 50%; border: none; background: #2a2a2a;
-      color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center;
-      justify-content: center; transition: background 0.2s;
-    }
-    .week-nav-btn:hover { background: #C41E1E; }
-    .week-nav-label { font: 700 14px 'Manrope', sans-serif; color: #ccc; min-width: 180px; text-align: center; }
-    .week-nav-today {
-      padding: 8px 16px; background: #2a2a2a; border: none; color: #ccc;
-      font: 600 12px 'Manrope', sans-serif; border-radius: 4px; cursor: pointer; transition: background 0.2s;
-    }
-    .week-nav-today:hover { background: #3a3a3a; color: #fff; }
+    /* ── Page content ──────────────────────────── */
+    .content { padding: 12px 12px 100px; max-width: 640px; margin: 0 auto; }
 
-    /* ── Day card ── */
-    .day-card {
-      background: #fff; border-radius: 10px; margin-bottom: 20px;
-      overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .day-header {
-      background: #1A1A1A; color: #f0ad4e; padding: 10px 20px;
-      font: 700 14px 'Paytone One', sans-serif; letter-spacing: 0.5px;
-      border-bottom: 2px solid #C41E1E;
-    }
-    .day-empty .day-header { border-bottom-color: #333; }
-    .day-empty-msg { padding: 16px 20px; color: #999; font: 400 13px 'Manrope', sans-serif; }
-    .day-panels { display: grid; grid-template-columns: 1fr 1fr; }
-
-    /* ── Panel ── */
-    .panel { padding: 18px 20px; border-right: 1px solid #eee; }
-    .panel:last-child { border-right: none; }
-    .panel-over { background: #fff8f8; }
-    .panel-title {
-      font: 700 13px 'Paytone One', sans-serif; color: #1A1A1A;
-      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
-    }
-
-    /* ── Worker row ── */
-    .worker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-    .worker-row label { font: 700 11px 'Manrope', sans-serif; color: #888; letter-spacing: 0.5px; text-transform: uppercase; margin: 0; }
-    .worker-input {
-      width: 60px; padding: 6px 8px; font: 700 15px 'Manrope', sans-serif;
-      border: 1px solid #ddd; border-radius: 4px; text-align: center;
-    }
-    .capacity-label { font: 400 12px 'Manrope', sans-serif; color: #888; }
-
-    /* ── Section label ── */
-    .section-label { font: 700 10px 'Manrope', sans-serif; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 6px; }
-    .completed-label { color: #4a8a4a; }
-
-    /* ── Demand list ── */
-    .demand-list { margin-bottom: 8px; }
-    .demand-row {
-      display: flex; flex-direction: column; gap: 1px;
-      padding: 6px 0; border-bottom: 1px solid #f0f0f0;
-    }
-    .demand-row:last-child { border-bottom: none; }
-    .demand-sku { font: 700 13px 'Manrope', sans-serif; color: #1A1A1A; }
-    .demand-detail { font: 400 12px 'Manrope', sans-serif; color: #555; }
-    .demand-detail strong { color: #C41E1E; }
-    .demand-orders { font: 400 11px 'Manrope', sans-serif; color: #999; }
-    .demand-row-warn { border-left: 3px solid #C41E1E; padding-left: 6px; }
-    .inv-badge {
-      display: inline-block; font: 600 10px 'Manrope', sans-serif;
-      color: #2a7a2a; background: #e8f5e8; padding: 1px 6px; border-radius: 3px; margin-top: 2px;
-    }
-    .demand-total {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 8px 10px; border-radius: 6px; margin: 8px 0;
-      font: 700 13px 'Manrope', sans-serif;
-    }
-    .demand-total.ok { background: #f0f8f0; color: #1A1A1A; }
-    .demand-total.over { background: #fff0f0; color: #1A1A1A; }
-    .capacity-status { font: 600 12px 'Manrope', sans-serif; }
-    .capacity-status.ok { color: #4a8a4a; }
-    .capacity-status.over { color: #C41E1E; }
-    .rollover-badge {
-      font: 600 10px 'Manrope', sans-serif; background: #fff3cd;
-      color: #856404; padding: 2px 6px; border-radius: 3px; border: 1px solid #ffc107;
-    }
-    .no-demand { font: 400 12px 'Manrope', sans-serif; color: #bbb; padding: 8px 0; }
-
-    /* ── Inventory section ── */
-    .inv-section { margin: 10px 0; padding: 8px 10px; background: #f9f9f9; border-radius: 6px; }
-    .inv-section .section-label { margin: 0 0 4px; display: block; }
-    .inv-item { font: 600 11px 'Manrope', sans-serif; color: #555; margin-right: 8px; }
-    .inv-empty { font: 400 11px 'Manrope', sans-serif; color: #bbb; }
-    .btn-link {
-      background: none; border: none; color: #C41E1E; font: 600 11px 'Manrope', sans-serif;
-      cursor: pointer; padding: 0; margin-left: 8px; text-decoration: underline;
-    }
-    .btn-link:hover { color: #8B0000; }
-
-    /* ── Completed ── */
-    .completed-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-    .completed-item {
-      font: 600 11px 'Manrope', sans-serif; background: #e8f5e8; color: #2a7a2a;
-      padding: 2px 8px; border-radius: 4px;
-    }
-
-    /* ── Checkoff details ── */
-    .checkoff-details { margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; }
-    .checkoff-details summary {
-      font: 600 12px 'Manrope', sans-serif; color: #888; cursor: pointer;
-      list-style: none; user-select: none;
-    }
-    .checkoff-details summary::-webkit-details-marker { display: none; }
-    .checkoff-details summary::before { content: '▸ '; font-size: 10px; }
-    .checkoff-details[open] summary::before { content: '▾ '; }
-    .checkoff-details summary:hover { color: #1A1A1A; }
-    .checkoff-form { margin-top: 10px; }
-    .checkoff-rows { margin-bottom: 10px; }
-    .checkoff-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
-    .checkoff-sku { font: 600 12px 'Manrope', sans-serif; color: #333; flex: 1; min-width: 100px; }
-    .checkoff-input {
-      width: 60px; padding: 6px 8px; font: 700 14px 'Manrope', sans-serif;
-      border: 1px solid #ddd; border-radius: 4px; text-align: center;
-    }
-    .checkoff-unit { font: 400 11px 'Manrope', sans-serif; color: #888; }
-    .checkoff-actions { display: flex; align-items: center; gap: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; flex-wrap: wrap; }
-    .worker-input-inline {
-      width: 55px; padding: 6px 8px; font: 600 13px 'Manrope', sans-serif;
-      border: 1px solid #ddd; border-radius: 4px; text-align: center;
-    }
-
-    /* ── Buttons ── */
-    .btn {
-      display: inline-block; padding: 10px 20px; border-radius: 4px;
-      font: 700 13px 'Manrope', sans-serif; border: none; cursor: pointer; transition: opacity 0.2s;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn-sm { padding: 7px 14px; font-size: 12px; }
-    .btn-red { background: #C41E1E; color: #fff; }
-    .btn-secondary { background: #eee; color: #333; }
-
-    /* ── Inventory modal ── */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-      z-index: 1000; align-items: center; justify-content: center; padding: 20px;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal-content {
-      background: #fff; border-radius: 10px; padding: 28px 24px;
-      width: 95%; max-width: 480px; max-height: 80vh; overflow-y: auto;
-    }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .modal-header h2 { font: 700 18px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0; }
-    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #888; padding: 4px 8px; }
-    .modal-close:hover { color: #C41E1E; }
-    .modal-sub { font: 400 13px 'Manrope', sans-serif; color: #888; margin: 0 0 18px; }
-    .inv-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .inv-row label { flex: 1; font: 600 13px 'Manrope', sans-serif; color: #333; min-width: 0; margin: 0; }
-    .inv-row input { width: 80px; padding: 8px 10px; font: 600 14px 'Manrope', sans-serif; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
-    .inv-unit { font: 400 12px 'Manrope', sans-serif; color: #999; white-space: nowrap; }
-    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-    .modal-actions .btn { flex: 1; text-align: center; min-height: 44px; }
-
-    /* ── Loading / error ── */
-    .loading { color: #888; font: 400 14px 'Manrope', sans-serif; padding: 40px 0; text-align: center; }
-    .load-error { color: #C41E1E; font: 600 14px 'Manrope', sans-serif; padding: 20px 0; }
-
-    /* ── Today highlight ── */
-    .day-card.day-today .day-header { background: #C41E1E; color: #fff; }
-
-    /* ── Unconfirmed banner ── */
+    /* ── Alert banner ──────────────────────────── */
     .alert-banner {
-      background: #fff3cd; color: #856404; border: 1px solid #ffc107;
-      border-radius: 8px; padding: 12px 20px; margin-bottom: 16px;
-      font: 600 13px 'Manrope', sans-serif; display: flex; align-items: center; gap: 8px;
+      background: #fff3cd; color: #856404;
+      border-radius: 10px; padding: 12px 16px;
+      font: 600 14px 'Manrope', sans-serif; margin-bottom: 12px;
     }
-    .alert-banner a { color: #856404; text-decoration: underline; }
+    .alert-banner a { color: #856404; }
 
-    /* ── Mobile ── */
-    @media (max-width: 768px) {
-      input, select { font-size: 16px !important; }
-      .day-panels { grid-template-columns: 1fr; }
-      .panel { border-right: none; border-bottom: 1px solid #eee; }
-      .panel:last-child { border-bottom: none; }
-      .schedule-header { flex-direction: column; align-items: stretch; }
-      .schedule-header h2 { text-align: center; }
-      .week-nav { justify-content: center; }
-      .week-nav-btn { width: 44px; height: 44px; }
-      .week-nav-today { min-height: 44px; padding: 10px 16px; }
-      .worker-input, .checkoff-input, .worker-input-inline { font-size: 16px !important; }
-      .btn { min-height: 44px; }
-      .modal-content { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0; align-self: flex-end; }
-      .modal-overlay.open { align-items: flex-end; padding: 0; }
+    /* ── Team card ─────────────────────────────── */
+    .team-card {
+      background: var(--white); border-radius: 14px;
+      margin-bottom: 12px; overflow: hidden;
+    }
+    .team-header {
+      padding: 14px 16px 12px; border-bottom: 1px solid var(--gray-2);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    }
+    .team-name { font-family: 'Paytone One', sans-serif; font-size: 19px; color: var(--dark); line-height: 1.2; }
+    .team-date { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 3px; }
+    .team-body { padding: 14px 16px; }
+
+    /* ── Status badge ──────────────────────────── */
+    .status-badge {
+      flex-shrink: 0; padding: 5px 10px; border-radius: 20px;
+      font: 700 12px 'Manrope', sans-serif; white-space: nowrap;
+    }
+    .badge-none    { background: var(--gray-2); color: var(--gray-4); }
+    .badge-partial { background: #fff3cd; color: #856404; }
+    .badge-done    { background: #d4edda; color: #155724; }
+    .badge-over    { background: #fff0f0; color: var(--red); }
+
+    /* ── Workers row ───────────────────────────── */
+    .workers-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-2);
+    }
+    .workers-label { font: 700 14px 'Manrope', sans-serif; color: var(--dark); }
+    .workers-sub { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); display: block; margin-top: 2px; }
+    .stepper-inline {
+      display: flex; align-items: center;
+      border: 1.5px solid var(--gray-2); border-radius: 8px; overflow: hidden;
+    }
+    .stepper-btn {
+      width: 44px; height: 44px; border: none; background: var(--gray-1);
+      font-size: 20px; font-weight: 700; color: var(--dark); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .stepper-btn:active { background: var(--gray-2); }
+    .stepper-val {
+      min-width: 42px; text-align: center;
+      font: 800 17px 'Manrope', sans-serif; color: var(--dark);
+      border-left: 1.5px solid var(--gray-2); border-right: 1.5px solid var(--gray-2);
+      line-height: 44px;
+    }
+
+    /* ── SKU list ──────────────────────────────── */
+    .section-label {
+      font: 700 11px 'Manrope', sans-serif; color: var(--gray-3);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .sku-row {
+      padding: 10px 0; border-bottom: 1px solid var(--gray-2);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .sku-row:last-child { border-bottom: none; }
+    .sku-name { font: 700 17px 'Manrope', sans-serif; color: var(--dark); }
+    .sku-detail { font: 400 14px 'Manrope', sans-serif; color: var(--gray-4); }
+    .sku-detail strong { color: var(--dark); font-weight: 800; }
+    .sku-customers { font: 400 12px 'Manrope', sans-serif; color: var(--gray-3); }
+    .sku-warn { color: var(--red); font: 600 13px 'Manrope', sans-serif; }
+    .inv-badge {
+      display: inline-block; font: 600 11px 'Manrope', sans-serif;
+      color: var(--green); background: #e8f5e8;
+      padding: 2px 7px; border-radius: 4px; margin-top: 2px;
+    }
+
+    /* ── Group label (BFP coating) ─────────────── */
+    .group-label {
+      font: 700 11px 'Manrope', sans-serif; color: var(--red);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin: 14px 0 4px; padding-top: 8px; border-top: 1px dashed var(--gray-2);
+    }
+
+    /* ── Batch total ───────────────────────────── */
+    .batch-total {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-radius: 10px; margin: 12px 0;
+    }
+    .batch-total.ok   { background: #f0f8f0; }
+    .batch-total.over { background: #fff0f0; }
+    .batch-total.zero { background: var(--gray-1); }
+    .batch-total-left { display: flex; flex-direction: column; gap: 2px; }
+    .batch-total-num { font: 800 28px 'Manrope', sans-serif; color: var(--dark); line-height: 1; }
+    .batch-total-lbl { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); }
+    .rollover-pill {
+      display: inline-block; font: 600 11px 'Manrope', sans-serif;
+      background: #fff3cd; color: #856404;
+      padding: 2px 7px; border-radius: 6px; margin-top: 2px;
+    }
+    .batch-status { font: 700 14px 'Manrope', sans-serif; }
+    .status-ok   { color: var(--green); }
+    .status-over { color: var(--red); }
+    .workers-cap { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 3px; }
+
+    /* ── Inventory strip ───────────────────────── */
+    .inv-strip {
+      background: var(--gray-1); border-radius: 8px; padding: 10px 12px; margin: 10px 0;
+    }
+    .inv-strip-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+    }
+    .inv-strip-items { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); }
+    .inv-strip-empty { font: 400 13px 'Manrope', sans-serif; color: var(--gray-3); }
+    .btn-link {
+      background: none; border: none; color: var(--red);
+      font: 600 13px 'Manrope', sans-serif; cursor: pointer; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Completed strip ───────────────────────── */
+    .completed-strip {
+      background: #e8f5e8; border-radius: 8px; padding: 10px 12px; margin: 10px 0;
+    }
+    .completed-strip-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 6px; flex-wrap: wrap;
+    }
+    .completed-strip-lbl { font: 700 13px 'Manrope', sans-serif; color: var(--green); }
+    .completed-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+    .completed-pill {
+      font: 600 12px 'Manrope', sans-serif; color: var(--green);
+      background: var(--white); border-radius: 6px; padding: 3px 9px;
+    }
+    .progress-short { font: 700 13px 'Manrope', sans-serif; color: var(--red); }
+    .progress-done  { font: 700 13px 'Manrope', sans-serif; color: var(--green); }
+
+    /* ── FOH note ──────────────────────────────── */
+    .foh-note {
+      font: 400 12px 'Manrope', sans-serif; color: var(--gray-3);
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gray-2);
+    }
+
+    /* ── Log button ────────────────────────────── */
+    .log-btn {
+      display: block; width: 100%; min-height: 54px;
+      background: var(--red); color: var(--white); border: none;
+      border-radius: 10px; font: 700 16px 'Manrope', sans-serif; cursor: pointer;
+      margin-top: 14px; -webkit-tap-highlight-color: transparent;
+    }
+    .log-btn:active { background: var(--red-dk); }
+    .log-btn.logged { background: var(--green); }
+    .log-btn.logged:active { background: #1e5c1e; }
+
+    /* ── Week view ─────────────────────────────── */
+    .week-section-lbl {
+      font: 700 11px 'Manrope', sans-serif; color: var(--gray-3);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 14px 4px 6px;
+    }
+    .week-row {
+      background: var(--white); border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px; min-height: 64px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .week-row:active { background: var(--gray-1); }
+    .week-row.is-today { border-left: 4px solid var(--red); padding-left: 12px; }
+    .week-row.is-empty { opacity: 0.45; }
+    .week-row-date { flex: 1; }
+    .week-row-day { font: 700 17px 'Manrope', sans-serif; color: var(--dark); }
+    .week-row-full { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 2px; }
+    .week-row-icons { display: flex; gap: 4px; align-items: center; }
+    .week-icon { font-size: 20px; line-height: 1; }
+    .week-chevron { font: 400 18px 'Manrope', sans-serif; color: var(--gray-3); margin-left: 4px; }
+
+    /* ── No production ─────────────────────────── */
+    .no-prod {
+      text-align: center; color: var(--gray-3);
+      font: 400 15px 'Manrope', sans-serif; padding: 48px 20px;
+    }
+
+    /* ── Load error ────────────────────────────── */
+    .load-error {
+      background: #fff0f0; border-radius: 12px; padding: 24px 20px;
+      text-align: center; font: 600 15px 'Manrope', sans-serif; color: var(--red);
+    }
+
+    /* ── Bottom sheet ──────────────────────────── */
+    .sheet-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 200;
+      align-items: flex-end; justify-content: center;
+    }
+    .sheet-overlay.open { display: flex; }
+    .sheet {
+      background: var(--white); border-radius: 18px 18px 0 0;
+      width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .sheet-handle {
+      width: 40px; height: 4px; background: var(--gray-2);
+      border-radius: 2px; margin: 12px auto 16px;
+    }
+    .sheet-header { padding: 0 20px 16px; border-bottom: 1px solid var(--gray-2); }
+    .sheet-title { font-family: 'Paytone One', sans-serif; font-size: 20px; color: var(--dark); }
+    .sheet-sub { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 3px; }
+    .sheet-body { padding: 0 20px; }
+    .sheet-footer { padding: 12px 20px 20px; border-top: 1px solid var(--gray-2); }
+
+    /* ── Sheet workers row ─────────────────────── */
+    .sheet-workers-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0; border-bottom: 1px solid var(--gray-2);
+    }
+    .sheet-workers-lbl { font: 700 16px 'Manrope', sans-serif; color: var(--dark); }
+    .sheet-workers-sub { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); display: block; margin-top: 2px; }
+
+    /* ── Sheet stepper (large) ─────────────────── */
+    .stepper-lg { display: flex; align-items: center; }
+    .step-btn {
+      width: 48px; height: 48px; border: 1.5px solid var(--gray-2); border-radius: 8px;
+      background: var(--gray-1); font-size: 24px; font-weight: 700; color: var(--dark);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .step-btn:active { background: var(--gray-2); }
+    .step-val {
+      min-width: 56px; text-align: center;
+      font: 800 22px 'Manrope', sans-serif; color: var(--dark);
+    }
+
+    /* ── Sheet SKU row ─────────────────────────── */
+    .log-sku-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0; border-bottom: 1px solid var(--gray-2); gap: 12px;
+    }
+    .log-sku-row:last-child { border-bottom: none; }
+    .log-sku-info { flex: 1; min-width: 0; }
+    .log-sku-name { font: 700 16px 'Manrope', sans-serif; color: var(--dark); }
+    .log-sku-demand { font: 400 13px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 2px; }
+
+    /* ── Sheet inv input row ───────────────────── */
+    .inv-input-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--gray-2); gap: 10px;
+    }
+    .inv-input-row:last-child { border-bottom: none; }
+    .inv-input-lbl { font: 700 15px 'Manrope', sans-serif; color: var(--dark); flex: 1; }
+    .inv-input {
+      width: 80px; padding: 10px; text-align: center;
+      font: 700 17px 'Manrope', sans-serif !important;
+      border: 1.5px solid var(--gray-2); border-radius: 8px;
+    }
+    .inv-input-unit { font: 400 12px 'Manrope', sans-serif; color: var(--gray-4); white-space: nowrap; }
+
+    /* ── Sheet buttons ─────────────────────────── */
+    .btn-primary {
+      display: block; width: 100%; min-height: 54px;
+      background: var(--red); color: var(--white); border: none;
+      border-radius: 10px; font: 700 16px 'Manrope', sans-serif; cursor: pointer;
+    }
+    .btn-primary:active { background: var(--red-dk); }
+    .btn-primary:disabled { opacity: 0.5; }
+    .btn-secondary {
+      display: block; width: 100%; min-height: 48px;
+      background: var(--gray-1); color: var(--dark); border: 1.5px solid var(--gray-2);
+      border-radius: 10px; font: 600 15px 'Manrope', sans-serif; cursor: pointer;
+      margin-top: 8px;
+    }
+
+    @media (min-width: 640px) {
+      .team-name { font-size: 21px; }
+      .sku-name  { font-size: 18px; }
+      .batch-total-num { font-size: 32px; }
     }
   </style>
 </head>
 <body>
 
-<div class="hero">
-  <h1>Production Schedule</h1>
-  <p class="hero-sub"><a href="../delivery-planner/index.html">← Delivery Planner</a></p>
+<nav class="topnav">
+  <button class="nav-arrow" id="nav-prev" aria-label="Previous day">‹</button>
+  <div class="date-display" id="date-display" role="button" tabindex="0" aria-label="Go to today">
+    <span class="date-label" id="date-label">Today</span>
+    <span class="date-sub" id="date-sub"></span>
+  </div>
+  <button class="nav-arrow" id="nav-next" aria-label="Next day">›</button>
+  <button class="week-toggle" id="week-toggle">Week</button>
+</nav>
+
+<div class="content">
+  <div id="alert-area"></div>
+  <div id="main-view"><div class="no-prod">Loading…</div></div>
 </div>
 
-<div class="page">
-  <div class="schedule-header">
-    <h2>Weekly Production</h2>
-    <div class="week-nav">
-      <button class="week-nav-btn" id="week-prev" title="Previous week">&#8249;</button>
-      <div class="week-nav-label" id="week-label"></div>
-      <button class="week-nav-btn" id="week-next" title="Next week">&#8250;</button>
-      <button class="week-nav-today" id="week-today">Today</button>
+<!-- Log completions sheet -->
+<div class="sheet-overlay" id="log-overlay" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="log-title">Log Completions</div>
+      <div class="sheet-sub" id="log-sub"></div>
+    </div>
+    <div class="sheet-body" id="log-body"></div>
+    <div class="sheet-footer">
+      <button class="btn-primary" id="log-save">Save Completions</button>
+      <button class="btn-secondary" id="log-cancel">Cancel</button>
     </div>
   </div>
-  <div id="schedule-container"><div class="loading">Loading production schedule…</div></div>
 </div>
 
-<!-- Inventory modal -->
-<div class="modal-overlay" id="inventory-overlay">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>On-Hand Inventory</h2>
-      <button class="modal-close" id="inventory-close">✕</button>
+<!-- Inventory sheet -->
+<div class="sheet-overlay" id="inv-overlay" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="inv-title">On-Hand Inventory</div>
+      <div class="sheet-sub" id="inv-sub"></div>
     </div>
-    <p class="modal-sub" id="inventory-modal-label"></p>
-    <div id="inventory-form-rows"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="inventory-cancel">Cancel</button>
-      <button class="btn btn-red" id="inventory-save">Save</button>
+    <div class="sheet-body" id="inv-body"></div>
+    <div class="sheet-footer">
+      <button class="btn-primary" id="inv-save">Save Inventory</button>
+      <button class="btn-secondary" id="inv-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -256,11 +385,12 @@
 <script type="module">
   import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
-  // ── Config ────────────────────────────────────────────────────────────────
-  const DELIVERY_LOG    = '/dangpretz/delivery-planner';
-  const PRODUCTION_LOG  = '/dangpretz/production';
+  // ─── CONFIG ───────────────────────────────────────────────────────────────
 
-  // Pretzels per batch for each SKU (edit as needed)
+  const DELIVERY_LOG   = '/dangpretz/delivery-planner';
+  const PRODUCTION_LOG = '/dangpretz/production';
+
+  // Pretzels per batch — used to convert order qty → batches needed
   const BATCH_SIZES = {
     '21oz mammoth pretzel': 24,
     '10oz mustache':        48,
@@ -274,15 +404,7 @@
     'bees bats':            72,
   };
 
-  // SKUs handled by FOH — never show in production schedule.
-  // Add any dips, retail-only items, etc. here.
-  const FOH_SKUS = new Set([
-    '3oz cheese dip',
-    'bulk dangerous dip (25 srv)',
-  ]);
-
-  // Units per case for each SKU — ⚠️ UPDATE THESE WITH ACTUAL CASE SIZES
-  // Set to 0 to suppress case counts until you've confirmed the numbers.
+  // Units per case — ⚠️ SET TO 0 UNTIL CONFIRMED, suppresses case count display
   const CASE_SIZES = {
     '21oz mammoth pretzel': 0,  // ← update
     '10oz mustache':        0,  // ← update
@@ -296,36 +418,53 @@
     'bees bats':            0,  // ← update
   };
 
-  const BATCHES_PER_WORKER = 5;   // per 8-hour shift
-  const SHAPE_LEAD = 2;           // shape pretzels N days before delivery
-  const BFP_LEAD   = 1;           // bake/freeze/pack N days before delivery
+  // FOH-only items — excluded from production schedule entirely
+  const FOH_SKUS = new Set([
+    '3oz cheese dip',
+    'bulk dangerous dip (25 srv)',
+  ]);
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  let weekOffset = 0;
-  let allDeliveries = [];
+  // BFP bake groups — coating SKUs get a separate section in the BFP card
+  const BAKE_GROUPS = {
+    coating: ['10oz bbk', '10oz spicy bee', '6.5oz bbk', '6.5oz spicy bee'],
+  };
+
+  const BATCHES_PER_WORKER = 5;  // batches a single worker can complete per shift
+  const SHAPE_LEAD = 2;          // shape team works N days before delivery date
+  const BFP_LEAD   = 1;          // BFP team works N days before delivery date
+  const WEEK_RANGE = 14;         // days shown in week view
+
+  // ─── STATE ────────────────────────────────────────────────────────────────
+
+  let allDeliveries   = [];
   let productionState = {};
-  let invModalDate = null;
-  let invModalType = null;
+  let currentDate     = new Date();
+  let viewMode        = 'day'; // 'day' | 'week'
 
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  // Log sheet
+  let logType    = null;
+  let logDate    = null;
+  let logItems   = [];  // [{ sku, demand, value }]
+  let logWorkers = 1;
 
-  // ── Date helpers ──────────────────────────────────────────────────────────
-  const toDateStr  = d => d.toISOString().slice(0, 10);
-  const parseDate  = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
-  const addDays    = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-  const fmtDate    = d => `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
-  const esc        = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Inv sheet
+  let invDate = null;
+  let invType = null;
 
-  function getWeekDays(offset) {
-    const today = new Date();
-    const dow = today.getDay();
-    const mon = new Date(today);
-    mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + offset * 7);
-    return Array.from({ length: 7 }, (_, i) => addDays(mon, i));
-  }
+  // ─── DATE HELPERS ─────────────────────────────────────────────────────────
 
-  // ── Resolve deliveries ────────────────────────────────────────────────────
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const toDateStr = d => d.toISOString().slice(0, 10);
+  const parseDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+  const addDays   = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const fmtShort  = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const fmtFull   = d => `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const esc       = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // ─── RESOLVE DELIVERIES ───────────────────────────────────────────────────
+
   function resolveDeliveries(logs) {
     const byId = {};
     if (!Array.isArray(logs)) return [];
@@ -334,10 +473,16 @@
       if (row.action === 'delete') { delete byId[id]; return; }
       if (row.action === 'barcodes') return;
       if (row.action === 'confirm') {
-        if (byId[id]) byId[id].status = (byId[id].type||'delivery').toLowerCase() === 'pickup' ? 'picked_up' : 'delivered';
+        if (byId[id]) {
+          byId[id].status = (byId[id].type || 'delivery').toLowerCase() === 'pickup'
+            ? 'picked_up' : 'delivered';
+        }
         return;
       }
-      if (row.action === 'status') { if (byId[id]) byId[id].status = row.status || 'scheduled'; return; }
+      if (row.action === 'status') {
+        if (byId[id]) byId[id].status = row.status || 'scheduled';
+        return;
+      }
       if (row.action === 'update') {
         const prev = byId[id];
         byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
@@ -349,7 +494,10 @@
     return Object.values(byId);
   }
 
-  // ── Resolve production logs ───────────────────────────────────────────────
+  // ─── RESOLVE PRODUCTION LOGS (accumulation fix) ───────────────────────────
+  // Each shape_done / bfp_done entry is merged (summed) into the daily total.
+  // Previously the last log entry overwrote earlier ones.
+
   function resolveProductionLogs(logs) {
     const state = {};
     if (!Array.isArray(logs)) return state;
@@ -357,40 +505,59 @@
       const { date, action } = row;
       if (!date || !action) return;
       if (!state[date]) state[date] = {};
+      const s = state[date];
+
       if (action === 'inventory') {
         try {
           const snaps = JSON.parse(row.snapshots || '[]');
           const cf = {}, fr = {};
-          snaps.forEach(s => {
-            if (s.coldFerment > 0) cf[s.sku] = Number(s.coldFerment);
-            if (s.frozen > 0)      fr[s.sku] = Number(s.frozen);
+          snaps.forEach(sn => {
+            if (sn.coldFerment > 0) cf[sn.sku] = Number(sn.coldFerment);
+            if (sn.frozen > 0)      fr[sn.sku] = Number(sn.frozen);
           });
-          state[date].coldFerment = cf;
-          state[date].frozen = fr;
+          s.coldFerment = cf;
+          s.frozen = fr;
         } catch {}
+        return;
       }
+
       if (action === 'shape_done') {
         try {
-          state[date].shapeDone    = JSON.parse(row.completions || '[]');
-          state[date].shapeWorkers = Number(row.workers) || 1;
-          state[date].shapeTime    = row.timeStamp;
+          const incoming = JSON.parse(row.completions || '[]');
+          const merged = {};
+          (s.shapeDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+          incoming.forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+          s.shapeDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+          s.shapeWorkers = Number(row.workers) || 1;
+          s.shapeTime    = row.timeStamp;
         } catch {}
+        return;
       }
+
       if (action === 'bfp_done') {
         try {
-          state[date].bfpDone    = JSON.parse(row.completions || '[]');
-          state[date].bfpWorkers = Number(row.workers) || 1;
-          state[date].bfpTime    = row.timeStamp;
+          const incoming = JSON.parse(row.completions || '[]');
+          const merged = {};
+          (s.bfpDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+          incoming.forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+          s.bfpDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+          s.bfpWorkers = Number(row.workers) || 1;
+          s.bfpTime    = row.timeStamp;
         } catch {}
+        return;
       }
     });
     return state;
   }
 
-  // ── Build demand for a delivery date ──────────────────────────────────────
+  // ─── BUILD DEMAND ─────────────────────────────────────────────────────────
+  // All non-FOH SKUs from deliveries on deliveryDateStr are included.
+  // SKUs not in BATCH_SIZES get needsConfig:true (shown with a warning).
+
   function buildDemand(deliveryDateStr) {
     const skuMap = {};
     const fohSet = new Set();
+
     allDeliveries
       .filter(d => d.date === deliveryDateStr && !['delivered','picked_up','cancelled'].includes(d.status))
       .forEach(delivery => {
@@ -398,52 +565,72 @@
         try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
         items.forEach(({ sku, quantity }) => {
           if (!sku) return;
-          const skuNorm = sku.trim();
-          // Explicitly-excluded FOH items
-          if (FOH_SKUS.has(skuNorm.toLowerCase()) || FOH_SKUS.has(skuNorm)) {
-            fohSet.add(skuNorm); return;
-          }
-          if (!skuMap[skuNorm]) skuMap[skuNorm] = { sku: skuNorm, pretzels: 0, orders: [] };
-          skuMap[skuNorm].pretzels += Number(quantity) || 0;
+          const key  = sku.trim();
+          const norm = key.toLowerCase();
+          if (FOH_SKUS.has(norm) || FOH_SKUS.has(key)) { fohSet.add(key); return; }
+          if (!skuMap[key]) skuMap[key] = { sku: key, pretzels: 0, orders: [] };
+          skuMap[key].pretzels += Number(quantity) || 0;
           const cust = delivery.customer || delivery.location || '?';
-          if (!skuMap[skuNorm].orders.includes(cust)) skuMap[skuNorm].orders.push(cust);
+          if (!skuMap[key].orders.includes(cust)) skuMap[key].orders.push(cust);
         });
       });
+
     const demand = Object.values(skuMap).map(item => {
       const batchSize = BATCH_SIZES[item.sku];
       const caseSize  = CASE_SIZES[item.sku];
       return {
-        sku:          item.sku,
-        pretzels:     item.pretzels,
-        batches:      batchSize ? Math.ceil(item.pretzels / batchSize) : null,
-        cases:        caseSize  ? Math.ceil(item.pretzels / caseSize)  : null,
-        orders:       item.orders,
-        needsConfig:  !batchSize,   // true = batch size not yet configured
+        sku:         item.sku,
+        pretzels:    item.pretzels,
+        batches:     batchSize ? Math.ceil(item.pretzels / batchSize) : null,
+        cases:       caseSize  ? Math.ceil(item.pretzels / caseSize)  : null,
+        orders:      item.orders,
+        needsConfig: !batchSize,
       };
     });
+
     return { demand, foh: [...fohSet] };
   }
 
-  // ── Worker count ──────────────────────────────────────────────────────────
-  const getWorkers = (type, date) => Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
-  const setWorkers = (type, date, n) => localStorage.setItem(`prod-${type}-workers-${date}`, String(Math.max(1, n)));
+  // ─── WORKER PERSISTENCE ───────────────────────────────────────────────────
 
-  // ── Rollover ──────────────────────────────────────────────────────────────
+  const getWorkers  = (type, date) => Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
+  const saveWorkers = (type, date, n) => localStorage.setItem(`prod-${type}-workers-${date}`, String(Math.max(1, n)));
+
+  // ─── ROLLOVER ─────────────────────────────────────────────────────────────
+
   function getRollover(type, dateStr) {
-    const yesterdayStr = toDateStr(addDays(parseDate(dateStr), -1));
-    // Yesterday's demand drove deliveries one lead-day further from yesterday
-    const yDeliveryDate = toDateStr(addDays(parseDate(dateStr), type === 'shape' ? SHAPE_LEAD - 1 : BFP_LEAD - 1));
-    const { demand: yDemand } = buildDemand(yDeliveryDate);
-    const yTotal = yDemand.reduce((s, d) => s + (d.batches || 0), 0);
-    const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
-    const yDone = ((productionState[yesterdayStr] || {})[doneKey] || []).reduce((s, c) => s + (Number(c.batches)||0), 0);
-    return Math.max(0, yTotal - yDone);
+    const lead = type === 'shape' ? SHAPE_LEAD : BFP_LEAD;
+    const prevDeliveryDate   = toDateStr(addDays(parseDate(dateStr), lead - 1));
+    const prevProductionDate = toDateStr(addDays(parseDate(dateStr), -1));
+    const { demand: prevDemand } = buildDemand(prevDeliveryDate);
+    const prevTotal = prevDemand.reduce((s, d) => s + (d.batches || 0), 0);
+    const doneKey   = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const prevDone  = ((productionState[prevProductionDate] || {})[doneKey] || [])
+      .reduce((s, c) => s + (Number(c.batches) || 0), 0);
+    return Math.max(0, prevTotal - prevDone);
   }
 
-  // ── Render panel ──────────────────────────────────────────────────────────
-  function renderPanel(type, dateStr, demand, dayState, foh = []) {
+  // ─── TEAM STATUS (for week view icons) ────────────────────────────────────
+
+  function getTeamStatus(type, dateStr, demand) {
+    const needed   = demand.reduce((s, d) => s + (d.batches || 0), 0);
+    const rollover = getRollover(type, dateStr);
+    const total    = needed + rollover;
+    if (total === 0) return 'none';
+    const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const done    = ((productionState[dateStr] || {})[doneKey] || [])
+      .reduce((s, c) => s + (Number(c.batches) || 0), 0);
+    if (done === 0) return 'todo';
+    if (done >= total) return 'done';
+    return 'partial';
+  }
+
+  // ─── RENDER TEAM CARD ─────────────────────────────────────────────────────
+
+  function renderTeamCard(type, dateStr, demand, dayState, foh) {
     const isBFP    = type === 'bfp';
-    const title    = isBFP ? 'Bake / Freeze / Pack' : 'Shape & Cold Ferment';
+    const title    = isBFP ? 'Bake · Freeze · Pack' : 'Shape & Cold Ferment';
+    const leadStr  = toDateStr(addDays(parseDate(dateStr), isBFP ? BFP_LEAD : SHAPE_LEAD));
     const workers  = getWorkers(type, dateStr);
     const capacity = workers * BATCHES_PER_WORKER;
     const needed   = demand.reduce((s, d) => s + (d.batches || 0), 0);
@@ -451,251 +638,453 @@
     const total    = needed + rollover;
     const isOver   = total > capacity && needed > 0;
     const spare    = capacity - total;
-    const doneKey  = isBFP ? 'bfpDone' : 'shapeDone';
-    const timeKey  = isBFP ? 'bfpTime' : 'shapeTime';
-    const invKey   = isBFP ? 'frozen' : 'coldFerment';
-    const completed  = dayState[doneKey] || [];
-    const doneTotal  = completed.reduce((s, c) => s + (Number(c.batches)||0), 0);
-    const inventory  = dayState[invKey] || {};
-    const leadDate   = toDateStr(addDays(parseDate(dateStr), isBFP ? BFP_LEAD : SHAPE_LEAD));
 
-    // Demand rows
-    let demandHtml = '';
-    if (demand.length === 0) {
-      demandHtml = `<div class="no-demand">No deliveries on ${esc(leadDate)}</div>`;
+    const doneKey   = isBFP ? 'bfpDone'   : 'shapeDone';
+    const timeKey   = isBFP ? 'bfpTime'   : 'shapeTime';
+    const invKey    = isBFP ? 'frozen'     : 'coldFerment';
+    const completed = dayState[doneKey] || [];
+    const doneTotal = completed.reduce((s, c) => s + (Number(c.batches) || 0), 0);
+    const inventory = dayState[invKey] || {};
+
+    // Status badge
+    let badgeClass, badgeText;
+    if (demand.length === 0 || total === 0) {
+      badgeClass = 'badge-none'; badgeText = 'No orders';
+    } else if (doneTotal === 0) {
+      badgeClass = 'badge-none'; badgeText = 'Not started';
+    } else if (doneTotal > total) {
+      badgeClass = 'badge-over'; badgeText = `✅ Done +${doneTotal - total}`;
+    } else if (doneTotal >= total) {
+      badgeClass = 'badge-done'; badgeText = '✅ Done';
     } else {
-      const rows = demand.map(d => {
-        const inv = inventory[d.sku] || 0;
-        const caseStr = d.cases != null ? ` → ${d.cases} case${d.cases !== 1 ? 's' : ''}` : '';
-        const batchDetail = d.needsConfig
-          ? `<span style="color:#C41E1E;font-weight:700">⚠️ batch size not configured — add to BATCH_SIZES</span>`
-          : `<strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong>${esc(caseStr)}`;
-        return `<div class="demand-row${d.needsConfig ? ' demand-row-warn' : ''}">
-          <span class="demand-sku">${esc(d.sku)}</span>
-          <span class="demand-detail">${d.pretzels} units = ${batchDetail}</span>
-          ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
-          <span class="demand-orders">${d.orders.map(esc).join(' · ')}</span>
-        </div>`;
-      }).join('');
-      const statusHtml = isOver
-        ? `<span class="capacity-status over">🔴 +${total - capacity} over</span>`
-        : `<span class="capacity-status ok">✅ ${spare} spare</span>`;
-      const rollHtml = rollover > 0
-        ? `<span class="rollover-badge">+${rollover} from yesterday</span>` : '';
-      const skippedHtml = foh.length > 0
-        ? `<div class="section-label" style="color:#aaa;margin-top:4px">FOH only (not scheduled): ${foh.map(esc).join(', ')}</div>`
-        : '';
-      demandHtml = `
-        <div class="section-label">For ${esc(leadDate)} deliveries</div>
-        <div class="demand-list">${rows}</div>
-        <div class="demand-total ${isOver ? 'over' : 'ok'}">
-          ${total} batch${total !== 1 ? 'es' : ''} needed ${rollHtml} ${statusHtml}
-        </div>
-        ${skippedHtml}`;
+      badgeClass = 'badge-partial'; badgeText = `⏳ ${doneTotal}/${total}`;
     }
+
+    // Workers row
+    const workersHtml = `
+      <div class="workers-row">
+        <div>
+          <span class="workers-label">Workers</span>
+          <span class="workers-sub">${capacity} batch capacity</span>
+        </div>
+        <div class="stepper-inline">
+          <button class="stepper-btn" data-worker-dec data-type="${esc(type)}" data-date="${esc(dateStr)}">−</button>
+          <span class="stepper-val" id="wv-${esc(type)}-${esc(dateStr)}">${workers}</span>
+          <button class="stepper-btn" data-worker-inc data-type="${esc(type)}" data-date="${esc(dateStr)}">+</button>
+        </div>
+      </div>`;
+
+    // SKU rows
+    const renderRows = rows => rows.map(d => {
+      const inv      = inventory[d.sku] || 0;
+      const caseStr  = d.cases ? ` · ${d.cases} case${d.cases !== 1 ? 's' : ''}` : '';
+      const batchInfo = d.needsConfig
+        ? `<span class="sku-warn">⚠️ Add to BATCH_SIZES config</span>`
+        : `<span class="sku-detail"><strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong>${esc(caseStr)} — ${d.pretzels} units</span>`;
+      return `<div class="sku-row">
+        <span class="sku-name">${esc(d.sku)}</span>
+        ${batchInfo}
+        ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
+        <span class="sku-customers">${d.orders.map(esc).join(' · ')}</span>
+      </div>`;
+    }).join('');
+
+    let skuHtml = '';
+    if (demand.length === 0) {
+      skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">No deliveries for ${esc(leadStr)}</div>`;
+    } else if (isBFP) {
+      const coating  = demand.filter(d => BAKE_GROUPS.coating.includes(d.sku));
+      const standard = demand.filter(d => !BAKE_GROUPS.coating.includes(d.sku));
+      if (standard.length > 0) {
+        skuHtml += coating.length > 0 ? `<div class="group-label">Standard</div>` : '';
+        skuHtml += renderRows(standard);
+      }
+      if (coating.length > 0) {
+        skuHtml += `<div class="group-label">+ Coating step</div>${renderRows(coating)}`;
+      }
+    } else {
+      skuHtml = renderRows(demand);
+    }
+
+    // Batch total
+    const batchTotalHtml = demand.length > 0 ? `
+      <div class="batch-total ${isOver ? 'over' : (needed > 0 ? 'ok' : 'zero')}">
+        <div class="batch-total-left">
+          <span class="batch-total-num">${total}</span>
+          <span class="batch-total-lbl">batch${total !== 1 ? 'es' : ''} needed</span>
+          ${rollover > 0 ? `<span class="rollover-pill">+${rollover} rollover</span>` : ''}
+        </div>
+        <div style="text-align:right">
+          <span class="batch-status ${isOver ? 'status-over' : 'status-ok'}">
+            ${isOver ? `🔴 +${total - capacity} over` : `✅ ${spare} spare`}
+          </span>
+          <div class="workers-cap">${workers} worker${workers !== 1 ? 's' : ''} · ${capacity} cap</div>
+        </div>
+      </div>` : '';
 
     // Inventory strip
     const invItems = Object.entries(inventory).filter(([,v]) => v > 0)
-      .map(([sku, n]) => `<span class="inv-item">${esc(sku)}: ${n}</span>`).join('');
-    const invHtml = `<div class="inv-section">
-      <span class="section-label">${isBFP ? 'Frozen' : 'Cold ferment'} on hand</span>
-      ${invItems || '<span class="inv-empty">None set</span>'}
-      <button class="btn-link" data-inv-btn data-date="${esc(dateStr)}" data-inv-type="${esc(type)}">Update ▸</button>
-    </div>`;
+      .map(([sku, n]) => `${esc(sku)}: ${n}`).join(' · ');
+    const invHtml = `
+      <div class="inv-strip">
+        <div class="inv-strip-header">
+          <span class="section-label" style="margin:0">${isBFP ? 'Frozen on hand' : 'Cold ferment on hand'}</span>
+          <button class="btn-link" data-inv-btn data-date="${esc(dateStr)}" data-inv-type="${esc(type)}">Update</button>
+        </div>
+        ${invItems
+          ? `<span class="inv-strip-items">${invItems}</span>`
+          : `<span class="inv-strip-empty">None entered</span>`}
+      </div>`;
 
     // Completed strip
     let completedHtml = '';
-    if (completed.length > 0) {
-      const timeStr = dayState[timeKey] ? new Date(dayState[timeKey]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '';
-      const pills = completed.map(c => `<span class="completed-item">${esc(c.sku)} ×${c.batches}</span>`).join('');
-      const delta = doneTotal - total;
-      const progressStr = total > 0
-        ? (delta >= 0
-          ? `<span style="color:#2a7a2a;font-weight:700"> — ✅ Done${delta > 0 ? ` (+${delta} extra)` : '!'}</span>`
-          : `<span style="color:#C41E1E;font-weight:700"> — ⚠️ ${Math.abs(delta)} short</span>`)
+    if (doneTotal > 0) {
+      const timeStr = dayState[timeKey]
+        ? new Date(dayState[timeKey]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : '';
+      const delta = doneTotal - total;
+      const progressHtml = total > 0
+        ? (delta >= 0
+          ? `<span class="progress-done">✅ Done${delta > 0 ? ` (+${delta})` : '!'}</span>`
+          : `<span class="progress-short">⚠️ ${Math.abs(delta)} short</span>`)
+        : '';
+      const pills = completed.map(c => `<span class="completed-pill">${esc(c.sku)} ×${c.batches}</span>`).join('');
       completedHtml = `
-        <div class="section-label completed-label">✅ Logged${timeStr ? ' at ' + timeStr : ''} (${doneTotal} batch${doneTotal !== 1 ? 'es' : ''}${progressStr})</div>
-        <div class="completed-list">${pills}</div>`;
-    }
-
-    // Check-off form (pre-filled with demand)
-    let checkoffHtml = '';
-    if (demand.length > 0) {
-      const rows = demand.map(d => {
-        if (d.needsConfig) {
-          return `<div class="checkoff-row">
-            <span class="checkoff-sku" style="color:#C41E1E">${esc(d.sku)}</span>
-            <span class="checkoff-unit" style="color:#aaa">add batch size to config first</span>
-          </div>`;
-        }
-        return `<div class="checkoff-row">
-          <span class="checkoff-sku">${esc(d.sku)}</span>
-          <input type="number" class="checkoff-input" min="0" max="99"
-            data-sku="${esc(d.sku)}" value="${d.batches}">
-          <span class="checkoff-unit">batch${d.batches !== 1 ? 'es' : ''}</span>
-        </div>`;
-      }).join('');
-      checkoffHtml = `
-        <details class="checkoff-details">
-          <summary>Log completions</summary>
-          <div class="checkoff-form" data-checkoff-type="${esc(type)}" data-checkoff-date="${esc(dateStr)}">
-            <div class="checkoff-rows">${rows}</div>
-            <div class="checkoff-actions">
-              <input type="number" class="worker-input-inline" min="1" max="20"
-                value="${workers}" placeholder="Workers">
-              <span class="checkoff-unit">workers</span>
-              <button class="btn btn-sm btn-red save-checkoff"
-                data-type="${esc(type)}" data-date="${esc(dateStr)}">Save check-off</button>
-            </div>
+        <div class="completed-strip">
+          <div class="completed-strip-header">
+            <span class="completed-strip-lbl">Logged${timeStr ? ` at ${timeStr}` : ''} — ${doneTotal} batch${doneTotal !== 1 ? 'es' : ''}</span>
+            ${progressHtml}
           </div>
-        </details>`;
+          <div class="completed-pills">${pills}</div>
+        </div>`;
     }
 
-    return `<div class="panel panel-${esc(type)}${isOver ? ' panel-over' : ''}">
-      <div class="panel-title">${esc(title)}</div>
-      <div class="worker-row">
-        <label>Workers</label>
-        <input type="number" min="1" max="20" class="worker-input"
-          data-type="${esc(type)}" data-date="${esc(dateStr)}" value="${workers}">
-        <span class="capacity-label">${capacity} batch${capacity !== 1 ? 'es' : ''} capacity</span>
+    // FOH note
+    const fohHtml = foh.length > 0
+      ? `<div class="foh-note">FOH only (not in schedule): ${foh.map(esc).join(', ')}</div>` : '';
+
+    // Log button
+    const logBtnClass = (doneTotal >= total && total > 0) ? 'log-btn logged' : 'log-btn';
+    const logBtnText  = (doneTotal >= total && total > 0) ? '✅ Log More' : 'Log Completions';
+    const logBtnHtml  = demand.length > 0
+      ? `<button class="${logBtnClass}" data-log-btn data-type="${esc(type)}" data-date="${esc(dateStr)}">${logBtnText}</button>`
+      : '';
+
+    return `<div class="team-card">
+      <div class="team-header">
+        <div>
+          <div class="team-name">${esc(title)}</div>
+          <div class="team-date">For ${esc(leadStr)} deliveries</div>
+        </div>
+        <span class="status-badge ${badgeClass}">${badgeText}</span>
       </div>
-      ${demandHtml}
-      ${invHtml}
-      ${completedHtml}
-      ${checkoffHtml}
+      <div class="team-body">
+        ${workersHtml}
+        ${skuHtml}
+        ${batchTotalHtml}
+        ${invHtml}
+        ${completedHtml}
+        ${fohHtml}
+        ${logBtnHtml}
+      </div>
     </div>`;
   }
 
-  // ── Render day ────────────────────────────────────────────────────────────
-  function renderDay(dayDate) {
-    const dateStr             = toDateStr(dayDate);
-    const isToday             = dateStr === toDateStr(new Date());
-    const { demand: shapeDemand, foh: shapeFoh } = buildDemand(toDateStr(addDays(dayDate, SHAPE_LEAD)));
-    const { demand: bfpDemand,   foh: bfpFoh   } = buildDemand(toDateStr(addDays(dayDate, BFP_LEAD)));
-    const dayState            = productionState[dateStr] || {};
+  // ─── RENDER DAY VIEW ──────────────────────────────────────────────────────
+
+  function renderDayView() {
+    const dateStr  = toDateStr(currentDate);
+    const shapeLead = toDateStr(addDays(currentDate, SHAPE_LEAD));
+    const bfpLead   = toDateStr(addDays(currentDate, BFP_LEAD));
+    const { demand: shapeDemand, foh: shapeFoh } = buildDemand(shapeLead);
+    const { demand: bfpDemand,   foh: bfpFoh   } = buildDemand(bfpLead);
+    const dayState = productionState[dateStr] || {};
 
     if (shapeDemand.length === 0 && bfpDemand.length === 0) {
-      return `<details class="day-card day-empty">
-        <summary class="day-header">${esc(fmtDate(dayDate))} — No production</summary>
-      </details>`;
+      return `<div class="no-prod">No production scheduled.<br>
+        <span style="font-size:13px">Shape: no ${shapeLead} deliveries · BFP: no ${bfpLead} deliveries</span></div>`;
     }
 
-    return `<div class="day-card${isToday ? ' day-today' : ''}">
-      <div class="day-header">${esc(fmtDate(dayDate))}${isToday ? ' — TODAY' : ''}</div>
-      <div class="day-panels">
-        ${renderPanel('shape', dateStr, shapeDemand, dayState, shapeFoh)}
-        ${renderPanel('bfp',   dateStr, bfpDemand,   dayState, bfpFoh)}
-      </div>
-    </div>`;
+    return renderTeamCard('shape', dateStr, shapeDemand, dayState, shapeFoh)
+         + renderTeamCard('bfp',   dateStr, bfpDemand,   dayState, bfpFoh);
   }
 
-  // ── Render week ───────────────────────────────────────────────────────────
-  function render() {
-    const days = getWeekDays(weekOffset);
-    const schedHtml = days.map(renderDay).join('') || '<div class="loading">No deliveries found.</div>';
+  // ─── RENDER WEEK VIEW ─────────────────────────────────────────────────────
 
-    // Unconfirmed deliveries today
+  function renderWeekView() {
+    const today    = new Date();
+    const todayStr = toDateStr(today);
+    const statusIcon = s => s === 'done' ? '✅' : s === 'partial' ? '⏳' : s === 'todo' ? '⬜' : '—';
+    let html = '';
+
+    for (let i = 0; i < WEEK_RANGE; i++) {
+      const d  = addDays(today, i);
+      const ds = toDateStr(d);
+
+      const { demand: sDemand } = buildDemand(toDateStr(addDays(d, SHAPE_LEAD)));
+      const { demand: bDemand } = buildDemand(toDateStr(addDays(d, BFP_LEAD)));
+      const isEmpty = sDemand.length === 0 && bDemand.length === 0;
+      const sStatus = getTeamStatus('shape', ds, sDemand);
+      const bStatus = getTeamStatus('bfp', ds, bDemand);
+
+      // Week section headers
+      if (i === 0)                  html += `<div class="week-section-lbl">This week</div>`;
+      else if (i === 7)             html += `<div class="week-section-lbl">Next week</div>`;
+
+      const dayLabel = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : DAYS[d.getDay()];
+      const dateLabel = (i === 0 || i === 1) ? fmtShort(d) : fmtShort(d);
+
+      html += `<div class="week-row${ds === todayStr ? ' is-today' : ''}${isEmpty ? ' is-empty' : ''}"
+        data-goto="${esc(ds)}" role="button" tabindex="0">
+        <div class="week-row-date">
+          <div class="week-row-day">${esc(dayLabel)}</div>
+          <div class="week-row-full">${esc(dateLabel)}${isEmpty ? ' — no production' : ''}</div>
+        </div>
+        <div class="week-row-icons">
+          <span class="week-icon" title="Shape">${statusIcon(sStatus)}</span>
+          <span class="week-icon" title="BFP">${statusIcon(bStatus)}</span>
+          <span class="week-chevron">›</span>
+        </div>
+      </div>`;
+    }
+
+    return html || `<div class="no-prod">No upcoming deliveries in the next ${WEEK_RANGE} days.</div>`;
+  }
+
+  // ─── UPDATE NAV BAR ───────────────────────────────────────────────────────
+
+  function updateNav() {
+    const todayStr = toDateStr(new Date());
+    const curStr   = toDateStr(currentDate);
+    const label    = document.getElementById('date-label');
+    const sub      = document.getElementById('date-sub');
+    const wt       = document.getElementById('week-toggle');
+
+    if (viewMode === 'week') {
+      label.textContent = 'Week View';
+      label.classList.remove('is-today');
+      sub.textContent = `Next ${WEEK_RANGE} days`;
+      wt.classList.add('active');
+    } else {
+      const diff = Math.round((parseDate(curStr) - parseDate(todayStr)) / 86400000);
+      if (diff === 0)       { label.textContent = 'Today';     label.classList.add('is-today'); }
+      else if (diff === 1)  { label.textContent = 'Tomorrow';  label.classList.remove('is-today'); }
+      else if (diff === -1) { label.textContent = 'Yesterday'; label.classList.remove('is-today'); }
+      else                  { label.textContent = fmtFull(currentDate); label.classList.remove('is-today'); }
+      sub.textContent = diff === 0 ? fmtFull(currentDate)
+        : diff > 0 ? `${diff} days away` : `${-diff} days ago`;
+      wt.classList.remove('active');
+    }
+  }
+
+  // ─── MAIN RENDER ──────────────────────────────────────────────────────────
+
+  function render() {
+    updateNav();
+
+    // Unconfirmed banner (show in both views)
     const todayStr = toDateStr(new Date());
     const unconfirmed = allDeliveries.filter(d =>
       d.date === todayStr && !['delivered','picked_up','cancelled'].includes(d.status)
     );
-    const bannerHtml = unconfirmed.length > 0
-      ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length > 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
+    document.getElementById('alert-area').innerHTML = unconfirmed.length > 0
+      ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length !== 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
       : '';
 
-    document.getElementById('schedule-container').innerHTML = bannerHtml + schedHtml;
+    document.getElementById('main-view').innerHTML =
+      viewMode === 'week' ? renderWeekView() : renderDayView();
+
     bindActions();
   }
 
-  function updateWeekLabel() {
-    const days = getWeekDays(weekOffset);
-    const a = days[0], b = days[6];
-    document.getElementById('week-label').textContent =
-      `${MONTH_NAMES[a.getMonth()]} ${a.getDate()} – ${MONTH_NAMES[b.getMonth()]} ${b.getDate()}, ${b.getFullYear()}`;
-  }
+  // ─── BIND ACTIONS ─────────────────────────────────────────────────────────
 
-  // ── Event binding ─────────────────────────────────────────────────────────
   function bindActions() {
-    // Worker count change
-    document.querySelectorAll('.worker-input').forEach(inp => {
-      inp.addEventListener('change', () => {
-        setWorkers(inp.dataset.type, inp.dataset.date, parseInt(inp.value, 10) || 1);
+    // Worker stepper: decrement
+    document.querySelectorAll('[data-worker-dec]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const { type, date } = btn.dataset;
+        const cur = getWorkers(type, date);
+        if (cur <= 1) return;
+        saveWorkers(type, date, cur - 1);
         render();
       });
     });
 
-    // Open inventory modal
-    document.querySelectorAll('[data-inv-btn]').forEach(btn => {
-      btn.addEventListener('click', () => openInventoryModal(btn.dataset.date, btn.dataset.invType));
+    // Worker stepper: increment
+    document.querySelectorAll('[data-worker-inc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const { type, date } = btn.dataset;
+        saveWorkers(type, date, getWorkers(type, date) + 1);
+        render();
+      });
     });
 
-    // Save check-off
-    document.querySelectorAll('.save-checkoff').forEach(btn => {
-      btn.addEventListener('click', () => saveCheckoff(btn.dataset.type, btn.dataset.date, btn));
+    // Open log completions sheet
+    document.querySelectorAll('[data-log-btn]').forEach(btn => {
+      btn.addEventListener('click', () => openLogSheet(btn.dataset.type, btn.dataset.date));
+    });
+
+    // Open inventory sheet
+    document.querySelectorAll('[data-inv-btn]').forEach(btn => {
+      btn.addEventListener('click', () => openInvSheet(btn.dataset.date, btn.dataset.invType));
+    });
+
+    // Week row → drill into day
+    document.querySelectorAll('[data-goto]').forEach(row => {
+      row.addEventListener('click', () => {
+        currentDate = parseDate(row.dataset.goto);
+        viewMode = 'day';
+        render();
+      });
     });
   }
 
-  // ── Save check-off ────────────────────────────────────────────────────────
-  async function saveCheckoff(type, date, btn) {
-    const form = btn.closest('.checkoff-form');
-    const completions = [];
-    form.querySelectorAll('.checkoff-input').forEach(inp => {
-      const n = parseInt(inp.value, 10);
-      if (n > 0) completions.push({ sku: inp.dataset.sku, batches: n });
-    });
-    if (!completions.length) return;
-    const workers = parseInt(form.querySelector('.worker-input-inline')?.value, 10) || getWorkers(type, date);
-    const confirmSummary = completions.map(c => `${c.sku} ×${c.batches}`).join('\n');
-    if (!confirm(`Log completions for ${date}?\n\n${confirmSummary}`)) return;
+  // ─── LOG COMPLETIONS SHEET ────────────────────────────────────────────────
 
-    btn.disabled = true; btn.textContent = 'Saving…';
+  function openLogSheet(type, dateStr) {
+    logType    = type;
+    logDate    = dateStr;
+    logWorkers = getWorkers(type, dateStr);
+
+    const leadStr       = toDateStr(addDays(parseDate(dateStr), type === 'shape' ? SHAPE_LEAD : BFP_LEAD));
+    const { demand }    = buildDemand(leadStr);
+    const dayState      = productionState[dateStr] || {};
+    const doneKey       = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const prevDone      = dayState[doneKey] || [];
+
+    // Only configurable SKUs in the log sheet (unconfigured ones can't be logged)
+    logItems = demand
+      .filter(d => !d.needsConfig)
+      .map(d => ({ sku: d.sku, demand: d.batches, value: 0 }));
+
+    document.getElementById('log-title').textContent =
+      type === 'shape' ? 'Shape & Cold Ferment' : 'Bake · Freeze · Pack';
+    document.getElementById('log-sub').textContent =
+      `${dateStr}${prevDone.length > 0 ? ' · Adding to previous log' : ''}`;
+
+    renderLogBody();
+    document.getElementById('log-overlay').classList.add('open');
+  }
+
+  function renderLogBody() {
+    const capacity = logWorkers * BATCHES_PER_WORKER;
+
+    let html = `
+      <div class="sheet-workers-row">
+        <div>
+          <span class="sheet-workers-lbl">Workers</span>
+          <span class="sheet-workers-sub" id="log-cap-lbl">${capacity} batch capacity</span>
+        </div>
+        <div class="stepper-lg">
+          <button class="step-btn" id="log-w-dec">−</button>
+          <span class="step-val" id="log-w-val">${logWorkers}</span>
+          <button class="step-btn" id="log-w-inc">+</button>
+        </div>
+      </div>`;
+
+    html += logItems.map((item, i) => `
+      <div class="log-sku-row">
+        <div class="log-sku-info">
+          <div class="log-sku-name">${esc(item.sku)}</div>
+          <div class="log-sku-demand">Demand: ${item.demand} batch${item.demand !== 1 ? 'es' : ''}</div>
+        </div>
+        <div class="stepper-lg">
+          <button class="step-btn" data-ldec="${i}">−</button>
+          <span class="step-val" id="lv-${i}">${item.value}</span>
+          <button class="step-btn" data-linc="${i}">+</button>
+        </div>
+      </div>`).join('');
+
+    document.getElementById('log-body').innerHTML = html;
+
+    // Worker stepper bindings
+    document.getElementById('log-w-dec').addEventListener('click', () => {
+      if (logWorkers <= 1) return;
+      logWorkers--;
+      document.getElementById('log-w-val').textContent = logWorkers;
+      document.getElementById('log-cap-lbl').textContent = `${logWorkers * BATCHES_PER_WORKER} batch capacity`;
+    });
+    document.getElementById('log-w-inc').addEventListener('click', () => {
+      logWorkers++;
+      document.getElementById('log-w-val').textContent = logWorkers;
+      document.getElementById('log-cap-lbl').textContent = `${logWorkers * BATCHES_PER_WORKER} batch capacity`;
+    });
+
+    // Item stepper bindings
+    document.querySelectorAll('[data-ldec]').forEach(btn => {
+      const i = parseInt(btn.dataset.ldec, 10);
+      btn.addEventListener('click', () => {
+        if (logItems[i].value <= 0) return;
+        logItems[i].value--;
+        document.getElementById(`lv-${i}`).textContent = logItems[i].value;
+      });
+    });
+    document.querySelectorAll('[data-linc]').forEach(btn => {
+      const i = parseInt(btn.dataset.linc, 10);
+      btn.addEventListener('click', () => {
+        logItems[i].value++;
+        document.getElementById(`lv-${i}`).textContent = logItems[i].value;
+      });
+    });
+  }
+
+  async function saveLog() {
+    const completions = logItems.filter(i => i.value > 0).map(i => ({ sku: i.sku, batches: i.value }));
+    if (!completions.length) { alert('Enter at least one completed batch.'); return; }
+
+    const summary = completions.map(c => `${c.sku} ×${c.batches}`).join('\n');
+    if (!confirm(`Log completions for ${logDate}?\n\n${summary}`)) return;
+
+    const saveBtn = document.getElementById('log-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
     try {
       await appendLog(PRODUCTION_LOG, {
-        action: type === 'shape' ? 'shape_done' : 'bfp_done',
-        date,
+        action:      logType === 'shape' ? 'shape_done' : 'bfp_done',
+        date:        logDate,
         completions: JSON.stringify(completions),
-        workers,
-        timeStamp: new Date().toISOString(),
+        workers:     logWorkers,
+        timeStamp:   new Date().toISOString(),
       });
-      setWorkers(type, date, workers);
+      saveWorkers(logType, logDate, logWorkers);
+      document.getElementById('log-overlay').classList.remove('open');
       await loadProduction();
       render();
     } catch (e) {
-      btn.disabled = false; btn.textContent = 'Save check-off';
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Completions';
       alert('Error saving: ' + e.message);
     }
   }
 
-  // ── Inventory modal ───────────────────────────────────────────────────────
-  function openInventoryModal(date, type) {
-    invModalDate = date; invModalType = type;
-    const isBFP = type === 'bfp';
-    document.getElementById('inventory-modal-label').textContent =
-      `${isBFP ? 'Frozen pretzels' : 'Cold-ferment pretzels'} on hand as of ${date}`;
-    const invKey = isBFP ? 'frozen' : 'coldFerment';
-    const existing = (productionState[date] || {})[invKey] || {};
-    document.getElementById('inventory-form-rows').innerHTML = Object.keys(BATCH_SIZES).map(sku => `
-      <div class="inv-row">
-        <label>${esc(sku)}</label>
-        <input type="number" min="0" data-sku="${esc(sku)}" value="${existing[sku] || 0}">
-        <span class="inv-unit">pretzels</span>
-      </div>`).join('');
-    document.getElementById('inventory-overlay').classList.add('open');
-  }
+  // ─── INVENTORY SHEET ──────────────────────────────────────────────────────
 
-  async function saveInventory() {
-    const date   = invModalDate;
-    const type   = invModalType;
+  function openInvSheet(dateStr, type) {
+    invDate = dateStr; invType = type;
     const isBFP  = type === 'bfp';
     const invKey = isBFP ? 'frozen' : 'coldFerment';
+    const existing = (productionState[dateStr] || {})[invKey] || {};
+
+    document.getElementById('inv-title').textContent = isBFP ? 'Frozen on Hand' : 'Cold Ferment on Hand';
+    document.getElementById('inv-sub').textContent   = `As of ${dateStr}`;
+    document.getElementById('inv-body').innerHTML    = Object.keys(BATCH_SIZES).map(sku => `
+      <div class="inv-input-row">
+        <label class="inv-input-lbl" for="ii-${esc(sku)}">${esc(sku)}</label>
+        <input class="inv-input" type="number" min="0" id="ii-${esc(sku)}" data-sku="${esc(sku)}" value="${existing[sku] || 0}">
+        <span class="inv-input-unit">pretzels</span>
+      </div>`).join('');
+
+    document.getElementById('inv-overlay').classList.add('open');
+  }
+
+  async function saveInv() {
+    const isBFP    = invType === 'bfp';
+    const invKey   = isBFP ? 'frozen' : 'coldFerment';
     const otherKey = isBFP ? 'coldFerment' : 'frozen';
-    const dayState = productionState[date] || {};
-    const otherInv = dayState[otherKey] || {};
+    const otherInv = (productionState[invDate] || {})[otherKey] || {};
 
     const snaps = [];
     Object.keys(BATCH_SIZES).forEach(sku => {
-      const inp = document.querySelector(`#inventory-form-rows [data-sku="${CSS.escape(sku)}"]`);
+      const inp   = document.querySelector(`#inv-body [data-sku="${CSS.escape(sku)}"]`);
       const count = parseInt(inp?.value, 10) || 0;
       const other = otherInv[sku] || 0;
       if (count > 0 || other > 0) {
@@ -707,26 +1096,27 @@
       }
     });
 
-    const saveBtn = document.getElementById('inventory-save');
+    const saveBtn = document.getElementById('inv-save');
     saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
     try {
       await appendLog(PRODUCTION_LOG, {
-        action: 'inventory',
-        date,
+        action:    'inventory',
+        date:      invDate,
         snapshots: JSON.stringify(snaps),
         timeStamp: new Date().toISOString(),
       });
-      document.getElementById('inventory-overlay').classList.remove('open');
+      document.getElementById('inv-overlay').classList.remove('open');
       await loadProduction();
       render();
     } catch (e) {
       alert('Error saving inventory: ' + e.message);
     } finally {
-      saveBtn.disabled = false; saveBtn.textContent = 'Save';
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Inventory';
     }
   }
 
-  // ── Data loading ──────────────────────────────────────────────────────────
+  // ─── DATA LOADING ─────────────────────────────────────────────────────────
+
   async function loadDeliveries() {
     const logs = await fetchLog(DELIVERY_LOG);
     allDeliveries = resolveDeliveries(logs);
@@ -737,24 +1127,64 @@
     productionState = resolveProductionLogs(logs);
   }
 
-  // ── Nav wiring ────────────────────────────────────────────────────────────
-  document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; updateWeekLabel(); render(); });
-  document.getElementById('week-next').addEventListener('click', () => { weekOffset++; updateWeekLabel(); render(); });
-  document.getElementById('week-today').addEventListener('click', () => { weekOffset = 0; updateWeekLabel(); render(); });
-  document.getElementById('inventory-close').addEventListener('click',  () => document.getElementById('inventory-overlay').classList.remove('open'));
-  document.getElementById('inventory-cancel').addEventListener('click', () => document.getElementById('inventory-overlay').classList.remove('open'));
-  document.getElementById('inventory-save').addEventListener('click', saveInventory);
+  // ─── NAV WIRING ───────────────────────────────────────────────────────────
 
-  // ── Boot ──────────────────────────────────────────────────────────────────
-  updateWeekLabel();
+  document.getElementById('nav-prev').addEventListener('click', () => {
+    if (viewMode === 'week') { viewMode = 'day'; }
+    else { currentDate = addDays(currentDate, -1); }
+    render();
+  });
+
+  document.getElementById('nav-next').addEventListener('click', () => {
+    if (viewMode === 'week') return;
+    currentDate = addDays(currentDate, 1);
+    render();
+  });
+
+  document.getElementById('date-display').addEventListener('click', () => {
+    currentDate = new Date();
+    viewMode = 'day';
+    render();
+  });
+
+  document.getElementById('week-toggle').addEventListener('click', () => {
+    viewMode = viewMode === 'week' ? 'day' : 'week';
+    render();
+  });
+
+  // Log sheet
+  document.getElementById('log-save').addEventListener('click', saveLog);
+  document.getElementById('log-cancel').addEventListener('click', () =>
+    document.getElementById('log-overlay').classList.remove('open'));
+  document.getElementById('log-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('log-overlay'))
+      document.getElementById('log-overlay').classList.remove('open');
+  });
+
+  // Inv sheet
+  document.getElementById('inv-save').addEventListener('click', saveInv);
+  document.getElementById('inv-cancel').addEventListener('click', () =>
+    document.getElementById('inv-overlay').classList.remove('open'));
+  document.getElementById('inv-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('inv-overlay'))
+      document.getElementById('inv-overlay').classList.remove('open');
+  });
+
+  // ─── BOOT ─────────────────────────────────────────────────────────────────
+
   (async () => {
     try {
       await Promise.all([loadDeliveries(), loadProduction()]);
       render();
     } catch (e) {
-      document.getElementById('schedule-container').innerHTML =
-        `<div class="load-error">⚠️ Error loading data: ${esc(e.message)}
-          <button onclick="window.location.reload()" style="margin-left:12px;padding:8px 16px;background:#C41E1E;color:#fff;border:none;border-radius:4px;font:700 13px 'Manrope',sans-serif;cursor:pointer;">Retry</button>
+      document.getElementById('main-view').innerHTML = `
+        <div class="load-error">
+          ⚠️ Could not load data<br>
+          <span style="font:400 13px 'Manrope',sans-serif">${esc(e.message)}</span><br><br>
+          <button onclick="window.location.reload()"
+            style="padding:12px 28px;background:var(--red);color:#fff;border:none;border-radius:8px;font:700 15px 'Manrope',sans-serif;cursor:pointer;min-height:48px">
+            Retry
+          </button>
         </div>`;
     }
   })();
