@@ -587,6 +587,7 @@
   let productionState = {};
   let skuConfig       = {}; // { sku: { batchSize, type } } — from sku_config log entries
   let skuAliases      = {}; // { oldSku: canonicalSku } — from sku_alias log entries
+  let latestInventoryTs = null; // ISO timestamp of latest inventory snapshot
   let schedule        = { shape: {}, bfp: {}, overdue: [], foh: [], unconfigured: [] };
   let currentDate     = new Date();
   let viewMode        = 'day';
@@ -622,10 +623,18 @@
         if (byId[id]) {
           byId[id].status = (byId[id].type || 'delivery').toLowerCase() === 'pickup'
             ? 'picked_up' : 'delivered';
+          byId[id]._confirmedAt = row.timeStamp || ''; // for inventory auto-deduct timing
         }
         return;
       }
-      if (row.action === 'status') { if (byId[id]) byId[id].status = row.status || 'scheduled'; return; }
+      if (row.action === 'status') {
+        if (byId[id]) {
+          byId[id].status = row.status || 'scheduled';
+          if (['delivered','picked_up'].includes(byId[id].status))
+            byId[id]._confirmedAt = row.timeStamp || '';
+        }
+        return;
+      }
       if (row.action === 'update') {
         const prev = byId[id];
         byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
@@ -834,7 +843,16 @@
 
     if (latestInvDate) {
       allDeliveries
-        .filter(d => ['delivered','picked_up'].includes(d.status) && d.date >= latestInvDate)
+        .filter(d => {
+          if (!['delivered','picked_up'].includes(d.status)) return false;
+          // Prefer timestamp comparison: only deduct if delivery was confirmed AFTER
+          // the latest stock count (otherwise the user's count already reflects it)
+          if (d._confirmedAt && latestInventoryTs) {
+            return d._confirmedAt > latestInventoryTs;
+          }
+          // Fallback to date-level comparison if timestamps aren't available
+          return d.date >= latestInvDate;
+        })
         .forEach(delivery => {
           let items = [];
           try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
@@ -881,23 +899,30 @@
       item.bfpLeft   = item.bfpLeft   > 0 ? Math.ceil(item.bfpLeft)   : 0;
     });
 
-    // Separate overdue items (window already closed, work not done)
+    // Build pools — overdue items are forced into today's window so they
+    // appear on today's schedule (with isOverdue flag) AND in the alert banner
     const overdue = [];
     const shapePool = [], bfpPool = [];
     Object.values(bySkuItems).flat().forEach(item => {
       if (item.shapeLeft > 0) {
-        if (item.shapeWindow.end < todayStr) {
-          overdue.push({ team: 'shape', sku: item.sku, batches: item.shapeLeft, windowEnd: item.shapeWindow.end, deliveryDate: item.deliveryDate });
-        } else {
-          shapePool.push({ sku: item.sku, left: item.shapeLeft, deliveryDate: item.deliveryDate, window: item.shapeWindow, orders: item.orders, pretzels: item.pretzels });
-        }
+        const closed = item.shapeWindow.end < todayStr;
+        if (closed) overdue.push({ team: 'shape', sku: item.sku, batches: item.shapeLeft, windowEnd: item.shapeWindow.end, deliveryDate: item.deliveryDate });
+        shapePool.push({
+          sku: item.sku, left: item.shapeLeft, deliveryDate: item.deliveryDate,
+          window: closed ? { start: todayStr, end: todayStr } : item.shapeWindow,
+          orders: item.orders, pretzels: item.pretzels,
+          isOverdue: closed,
+        });
       }
       if (item.bfpLeft > 0) {
-        if (item.bfpWindow.end < todayStr) {
-          overdue.push({ team: 'bfp', sku: item.sku, batches: item.bfpLeft, windowEnd: item.bfpWindow.end, deliveryDate: item.deliveryDate });
-        } else {
-          bfpPool.push({ sku: item.sku, left: item.bfpLeft, deliveryDate: item.deliveryDate, window: item.bfpWindow, orders: item.orders, pretzels: item.pretzels });
-        }
+        const closed = item.bfpWindow.end < todayStr;
+        if (closed) overdue.push({ team: 'bfp', sku: item.sku, batches: item.bfpLeft, windowEnd: item.bfpWindow.end, deliveryDate: item.deliveryDate });
+        bfpPool.push({
+          sku: item.sku, left: item.bfpLeft, deliveryDate: item.deliveryDate,
+          window: closed ? { start: todayStr, end: todayStr } : item.bfpWindow,
+          orders: item.orders, pretzels: item.pretzels,
+          isOverdue: closed,
+        });
       }
     });
 
@@ -953,7 +978,8 @@
           if (existing) {
             existing.batches += take;
             if (!existing.deliveryDates.includes(a.deliveryDate)) existing.deliveryDates.push(a.deliveryDate);
-            existing.urgent = existing.urgent || a.daysLeft === 0;
+            existing.urgent    = existing.urgent || a.daysLeft === 0;
+            existing.isOverdue = existing.isOverdue || !!a.isOverdue;
             a.orders.forEach(o => { if (!existing.orders.includes(o)) existing.orders.push(o); });
           } else {
             dayItems.push({
@@ -961,6 +987,7 @@
               deliveryDates: [a.deliveryDate],
               urgent: a.daysLeft === 0,
               overloaded: isOverloaded,
+              isOverdue: !!a.isOverdue,
               orders: [...a.orders],
             });
           }
@@ -1053,7 +1080,9 @@
       const inv     = inventory[d.sku] || 0;
       const caseSize = CASE_SIZES[d.sku];
       const caseStr  = caseSize ? ` · ${Math.ceil(d.batches * (BATCH_SIZES[d.sku]||0) / caseSize)} cases` : '';
-      const urgTag   = d.urgent
+      const urgTag   = d.isOverdue
+        ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue — do today</span>`
+        : d.urgent
         ? `<span class="sku-tag sku-tag-urgent">🔴 Must do today</span>`
         : `<span class="sku-tag sku-tag-ahead">🟡 Pulling ahead</span>`;
       const delivStr = d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ');
@@ -1699,6 +1728,10 @@
   async function loadProduction() {
     const logs = await fetchLog(PRODUCTION_LOG);
     productionState = resolveProductionLogs(logs);
+    // Capture latest inventory timestamp for auto-deduct timing decisions
+    const invLogs = (logs || []).filter(l => l.action === 'inventory');
+    invLogs.sort((a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || ''));
+    latestInventoryTs = invLogs.length ? invLogs[invLogs.length - 1].timeStamp : null;
   }
 
   async function loadSkus() {
