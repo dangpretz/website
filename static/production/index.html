@@ -784,15 +784,19 @@
       Object.entries(skuMap).forEach(([sku, data]) => {
         const batchSize = getBatchSize(sku);
         if (!batchSize) { unconfigured.add(sku); return; } // flag for warning UI
-        const batches = Math.ceil(data.pretzels / batchSize);
         if (!bySkuItems[sku]) bySkuItems[sku] = [];
+        // Track demand in PRETZELS (shapeLeftP, bfpLeftP) so we can pool by SKU
+        // before ceiling — prevents per-delivery rounding from inflating batches
         bySkuItems[sku].push({
-          sku, batches, pretzels: data.pretzels, deliveryDate: delivDate,
+          sku, pretzels: data.pretzels, deliveryDate: delivDate,
           orders: data.orders,
           shapeWindow: { start: toDateStr(addDays(dd, -SHAPE_MAX_LEAD)), end: toDateStr(addDays(dd, -SHAPE_MIN_LEAD)) },
           bfpWindow:   { start: toDateStr(addDays(dd, -BFP_MAX_LEAD)),   end: toDateStr(addDays(dd, -BFP_MIN_LEAD))   },
-          shapeLeft: batches,
-          bfpLeft:   batches,
+          shapeLeftP: data.pretzels, // remaining pretzel demand for shape
+          bfpLeftP:   data.pretzels, // remaining pretzel demand for BFP
+          shapeLeft:  0,             // batches (filled in after pooling)
+          bfpLeft:    0,
+          batches:    0,             // display batch count (filled in after pooling)
         });
       });
     }
@@ -811,22 +815,23 @@
       });
     });
 
-    Object.entries(doneSku.shape).forEach(([sku, total]) => {
-      if (!bySkuItems[sku]) return;
-      let left = total;
+    // Subtract completions in pretzels (shape_done/bfp_done are batches → multiply by batchSize)
+    Object.entries(doneSku.shape).forEach(([sku, batches]) => {
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftP = batches * getBatchSize(sku);
       for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.shapeLeft, left);
-        item.shapeLeft -= take; left -= take;
-        if (left <= 0) break;
+        const take = Math.min(item.shapeLeftP, leftP);
+        item.shapeLeftP -= take; leftP -= take;
+        if (leftP <= 0) break;
       }
     });
-    Object.entries(doneSku.bfp).forEach(([sku, total]) => {
-      if (!bySkuItems[sku]) return;
-      let left = total;
+    Object.entries(doneSku.bfp).forEach(([sku, batches]) => {
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftP = batches * getBatchSize(sku);
       for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.bfpLeft, left);
-        item.bfpLeft -= take; left -= take;
-        if (left <= 0) break;
+        const take = Math.min(item.bfpLeftP, leftP);
+        item.bfpLeftP -= take; leftP -= take;
+        if (leftP <= 0) break;
       }
     });
 
@@ -867,36 +872,61 @@
     }
 
     // Frozen runs first: finished pretzels in freezer satisfy BOTH shape and BFP
-    // demand (they're already done — no shaping or baking needed)
+    // demand (they're already done — no shaping or baking needed). All in pretzels.
     Object.entries(latestInv.frozen).forEach(([sku, pretzels]) => {
       if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftBatches = pretzels / getBatchSize(sku);
+      let leftP = pretzels;
       for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.bfpLeft, leftBatches);
-        item.bfpLeft  -= take;
-        item.shapeLeft = Math.max(0, item.shapeLeft - take); // frozen also covers shape
-        leftBatches   -= take;
-        if (leftBatches <= 0) break;
+        const take = Math.min(item.bfpLeftP, leftP);
+        item.bfpLeftP   -= take;
+        item.shapeLeftP  = Math.max(0, item.shapeLeftP - take); // frozen also covers shape
+        leftP           -= take;
+        if (leftP <= 0) break;
       }
     });
 
-    // Cold-ferment runs second: shaped dough only satisfies shape demand
-    // (BFP still needed because the dough still has to be baked)
+    // Cold-ferment runs second: shaped dough only satisfies shape demand.
     Object.entries(latestInv.coldFerment).forEach(([sku, pretzels]) => {
       if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftBatches = pretzels / getBatchSize(sku);
+      let leftP = pretzels;
       for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.shapeLeft, leftBatches);
-        item.shapeLeft -= take; leftBatches -= take;
-        if (leftBatches <= 0) break;
+        const take = Math.min(item.shapeLeftP, leftP);
+        item.shapeLeftP -= take; leftP -= take;
+        if (leftP <= 0) break;
       }
     });
 
-    // Round remaining demand up to whole batches (inventory deduction is fractional
-    // but workers can only make whole batches — prevents "×4.625" display)
-    Object.values(bySkuItems).flat().forEach(item => {
-      item.shapeLeft = item.shapeLeft > 0 ? Math.ceil(item.shapeLeft) : 0;
-      item.bfpLeft   = item.bfpLeft   > 0 ? Math.ceil(item.bfpLeft)   : 0;
+    // Pool remaining pretzel demand per SKU, ceil ONCE to get total batches needed,
+    // then distribute back to deliveries FIFO. This prevents the per-delivery ceiling
+    // from inflating batch counts when one batch could cover multiple deliveries.
+    Object.entries(bySkuItems).forEach(([sku, arr]) => {
+      const bs = getBatchSize(sku);
+      if (!bs) return;
+
+      const distribute = (leftField, batchField) => {
+        const totalP = arr.reduce((s, i) => s + Math.max(0, i[leftField]), 0);
+        let remaining = Math.ceil(totalP / bs); // single ceil for the entire SKU
+        // Allocate FIFO by delivery date (arr already sorted ascending)
+        arr.forEach(item => {
+          if (item[leftField] <= 0 || remaining <= 0) { item[batchField] = 0; return; }
+          const need = Math.ceil(item[leftField] / bs);
+          item[batchField] = Math.min(need, remaining);
+          remaining -= item[batchField];
+        });
+        // Any leftover (rounding slack) goes to the last delivery with positive demand
+        if (remaining > 0) {
+          for (let i = arr.length - 1; i >= 0; i--) {
+            if (arr[i][leftField] > 0) { arr[i][batchField] += remaining; break; }
+          }
+        }
+      };
+
+      distribute('shapeLeftP', 'shapeLeft');
+      distribute('bfpLeftP',   'bfpLeft');
+
+      // Set display batches as max(shape, bfp) per delivery so the card shows the
+      // right batch count regardless of which team is viewing
+      arr.forEach(item => { item.batches = Math.max(item.shapeLeft, item.bfpLeft); });
     });
 
     // Build pools — overdue items are forced into today's window so they
@@ -1078,8 +1108,9 @@
     // SKU rows — render function handles BFP coating split
     const renderRows = rows => rows.map(d => {
       const inv     = inventory[d.sku] || 0;
+      const bs      = getBatchSize(d.sku); // use runtime batch size (BATCH_SIZES + skuConfig)
       const caseSize = CASE_SIZES[d.sku];
-      const caseStr  = caseSize ? ` · ${Math.ceil(d.batches * (BATCH_SIZES[d.sku]||0) / caseSize)} cases` : '';
+      const caseStr  = caseSize ? ` · ${Math.ceil(d.batches * bs / caseSize)} cases` : '';
       const urgTag   = d.isOverdue
         ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue — do today</span>`
         : d.urgent
@@ -1089,7 +1120,7 @@
       return `<div class="sku-row">
         <span class="sku-name">${esc(d.sku)}</span>
         ${urgTag}
-        <span class="sku-detail"><strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong> — ${d.batches * (BATCH_SIZES[d.sku]||0)} units${esc(caseStr)}</span>
+        <span class="sku-detail"><strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong> — ${d.batches * bs} units${esc(caseStr)}</span>
         <span class="sku-delivery">For ${esc(delivStr)} delivery</span>
         ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
         <span class="sku-customers">${d.orders.map(esc).join(' · ')}</span>
