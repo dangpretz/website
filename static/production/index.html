@@ -425,35 +425,46 @@
 
     /* Inline stepper logger */
     .row-logger {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 8px;
       background: var(--gray-1); border-radius: 12px;
-      padding: 10px 12px;
+      padding: 10px 10px;
     }
     .row-logger.done { background: #e8f5e8; }
     .row-logger.over { background: #fff0f0; }
     .row-log-btn {
-      width: 48px; height: 48px; border: 1.5px solid var(--gray-2);
+      width: 44px; height: 48px; border: 1.5px solid var(--gray-2);
       border-radius: 10px; background: var(--white);
-      font: 700 24px 'Manrope', sans-serif; color: var(--dark); cursor: pointer;
+      font: 700 22px 'Manrope', sans-serif; color: var(--dark); cursor: pointer;
       -webkit-tap-highlight-color: transparent; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
     }
     .row-log-btn:active { background: var(--gray-2); }
     .row-log-btn:disabled { opacity: 0.4; cursor: default; }
     .row-log-display {
-      flex: 1; text-align: center;
+      flex: 1; text-align: center; display: flex; flex-direction: column;
+      align-items: center; gap: 1px;
     }
-    .row-log-count {
-      font: 800 17px 'Manrope', sans-serif; color: var(--dark); line-height: 1.2;
+    .row-log-numbers { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+    .row-log-input {
+      width: 64px; padding: 4px 6px; text-align: center;
+      font: 800 18px 'Manrope', sans-serif !important; color: var(--dark);
+      border: 1.5px solid transparent; border-radius: 6px;
+      background: rgba(255,255,255,0.6);
+      -moz-appearance: textfield;
     }
-    .row-log-count .of { color: var(--gray-3); font-weight: 600; }
+    .row-log-input::-webkit-outer-spin-button,
+    .row-log-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .row-log-input:focus { border-color: var(--red); outline: none; background: var(--white); }
+    .row-log-of {
+      font: 700 15px 'Manrope', sans-serif; color: var(--gray-3);
+    }
     .row-log-label {
-      font: 600 11px 'Manrope', sans-serif; color: var(--gray-4);
-      text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px;
+      font: 600 10px 'Manrope', sans-serif; color: var(--gray-4);
+      text-transform: uppercase; letter-spacing: 0.5px;
     }
     .row-log-status {
       font: 700 12px 'Manrope', sans-serif; flex-shrink: 0;
-      min-width: 40px; text-align: center;
+      min-width: 32px; text-align: center;
     }
     .row-log-status.saving { color: var(--gray-3); font-weight: 600; }
     .row-log-status.saved  { color: var(--green); }
@@ -537,7 +548,15 @@
         </label>
         <input type="number" id="cfg-batch-size" min="1"
           placeholder="e.g. 48"
+          style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:14px">
+
+        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:6px">
+          Pretzels per tray <span style="font-weight:400;color:var(--gray-3)">(BFP step size, optional)</span>
+        </label>
+        <input type="number" id="cfg-tray-size" min="0"
+          placeholder="e.g. 9"
           style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:20px">
+
         <div style="font:700 14px 'Manrope',sans-serif;color:var(--dark);margin-bottom:10px">Production type</div>
         <button class="cfg-type-btn selected" data-cfg-type="standard">Standard pretzel</button>
         <button class="cfg-type-btn" data-cfg-type="coating">+ Coating step (BBK / Spicy Bee)</button>
@@ -609,8 +628,20 @@
   // skuConfig (loaded from log) overrides/extends hardcoded BATCH_SIZES.
 
   const getBatchSize    = sku => (skuConfig[sku]?.batchSize > 0 ? skuConfig[sku].batchSize : 0) || BATCH_SIZES[sku] || 0;
+  const getTraySize     = sku => skuConfig[sku]?.traySize > 0 ? skuConfig[sku].traySize : 0;
   const isFOH           = sku => skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has(sku.toLowerCase()) || FOH_SKUS.has(sku);
   const isCoating       = sku => skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku);
+
+  // Step size for the inline +/- logger:
+  //   shape: full batch (workers shape whole batches)
+  //   bfp:   tray if configured, else falls back to batch
+  const getStepDelta = (type, sku) => {
+    if (type === 'bfp') {
+      const ts = getTraySize(sku);
+      if (ts > 0) return ts;
+    }
+    return getBatchSize(sku);
+  };
   // All production SKUs (hardcoded + in-app configured, excluding FOH)
   const allProductionSkus = () => [...new Set([
     ...Object.keys(BATCH_SIZES),
@@ -714,7 +745,8 @@
       if (action === 'sku_config') {
         if (row.sku) skuConfig[row.sku] = {
           batchSize: Number(row.batchSize) || 0,
-          type: row.type || 'standard',
+          traySize: Number(row.traySize)  || 0,
+          type:     row.type || 'standard',
         };
         return;
       }
@@ -1181,13 +1213,15 @@
         </div>
       </div>`;
 
-    // SKU block — pretzel display + inline stepper
+    // SKU block — pretzel display + inline typeable logger
     const renderBlock = d => {
       const bs        = getBatchSize(d.sku);
+      const stepDelta = getStepDelta(type, d.sku);
       const dough     = fullInv.coldFerment[d.sku] || 0;
       const frozen    = fullInv.frozen[d.sku]      || 0;
-      const origP     = (d.needBatches + d.madeBatches) * bs;
-      const madeP     = d.madeBatches * bs;
+      const totalBatches = d.needBatches + d.madeBatches;
+      const origP     = totalBatches * bs;
+      const madeP     = Math.round(d.madeBatches * bs);
       const tagHtml   = d.isOverdue
         ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue</span>`
         : d.urgent
@@ -1203,11 +1237,14 @@
       const isOverLog = madeP > origP;
       const loggerClass = isOverLog ? 'over' : isDone ? 'done' : '';
       const loggerStatus = isOverLog
-        ? `<span class="row-log-status over">+${madeP - origP}</span>`
+        ? `<span class="row-log-status over" id="rls-${esc(type)}-${esc(d.sku)}">+${madeP - origP}</span>`
         : isDone
-        ? `<span class="row-log-status done">✅</span>`
+        ? `<span class="row-log-status done" id="rls-${esc(type)}-${esc(d.sku)}">✅</span>`
         : `<span class="row-log-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
       const stepperKey = `${type}|${dateStr}|${d.sku}`;
+      const stepUnit   = type === 'bfp' && getTraySize(d.sku) > 0
+        ? `tray of ${stepDelta}`
+        : `batch of ${bs}`;
 
       return `<div class="sku-block">
         <div class="sku-block-head">
@@ -1215,7 +1252,7 @@
           ${tagHtml}
         </div>
         ${origP > 0
-          ? `<div class="sku-block-need"><strong>${origP}</strong> pretzels needed today <span style="color:var(--gray-3);font-weight:600">(${d.needBatches + d.madeBatches} batch${(d.needBatches + d.madeBatches) !== 1 ? 'es' : ''} of ${bs})</span></div>`
+          ? `<div class="sku-block-need"><strong>${origP}</strong> pretzels needed today <span style="color:var(--gray-3);font-weight:600">(${totalBatches} ${totalBatches !== 1 ? 'batches' : 'batch'} of ${bs})</span></div>`
           : ''}
         <div class="sku-block-meta">For ${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
         <div class="sku-block-onhand">
@@ -1223,14 +1260,18 @@
           <span class="ohi ${frozen > 0 ? '' : 'zero'}">❄️ ${frozen} frozen</span>
         </div>
         <div class="row-logger ${loggerClass}">
-          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" ${madeP <= 0 ? 'disabled' : ''}>−</button>
+          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" title="-1 ${stepUnit}" ${madeP <= 0 ? 'disabled' : ''}>−</button>
           <div class="row-log-display">
-            <div class="row-log-count" id="rlc-${esc(type)}-${esc(d.sku)}">
-              <strong>${madeP}</strong><span class="of"> / ${origP}</span>
+            <div class="row-log-numbers">
+              <input type="number" class="row-log-input" min="0" inputmode="numeric"
+                     value="${madeP}"
+                     data-log-input data-key="${esc(stepperKey)}"
+                     id="rli-${esc(type)}-${esc(d.sku)}">
+              <span class="row-log-of">/ ${origP}</span>
             </div>
-            <div class="row-log-label">made today</div>
+            <div class="row-log-label">pretzels made today · +/- = ${stepUnit}</div>
           </div>
-          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1">+</button>
+          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1" title="+1 ${stepUnit}">+</button>
           ${loggerStatus}
         </div>
       </div>`;
@@ -1447,31 +1488,49 @@
     loggedPretzels[type][dateStr][sku] = Math.max(0, pretzels);
   }
 
-  function bumpStepper(type, dateStr, sku, deltaBatches) {
-    const bs = getBatchSize(sku);
-    if (!bs) return;
+  function bumpStepper(type, dateStr, sku, deltaSign) {
+    // deltaSign is +1 or -1 — actual increment is the SKU's stepDelta (batch or tray)
+    const stepDelta = getStepDelta(type, sku);
+    if (!stepDelta) return;
     const cur  = getCurrentPretzels(type, dateStr, sku);
-    const next = Math.max(0, cur + (deltaBatches * bs));
+    const next = Math.max(0, cur + (deltaSign * stepDelta));
     if (next === cur) return;
     setLocalLog(type, dateStr, sku, next);
-    updateStepperDom(type, dateStr, sku, next);
+    // Update input value too so user sees the change
+    const inputEl = document.getElementById(`rli-${type}-${sku}`);
+    if (inputEl) inputEl.value = next;
+    updateStepperDom(type, dateStr, sku);
     scheduleSave(type, dateStr, sku);
   }
 
-  function updateStepperDom(type, dateStr, sku) {
+  function setStepperValue(type, dateStr, sku, rawInput) {
+    // Direct typing: any non-negative integer
+    const next = Math.max(0, parseInt(rawInput, 10) || 0);
+    const cur  = getCurrentPretzels(type, dateStr, sku);
+    if (next === cur) return;
+    setLocalLog(type, dateStr, sku, next);
+    updateStepperDom(type, dateStr, sku, /* skipInput */ true);
+    scheduleSave(type, dateStr, sku);
+  }
+
+  function updateStepperDom(type, dateStr, sku, skipInput = false) {
     const cur = getCurrentPretzels(type, dateStr, sku);
     const bs  = getBatchSize(sku);
-    // Need to know total need for display; pull from current schedule + completions
+    // Total need for display: pull from current schedule + completions
     const items = schedule[type][dateStr] || [];
     const sched = items.find(i => i.sku === sku);
     const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
     const completedRow = ((productionState[dateStr] || {})[doneKey] || []).find(c => c.sku === sku);
     const schedBatches = sched ? sched.batches : 0;
     const madeBatches  = completedRow ? (Number(completedRow.batches) || 0) : 0;
-    const origP = (schedBatches + madeBatches) * bs;
-    const countEl = document.getElementById(`rlc-${type}-${sku}`);
-    if (countEl) {
-      countEl.innerHTML = `<strong>${cur}</strong><span class="of"> / ${origP}</span>`;
+    const origP = Math.round((schedBatches + madeBatches) * bs);
+    // Update the "/ N" suffix
+    const ofEl = document.querySelector(`#rli-${type}-${sku}`)?.parentElement?.querySelector('.row-log-of');
+    if (ofEl) ofEl.textContent = `/ ${origP}`;
+    // Update input value (unless caller is the input itself, mid-keystroke)
+    if (!skipInput) {
+      const inp = document.getElementById(`rli-${type}-${sku}`);
+      if (inp && document.activeElement !== inp) inp.value = cur;
     }
     // Decrement button disabled when at zero
     const decBtns = document.querySelectorAll(`[data-log-step][data-key="${type}|${dateStr}|${sku}"][data-delta="-1"]`);
@@ -1479,7 +1538,7 @@
     // Status indicator
     const statusEl = document.getElementById(`rls-${type}-${sku}`);
     if (statusEl) {
-      if (cur > origP) {
+      if (cur > origP && origP > 0) {
         statusEl.className = 'row-log-status over';
         statusEl.textContent = `+${cur - origP}`;
       } else if (cur >= origP && origP > 0) {
@@ -1508,7 +1567,7 @@
     const lastP  = getLastSavedPretzels(type, dateStr, sku);
     const deltaP = curP - lastP;
     if (deltaP === 0) return;
-    const deltaBatches = deltaP / bs; // always integer (steps are batch-sized)
+    const deltaBatches = deltaP / bs; // fractional OK (typed values may not align to batches)
     const statusEl = document.getElementById(`rls-${type}-${sku}`);
     if (statusEl) { statusEl.className = 'row-log-status saving'; statusEl.textContent = 'saving…'; }
     try {
@@ -1523,14 +1582,22 @@
       if (!lastSavedPretzels[type])           lastSavedPretzels[type] = {};
       if (!lastSavedPretzels[type][dateStr])  lastSavedPretzels[type][dateStr] = {};
       lastSavedPretzels[type][dateStr][sku] = curP;
-      // Reload server state and re-render
+      // Pull fresh server state and rebuild schedule (so other SKUs reflect changes)
       await loadProduction();
       schedule = buildOptimalSchedule();
-      // Sync local state with server (server is authoritative now)
+      // Sync local with server post-reload
       const newServerP = getMadePretzels(type, dateStr, sku);
       setLocalLog(type, dateStr, sku, newServerP);
       lastSavedPretzels[type][dateStr][sku] = newServerP;
-      render();
+      // If the user is mid-typing in some input, skip full re-render to preserve focus.
+      // The current SKU's stepper will reflect the saved value via updateStepperDom.
+      const activeIsLogInput = document.activeElement?.matches?.('[data-log-input]');
+      if (activeIsLogInput) {
+        updateStepperDom(type, dateStr, sku, /* skipInput */ document.activeElement?.id === `rli-${type}-${sku}`);
+      } else {
+        render();
+      }
+      if (statusEl) { statusEl.className = 'row-log-status saved'; statusEl.textContent = '✓'; setTimeout(() => updateStepperDom(type, dateStr, sku), 1500); }
     } catch (e) {
       if (statusEl) { statusEl.className = 'row-log-status error'; statusEl.textContent = 'error'; }
       console.error('Log save failed:', e);
@@ -1611,19 +1678,22 @@
   function render() {
     updateNav();
 
-    // Consolidated overdue panel (one block, merged by SKU)
+    // Consolidated overdue panel (one block, merged by SKU, pretzel-first display)
     let overdueHtml = '';
     if (schedule.overdue.length > 0) {
       const mergeBySku = (items) => {
         const m = {};
         items.forEach(o => { m[o.sku] = (m[o.sku] || 0) + o.batches; });
-        return Object.entries(m).map(([sku, n]) => `${esc(sku)} ×${n}`).join(' · ');
+        return Object.entries(m).map(([sku, b]) => {
+          const bs = getBatchSize(sku);
+          const p  = Math.round(b * bs);
+          return `${esc(sku)} · <strong>${p}</strong> pretzel${p !== 1 ? 's' : ''} (${b} batch${b !== 1 ? 'es' : ''})`;
+        }).join(' · ');
       };
       const shapeOver = schedule.overdue.filter(o => o.team === 'shape');
       const bfpOver   = schedule.overdue.filter(o => o.team === 'bfp');
       const groupHtml = (items, label) => items.length === 0 ? '' :
         `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ${mergeBySku(items)}</div>`;
-      // Count distinct SKU×team groups so the headline isn't inflated by per-delivery rows
       const distinctCount = new Set(schedule.overdue.map(o => `${o.team}:${o.sku}`)).size;
       overdueHtml = `<div class="overdue-banner">
         <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${distinctCount} overdue — production window${distinctCount > 1 ? 's have' : ' has'} closed</div>
@@ -1714,6 +1784,11 @@
         bumpStepper(type, dateStr, sku, delta);
       });
     });
+    document.querySelectorAll('[data-log-input]').forEach(inp => {
+      const [type, dateStr, sku] = inp.dataset.key.split('|');
+      inp.addEventListener('focus', () => inp.select());
+      inp.addEventListener('input', () => setStepperValue(type, dateStr, sku, inp.value));
+    });
     document.querySelectorAll('[data-extra-btn]').forEach(btn => {
       btn.addEventListener('click', () => openExtraSheet(btn.dataset.type, btn.dataset.date));
     });
@@ -1800,6 +1875,7 @@
     cfgType = skuConfig[sku]?.type || 'standard';
     document.getElementById('cfg-sku-display').textContent = sku;
     document.getElementById('cfg-batch-size').value = skuConfig[sku]?.batchSize || '';
+    document.getElementById('cfg-tray-size').value  = skuConfig[sku]?.traySize  || '';
     document.querySelectorAll('.cfg-type-btn').forEach(btn =>
       btn.classList.toggle('selected', btn.dataset.cfgType === cfgType));
 
@@ -1827,9 +1903,12 @@
       } else {
         const batchSize = parseInt(document.getElementById('cfg-batch-size').value, 10);
         if (!batchSize || batchSize < 1) { alert('Enter a batch size first'); throw new Error('No size'); }
+        const traySize = parseInt(document.getElementById('cfg-tray-size').value, 10) || 0;
         await appendLog(PRODUCTION_LOG, {
           action: 'sku_config', sku: cfgSku,
-          batchSize: String(batchSize), type: cfgType,
+          batchSize: String(batchSize),
+          traySize:  String(traySize),
+          type: cfgType,
           timeStamp: new Date().toISOString(),
         });
       }
