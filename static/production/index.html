@@ -401,6 +401,66 @@
       margin-top: 8px;
     }
 
+    /* ── New SKU row + inline logger ───────────── */
+    .sku-block {
+      padding: 14px 0; border-bottom: 1px solid var(--gray-2);
+    }
+    .sku-block:last-of-type { border-bottom: none; }
+    .sku-block-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 8px; margin-bottom: 4px;
+    }
+    .sku-block-name { font: 800 18px 'Manrope', sans-serif; color: var(--dark); flex: 1; }
+    .sku-block-need {
+      font: 700 15px 'Manrope', sans-serif; color: var(--dark); margin-bottom: 2px;
+    }
+    .sku-block-need strong { font-size: 18px; }
+    .sku-block-meta { font: 400 12px 'Manrope', sans-serif; color: var(--gray-3); margin-bottom: 6px; }
+    .sku-block-onhand {
+      font: 600 12px 'Manrope', sans-serif; color: var(--gray-4);
+      padding: 4px 0; margin-bottom: 8px;
+    }
+    .sku-block-onhand .ohi { display: inline-block; margin-right: 10px; }
+    .sku-block-onhand .ohi.zero { opacity: 0.35; }
+
+    /* Inline stepper logger */
+    .row-logger {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--gray-1); border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .row-logger.done { background: #e8f5e8; }
+    .row-logger.over { background: #fff0f0; }
+    .row-log-btn {
+      width: 48px; height: 48px; border: 1.5px solid var(--gray-2);
+      border-radius: 10px; background: var(--white);
+      font: 700 24px 'Manrope', sans-serif; color: var(--dark); cursor: pointer;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .row-log-btn:active { background: var(--gray-2); }
+    .row-log-btn:disabled { opacity: 0.4; cursor: default; }
+    .row-log-display {
+      flex: 1; text-align: center;
+    }
+    .row-log-count {
+      font: 800 17px 'Manrope', sans-serif; color: var(--dark); line-height: 1.2;
+    }
+    .row-log-count .of { color: var(--gray-3); font-weight: 600; }
+    .row-log-label {
+      font: 600 11px 'Manrope', sans-serif; color: var(--gray-4);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px;
+    }
+    .row-log-status {
+      font: 700 12px 'Manrope', sans-serif; flex-shrink: 0;
+      min-width: 40px; text-align: center;
+    }
+    .row-log-status.saving { color: var(--gray-3); font-weight: 600; }
+    .row-log-status.saved  { color: var(--green); }
+    .row-log-status.done   { color: var(--green); }
+    .row-log-status.over   { color: var(--red); }
+    .row-log-status.error  { color: var(--red); }
+
     @media (min-width: 640px) {
       .team-name { font-size: 21px; }
       .sku-name  { font-size: 18px; }
@@ -428,22 +488,6 @@
     <button class="tab-btn" data-tab="stock">📦 Stock</button>
   </div>
   <div id="main-view"><div class="no-prod">Loading…</div></div>
-</div>
-
-<!-- Log completions sheet -->
-<div class="sheet-overlay" id="log-overlay" role="dialog" aria-modal="true">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <div class="sheet-title" id="log-title">Log Completions</div>
-      <div class="sheet-sub" id="log-sub"></div>
-    </div>
-    <div class="sheet-body" id="log-body"></div>
-    <div class="sheet-footer">
-      <button class="btn-primary" id="log-save">Save Completions</button>
-      <button class="btn-secondary" id="log-cancel">Cancel</button>
-    </div>
-  </div>
 </div>
 
 <!-- Extra / unscheduled batch sheet -->
@@ -592,9 +636,17 @@
   let currentDate     = new Date();
   let viewMode        = 'day';
 
-  let logType = null, logDate = null, logItems = [], logWorkers = 1;
   let extraType = null, extraDate = null, extraValue = 1;
   let dayTab = 'shape'; // active tab in day view: 'shape' | 'bfp' | 'stock'
+
+  // Inline logging state
+  // loggedPretzels[type][dateStr][sku] = current pretzel count (local, mid-edit)
+  // lastSavedPretzels = same shape, snapshot of what's been persisted
+  // saveTimers[key] = pending debounce timeout id
+  let loggedPretzels    = {};
+  let lastSavedPretzels = {};
+  const saveTimers      = {};
+  const SAVE_DEBOUNCE_MS = 1000;
 
   // ─── DATE HELPERS ─────────────────────────────────────────────────────────
 
@@ -1057,33 +1109,57 @@
   function renderTeamCard(type, dateStr) {
     const isBFP    = type === 'bfp';
     const title    = isBFP ? 'Bake · Freeze · Pack' : 'Shape & Cold Ferment';
-    const items    = schedule[type][dateStr] || [];
     const dayState = productionState[dateStr] || {};
     const workers  = getWorkers(type, dateStr);
     const capacity = workers * BATCHES_PER_WORKER;
-    const needed   = items.reduce((s, d) => s + d.batches, 0);
-    const isOver   = needed > capacity;
-    const spare    = capacity - needed;
+    const doneKey  = isBFP ? 'bfpDone' : 'shapeDone';
+    const fullInv  = getLatestInventory(); // both dough + frozen for display
 
-    const doneKey   = isBFP ? 'bfpDone'   : 'shapeDone';
-    const timeKey   = isBFP ? 'bfpTime'   : 'shapeTime';
-    const invKey    = isBFP ? 'frozen'     : 'coldFerment';
-    const completed = dayState[doneKey] || [];
-    const doneTotal = completed.reduce((s, c) => s + (Number(c.batches) || 0), 0);
-    const inventory = getLatestInventory()[invKey]; // always use most recent snapshot
+    // Build unified items list: scheduled + already-completed (so completed SKUs
+    // still appear with their stepper showing "✓ Done")
+    const scheduledItems = schedule[type][dateStr] || [];
+    const completedRows  = dayState[doneKey] || [];
+    const itemMap = {};
+    scheduledItems.forEach(item => {
+      itemMap[item.sku] = { ...item, needBatches: item.batches, madeBatches: 0 };
+    });
+    completedRows.forEach(c => {
+      const made = Number(c.batches) || 0;
+      if (itemMap[c.sku]) {
+        itemMap[c.sku].madeBatches = made;
+      } else {
+        // Completed but no longer scheduled (fully done or unscheduled add)
+        itemMap[c.sku] = {
+          sku: c.sku,
+          batches: 0, needBatches: 0, madeBatches: made,
+          deliveryDates: [], orders: [],
+          urgent: false, isOverdue: false, overloaded: false,
+        };
+      }
+    });
+    const items = Object.values(itemMap);
 
-    // Status badge
+    const totalNeed   = items.reduce((s, d) => s + d.needBatches, 0);
+    const totalMade   = items.reduce((s, d) => s + d.madeBatches, 0);
+    const totalOrig   = totalNeed + totalMade; // original demand for today
+    const totalNeedP  = items.reduce((s, d) => s + d.needBatches * getBatchSize(d.sku), 0);
+    const totalMadeP  = items.reduce((s, d) => s + d.madeBatches * getBatchSize(d.sku), 0);
+    const totalOrigP  = totalNeedP + totalMadeP;
+    const isOver      = totalOrig > capacity;
+    const spare       = capacity - totalOrig;
+
+    // Status badge — pretzel-based
     let badgeClass, badgeText;
-    if (needed === 0) {
+    if (totalOrig === 0) {
       badgeClass = 'badge-none'; badgeText = 'No orders';
-    } else if (doneTotal === 0) {
+    } else if (totalMade === 0) {
       badgeClass = 'badge-none'; badgeText = 'Not started';
-    } else if (doneTotal > needed) {
-      badgeClass = 'badge-over'; badgeText = `✅ Done +${doneTotal - needed}`;
-    } else if (doneTotal >= needed) {
+    } else if (totalMade > totalOrig) {
+      badgeClass = 'badge-over'; badgeText = `✅ Done +${totalMadeP - totalOrigP}`;
+    } else if (totalMade >= totalOrig) {
       badgeClass = 'badge-done'; badgeText = '✅ Done';
     } else {
-      badgeClass = 'badge-partial'; badgeText = `⏳ ${doneTotal}/${needed}`;
+      badgeClass = 'badge-partial'; badgeText = `⏳ ${totalMadeP}/${totalOrigP}`;
     }
 
     // Delivery dates context for header
@@ -1096,7 +1172,7 @@
       <div class="workers-row">
         <div>
           <span class="workers-label">Workers</span>
-          <span class="workers-sub">${capacity} batch capacity</span>
+          <span class="workers-sub">${capacity} batch capacity (${capacity * 100}+ pretzels/day)</span>
         </div>
         <div class="stepper-inline">
           <button class="stepper-btn" data-worker-dec data-type="${esc(type)}" data-date="${esc(dateStr)}">−</button>
@@ -1105,27 +1181,60 @@
         </div>
       </div>`;
 
-    // SKU rows — render function handles BFP coating split
-    const renderRows = rows => rows.map(d => {
-      const inv     = inventory[d.sku] || 0;
-      const bs      = getBatchSize(d.sku); // use runtime batch size (BATCH_SIZES + skuConfig)
-      const caseSize = CASE_SIZES[d.sku];
-      const caseStr  = caseSize ? ` · ${Math.ceil(d.batches * bs / caseSize)} cases` : '';
-      const urgTag   = d.isOverdue
-        ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue — do today</span>`
+    // SKU block — pretzel display + inline stepper
+    const renderBlock = d => {
+      const bs        = getBatchSize(d.sku);
+      const dough     = fullInv.coldFerment[d.sku] || 0;
+      const frozen    = fullInv.frozen[d.sku]      || 0;
+      const origP     = (d.needBatches + d.madeBatches) * bs;
+      const madeP     = d.madeBatches * bs;
+      const tagHtml   = d.isOverdue
+        ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue</span>`
         : d.urgent
         ? `<span class="sku-tag sku-tag-urgent">🔴 Must do today</span>`
-        : `<span class="sku-tag sku-tag-ahead">🟡 Pulling ahead</span>`;
-      const delivStr = d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ');
-      return `<div class="sku-row">
-        <span class="sku-name">${esc(d.sku)}</span>
-        ${urgTag}
-        <span class="sku-detail"><strong>${d.batches} batch${d.batches !== 1 ? 'es' : ''}</strong> — ${d.batches * bs} units${esc(caseStr)}</span>
-        <span class="sku-delivery">For ${esc(delivStr)} delivery</span>
-        ${inv > 0 ? `<span class="inv-badge">✓ ${inv} on hand</span>` : ''}
-        <span class="sku-customers">${d.orders.map(esc).join(' · ')}</span>
+        : d.needBatches > 0
+        ? `<span class="sku-tag sku-tag-ahead">🟡 Pulling ahead</span>`
+        : `<span class="sku-tag sku-tag-ahead" style="background:#e8f5e8;color:var(--green)">✅ Done</span>`;
+      const delivStr = d.deliveryDates.length > 0
+        ? d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ')
+        : 'Logged today';
+      const custStr  = d.orders.length > 0 ? d.orders.map(esc).join(' · ') : '';
+      const isDone   = madeP >= origP && origP > 0;
+      const isOverLog = madeP > origP;
+      const loggerClass = isOverLog ? 'over' : isDone ? 'done' : '';
+      const loggerStatus = isOverLog
+        ? `<span class="row-log-status over">+${madeP - origP}</span>`
+        : isDone
+        ? `<span class="row-log-status done">✅</span>`
+        : `<span class="row-log-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
+      const stepperKey = `${type}|${dateStr}|${d.sku}`;
+
+      return `<div class="sku-block">
+        <div class="sku-block-head">
+          <span class="sku-block-name">${esc(d.sku)}</span>
+          ${tagHtml}
+        </div>
+        ${origP > 0
+          ? `<div class="sku-block-need"><strong>${origP}</strong> pretzels needed today <span style="color:var(--gray-3);font-weight:600">(${d.needBatches + d.madeBatches} batch${(d.needBatches + d.madeBatches) !== 1 ? 'es' : ''} of ${bs})</span></div>`
+          : ''}
+        <div class="sku-block-meta">For ${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
+        <div class="sku-block-onhand">
+          <span class="ohi ${dough > 0 ? '' : 'zero'}">🧊 ${dough} dough</span>
+          <span class="ohi ${frozen > 0 ? '' : 'zero'}">❄️ ${frozen} frozen</span>
+        </div>
+        <div class="row-logger ${loggerClass}">
+          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" ${madeP <= 0 ? 'disabled' : ''}>−</button>
+          <div class="row-log-display">
+            <div class="row-log-count" id="rlc-${esc(type)}-${esc(d.sku)}">
+              <strong>${madeP}</strong><span class="of"> / ${origP}</span>
+            </div>
+            <div class="row-log-label">made today</div>
+          </div>
+          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1">+</button>
+          ${loggerStatus}
+        </div>
       </div>`;
-    }).join('');
+    };
 
     let skuHtml = '';
     if (items.length === 0) {
@@ -1133,30 +1242,30 @@
     } else if (isBFP) {
       const coating  = items.filter(d => isCoating(d.sku));
       const standard = items.filter(d => !isCoating(d.sku));
-      if (standard.length > 0) { skuHtml += coating.length > 0 ? `<div class="group-label">Standard</div>` : ''; skuHtml += renderRows(standard); }
-      if (coating.length > 0)  { skuHtml += `<div class="group-label">+ Coating step</div>${renderRows(coating)}`; }
+      if (standard.length > 0) { skuHtml += coating.length > 0 ? `<div class="group-label">Standard</div>` : ''; skuHtml += standard.map(renderBlock).join(''); }
+      if (coating.length > 0)  { skuHtml += `<div class="group-label">+ Coating step</div>${coating.map(renderBlock).join('')}`; }
     } else {
-      skuHtml = renderRows(items);
+      skuHtml = items.map(renderBlock).join('');
     }
 
-    // Batch total
-    const batchTotalHtml = needed > 0 ? `
+    // Total panel — pretzel-based
+    const totalHtml = totalOrig > 0 ? `
       <div class="batch-total ${isOver ? 'over' : 'ok'}">
         <div class="batch-total-left">
-          <span class="batch-total-num">${needed}</span>
-          <span class="batch-total-lbl">batch${needed !== 1 ? 'es' : ''} today</span>
+          <span class="batch-total-num">${totalOrigP}</span>
+          <span class="batch-total-lbl">pretzels today (${totalOrig} batch${totalOrig !== 1 ? 'es' : ''})</span>
         </div>
         <div style="text-align:right">
           <span class="batch-status ${isOver ? 'status-over' : 'status-ok'}">
-            ${isOver ? `🔴 +${needed - capacity} over` : `✅ ${spare} spare`}
+            ${isOver ? `🔴 +${totalOrig - capacity} over` : `✅ ${spare} spare`}
           </span>
-          <div class="workers-cap">${workers} worker${workers !== 1 ? 's' : ''} · ${capacity} cap</div>
+          <div class="workers-cap">${workers} worker${workers !== 1 ? 's' : ''} · ${capacity} batch cap</div>
         </div>
       </div>` : '';
 
-    // Spare-capacity hint — explain why there's spare (window constraint, not workers)
+    // Spare-capacity hint
     let spareHint = '';
-    if (needed > 0 && !isOver && spare >= 4) {
+    if (totalOrig > 0 && !isOver && spare >= 4) {
       const tomorrowStr = toDateStr(addDays(parseDate(dateStr), 1));
       const tomorrowItems = schedule[type][tomorrowStr] || [];
       const tomorrowTotal = tomorrowItems.reduce((s, d) => s + d.batches, 0);
@@ -1167,40 +1276,12 @@
       }
     }
 
-    // Inventory is now in the Stock tab — no inline strip needed
-
-    // Completed strip
-    let completedHtml = '';
-    if (doneTotal > 0) {
-      const timeStr = dayState[timeKey]
-        ? new Date(dayState[timeKey]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : '';
-      const delta = doneTotal - needed;
-      const progressHtml = needed > 0
-        ? (delta >= 0
-          ? `<span class="progress-done">✅ Done${delta > 0 ? ` (+${delta})` : '!'}</span>`
-          : `<span class="progress-short">⚠️ ${Math.abs(delta)} short</span>`)
-        : '';
-      const pills = completed.map(c => `<span class="completed-pill">${esc(c.sku)} ×${c.batches}</span>`).join('');
-      completedHtml = `
-        <div class="completed-strip">
-          <div class="completed-strip-header">
-            <span class="completed-strip-lbl">Logged${timeStr ? ` at ${timeStr}` : ''} — ${doneTotal} batch${doneTotal !== 1 ? 'es' : ''}</span>
-            ${progressHtml}
-          </div>
-          <div class="completed-pills">${pills}</div>
-        </div>`;
-    }
-
     // FOH note (shape card only, once)
     const fohHtml = (!isBFP && schedule.foh.length > 0)
       ? `<div class="foh-note">FOH only (not scheduled): ${schedule.foh.map(esc).join(', ')}</div>` : '';
 
-    // Buttons
-    const logBtnClass = (doneTotal >= needed && needed > 0) ? 'log-btn logged' : 'log-btn';
-    const logBtnText  = (doneTotal >= needed && needed > 0) ? '✅ Log More' : 'Log Completions';
-    const logBtnHtml  = `<button class="${logBtnClass}" data-log-btn data-type="${esc(type)}" data-date="${esc(dateStr)}">${logBtnText}</button>
-      <button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}">+ Add Unscheduled Batch</button>`;
+    // Only the "+ Add Unscheduled Batch" button remains — log completions are inline now
+    const extraBtnHtml = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">+ Add Unscheduled Batch</button>`;
 
     return `<div class="team-card">
       <div class="team-header">
@@ -1213,11 +1294,10 @@
       <div class="team-body">
         ${workersHtml}
         ${skuHtml}
-        ${batchTotalHtml}
+        ${totalHtml}
         ${spareHint}
-        ${completedHtml}
         ${fohHtml}
-        ${logBtnHtml}
+        ${extraBtnHtml}
       </div>
     </div>`;
   }
@@ -1334,6 +1414,126 @@
     } catch (e) {
       alert('Error saving: ' + e.message);
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Stock Count'; }
+    }
+  }
+
+  // ─── INLINE LOGGER (TAP +/- ON SKU ROW) ───────────────────────────────────
+  // Each tap optimistically updates local state; a debounced timer pushes the
+  // delta to the production log so rapid taps coalesce into one network call.
+
+  function getMadePretzels(type, dateStr, sku) {
+    // Returns the pretzel count currently logged today for this SKU
+    const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const arr = (productionState[dateStr] || {})[doneKey] || [];
+    const c = arr.find(x => x.sku === sku);
+    const batches = c ? Number(c.batches) || 0 : 0;
+    return batches * getBatchSize(sku);
+  }
+
+  function getCurrentPretzels(type, dateStr, sku) {
+    // Local state takes priority; falls back to server state
+    return loggedPretzels[type]?.[dateStr]?.[sku]
+      ?? getMadePretzels(type, dateStr, sku);
+  }
+
+  function getLastSavedPretzels(type, dateStr, sku) {
+    return lastSavedPretzels[type]?.[dateStr]?.[sku]
+      ?? getMadePretzels(type, dateStr, sku);
+  }
+
+  function setLocalLog(type, dateStr, sku, pretzels) {
+    if (!loggedPretzels[type])           loggedPretzels[type] = {};
+    if (!loggedPretzels[type][dateStr])  loggedPretzels[type][dateStr] = {};
+    loggedPretzels[type][dateStr][sku] = Math.max(0, pretzels);
+  }
+
+  function bumpStepper(type, dateStr, sku, deltaBatches) {
+    const bs = getBatchSize(sku);
+    if (!bs) return;
+    const cur  = getCurrentPretzels(type, dateStr, sku);
+    const next = Math.max(0, cur + (deltaBatches * bs));
+    if (next === cur) return;
+    setLocalLog(type, dateStr, sku, next);
+    updateStepperDom(type, dateStr, sku, next);
+    scheduleSave(type, dateStr, sku);
+  }
+
+  function updateStepperDom(type, dateStr, sku) {
+    const cur = getCurrentPretzels(type, dateStr, sku);
+    const bs  = getBatchSize(sku);
+    // Need to know total need for display; pull from current schedule + completions
+    const items = schedule[type][dateStr] || [];
+    const sched = items.find(i => i.sku === sku);
+    const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const completedRow = ((productionState[dateStr] || {})[doneKey] || []).find(c => c.sku === sku);
+    const schedBatches = sched ? sched.batches : 0;
+    const madeBatches  = completedRow ? (Number(completedRow.batches) || 0) : 0;
+    const origP = (schedBatches + madeBatches) * bs;
+    const countEl = document.getElementById(`rlc-${type}-${sku}`);
+    if (countEl) {
+      countEl.innerHTML = `<strong>${cur}</strong><span class="of"> / ${origP}</span>`;
+    }
+    // Decrement button disabled when at zero
+    const decBtns = document.querySelectorAll(`[data-log-step][data-key="${type}|${dateStr}|${sku}"][data-delta="-1"]`);
+    decBtns.forEach(b => { b.disabled = cur <= 0; });
+    // Status indicator
+    const statusEl = document.getElementById(`rls-${type}-${sku}`);
+    if (statusEl) {
+      if (cur > origP) {
+        statusEl.className = 'row-log-status over';
+        statusEl.textContent = `+${cur - origP}`;
+      } else if (cur >= origP && origP > 0) {
+        statusEl.className = 'row-log-status done';
+        statusEl.textContent = '✅';
+      } else {
+        statusEl.className = 'row-log-status saving';
+        statusEl.textContent = 'saving…';
+      }
+    }
+  }
+
+  function scheduleSave(type, dateStr, sku) {
+    const key = `${type}|${dateStr}|${sku}`;
+    if (saveTimers[key]) clearTimeout(saveTimers[key]);
+    saveTimers[key] = setTimeout(() => {
+      saveTimers[key] = null;
+      saveStepperDelta(type, dateStr, sku);
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  async function saveStepperDelta(type, dateStr, sku) {
+    const bs = getBatchSize(sku);
+    if (!bs) return;
+    const curP   = getCurrentPretzels(type, dateStr, sku);
+    const lastP  = getLastSavedPretzels(type, dateStr, sku);
+    const deltaP = curP - lastP;
+    if (deltaP === 0) return;
+    const deltaBatches = deltaP / bs; // always integer (steps are batch-sized)
+    const statusEl = document.getElementById(`rls-${type}-${sku}`);
+    if (statusEl) { statusEl.className = 'row-log-status saving'; statusEl.textContent = 'saving…'; }
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action:      type === 'shape' ? 'shape_done' : 'bfp_done',
+        date:        dateStr,
+        completions: JSON.stringify([{ sku, batches: deltaBatches }]),
+        workers:     getWorkers(type, dateStr),
+        timeStamp:   new Date().toISOString(),
+      });
+      // Mark this delta as persisted
+      if (!lastSavedPretzels[type])           lastSavedPretzels[type] = {};
+      if (!lastSavedPretzels[type][dateStr])  lastSavedPretzels[type][dateStr] = {};
+      lastSavedPretzels[type][dateStr][sku] = curP;
+      // Reload server state and re-render
+      await loadProduction();
+      schedule = buildOptimalSchedule();
+      // Sync local state with server (server is authoritative now)
+      const newServerP = getMadePretzels(type, dateStr, sku);
+      setLocalLog(type, dateStr, sku, newServerP);
+      lastSavedPretzels[type][dateStr][sku] = newServerP;
+      render();
+    } catch (e) {
+      if (statusEl) { statusEl.className = 'row-log-status error'; statusEl.textContent = 'error'; }
+      console.error('Log save failed:', e);
     }
   }
 
@@ -1507,8 +1707,12 @@
         render();
       });
     });
-    document.querySelectorAll('[data-log-btn]').forEach(btn => {
-      btn.addEventListener('click', () => openLogSheet(btn.dataset.type, btn.dataset.date));
+    document.querySelectorAll('[data-log-step]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [type, dateStr, sku] = btn.dataset.key.split('|');
+        const delta = parseInt(btn.dataset.delta, 10);
+        bumpStepper(type, dateStr, sku, delta);
+      });
     });
     document.querySelectorAll('[data-extra-btn]').forEach(btn => {
       btn.addEventListener('click', () => openExtraSheet(btn.dataset.type, btn.dataset.date));
@@ -1525,115 +1729,6 @@
         render();
       });
     });
-  }
-
-  // ─── LOG COMPLETIONS SHEET ────────────────────────────────────────────────
-
-  function openLogSheet(type, dateStr) {
-    logType    = type;
-    logDate    = dateStr;
-    logWorkers = getWorkers(type, dateStr);
-
-    const items    = schedule[type][dateStr] || [];
-    const dayState = productionState[dateStr] || {};
-    const doneKey  = type === 'shape' ? 'shapeDone' : 'bfpDone';
-    const prevDone = dayState[doneKey] || [];
-
-    // Pre-fill with scheduled amounts so workers confirm (or adjust) what they made
-    logItems = items.map(d => ({ sku: d.sku, demand: d.batches, value: d.batches }));
-
-    document.getElementById('log-title').textContent =
-      type === 'shape' ? 'Shape & Cold Ferment' : 'Bake · Freeze · Pack';
-    document.getElementById('log-sub').textContent =
-      `${dateStr}${prevDone.length > 0 ? ' · Adding to previous log' : ''}`;
-
-    renderLogBody();
-    document.getElementById('log-overlay').classList.add('open');
-  }
-
-  function renderLogBody() {
-    const capacity = logWorkers * BATCHES_PER_WORKER;
-    let html = `
-      <div class="sheet-workers-row">
-        <div>
-          <span class="sheet-workers-lbl">Workers</span>
-          <span class="sheet-workers-sub" id="log-cap-lbl">${capacity} batch capacity</span>
-        </div>
-        <div class="stepper-lg">
-          <button class="step-btn" id="log-w-dec">−</button>
-          <span class="step-val" id="log-w-val">${logWorkers}</span>
-          <button class="step-btn" id="log-w-inc">+</button>
-        </div>
-      </div>`;
-
-    html += logItems.map((item, i) => `
-      <div class="log-sku-row">
-        <div class="log-sku-info">
-          <div class="log-sku-name">${esc(item.sku)}</div>
-          <div class="log-sku-demand">Scheduled: ${item.demand} batch${item.demand !== 1 ? 'es' : ''}</div>
-        </div>
-        <div class="stepper-lg">
-          <button class="step-btn" data-ldec="${i}">−</button>
-          <span class="step-val" id="lv-${i}">${item.value}</span>
-          <button class="step-btn" data-linc="${i}">+</button>
-        </div>
-      </div>`).join('');
-
-    document.getElementById('log-body').innerHTML = html;
-
-    document.getElementById('log-w-dec').addEventListener('click', () => {
-      if (logWorkers <= 1) return;
-      logWorkers--;
-      document.getElementById('log-w-val').textContent = logWorkers;
-      document.getElementById('log-cap-lbl').textContent = `${logWorkers * BATCHES_PER_WORKER} batch capacity`;
-    });
-    document.getElementById('log-w-inc').addEventListener('click', () => {
-      logWorkers++;
-      document.getElementById('log-w-val').textContent = logWorkers;
-      document.getElementById('log-cap-lbl').textContent = `${logWorkers * BATCHES_PER_WORKER} batch capacity`;
-    });
-    document.querySelectorAll('[data-ldec]').forEach(btn => {
-      const i = parseInt(btn.dataset.ldec, 10);
-      btn.addEventListener('click', () => {
-        if (logItems[i].value <= 0) return;
-        logItems[i].value--;
-        document.getElementById(`lv-${i}`).textContent = logItems[i].value;
-      });
-    });
-    document.querySelectorAll('[data-linc]').forEach(btn => {
-      const i = parseInt(btn.dataset.linc, 10);
-      btn.addEventListener('click', () => {
-        logItems[i].value++;
-        document.getElementById(`lv-${i}`).textContent = logItems[i].value;
-      });
-    });
-  }
-
-  async function saveLog() {
-    const completions = logItems.filter(i => i.value > 0).map(i => ({ sku: i.sku, batches: i.value }));
-    if (!completions.length) { alert('Enter at least one completed batch.'); return; }
-    const summary = completions.map(c => `${c.sku} ×${c.batches}`).join('\n');
-    if (!confirm(`Log completions for ${logDate}?\n\n${summary}`)) return;
-
-    const saveBtn = document.getElementById('log-save');
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
-    try {
-      await appendLog(PRODUCTION_LOG, {
-        action:      logType === 'shape' ? 'shape_done' : 'bfp_done',
-        date:        logDate,
-        completions: JSON.stringify(completions),
-        workers:     logWorkers,
-        timeStamp:   new Date().toISOString(),
-      });
-      saveWorkers(logType, logDate, logWorkers);
-      document.getElementById('log-overlay').classList.remove('open');
-      await loadProduction();
-      schedule = buildOptimalSchedule();
-      render();
-    } catch (e) {
-      saveBtn.disabled = false; saveBtn.textContent = 'Save Completions';
-      alert('Error saving: ' + e.message);
-    }
   }
 
   // ─── EXTRA / UNSCHEDULED BATCH SHEET ─────────────────────────────────────
@@ -1792,15 +1887,6 @@
   document.getElementById('week-toggle').addEventListener('click', () => {
     viewMode = viewMode === 'week' ? 'day' : 'week';
     render();
-  });
-
-  // Log sheet
-  document.getElementById('log-save').addEventListener('click', saveLog);
-  document.getElementById('log-cancel').addEventListener('click', () =>
-    document.getElementById('log-overlay').classList.remove('open'));
-  document.getElementById('log-overlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('log-overlay'))
-      document.getElementById('log-overlay').classList.remove('open');
   });
 
   // Extra sheet
