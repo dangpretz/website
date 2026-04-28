@@ -660,7 +660,7 @@
     ...Object.keys(skuConfig).filter(s => !isFOH(s) && getBatchSize(s) > 0),
   ])];
 
-  const BATCHES_PER_WORKER  = 6;   // soft cap per worker per shift
+  const BATCHES_PER_WORKER  = 5;   // batches per worker per day (cap)
   const SHAPE_MIN_LEAD      = 2;   // shape must happen at least N days before delivery
   const SHAPE_MAX_LEAD      = 7;   // shape can happen up to N days before delivery
   const BFP_MIN_LEAD        = 1;   // BFP must happen at least N days before delivery
@@ -1217,7 +1217,7 @@
       <div class="workers-row">
         <div>
           <span class="workers-label">Workers</span>
-          <span class="workers-sub">${capacity} batch capacity (${capacity * 100}+ pretzels/day)</span>
+          <span class="workers-sub">${capacity} batch capacity</span>
         </div>
         <div class="stepper-inline">
           <button class="stepper-btn" data-worker-dec data-type="${esc(type)}" data-date="${esc(dateStr)}">−</button>
