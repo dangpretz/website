@@ -556,6 +556,13 @@
         </label>
         <input type="number" id="cfg-tray-size" min="0"
           placeholder="e.g. 9"
+          style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:14px">
+
+        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:6px">
+          Pretzels per case <span style="font-weight:400;color:var(--gray-3)">(BFP wholesale unit, optional)</span>
+        </label>
+        <input type="number" id="cfg-case-size" min="0"
+          placeholder="e.g. 52"
           style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:20px">
 
         <div style="font:700 14px 'Manrope',sans-serif;color:var(--dark);margin-bottom:10px">Production type</div>
@@ -602,18 +609,21 @@
     'bees bats':            72,
   };
 
-  // Units per case — ⚠️ SET TO 0 UNTIL CONFIRMED
+  // Pretzels per case — wholesale shipping unit. Per-SKU override via skuConfig.
   const CASE_SIZES = {
-    '21oz mammoth pretzel': 0,  // ← update
-    '10oz mustache':        0,  // ← update
-    '10oz plain':           0,  // ← update
-    '10oz bbk':             0,  // ← update
-    '10oz spicy bee':       0,  // ← update
-    '6.5oz plain':          0,  // ← update
-    '6.5oz bbk':            0,  // ← update
-    '6.5oz spicy bee':      0,  // ← update
-    'plain bombs':          0,  // ← update
-    'bees bats':            0,  // ← update
+    '21oz mammoth pretzel': 25,
+    '10oz mustache':        48,
+    '10oz plain':           48,
+    '10oz bbk':             48,
+    '10oz spicy bee':       48,
+    '6.5oz plain':          72,
+    '6.5oz bbk':            72,
+    '6.5oz spicy bee':      72,
+    '4oz twist plain':      52,
+    '4oz twist bbk':        52,
+    '4oz twist spicy bee':  52,
+    'plain bombs':          0,  // unknown
+    'bees bats':            0,  // unknown
   };
 
   const FOH_SKUS = new Set([
@@ -630,6 +640,7 @@
 
   const getBatchSize    = sku => (skuConfig[sku]?.batchSize > 0 ? skuConfig[sku].batchSize : 0) || BATCH_SIZES[sku] || 0;
   const getTraySize     = sku => skuConfig[sku]?.traySize > 0 ? skuConfig[sku].traySize : 0;
+  const getCaseSize     = sku => (skuConfig[sku]?.caseSize > 0 ? skuConfig[sku].caseSize : 0) || CASE_SIZES[sku] || 0;
   const isFOH           = sku => skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has(sku.toLowerCase()) || FOH_SKUS.has(sku);
   const isCoating       = sku => skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku);
 
@@ -746,8 +757,9 @@
       if (action === 'sku_config') {
         if (row.sku) skuConfig[row.sku] = {
           batchSize: Number(row.batchSize) || 0,
-          traySize: Number(row.traySize)  || 0,
-          type:     row.type || 'standard',
+          traySize:  Number(row.traySize)  || 0,
+          caseSize:  Number(row.caseSize)  || 0,
+          type:      row.type || 'standard',
         };
         return;
       }
@@ -1214,16 +1226,22 @@
         </div>
       </div>`;
 
-    // SKU block — pretzel display + inline typeable logger
+    // SKU block — team-aware display:
+    //   Shape leads with batches (workers think in batches)
+    //   BFP leads with pretzels + cases (wholesale shipping unit)
     const renderBlock = d => {
       const bs        = getBatchSize(d.sku);
+      const cs        = getCaseSize(d.sku);
       const stepDelta = getStepDelta(type, d.sku);
       const dough     = fullInv.coldFerment[d.sku] || 0;
       const frozen    = fullInv.frozen[d.sku]      || 0;
       const totalBatches = d.needBatches + d.madeBatches;
       const origP     = totalBatches * bs;
       const madeP     = Math.round(d.madeBatches * bs);
-      const tagHtml   = d.isOverdue
+      const origCases = cs > 0 ? Math.ceil(origP / cs) : 0;
+      const madeCases = cs > 0 ? Math.ceil(madeP / cs) : 0;
+
+      const tagHtml = d.isOverdue
         ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue</span>`
         : d.urgent
         ? `<span class="sku-tag sku-tag-urgent">🔴 Must do today</span>`
@@ -1247,14 +1265,40 @@
         ? `tray of ${stepDelta}`
         : `batch of ${bs}`;
 
+      // "Need today" line — team-specific lead
+      let needLineHtml = '';
+      if (origP > 0) {
+        if (type === 'shape') {
+          // Shape: batches first, pretzels in parens
+          needLineHtml = `<div class="sku-block-need">
+            <strong>${totalBatches}</strong> ${totalBatches !== 1 ? 'batches' : 'batch'} needed today
+            <span style="color:var(--gray-3);font-weight:600">(${origP} pretzels)</span>
+          </div>`;
+        } else {
+          // BFP: pretzels first, cases + batches in parens
+          const caseStr = origCases > 0 ? ` · ~${origCases} ${origCases !== 1 ? 'cases' : 'case'} of ${cs}` : '';
+          needLineHtml = `<div class="sku-block-need">
+            <strong>${origP}</strong> pretzels needed today
+            <span style="color:var(--gray-3);font-weight:600">(${totalBatches} ${totalBatches !== 1 ? 'batches' : 'batch'}${caseStr})</span>
+          </div>`;
+        }
+      }
+
+      // "Made today" sublabel — team-specific
+      let madeSubLabel = '';
+      if (type === 'shape') {
+        madeSubLabel = `${d.madeBatches} of ${totalBatches} ${totalBatches !== 1 ? 'batches' : 'batch'} · +/- = ${stepUnit}`;
+      } else {
+        const casePart = origCases > 0 ? `~${madeCases} of ~${origCases} ${origCases !== 1 ? 'cases' : 'case'} · ` : '';
+        madeSubLabel = `${casePart}+/- = ${stepUnit}`;
+      }
+
       return `<div class="sku-block">
         <div class="sku-block-head">
           <span class="sku-block-name">${esc(d.sku)}</span>
           ${tagHtml}
         </div>
-        ${origP > 0
-          ? `<div class="sku-block-need"><strong>${origP}</strong> pretzels needed today <span style="color:var(--gray-3);font-weight:600">(${totalBatches} ${totalBatches !== 1 ? 'batches' : 'batch'} of ${bs})</span></div>`
-          : ''}
+        ${needLineHtml}
         <div class="sku-block-meta">For ${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
         <div class="sku-block-onhand">
           <span class="ohi ${dough > 0 ? '' : 'zero'}">🧊 ${dough} dough</span>
@@ -1270,7 +1314,7 @@
                      id="rli-${esc(type)}-${esc(d.sku)}">
               <span class="row-log-of">/ ${origP}</span>
             </div>
-            <div class="row-log-label">pretzels made today · +/- = ${stepUnit}</div>
+            <div class="row-log-label">pretzels made today · ${madeSubLabel}</div>
           </div>
           <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1" title="+1 ${stepUnit}">+</button>
           ${loggerStatus}
@@ -1895,6 +1939,7 @@
     document.getElementById('cfg-sku-display').textContent = sku;
     document.getElementById('cfg-batch-size').value = skuConfig[sku]?.batchSize || '';
     document.getElementById('cfg-tray-size').value  = skuConfig[sku]?.traySize  || '';
+    document.getElementById('cfg-case-size').value  = skuConfig[sku]?.caseSize  || '';
     document.querySelectorAll('.cfg-type-btn').forEach(btn =>
       btn.classList.toggle('selected', btn.dataset.cfgType === cfgType));
 
@@ -1923,10 +1968,12 @@
         const batchSize = parseInt(document.getElementById('cfg-batch-size').value, 10);
         if (!batchSize || batchSize < 1) { alert('Enter a batch size first'); throw new Error('No size'); }
         const traySize = parseInt(document.getElementById('cfg-tray-size').value, 10) || 0;
+        const caseSize = parseInt(document.getElementById('cfg-case-size').value, 10) || 0;
         await appendLog(PRODUCTION_LOG, {
           action: 'sku_config', sku: cfgSku,
           batchSize: String(batchSize),
           traySize:  String(traySize),
+          caseSize:  String(caseSize),
           type: cfgType,
           timeStamp: new Date().toISOString(),
         });
