@@ -489,6 +489,7 @@
   </div>
   <button class="nav-arrow" id="nav-next" aria-label="Next day">›</button>
   <button class="week-toggle" id="week-toggle">Week</button>
+  <button class="week-toggle" id="refresh-btn" aria-label="Refresh data" title="Reload deliveries + production data">↻</button>
 </nav>
 
 <div class="content">
@@ -1350,16 +1351,20 @@
     if (dayTab === 'stock') return renderStockTab();
 
     const type       = dayTab; // 'shape' or 'bfp'
-    const shapeItems = schedule.shape[dateStr] || [];
-    const bfpItems   = schedule.bfp[dateStr]   || [];
+    const dayState   = productionState[dateStr] || {};
+    // A team has activity for the day if it has scheduled items OR logged completions
+    const hasShape = (schedule.shape[dateStr] || []).length > 0
+                  || (dayState.shapeDone || []).length > 0;
+    const hasBfp   = (schedule.bfp[dateStr]   || []).length > 0
+                  || (dayState.bfpDone   || []).length > 0;
 
-    if (shapeItems.length === 0 && bfpItems.length === 0) {
+    if (!hasShape && !hasBfp) {
       return `<div class="no-prod">Nothing scheduled today.<br>
         <span style="font-size:13px;color:var(--gray-3)">All upcoming orders covered, or no deliveries within production windows.</span>
       </div>`;
     }
-    const items = schedule[type][dateStr] || [];
-    if (items.length === 0) {
+    const teamHas = type === 'shape' ? hasShape : hasBfp;
+    if (!teamHas) {
       const other = type === 'shape' ? 'BFP' : 'Shape';
       return `<div class="no-prod" style="padding:32px 20px">Nothing for ${type === 'shape' ? 'Shape' : 'BFP'} today.<br>
         <span style="font-size:13px;color:var(--gray-3)">Check the ${other} tab.</span>
@@ -1535,18 +1540,22 @@
     // Decrement button disabled when at zero
     const decBtns = document.querySelectorAll(`[data-log-step][data-key="${type}|${dateStr}|${sku}"][data-delta="-1"]`);
     decBtns.forEach(b => { b.disabled = cur <= 0; });
-    // Status indicator
+    // Status indicator — only show "saving…" when a debounced save is pending
     const statusEl = document.getElementById(`rls-${type}-${sku}`);
     if (statusEl) {
+      const isPending = saveTimers[`${type}|${dateStr}|${sku}`] != null;
       if (cur > origP && origP > 0) {
         statusEl.className = 'row-log-status over';
         statusEl.textContent = `+${cur - origP}`;
       } else if (cur >= origP && origP > 0) {
         statusEl.className = 'row-log-status done';
         statusEl.textContent = '✅';
-      } else {
+      } else if (isPending) {
         statusEl.className = 'row-log-status saving';
         statusEl.textContent = 'saving…';
+      } else {
+        statusEl.className = 'row-log-status';
+        statusEl.textContent = '';
       }
     }
   }
@@ -1563,9 +1572,9 @@
   async function saveStepperDelta(type, dateStr, sku) {
     const bs = getBatchSize(sku);
     if (!bs) return;
-    const curP   = getCurrentPretzels(type, dateStr, sku);
+    const sentP  = getCurrentPretzels(type, dateStr, sku); // value AT save time
     const lastP  = getLastSavedPretzels(type, dateStr, sku);
-    const deltaP = curP - lastP;
+    const deltaP = sentP - lastP;
     if (deltaP === 0) return;
     const deltaBatches = deltaP / bs; // fractional OK (typed values may not align to batches)
     const statusEl = document.getElementById(`rls-${type}-${sku}`);
@@ -1578,26 +1587,36 @@
         workers:     getWorkers(type, dateStr),
         timeStamp:   new Date().toISOString(),
       });
-      // Mark this delta as persisted
+      // Always update lastSaved to what we sent — next save's delta is computed
+      // from this baseline regardless of further user input.
       if (!lastSavedPretzels[type])           lastSavedPretzels[type] = {};
       if (!lastSavedPretzels[type][dateStr])  lastSavedPretzels[type][dateStr] = {};
-      lastSavedPretzels[type][dateStr][sku] = curP;
+      lastSavedPretzels[type][dateStr][sku] = sentP;
       // Pull fresh server state and rebuild schedule (so other SKUs reflect changes)
       await loadProduction();
       schedule = buildOptimalSchedule();
-      // Sync local with server post-reload
-      const newServerP = getMadePretzels(type, dateStr, sku);
-      setLocalLog(type, dateStr, sku, newServerP);
-      lastSavedPretzels[type][dateStr][sku] = newServerP;
-      // If the user is mid-typing in some input, skip full re-render to preserve focus.
-      // The current SKU's stepper will reflect the saved value via updateStepperDom.
+      // Only sync local with server if user hasn't typed since save started.
+      // If they have, leave their in-progress value alone — next debounced save
+      // will compute the delta against the now-up-to-date lastSaved (sentP).
+      const localNow   = loggedPretzels[type]?.[dateStr]?.[sku];
+      const userQuiet  = localNow === sentP;
+      if (userQuiet) {
+        const newServerP = getMadePretzels(type, dateStr, sku);
+        setLocalLog(type, dateStr, sku, newServerP);
+        lastSavedPretzels[type][dateStr][sku] = newServerP;
+      }
+      // If the user is mid-typing, skip full re-render to preserve focus.
       const activeIsLogInput = document.activeElement?.matches?.('[data-log-input]');
       if (activeIsLogInput) {
         updateStepperDom(type, dateStr, sku, /* skipInput */ document.activeElement?.id === `rli-${type}-${sku}`);
       } else {
         render();
       }
-      if (statusEl) { statusEl.className = 'row-log-status saved'; statusEl.textContent = '✓'; setTimeout(() => updateStepperDom(type, dateStr, sku), 1500); }
+      if (statusEl) {
+        statusEl.className = 'row-log-status saved';
+        statusEl.textContent = '✓';
+        setTimeout(() => updateStepperDom(type, dateStr, sku), 1500);
+      }
     } catch (e) {
       if (statusEl) { statusEl.className = 'row-log-status error'; statusEl.textContent = 'error'; }
       console.error('Log save failed:', e);
@@ -1966,6 +1985,17 @@
   document.getElementById('week-toggle').addEventListener('click', () => {
     viewMode = viewMode === 'week' ? 'day' : 'week';
     render();
+  });
+  document.getElementById('refresh-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus()]);
+      schedule = buildOptimalSchedule();
+      render();
+    } finally {
+      btn.disabled = false; btn.textContent = '↻';
+    }
   });
 
   // Extra sheet
