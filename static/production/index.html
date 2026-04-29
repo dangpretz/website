@@ -517,6 +517,7 @@
   </div>
   <button class="nav-arrow" id="nav-next" aria-label="Next day">›</button>
   <button class="week-toggle" id="week-toggle">Week</button>
+  <button class="week-toggle" id="lang-btn" aria-label="Switch language">EN</button>
   <button class="week-toggle" id="refresh-btn" aria-label="Refresh data" title="Reload deliveries + production data">↻</button>
 </nav>
 
@@ -541,7 +542,7 @@
     <div class="sheet-body" style="padding:20px">
       <select class="extra-sku-select" id="extra-sku-select"></select>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
-        <span style="font:700 16px 'Manrope',sans-serif;color:var(--dark)">Batches</span>
+        <span id="extra-batches-lbl" style="font:700 16px 'Manrope',sans-serif;color:var(--dark)">Batches</span>
         <div class="stepper-lg">
           <button class="step-btn" id="extra-dec">−</button>
           <span class="step-val" id="extra-val">1</span>
@@ -562,48 +563,48 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <div class="sheet-title">Configure SKU</div>
+      <div class="sheet-title" id="cfg-title-text">Configure SKU</div>
       <div class="sheet-sub" id="cfg-sku-display"></div>
     </div>
     <div class="sheet-body" style="padding:20px 20px 4px">
       <div id="cfg-mode-bar" style="display:flex;background:var(--gray-1);border-radius:10px;padding:3px;gap:3px;margin-bottom:16px">
-        <button class="cfg-mode-btn active" data-cfg-mode="config" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:var(--white);font:700 13px 'Manrope',sans-serif;color:var(--dark);box-shadow:0 1px 4px rgba(0,0,0,0.10);cursor:pointer">New SKU</button>
-        <button class="cfg-mode-btn" data-cfg-mode="alias" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:none;font:700 13px 'Manrope',sans-serif;color:var(--gray-4);cursor:pointer">Map to existing</button>
+        <button class="cfg-mode-btn active" data-cfg-mode="config" id="cfg-newtab" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:var(--white);font:700 13px 'Manrope',sans-serif;color:var(--dark);box-shadow:0 1px 4px rgba(0,0,0,0.10);cursor:pointer">New SKU</button>
+        <button class="cfg-mode-btn" data-cfg-mode="alias" id="cfg-aliastab" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:none;font:700 13px 'Manrope',sans-serif;color:var(--gray-4);cursor:pointer">Map to existing</button>
       </div>
 
       <div id="cfg-config-panel">
-        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
+        <label id="cfg-lbl-batch" style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
           Pretzels per batch
         </label>
         <input type="number" id="cfg-batch-size" min="1"
           placeholder="e.g. 48"
           style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:14px">
 
-        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:6px">
+        <label id="cfg-lbl-tray" style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:6px">
           Pretzels per tray <span style="font-weight:400;color:var(--gray-3)">(BFP step size, optional)</span>
         </label>
         <input type="number" id="cfg-tray-size" min="0"
           placeholder="e.g. 9"
           style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:14px">
 
-        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:6px">
+        <label id="cfg-lbl-case" style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:6px">
           Pretzels per case <span style="font-weight:400;color:var(--gray-3)">(BFP wholesale unit, optional)</span>
         </label>
         <input type="number" id="cfg-case-size" min="0"
           placeholder="e.g. 52"
           style="width:100%;padding:14px;border:1.5px solid var(--gray-2);border-radius:10px;margin-bottom:20px">
 
-        <div style="font:700 14px 'Manrope',sans-serif;color:var(--dark);margin-bottom:10px">Production type</div>
-        <button class="cfg-type-btn selected" data-cfg-type="standard">Standard pretzel</button>
-        <button class="cfg-type-btn" data-cfg-type="coating">+ Coating step (BBK / Spicy Bee)</button>
-        <button class="cfg-type-btn" data-cfg-type="foh">Front of house only — don't schedule</button>
+        <div id="cfg-lbl-type" style="font:700 14px 'Manrope',sans-serif;color:var(--dark);margin-bottom:10px">Production type</div>
+        <button class="cfg-type-btn selected" data-cfg-type="standard" id="cfg-btn-std">Standard pretzel</button>
+        <button class="cfg-type-btn" data-cfg-type="coating" id="cfg-btn-coat">+ Coating step (BBK / Spicy Bee)</button>
+        <button class="cfg-type-btn" data-cfg-type="foh" id="cfg-btn-foh">Front of house only — don't schedule</button>
       </div>
 
       <div id="cfg-alias-panel" style="display:none">
-        <p style="font:400 13px 'Manrope',sans-serif;color:var(--gray-4);margin-bottom:12px">
+        <p id="cfg-alias-help" style="font:400 13px 'Manrope',sans-serif;color:var(--gray-4);margin-bottom:12px">
           Map this SKU name to an existing canonical SKU. All deliveries using this name will be redirected.
         </p>
-        <label style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
+        <label id="cfg-alias-lbl" style="font:700 14px 'Manrope',sans-serif;color:var(--dark);display:block;margin-bottom:8px">
           Map to canonical SKU
         </label>
         <select id="cfg-alias-target" class="extra-sku-select" style="margin-bottom:8px"></select>
@@ -709,14 +710,259 @@
   let viewMode        = 'day';
 
   let extraType = null, extraDate = null, extraValue = 1;
+
+  // ─── i18n ─────────────────────────────────────────────────────────────────
+  // Language source of truth: ?lang= URL param > localStorage > browser locale > 'en'
+  const _langParam = new URLSearchParams(window.location.search).get('lang');
+  const _langStored = (() => { try { return localStorage.getItem('prod-lang'); } catch { return null; } })();
+  const _langBrowser = (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+  let appLang = ['en','es'].includes(_langParam) ? _langParam
+              : ['en','es'].includes(_langStored) ? _langStored
+              : _langBrowser;
+
+  const I18N = {
+    en: {
+      // Tabs / titles
+      shape_card:     'Shape & Cold Ferment',
+      bfp_card:       'Bake · Freeze · Pack',
+      shape_tab:      'Shape',
+      bfp_tab:        'BFP',
+      stock_tab:      'Stock',
+      // Status
+      must_do_today:  '🔴 Must do today',
+      pulling_ahead:  '🟡 Pulling ahead',
+      overdue:        '🚨 Overdue',
+      overdue_today:  '🚨 Overdue — do today',
+      done:           '✅ Done',
+      not_started:    'Not started',
+      no_orders:      'No orders',
+      // Workers
+      workers:        'Workers',
+      batch_capacity: ({n}) => `${n} batch capacity`,
+      worker_cap:     ({w, c}) => `${w} worker${w !== 1 ? 's' : ''} · ${c} batch cap`,
+      // Production
+      pretzels_today: ({p, b, bs, hasCases, cases, cs}) =>
+        `<strong>${p}</strong> pretzels needed today <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'batches' : 'batch'} of ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cases' : 'case'} of ${cs}` : ''})</span>`,
+      batches_today_lead: ({b, p}) =>
+        `<strong>${b}</strong> ${b !== 1 ? 'batches' : 'batch'} needed today <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
+      pretzels_made:  'pretzels made today',
+      total_today_pretzels: ({p, b}) => `${p} pretzels today (${b} batch${b !== 1 ? 'es' : ''})`,
+      total_today_batches:  ({b, p}) => `${b} batches today (${p} pretzels)`,
+      total_pretzels_label: ({b}) => `pretzels today (${b} batch${b !== 1 ? 'es' : ''})`,
+      total_batches_label:  ({p}) => `batches today (${p} pretzels)`,
+      spare:          ({n}) => `✅ ${n} spare`,
+      over:           ({n}) => `🔴 +${n} over`,
+      for_delivery:   ({date}) => `For ${date}`,
+      logged_today:   'Logged today',
+      // Inventory
+      dough_label:    'dough',
+      frozen_label:   'frozen',
+      tray_of:        ({n}) => `tray of ${n}`,
+      batch_of:       ({n}) => `batch of ${n}`,
+      made_sub_shape: ({made, total, b, unit}) => `${made} of ${total} ${total !== 1 ? 'batches' : 'batch'} · +/- = ${unit}`,
+      made_sub_bfp:   ({mc, tc, hasCases, unit}) => `${hasCases ? `~${mc} of ~${tc} ${tc !== 1 ? 'cases' : 'case'} · ` : ''}+/- = ${unit}`,
+      // Buttons
+      add_unsched:    '+ Add Unscheduled Batch',
+      save_stock:     'Save Stock Count',
+      save:           'Save',
+      cancel:         'Cancel',
+      // Empty states
+      nothing_today:  'Nothing scheduled today.',
+      all_clear:      'All clear — nothing assigned to you today.',
+      nothing_for:    ({team}) => `Nothing for ${team} today.`,
+      check_other:    ({team}) => `Check the ${team} tab.`,
+      no_prod_extra:  'All upcoming orders covered, or no deliveries within production windows.',
+      // Alerts
+      overdue_title:  ({n}) => `🚨 ${n} overdue — production window${n > 1 ? 's have' : ' has'} closed`,
+      shape_label:    'Shape',
+      bfp_label:      'BFP',
+      new_sku:        ({sku}) => `⚠️ New SKU in orders: <strong>${sku}</strong>`,
+      set_up:         'Set up →',
+      unconfirmed:    ({n}) => `📦 ${n} delivery${n !== 1 ? 'ies' : 'y'} today not yet confirmed — `,
+      go_to_planner:  'Go to planner →',
+      dup_alert:      ({n}) => `⚠️ ${n} possible duplicate delivery${n > 1 ? 's' : ''} — `,
+      review_planner: 'Review →',
+      // Stock tab
+      stock_title:    'Stock Count',
+      last_count:     ({d}) => `Last count: ${d}`,
+      no_count_yet:   'No count saved yet',
+      reduced_for:    ({n}) => ` · ${n} SKU${n > 1 ? 's' : ''} reduced for deliveries since count`,
+      sku_col:        'SKU',
+      dough_col:      '🧊 Dough',
+      frozen_col:     '❄️ Frozen',
+      since_today:    'today',
+      since_yest:     'since yesterday',
+      since_date:     ({d}) => `since ${d}`,
+      delivered:      ({n, w, when}) => `−${n} delivered ${when} (was ${w})`,
+      forecast_window:({n}) => `Next ${n} days`,
+      summary_short:  ({n, p}) => `🔴 ${n} SKU${n !== 1 ? 's' : ''} short — need ${p} more`,
+      summary_surplus:({n, p}) => `🟢 ${n} SKU${n !== 1 ? 's' : ''} covered with surplus (${p} extra)`,
+      summary_none:   ({n}) => `⚪ ${n} SKU${n !== 1 ? 's' : ''} with no upcoming orders`,
+      no_skus_cfg:    'No production SKUs configured.',
+      fc_short:       ({d, p, n, c}) => `🔴 ${d}d need ${p} · stock ${n} · short ${c.text}`,
+      fc_tight:       ({d, p, n, net}) => `🟡 ${d}d need ${p} · stock ${n} · just enough (+${net})`,
+      fc_surplus:     ({d, p, n, c}) => `🟢 ${d}d need ${p} · stock ${n} · surplus +${c.text}`,
+      fc_none:        ({n}) => `⚪ no upcoming orders · stock ${n}`,
+      cases_paren:    ({n, c}) => ` (~${n} ${n !== 1 ? 'cases' : 'case'})`,
+      // Configure SKU
+      cfg_title:      'Configure SKU',
+      cfg_per_batch:  'Pretzels per batch',
+      cfg_per_tray:   'Pretzels per tray',
+      cfg_per_tray_sub: '(BFP step size, optional)',
+      cfg_per_case:   'Pretzels per case',
+      cfg_per_case_sub: '(BFP wholesale unit, optional)',
+      cfg_type:       'Production type',
+      cfg_standard:   'Standard pretzel',
+      cfg_coating:    '+ Coating step (BBK / Spicy Bee)',
+      cfg_foh:        "Front of house only — don't schedule",
+      cfg_new_tab:    'New SKU',
+      cfg_alias_tab:  'Map to existing',
+      cfg_alias_help: 'Map this SKU name to an existing canonical SKU. All deliveries using this name will be redirected.',
+      cfg_alias_label:'Map to canonical SKU',
+      // Add unscheduled
+      extra_title:    'Add Unscheduled Batch',
+      extra_sub:      'Last-minute order or walk-in',
+      extra_batches:  'Batches',
+      extra_save:     'Save Batch',
+      // Week view
+      no_prod_lookahead: ({n}) => `No production scheduled in the next ${n} days.`,
+      this_week:      'This week',
+      next_week:      'Next week',
+      today_label:    'Today',
+      tomorrow_label: 'Tomorrow',
+      yesterday_label:'Yesterday',
+      week_view:      'Week View',
+      next_n_days:    ({n}) => `Next ${n} days`,
+      days_away:      ({n}) => `${n} days away`,
+      days_ago:       ({n}) => `${n} days ago`,
+      no_prod_day:    'no production',
+      // Misc
+      foh_only:       ({list}) => `FOH only (not scheduled): ${list}`,
+      tomorrow_pending:({n}) => `${n} batch${n !== 1 ? 'es' : ''} scheduled tomorrow — earliest item not yet in production window`,
+    },
+    es: {
+      shape_card:     'Formar y fermentar',
+      bfp_card:       'Hornear · Congelar · Empacar',
+      shape_tab:      'Formar',
+      bfp_tab:        'HCE',
+      stock_tab:      'Inventario',
+      must_do_today:  '🔴 Hacer hoy',
+      pulling_ahead:  '🟡 Adelantado',
+      overdue:        '🚨 Atrasado',
+      overdue_today:  '🚨 Atrasado — hacer hoy',
+      done:           '✅ Listo',
+      not_started:    'Sin empezar',
+      no_orders:      'Sin pedidos',
+      workers:        'Trabajadores',
+      batch_capacity: ({n}) => `${n} tandas de capacidad`,
+      worker_cap:     ({w, c}) => `${w} trabajador${w !== 1 ? 'es' : ''} · ${c} tandas máx`,
+      pretzels_today: ({p, b, bs, hasCases, cases, cs}) =>
+        `<strong>${p}</strong> pretzels para hoy <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'tandas' : 'tanda'} de ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cajas' : 'caja'} de ${cs}` : ''})</span>`,
+      batches_today_lead: ({b, p}) =>
+        `<strong>${b}</strong> ${b !== 1 ? 'tandas' : 'tanda'} para hoy <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
+      pretzels_made:  'pretzels hechos hoy',
+      total_today_pretzels: ({p, b}) => `${p} pretzels hoy (${b} ${b !== 1 ? 'tandas' : 'tanda'})`,
+      total_today_batches:  ({b, p}) => `${b} ${b !== 1 ? 'tandas' : 'tanda'} hoy (${p} pretzels)`,
+      total_pretzels_label: ({b}) => `pretzels hoy (${b} ${b !== 1 ? 'tandas' : 'tanda'})`,
+      total_batches_label:  ({p}) => `${p > 1 ? 'tandas' : 'tanda'} hoy (${p} pretzels)`,
+      spare:          ({n}) => `✅ ${n} de sobra`,
+      over:           ({n}) => `🔴 +${n} de más`,
+      for_delivery:   ({date}) => `Para entrega del ${date}`,
+      logged_today:   'Registrado hoy',
+      dough_label:    'masa',
+      frozen_label:   'congelado',
+      tray_of:        ({n}) => `bandeja de ${n}`,
+      batch_of:       ({n}) => `tanda de ${n}`,
+      made_sub_shape: ({made, total, b, unit}) => `${made} de ${total} ${total !== 1 ? 'tandas' : 'tanda'} · +/- = ${unit}`,
+      made_sub_bfp:   ({mc, tc, hasCases, unit}) => `${hasCases ? `~${mc} de ~${tc} ${tc !== 1 ? 'cajas' : 'caja'} · ` : ''}+/- = ${unit}`,
+      add_unsched:    '+ Agregar tanda extra',
+      save_stock:     'Guardar inventario',
+      save:           'Guardar',
+      cancel:         'Cancelar',
+      nothing_today:  'Nada programado hoy.',
+      all_clear:      'Todo listo — nada asignado para hoy.',
+      nothing_for:    ({team}) => `Nada para ${team} hoy.`,
+      check_other:    ({team}) => `Revisa la pestaña de ${team}.`,
+      no_prod_extra:  'Todos los pedidos cubiertos o sin entregas en ventana de producción.',
+      overdue_title:  ({n}) => `🚨 ${n} atrasado${n > 1 ? 's' : ''} — ventana de producción cerrada`,
+      shape_label:    'Formar',
+      bfp_label:      'HCE',
+      new_sku:        ({sku}) => `⚠️ Producto nuevo en pedidos: <strong>${sku}</strong>`,
+      set_up:         'Configurar →',
+      unconfirmed:    ({n}) => `📦 ${n} entrega${n !== 1 ? 's' : ''} sin confirmar — `,
+      go_to_planner:  'Abrir planificador →',
+      dup_alert:      ({n}) => `⚠️ ${n} posible duplicado${n > 1 ? 's' : ''} — `,
+      review_planner: 'Revisar →',
+      stock_title:    'Conteo de inventario',
+      last_count:     ({d}) => `Último conteo: ${d}`,
+      no_count_yet:   'Sin conteo guardado',
+      reduced_for:    ({n}) => ` · ${n} producto${n > 1 ? 's' : ''} reducido${n > 1 ? 's' : ''} por entregas`,
+      sku_col:        'Producto',
+      dough_col:      '🧊 Masa',
+      frozen_col:     '❄️ Congelado',
+      since_today:    'hoy',
+      since_yest:     'desde ayer',
+      since_date:     ({d}) => `desde ${d}`,
+      delivered:      ({n, w, when}) => `−${n} entregados ${when} (eran ${w})`,
+      forecast_window:({n}) => `Próximos ${n} días`,
+      summary_short:  ({n, p}) => `🔴 Faltan ${p} pretzels · ${n} producto${n !== 1 ? 's' : ''}`,
+      summary_surplus:({n, p}) => `🟢 ${n} producto${n !== 1 ? 's' : ''} con sobrante (+${p})`,
+      summary_none:   ({n}) => `⚪ ${n} producto${n !== 1 ? 's' : ''} sin pedidos próximos`,
+      no_skus_cfg:    'Sin productos de producción configurados.',
+      fc_short:       ({d, p, n, c}) => `🔴 ${d}d necesitas ${p} · inv ${n} · faltan ${c.text}`,
+      fc_tight:       ({d, p, n, net}) => `🟡 ${d}d necesitas ${p} · inv ${n} · justo (+${net})`,
+      fc_surplus:     ({d, p, n, c}) => `🟢 ${d}d necesitas ${p} · inv ${n} · sobran +${c.text}`,
+      fc_none:        ({n}) => `⚪ sin pedidos próximos · inv ${n}`,
+      cases_paren:    ({n, c}) => ` (~${n} ${n !== 1 ? 'cajas' : 'caja'})`,
+      cfg_title:      'Configurar producto',
+      cfg_per_batch:  'Pretzels por tanda',
+      cfg_per_tray:   'Pretzels por bandeja',
+      cfg_per_tray_sub: '(tamaño de paso HCE, opcional)',
+      cfg_per_case:   'Pretzels por caja',
+      cfg_per_case_sub: '(unidad mayorista HCE, opcional)',
+      cfg_type:       'Tipo de producción',
+      cfg_standard:   'Pretzel estándar',
+      cfg_coating:    '+ Con cobertura (BBK / Spicy Bee)',
+      cfg_foh:        'Solo mostrador — no programar',
+      cfg_new_tab:    'Producto nuevo',
+      cfg_alias_tab:  'Mapear a existente',
+      cfg_alias_help: 'Mapea este nombre a un producto existente. Las entregas con este nombre se redirigirán.',
+      cfg_alias_label:'Mapear al producto canónico',
+      extra_title:    'Agregar tanda extra',
+      extra_sub:      'Pedido de último momento',
+      extra_batches:  'Tandas',
+      extra_save:     'Guardar tanda',
+      no_prod_lookahead: ({n}) => `Sin producción en los próximos ${n} días.`,
+      this_week:      'Esta semana',
+      next_week:      'Próxima semana',
+      today_label:    'Hoy',
+      tomorrow_label: 'Mañana',
+      yesterday_label:'Ayer',
+      week_view:      'Vista semanal',
+      next_n_days:    ({n}) => `Próximos ${n} días`,
+      days_away:      ({n}) => `en ${n} día${n !== 1 ? 's' : ''}`,
+      days_ago:       ({n}) => `hace ${n} día${n !== 1 ? 's' : ''}`,
+      no_prod_day:    'sin producción',
+      foh_only:       ({list}) => `Solo mostrador (no programado): ${list}`,
+      tomorrow_pending:({n}) => `${n} ${n !== 1 ? 'tandas' : 'tanda'} programada${n !== 1 ? 's' : ''} mañana — fuera de ventana hoy`,
+    },
+  };
+
+  const t = (key, params) => {
+    const entry = (I18N[appLang] && I18N[appLang][key]) ?? I18N.en[key] ?? key;
+    return typeof entry === 'function' ? entry(params || {}) : entry;
+  };
+  const _localeStr = () => appLang === 'es' ? 'es-MX' : 'en-US';
+
   // Role from ?role=shape | ?role=bfp | (default = manager). Used to scope the
   // UI so the dough team and BFP team can't see/edit each other's schedule.
   const _roleParam = new URLSearchParams(window.location.search).get('role');
   const userRole   = _roleParam === 'shape' ? 'shape'
                   : _roleParam === 'bfp'   ? 'bfp'
                   : 'manager';
-  if (userRole === 'shape')    document.title = 'Shape · Production';
-  else if (userRole === 'bfp') document.title = 'BFP · Production';
+  if (userRole === 'shape')      document.title = appLang === 'es' ? 'Formar · Producción' : 'Shape · Production';
+  else if (userRole === 'bfp')   document.title = appLang === 'es' ? 'HCE · Producción'    : 'BFP · Production';
+  else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
 
   // Role badge — small pill in the top nav so the team knows what they're seeing.
   // Manager has no badge (everything is visible).
@@ -748,9 +994,9 @@
   const parseDate   = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
   const addDays     = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
   const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
-  const fmtShort    = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const fmtFull     = d => `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const fmtDay      = d => DAYS[d.getDay()];
+  const fmtShort    = d => d.toLocaleDateString(_localeStr(), { month: 'short', day: 'numeric' });
+  const fmtFull     = d => d.toLocaleDateString(_localeStr(), { weekday: 'short', month: 'short', day: 'numeric' });
+  const fmtDay      = d => d.toLocaleDateString(_localeStr(), { weekday: 'short' });
   const esc         = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // ─── RESOLVE DELIVERIES ───────────────────────────────────────────────────
@@ -1248,7 +1494,7 @@
 
   function renderTeamCard(type, dateStr) {
     const isBFP    = type === 'bfp';
-    const title    = isBFP ? 'Bake · Freeze · Pack' : 'Shape & Cold Ferment';
+    const title    = isBFP ? t('bfp_card') : t('shape_card');
     const dayState = productionState[dateStr] || {};
     const workers  = getWorkers(type, dateStr);
     const capacity = workers * BATCHES_PER_WORKER;
@@ -1306,13 +1552,13 @@
     // Status badge — pretzel-based
     let badgeClass, badgeText;
     if (totalOrig === 0) {
-      badgeClass = 'badge-none'; badgeText = 'No orders';
+      badgeClass = 'badge-none'; badgeText = t('no_orders');
     } else if (totalMade === 0) {
-      badgeClass = 'badge-none'; badgeText = 'Not started';
+      badgeClass = 'badge-none'; badgeText = t('not_started');
     } else if (totalMade > totalOrig) {
-      badgeClass = 'badge-over'; badgeText = `✅ Done +${totalMadeP - totalOrigP}`;
+      badgeClass = 'badge-over'; badgeText = `${t('done')} +${totalMadeP - totalOrigP}`;
     } else if (totalMade >= totalOrig) {
-      badgeClass = 'badge-done'; badgeText = '✅ Done';
+      badgeClass = 'badge-done'; badgeText = t('done');
     } else {
       badgeClass = 'badge-partial'; badgeText = `⏳ ${totalMadeP}/${totalOrigP}`;
     }
@@ -1320,14 +1566,14 @@
     // Delivery dates context for header
     const allDelivDates = [...new Set(items.flatMap(d => d.deliveryDates))].sort();
     const delivContext = allDelivDates.length === 0 ? ''
-      : allDelivDates.map(ds => fmtShort(parseDate(ds))).join(' + ') + ' deliver' + (allDelivDates.length > 1 ? 'ies' : 'y');
+      : t('for_delivery', { date: allDelivDates.map(ds => fmtShort(parseDate(ds))).join(' + ') });
 
     // Workers stepper
     const workersHtml = `
       <div class="workers-row">
         <div>
-          <span class="workers-label">Workers</span>
-          <span class="workers-sub">${capacity} batch capacity</span>
+          <span class="workers-label">${t('workers')}</span>
+          <span class="workers-sub">${t('batch_capacity', { n: capacity })}</span>
         </div>
         <div class="stepper-inline">
           <button class="stepper-btn" data-worker-dec data-type="${esc(type)}" data-date="${esc(dateStr)}">−</button>
@@ -1352,15 +1598,15 @@
       const madeCases = cs > 0 ? Math.ceil(madeP / cs) : 0;
 
       const tagHtml = d.isOverdue
-        ? `<span class="sku-tag sku-tag-urgent">🚨 Overdue</span>`
+        ? `<span class="sku-tag sku-tag-urgent">${t('overdue')}</span>`
         : d.urgent
-        ? `<span class="sku-tag sku-tag-urgent">🔴 Must do today</span>`
+        ? `<span class="sku-tag sku-tag-urgent">${t('must_do_today')}</span>`
         : d.needBatches > 0
-        ? `<span class="sku-tag sku-tag-ahead">🟡 Pulling ahead</span>`
-        : `<span class="sku-tag sku-tag-ahead" style="background:#e8f5e8;color:var(--green)">✅ Done</span>`;
+        ? `<span class="sku-tag sku-tag-ahead">${t('pulling_ahead')}</span>`
+        : `<span class="sku-tag sku-tag-ahead" style="background:#e8f5e8;color:var(--green)">${t('done')}</span>`;
       const delivStr = d.deliveryDates.length > 0
         ? d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ')
-        : 'Logged today';
+        : t('logged_today');
       const custStr  = d.orders.length > 0 ? d.orders.map(esc).join(' · ') : '';
       const isDone   = madeP >= origP && origP > 0;
       const isOverLog = madeP > origP;
@@ -1372,36 +1618,23 @@
         : `<span class="row-log-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
       const stepperKey = `${type}|${dateStr}|${d.sku}`;
       const stepUnit   = type === 'bfp' && getTraySize(d.sku) > 0
-        ? `tray of ${stepDelta}`
-        : `batch of ${bs}`;
+        ? t('tray_of', { n: stepDelta })
+        : t('batch_of', { n: bs });
 
       // "Need today" line — team-specific lead
       let needLineHtml = '';
       if (origP > 0) {
         if (type === 'shape') {
-          // Shape: batches first, pretzels in parens
-          needLineHtml = `<div class="sku-block-need">
-            <strong>${totalBatches}</strong> ${totalBatches !== 1 ? 'batches' : 'batch'} needed today
-            <span style="color:var(--gray-3);font-weight:600">(${origP} pretzels)</span>
-          </div>`;
+          needLineHtml = `<div class="sku-block-need">${t('batches_today_lead', { b: totalBatches, p: origP })}</div>`;
         } else {
-          // BFP: pretzels first, cases + batches in parens
-          const caseStr = origCases > 0 ? ` · ~${origCases} ${origCases !== 1 ? 'cases' : 'case'} of ${cs}` : '';
-          needLineHtml = `<div class="sku-block-need">
-            <strong>${origP}</strong> pretzels needed today
-            <span style="color:var(--gray-3);font-weight:600">(${totalBatches} ${totalBatches !== 1 ? 'batches' : 'batch'}${caseStr})</span>
-          </div>`;
+          needLineHtml = `<div class="sku-block-need">${t('pretzels_today', { p: origP, b: totalBatches, bs, hasCases: origCases > 0, cases: origCases, cs })}</div>`;
         }
       }
 
       // "Made today" sublabel — team-specific
-      let madeSubLabel = '';
-      if (type === 'shape') {
-        madeSubLabel = `${d.madeBatches} of ${totalBatches} ${totalBatches !== 1 ? 'batches' : 'batch'} · +/- = ${stepUnit}`;
-      } else {
-        const casePart = origCases > 0 ? `~${madeCases} of ~${origCases} ${origCases !== 1 ? 'cases' : 'case'} · ` : '';
-        madeSubLabel = `${casePart}+/- = ${stepUnit}`;
-      }
+      const madeSubLabel = type === 'shape'
+        ? t('made_sub_shape', { made: d.madeBatches, total: totalBatches, b: totalBatches, unit: stepUnit })
+        : t('made_sub_bfp',   { mc: madeCases, tc: origCases, hasCases: origCases > 0, unit: stepUnit });
 
       return `<div class="sku-block">
         <div class="sku-block-head">
@@ -1409,10 +1642,10 @@
           ${tagHtml}
         </div>
         ${needLineHtml}
-        <div class="sku-block-meta">For ${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
+        <div class="sku-block-meta">${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
         <div class="sku-block-onhand">
-          <span class="ohi ${dough > 0 ? '' : 'zero'}">🧊 ${dough} dough</span>
-          <span class="ohi ${frozen > 0 ? '' : 'zero'}">❄️ ${frozen} frozen</span>
+          <span class="ohi ${dough > 0 ? '' : 'zero'}">🧊 ${dough} ${t('dough_label')}</span>
+          <span class="ohi ${frozen > 0 ? '' : 'zero'}">❄️ ${frozen} ${t('frozen_label')}</span>
         </div>
         <div class="row-logger ${loggerClass}">
           <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" title="-1 ${stepUnit}" ${madeP <= 0 ? 'disabled' : ''}>−</button>
@@ -1424,7 +1657,7 @@
                      id="rli-${esc(type)}-${esc(d.sku)}">
               <span class="row-log-of">/ ${origP}</span>
             </div>
-            <div class="row-log-label">pretzels made today · ${madeSubLabel}</div>
+            <div class="row-log-label">${t('pretzels_made')} · ${madeSubLabel}</div>
           </div>
           <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1" title="+1 ${stepUnit}">+</button>
           ${loggerStatus}
@@ -1434,12 +1667,14 @@
 
     let skuHtml = '';
     if (items.length === 0) {
-      skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">Nothing scheduled — all orders covered or no upcoming deliveries in range.</div>`;
+      skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">${t('no_prod_extra')}</div>`;
     } else if (isBFP) {
       const coating  = items.filter(d => isCoating(d.sku));
       const standard = items.filter(d => !isCoating(d.sku));
-      if (standard.length > 0) { skuHtml += coating.length > 0 ? `<div class="group-label">Standard</div>` : ''; skuHtml += standard.map(renderBlock).join(''); }
-      if (coating.length > 0)  { skuHtml += `<div class="group-label">+ Coating step</div>${coating.map(renderBlock).join('')}`; }
+      const standardLabel = appLang === 'es' ? 'Estándar' : 'Standard';
+      const coatingLabel  = appLang === 'es' ? '+ Con cobertura' : '+ Coating step';
+      if (standard.length > 0) { skuHtml += coating.length > 0 ? `<div class="group-label">${standardLabel}</div>` : ''; skuHtml += standard.map(renderBlock).join(''); }
+      if (coating.length > 0)  { skuHtml += `<div class="group-label">${coatingLabel}</div>${coating.map(renderBlock).join('')}`; }
     } else {
       skuHtml = items.map(renderBlock).join('');
     }
@@ -1449,13 +1684,13 @@
       <div class="batch-total ${isOver ? 'over' : 'ok'}">
         <div class="batch-total-left">
           <span class="batch-total-num">${totalOrigP}</span>
-          <span class="batch-total-lbl">pretzels today (${totalOrig} batch${totalOrig !== 1 ? 'es' : ''})</span>
+          <span class="batch-total-lbl">${t('total_pretzels_label', { b: totalOrig })}</span>
         </div>
         <div style="text-align:right">
           <span class="batch-status ${isOver ? 'status-over' : 'status-ok'}">
-            ${isOver ? `🔴 +${totalOrig - capacity} over` : `✅ ${spare} spare`}
+            ${isOver ? t('over', { n: totalOrig - capacity }) : t('spare', { n: spare })}
           </span>
-          <div class="workers-cap">${workers} worker${workers !== 1 ? 's' : ''} · ${capacity} batch cap</div>
+          <div class="workers-cap">${t('worker_cap', { w: workers, c: capacity })}</div>
         </div>
       </div>` : '';
 
@@ -1467,17 +1702,17 @@
       const tomorrowTotal = tomorrowItems.reduce((s, d) => s + d.batches, 0);
       if (tomorrowTotal > 0) {
         spareHint = `<div class="foh-note" style="border-top:none;padding-top:6px;margin-top:0">
-          ${tomorrowTotal} batch${tomorrowTotal !== 1 ? 'es' : ''} scheduled tomorrow — earliest item not yet in production window
+          ${t('tomorrow_pending', { n: tomorrowTotal })}
         </div>`;
       }
     }
 
     // FOH note (shape card only, once)
     const fohHtml = (!isBFP && schedule.foh.length > 0)
-      ? `<div class="foh-note">FOH only (not scheduled): ${schedule.foh.map(esc).join(', ')}</div>` : '';
+      ? `<div class="foh-note">${t('foh_only', { list: schedule.foh.map(esc).join(', ') })}</div>` : '';
 
     // Only the "+ Add Unscheduled Batch" button remains — log completions are inline now
-    const extraBtnHtml = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">+ Add Unscheduled Batch</button>`;
+    const extraBtnHtml = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">${t('add_unsched')}</button>`;
 
     return `<div class="team-card">
       <div class="team-header">
@@ -1517,19 +1752,18 @@
                   || (dayState.bfpDone   || []).length > 0;
 
     if (!hasShape && !hasBfp) {
-      return `<div class="no-prod">Nothing scheduled today.<br>
-        <span style="font-size:13px;color:var(--gray-3)">All upcoming orders covered, or no deliveries within production windows.</span>
+      return `<div class="no-prod">${t('nothing_today')}<br>
+        <span style="font-size:13px;color:var(--gray-3)">${t('no_prod_extra')}</span>
       </div>`;
     }
     const teamHas = type === 'shape' ? hasShape : hasBfp;
     if (!teamHas) {
-      const teamLabel  = type === 'shape' ? 'Shape' : 'BFP';
-      const otherLabel = type === 'shape' ? 'BFP'   : 'Shape';
-      // Only manager has tabs to switch to; teams just see "nothing for you today"
+      const teamLabel  = type === 'shape' ? t('shape_label') : t('bfp_label');
+      const otherLabel = type === 'shape' ? t('bfp_label')   : t('shape_label');
       const hint = userRole === 'manager'
-        ? `<span style="font-size:13px;color:var(--gray-3)">Check the ${otherLabel} tab.</span>`
-        : `<span style="font-size:13px;color:var(--gray-3)">All clear — nothing assigned to you today.</span>`;
-      return `<div class="no-prod" style="padding:32px 20px">Nothing for ${teamLabel} today.<br>${hint}</div>`;
+        ? `<span style="font-size:13px;color:var(--gray-3)">${t('check_other', { team: otherLabel })}</span>`
+        : `<span style="font-size:13px;color:var(--gray-3)">${t('all_clear')}</span>`;
+      return `<div class="no-prod" style="padding:32px 20px">${t('nothing_for', { team: teamLabel })}<br>${hint}</div>`;
     }
     return renderTeamCard(type, dateStr);
   }
@@ -1576,14 +1810,13 @@
     const todayStr = toDateStr(new Date());
     const yestStr  = toDateStr(addDays(new Date(), -1));
     const sinceLabel = !latestInvDate ? ''
-      : latestInvDate === todayStr ? 'today'
-      : latestInvDate === yestStr  ? 'since yesterday'
-      : `since ${fmtShort(parseDate(latestInvDate))}`;
+      : latestInvDate === todayStr ? t('since_today')
+      : latestInvDate === yestStr  ? t('since_yest')
+      : t('since_date', { d: fmtShort(parseDate(latestInvDate)) });
 
-    const lastSavedStr = latestInvDate ? `Last count: ${fmtShort(parseDate(latestInvDate))}` : 'No count saved yet';
+    const lastSavedStr = latestInvDate ? t('last_count', { d: fmtShort(parseDate(latestInvDate)) }) : t('no_count_yet');
     const deductCount  = Object.values(deducted).filter(n => n > 0).length;
-    const deductNote   = deductCount > 0
-      ? ` · ${deductCount} SKU${deductCount > 1 ? 's' : ''} reduced for deliveries since count` : '';
+    const deductNote   = deductCount > 0 ? t('reduced_for', { n: deductCount }) : '';
 
     // Strip "Twisted Sugar - " prefix to keep customer lists readable
     const compressCust = name => (name || '').replace(/^Twisted Sugar\s*-\s*/i, '');
@@ -1637,18 +1870,18 @@
     // Top summary card
     const summaryHtml = `
       <div class="stock-summary">
-        <span class="stock-summary-title">Next ${FORECAST_LOOKAHEAD} days</span>
+        <span class="stock-summary-title">${t('forecast_window', { n: FORECAST_LOOKAHEAD })}</span>
         ${summaryShortCount > 0
-          ? `<span class="stock-summary-line short">🔴 ${summaryShortCount} SKU${summaryShortCount !== 1 ? 's' : ''} short — need ${summaryShortPretzels} more</span>`
+          ? `<span class="stock-summary-line short">${t('summary_short', { n: summaryShortCount, p: summaryShortPretzels })}</span>`
           : ''}
         ${summarySurplusCount > 0
-          ? `<span class="stock-summary-line surplus">🟢 ${summarySurplusCount} SKU${summarySurplusCount !== 1 ? 's' : ''} covered with surplus (${summarySurplusPretzels} extra)</span>`
+          ? `<span class="stock-summary-line surplus">${t('summary_surplus', { n: summarySurplusCount, p: summarySurplusPretzels })}</span>`
           : ''}
         ${summaryNoneCount > 0
-          ? `<span class="stock-summary-line none">⚪ ${summaryNoneCount} SKU${summaryNoneCount !== 1 ? 's' : ''} with no upcoming orders</span>`
+          ? `<span class="stock-summary-line none">${t('summary_none', { n: summaryNoneCount })}</span>`
           : ''}
         ${summaryShortCount === 0 && summarySurplusCount === 0 && summaryNoneCount === 0
-          ? `<span class="stock-summary-line">No production SKUs configured.</span>`
+          ? `<span class="stock-summary-line">${t('no_skus_cfg')}</span>`
           : ''}
       </div>`;
 
@@ -1665,26 +1898,30 @@
       let dedStr = '';
       if (dedAmt > 0) {
         const MAX_SHOWN = 4;
+        const moreLabel = appLang === 'es' ? 'más' : 'more';
         const parts = dedDetails.slice(0, MAX_SHOWN)
           .map(x => `${esc(compressCust(x.customer))} ${x.qty}`);
-        if (dedDetails.length > MAX_SHOWN) parts.push(`+${dedDetails.length - MAX_SHOWN} more`);
-        dedStr = `<div class="stock-deduct">−${dedAmt} delivered ${esc(sinceLabel)} (was ${frozenRaw})</div>
+        if (dedDetails.length > MAX_SHOWN) parts.push(`+${dedDetails.length - MAX_SHOWN} ${moreLabel}`);
+        dedStr = `<div class="stock-deduct">${t('delivered', { n: dedAmt, w: frozenRaw, when: sinceLabel })}</div>
                   <div class="stock-deduct-list">${parts.join(', ')}</div>`;
       }
 
       // Forecast indicator
       let fcStr = '';
       if (fc) {
-        const caseStr = (n) => fc.caseSize > 0 ? ` (~${Math.ceil(n / fc.caseSize)} ${Math.ceil(n / fc.caseSize) !== 1 ? 'cases' : 'case'})` : '';
-        const dLabel  = `${FORECAST_LOOKAHEAD}d need`;
+        const casesText = (n) => {
+          if (fc.caseSize <= 0) return '';
+          const cn = Math.ceil(n / fc.caseSize);
+          return t('cases_paren', { n: cn });
+        };
         if (fc.bucket === 'short') {
-          fcStr = `<span class="stock-forecast short">🔴 ${dLabel} ${fc.demand} · stock ${fc.stock} · short ${-fc.net}${caseStr(-fc.net)}</span>`;
+          fcStr = `<span class="stock-forecast short">${t('fc_short', { d: FORECAST_LOOKAHEAD, p: fc.demand, n: fc.stock, c: { text: -fc.net + casesText(-fc.net) } })}</span>`;
         } else if (fc.bucket === 'tight') {
-          fcStr = `<span class="stock-forecast tight">🟡 ${dLabel} ${fc.demand} · stock ${fc.stock} · just enough (+${fc.net})</span>`;
+          fcStr = `<span class="stock-forecast tight">${t('fc_tight', { d: FORECAST_LOOKAHEAD, p: fc.demand, n: fc.stock, net: fc.net })}</span>`;
         } else if (fc.bucket === 'surplus') {
-          fcStr = `<span class="stock-forecast surplus">🟢 ${dLabel} ${fc.demand} · stock ${fc.stock} · surplus +${fc.net}${caseStr(fc.net)}</span>`;
+          fcStr = `<span class="stock-forecast surplus">${t('fc_surplus', { d: FORECAST_LOOKAHEAD, p: fc.demand, n: fc.stock, c: { text: fc.net + casesText(fc.net) } })}</span>`;
         } else if (fc.bucket === 'none' && fc.stock > 0) {
-          fcStr = `<span class="stock-forecast none">⚪ no upcoming orders · stock ${fc.stock}</span>`;
+          fcStr = `<span class="stock-forecast none">${t('fc_none', { n: fc.stock })}</span>`;
         }
       }
 
@@ -1700,18 +1937,18 @@
     return `<div class="team-card"><div class="team-body">
       <div class="stock-tab-header">
         <div>
-          <div class="stock-tab-title">Stock Count</div>
+          <div class="stock-tab-title">${t('stock_title')}</div>
           <div class="stock-tab-note">${esc(lastSavedStr)}${esc(deductNote)}</div>
         </div>
       </div>
       ${summaryHtml}
       <div class="stock-col-head">
-        <span>SKU</span>
-        <span style="text-align:center">🧊 Dough</span>
-        <span style="text-align:center">❄️ Frozen</span>
+        <span>${t('sku_col')}</span>
+        <span style="text-align:center">${t('dough_col')}</span>
+        <span style="text-align:center">${t('frozen_col')}</span>
       </div>
       ${rows}
-      <button class="btn-primary" id="stock-save" style="margin-top:20px">Save Stock Count</button>
+      <button class="btn-primary" id="stock-save" style="margin-top:20px">${t('save_stock')}</button>
     </div></div>`;
   }
 
@@ -1728,7 +1965,7 @@
     });
     const snapArr = Object.values(snaps).filter(s => s.coldFerment > 0 || s.frozen > 0);
     const saveBtn = document.getElementById('stock-save');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…'; }
     try {
       await appendLog(PRODUCTION_LOG, {
         action: 'inventory', date: toDateStr(new Date()),
@@ -1739,7 +1976,7 @@
       render();
     } catch (e) {
       alert('Error saving: ' + e.message);
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Stock Count'; }
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('save_stock'); }
     }
   }
 
@@ -1832,7 +2069,7 @@
         statusEl.textContent = '✅';
       } else if (isPending) {
         statusEl.className = 'row-log-status saving';
-        statusEl.textContent = 'saving…';
+        statusEl.textContent = appLang === 'es' ? 'guardando…' : 'saving…';
       } else {
         statusEl.className = 'row-log-status';
         statusEl.textContent = '';
@@ -1858,7 +2095,7 @@
     if (deltaP === 0) return;
     const deltaBatches = deltaP / bs; // fractional OK (typed values may not align to batches)
     const statusEl = document.getElementById(`rls-${type}-${sku}`);
-    if (statusEl) { statusEl.className = 'row-log-status saving'; statusEl.textContent = 'saving…'; }
+    if (statusEl) { statusEl.className = 'row-log-status saving'; statusEl.textContent = appLang === 'es' ? 'guardando…' : 'saving…'; }
     try {
       await appendLog(PRODUCTION_LOG, {
         action:      type === 'shape' ? 'shape_done' : 'bfp_done',
@@ -1925,18 +2162,18 @@
       const showBfp   = userRole === 'manager' || userRole === 'bfp';
       const isEmpty   = (showShape ? sTotal : 0) + (showBfp ? bTotal : 0) === 0;
 
-      if (i === 0) html += `<div class="week-section-lbl">This week</div>`;
-      else if (i === 7) html += `<div class="week-section-lbl">Next week</div>`;
+      if (i === 0) html += `<div class="week-section-lbl">${t('this_week')}</div>`;
+      else if (i === 7) html += `<div class="week-section-lbl">${t('next_week')}</div>`;
 
-      const dayLabel  = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : DAYS[d.getDay()];
-      const shapeText = sTotal > 0 ? `${statusIcon(sStatus)} Shape: ${sTotal}` : `${statusIcon(sStatus)} Shape`;
-      const bfpText   = bTotal > 0 ? `${statusIcon(bStatus)} BFP: ${bTotal}` : `${statusIcon(bStatus)} BFP`;
+      const dayLabel  = i === 0 ? t('today_label') : i === 1 ? t('tomorrow_label') : fmtDay(d);
+      const shapeText = sTotal > 0 ? `${statusIcon(sStatus)} ${t('shape_label')}: ${sTotal}` : `${statusIcon(sStatus)} ${t('shape_label')}`;
+      const bfpText   = bTotal > 0 ? `${statusIcon(bStatus)} ${t('bfp_label')}: ${bTotal}` : `${statusIcon(bStatus)} ${t('bfp_label')}`;
 
       html += `<div class="week-row${ds === todayStr ? ' is-today' : ''}${isEmpty ? ' is-empty' : ''}"
         data-goto="${esc(ds)}" role="button" tabindex="0">
         <div class="week-row-date">
           <div class="week-row-day">${esc(dayLabel)}</div>
-          <div class="week-row-sub">${esc(fmtShort(d))}${isEmpty ? ' — no production' : ''}</div>
+          <div class="week-row-sub">${esc(fmtShort(d))}${isEmpty ? ' — ' + t('no_prod_day') : ''}</div>
         </div>
         <div class="week-row-right">
           ${showShape ? `<span class="week-team-line">${shapeText}</span>` : ''}
@@ -1945,7 +2182,7 @@
         </div>
       </div>`;
     }
-    return html || `<div class="no-prod">No production scheduled in the next ${SCHEDULE_LOOKAHEAD} days.</div>`;
+    return html || `<div class="no-prod">${t('no_prod_lookahead', { n: SCHEDULE_LOOKAHEAD })}</div>`;
   }
 
   // ─── UPDATE NAV BAR ───────────────────────────────────────────────────────
@@ -1958,18 +2195,18 @@
     const wt       = document.getElementById('week-toggle');
 
     if (viewMode === 'week') {
-      label.textContent = 'Week View';
+      label.textContent = t('week_view');
       label.classList.remove('is-today');
-      sub.textContent = `Next ${SCHEDULE_LOOKAHEAD} days`;
+      sub.textContent = t('next_n_days', { n: SCHEDULE_LOOKAHEAD });
       wt.classList.add('active');
     } else {
       const diff = Math.round((parseDate(curStr) - parseDate(todayStr)) / 86400000);
-      if (diff === 0)       { label.textContent = 'Today';     label.classList.add('is-today'); }
-      else if (diff === 1)  { label.textContent = 'Tomorrow';  label.classList.remove('is-today'); }
-      else if (diff === -1) { label.textContent = 'Yesterday'; label.classList.remove('is-today'); }
+      if (diff === 0)       { label.textContent = t('today_label');     label.classList.add('is-today'); }
+      else if (diff === 1)  { label.textContent = t('tomorrow_label');  label.classList.remove('is-today'); }
+      else if (diff === -1) { label.textContent = t('yesterday_label'); label.classList.remove('is-today'); }
       else                  { label.textContent = fmtFull(currentDate); label.classList.remove('is-today'); }
       sub.textContent = diff === 0 ? fmtFull(currentDate)
-        : diff > 0 ? `${diff} days away` : `${-diff} days ago`;
+        : diff > 0 ? t('days_away', { n: diff }) : t('days_ago', { n: -diff });
       wt.classList.remove('active');
     }
   }
@@ -2001,9 +2238,9 @@
         `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ${mergeBySku(items)}</div>`;
       if (visibleSet.size > 0) {
         overdueHtml = `<div class="overdue-banner">
-          <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${visibleSet.size} overdue — production window${visibleSet.size > 1 ? 's have' : ' has'} closed</div>
-          ${groupHtml(shapeOver, 'Shape')}
-          ${groupHtml(bfpOver, 'BFP')}
+          <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">${t('overdue_title', { n: visibleSet.size })}</div>
+          ${groupHtml(shapeOver, t('shape_label'))}
+          ${groupHtml(bfpOver, t('bfp_label'))}
         </div>`;
       }
     }
@@ -2012,8 +2249,8 @@
     const unconfigHtml = userRole === 'manager'
       ? (schedule.unconfigured || []).map(sku =>
           `<div class="alert-banner" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-            <span>⚠️ New SKU in orders: <strong>${esc(sku)}</strong></span>
-            <button class="btn-link" data-cfg-btn data-sku="${esc(sku)}" style="white-space:nowrap">Set up →</button>
+            <span>${t('new_sku', { sku: esc(sku) })}</span>
+            <button class="btn-link" data-cfg-btn data-sku="${esc(sku)}" style="white-space:nowrap">${t('set_up')}</button>
           </div>`
         ).join('')
       : '';
@@ -2024,7 +2261,7 @@
       d.date === todayStr && !['delivered','picked_up','cancelled'].includes(d.status)
     );
     const unconfirmedHtml = unconfirmed.length > 0
-      ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length !== 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
+      ? `<div class="alert-banner">${t('unconfirmed', { n: unconfirmed.length })}<a href="../delivery-planner/index.html">${t('go_to_planner')}</a></div>`
       : '';
 
     // Possible-duplicate deliveries — manager only (data-quality flag, not workflow)
@@ -2042,12 +2279,12 @@
       const dups = Object.entries(dupGroups).filter(([,arr]) => arr.length >= 2);
       if (dups.length > 0) {
         dupHtml = `<div class="alert-banner" style="background:#fff3cd;color:#856404">
-            ⚠️ ${dups.length} possible duplicate delivery${dups.length > 1 ? 's' : ''} —
+            ${t('dup_alert', { n: dups.length })}
             ${dups.map(([key,arr]) => {
               const [date, cust] = key.split('|');
-              return `<strong>${esc(cust)}</strong> on ${esc(date)} (${arr.length}×)`;
+              return `<strong>${esc(cust)}</strong> · ${esc(date)} (${arr.length}×)`;
             }).join(', ')} —
-            <a href="../delivery-planner/index.html">Review →</a>
+            <a href="../delivery-planner/index.html">${t('review_planner')}</a>
           </div>`;
       }
     }
@@ -2142,7 +2379,7 @@
     if (!confirm(`Log ${extraValue} extra batch${extraValue !== 1 ? 'es' : ''} of ${sku} for ${extraDate}?`)) return;
 
     const saveBtn = document.getElementById('extra-save');
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…';
     try {
       await appendLog(PRODUCTION_LOG, {
         action:      extraType === 'shape' ? 'shape_done' : 'bfp_done',
@@ -2202,7 +2439,7 @@
 
   async function saveCfg() {
     const saveBtn = document.getElementById('cfg-save');
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…';
     try {
       if (cfgMode === 'alias') {
         const target = document.getElementById('cfg-alias-target').value;
@@ -2290,6 +2527,60 @@
     } finally {
       btn.disabled = false; btn.textContent = '↻';
     }
+  });
+
+  // Language toggle — flip and re-render. Persist to localStorage.
+  function syncLangBtn() {
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML  = html; };
+
+    const lb = document.getElementById('lang-btn');
+    if (lb) lb.textContent = appLang === 'en' ? 'ES' : 'EN';
+
+    // Tab bar
+    const tShape = document.querySelector('.tab-btn[data-tab="shape"]');
+    const tBfp   = document.querySelector('.tab-btn[data-tab="bfp"]');
+    const tStock = document.querySelector('.tab-btn[data-tab="stock"]');
+    if (tShape) tShape.textContent = '🥨 ' + t('shape_tab');
+    if (tBfp)   tBfp.textContent   = '🔥 ' + t('bfp_tab');
+    if (tStock) tStock.textContent = '📦 ' + t('stock_tab');
+
+    const wt = document.getElementById('week-toggle');
+    if (wt) wt.textContent = appLang === 'es' ? 'Sem' : 'Week';
+
+    // Configure SKU sheet
+    setText('cfg-title-text', t('cfg_title'));
+    setText('cfg-newtab',     t('cfg_new_tab'));
+    setText('cfg-aliastab',   t('cfg_alias_tab'));
+    setText('cfg-lbl-batch',  t('cfg_per_batch'));
+    setHTML('cfg-lbl-tray',   `${t('cfg_per_tray')} <span style="font-weight:400;color:var(--gray-3)">${t('cfg_per_tray_sub')}</span>`);
+    setHTML('cfg-lbl-case',   `${t('cfg_per_case')} <span style="font-weight:400;color:var(--gray-3)">${t('cfg_per_case_sub')}</span>`);
+    setText('cfg-lbl-type',   t('cfg_type'));
+    setText('cfg-btn-std',    t('cfg_standard'));
+    setText('cfg-btn-coat',   t('cfg_coating'));
+    setText('cfg-btn-foh',    t('cfg_foh'));
+    setText('cfg-alias-help', t('cfg_alias_help'));
+    setText('cfg-alias-lbl',  t('cfg_alias_label'));
+    setText('cfg-save',       t('save'));
+    setText('cfg-cancel',     t('cancel'));
+
+    // Extra batch sheet
+    setText('extra-title',       t('extra_title'));
+    setText('extra-sub',         t('extra_sub'));
+    setText('extra-batches-lbl', t('extra_batches'));
+    setText('extra-save',        t('extra_save'));
+    setText('extra-cancel',      t('cancel'));
+  }
+  syncLangBtn();
+  document.getElementById('lang-btn').addEventListener('click', () => {
+    appLang = appLang === 'en' ? 'es' : 'en';
+    try { localStorage.setItem('prod-lang', appLang); } catch {}
+    syncLangBtn();
+    if (userRole === 'shape')      document.title = appLang === 'es' ? 'Formar · Producción' : 'Shape · Production';
+    else if (userRole === 'bfp')   document.title = appLang === 'es' ? 'HCE · Producción'    : 'BFP · Production';
+    else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
+    schedule = buildOptimalSchedule();
+    render();
   });
 
   // Extra sheet
