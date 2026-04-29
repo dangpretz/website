@@ -1082,17 +1082,39 @@
       }
     });
 
-    // Step 3: Greedy schedule each pool
-    function schedulePool(pool, type) {
+    // Step 3: Greedy schedule each pool. For BFP, an optional `ctx` enforces a
+    // dough constraint — BFP can't bake more than the dough on hand at the
+    // start of that day (initial cold-ferment + previous days' scheduled shape).
+    // Same-day shape→BFP isn't possible because dough needs ≥1 day to ferment.
+    function schedulePool(pool, type, ctx = null) {
       const sched   = {};
       const lookahead = type === 'shape'
         ? SCHEDULE_LOOKAHEAD + SHAPE_MAX_LEAD
         : SCHEDULE_LOOKAHEAD + BFP_MAX_LEAD;
 
+      // Per-SKU dough balance, tracked across days for BFP scheduling
+      const doughBalance = {};
+      if (type === 'bfp' && ctx) {
+        Object.entries(ctx.initialDough || {}).forEach(([sku, n]) => {
+          doughBalance[sku] = Number(n) || 0;
+        });
+      }
+
       for (let i = 0; i < lookahead; i++) {
         const dayStr  = toDateStr(addDays(today, i));
         const workers  = getWorkers(type, dayStr);
         const capacity = workers * BATCHES_PER_WORKER;
+
+        // For BFP: at the start of each day, add yesterday's scheduled shape
+        // output to the dough balance (1-day cold-ferment minimum)
+        if (type === 'bfp' && ctx && i > 0) {
+          const yestStr = toDateStr(addDays(today, i - 1));
+          (ctx.shapeSchedule[yestStr] || []).forEach(item => {
+            const bs = getBatchSize(item.sku);
+            if (!bs) return;
+            doughBalance[item.sku] = (doughBalance[item.sku] || 0) + (item.batches * bs);
+          });
+        }
 
         // Eligible items: window includes today and still have work left
         const eligible = pool.filter(p =>
@@ -1123,11 +1145,28 @@
 
         for (const a of annotated) {
           if (cap <= 0) break;
-          const take = Math.min(a.left, cap);
+          let take = Math.min(a.left, cap);
+
+          // BFP dough constraint: cap take by available dough for this SKU
+          // (overdue items bypass — they're already a problem and need visibility)
+          if (type === 'bfp' && ctx && !a.isOverdue) {
+            const bs = getBatchSize(a.sku);
+            const doughBatches = bs > 0 ? Math.floor((doughBalance[a.sku] || 0) / bs) : 0;
+            take = Math.min(take, doughBatches);
+            if (take <= 0) continue; // no dough — defer this item to a later day
+          }
 
           // Mutate pool item
           const poolItem = pool.find(p => p.sku === a.sku && p.deliveryDate === a.deliveryDate);
           if (poolItem) poolItem.left -= take;
+
+          // Decrement dough balance for BFP (capped so it never goes negative
+          // even if an overdue item bypassed the constraint)
+          if (type === 'bfp' && ctx) {
+            const bs = getBatchSize(a.sku);
+            const consumed = Math.min(take * bs, doughBalance[a.sku] || 0);
+            doughBalance[a.sku] = Math.max(0, (doughBalance[a.sku] || 0) - consumed);
+          }
 
           // Merge same-SKU into day's item list
           const existing = dayItems.find(d => d.sku === a.sku);
@@ -1155,9 +1194,17 @@
       return sched;
     }
 
+    // Schedule shape FIRST so BFP can use the resulting dough timeline as a
+    // constraint on what can actually be baked each day.
+    const shapeSchedule = schedulePool(shapePool, 'shape');
+    const bfpSchedule   = schedulePool(bfpPool,   'bfp', {
+      shapeSchedule,
+      initialDough: { ...latestInv.coldFerment },
+    });
+
     return {
-      shape:        schedulePool(shapePool, 'shape'),
-      bfp:          schedulePool(bfpPool,   'bfp'),
+      shape:        shapeSchedule,
+      bfp:          bfpSchedule,
       overdue,
       foh:          [...fohSeen],
       unconfigured: [...unconfigured],
