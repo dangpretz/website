@@ -93,6 +93,33 @@
     .stock-deduct { font: 400 11px 'Manrope', sans-serif; color: var(--green); }
     .stock-deduct-list { font: 400 11px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 1px; line-height: 1.3; }
 
+    /* Forecast badge per SKU row */
+    .stock-forecast {
+      display: block; font: 600 11px 'Manrope', sans-serif;
+      margin-top: 3px; line-height: 1.3;
+    }
+    .stock-forecast.short   { color: var(--red); }
+    .stock-forecast.tight   { color: #856404; }
+    .stock-forecast.surplus { color: var(--green); }
+    .stock-forecast.none    { color: var(--gray-3); }
+
+    /* Summary card at top of stock tab */
+    .stock-summary {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 12px 14px; margin: 6px 0 14px;
+      background: var(--gray-1); border-radius: 10px;
+    }
+    .stock-summary-title {
+      font: 700 11px 'Manrope', sans-serif; color: var(--gray-3);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;
+    }
+    .stock-summary-line {
+      font: 600 13px 'Manrope', sans-serif; color: var(--dark);
+    }
+    .stock-summary-line.short   { color: var(--red); }
+    .stock-summary-line.surplus { color: var(--green); }
+    .stock-summary-line.none    { color: var(--gray-4); }
+
     /* ── Page content ──────────────────────────── */
     .content { padding: 12px 12px 100px; max-width: 640px; margin: 0 auto; }
 
@@ -1472,6 +1499,70 @@
     // Strip "Twisted Sugar - " prefix to keep customer lists readable
     const compressCust = name => (name || '').replace(/^Twisted Sugar\s*-\s*/i, '');
 
+    // Build 14-day demand per canonical SKU from active deliveries
+    const demandBySku = {};
+    for (let i = 0; i <= SCHEDULE_LOOKAHEAD; i++) {
+      const ds = toDateStr(addDays(new Date(), i));
+      allDeliveries
+        .filter(d => d.date === ds && !['delivered','picked_up','cancelled'].includes(d.status))
+        .forEach(delivery => {
+          let items = [];
+          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+          items.forEach(({ sku: lineSku, quantity }) => {
+            let key = lineSku?.trim();
+            if (!key) return;
+            if (skuAliases[key]) key = skuAliases[key];
+            demandBySku[key] = (demandBySku[key] || 0) + (Number(quantity) || 0);
+          });
+        });
+    }
+
+    // Compute per-SKU forecast bucket and summary tallies
+    const forecasts = {}; // sku -> { bucket, net, demand, stock, casesOff }
+    let summaryShortCount   = 0, summaryShortPretzels   = 0;
+    let summarySurplusCount = 0, summarySurplusPretzels = 0;
+    let summaryNoneCount    = 0;
+
+    allSkus.forEach(sku => {
+      if (isFOH(sku)) return; // FOH SKUs aren't part of production forecast
+      const doughRaw  = inv.coldFerment[sku] || 0;
+      const frozenRaw = inv.frozen[sku]      || 0;
+      const dedAmt    = deducted[sku] || 0;
+      const frozenEff = Math.max(0, frozenRaw - dedAmt);
+      const stock     = doughRaw + frozenEff;
+      const demand    = demandBySku[sku] || 0;
+      const net       = stock - demand;
+      const cs        = getCaseSize(sku);
+      const tightThreshold = cs > 0 ? cs : (getBatchSize(sku) || 0);
+      let bucket;
+      if (demand === 0)             bucket = 'none';
+      else if (net < 0)             bucket = 'short';
+      else if (net < tightThreshold) bucket = 'tight';
+      else                           bucket = 'surplus';
+      forecasts[sku] = { bucket, net, demand, stock, caseSize: cs };
+      if (bucket === 'short')   { summaryShortCount++;   summaryShortPretzels   += -net; }
+      if (bucket === 'surplus') { summarySurplusCount++; summarySurplusPretzels += net;  }
+      if (bucket === 'none')    summaryNoneCount++;
+    });
+
+    // Top summary card
+    const summaryHtml = `
+      <div class="stock-summary">
+        <span class="stock-summary-title">Next ${SCHEDULE_LOOKAHEAD} days</span>
+        ${summaryShortCount > 0
+          ? `<span class="stock-summary-line short">🔴 ${summaryShortCount} SKU${summaryShortCount !== 1 ? 's' : ''} short — need ${summaryShortPretzels} more</span>`
+          : ''}
+        ${summarySurplusCount > 0
+          ? `<span class="stock-summary-line surplus">🟢 ${summarySurplusCount} SKU${summarySurplusCount !== 1 ? 's' : ''} covered with surplus (${summarySurplusPretzels} extra)</span>`
+          : ''}
+        ${summaryNoneCount > 0
+          ? `<span class="stock-summary-line none">⚪ ${summaryNoneCount} SKU${summaryNoneCount !== 1 ? 's' : ''} with no upcoming orders</span>`
+          : ''}
+        ${summaryShortCount === 0 && summarySurplusCount === 0 && summaryNoneCount === 0
+          ? `<span class="stock-summary-line">No production SKUs configured.</span>`
+          : ''}
+      </div>`;
+
     const rows = allSkus.map(sku => {
       const isFohSku   = isFOH(sku);
       const doughRaw   = inv.coldFerment[sku] || 0;
@@ -1480,10 +1571,10 @@
       const dedDetails = deductDetails[sku] || [];
       // Effective frozen = saved snapshot − auto-deducted (what the scheduler uses).
       const frozenEff  = Math.max(0, frozenRaw - dedAmt);
+      const fc         = forecasts[sku];
 
       let dedStr = '';
       if (dedAmt > 0) {
-        // Per-delivery breakdown: "Fisher 50, Hopkins 36, +1 more"
         const MAX_SHOWN = 4;
         const parts = dedDetails.slice(0, MAX_SHOWN)
           .map(x => `${esc(compressCust(x.customer))} ${x.qty}`);
@@ -1491,8 +1582,24 @@
         dedStr = `<div class="stock-deduct">−${dedAmt} delivered ${esc(sinceLabel)} (was ${frozenRaw})</div>
                   <div class="stock-deduct-list">${parts.join(', ')}</div>`;
       }
+
+      // Forecast indicator
+      let fcStr = '';
+      if (fc) {
+        const caseStr = (n) => fc.caseSize > 0 ? ` (~${Math.ceil(n / fc.caseSize)} ${Math.ceil(n / fc.caseSize) !== 1 ? 'cases' : 'case'})` : '';
+        if (fc.bucket === 'short') {
+          fcStr = `<span class="stock-forecast short">🔴 14d need ${fc.demand} · stock ${fc.stock} · short ${-fc.net}${caseStr(-fc.net)}</span>`;
+        } else if (fc.bucket === 'tight') {
+          fcStr = `<span class="stock-forecast tight">🟡 14d need ${fc.demand} · stock ${fc.stock} · just enough (+${fc.net})</span>`;
+        } else if (fc.bucket === 'surplus') {
+          fcStr = `<span class="stock-forecast surplus">🟢 14d need ${fc.demand} · stock ${fc.stock} · surplus +${fc.net}${caseStr(fc.net)}</span>`;
+        } else if (fc.bucket === 'none' && fc.stock > 0) {
+          fcStr = `<span class="stock-forecast none">⚪ no upcoming orders · stock ${fc.stock}</span>`;
+        }
+      }
+
       return `<div class="stock-row">
-        <div><span class="stock-sku">${esc(sku)}</span>${dedStr}</div>
+        <div><span class="stock-sku">${esc(sku)}</span>${dedStr}${fcStr}</div>
         ${isFohSku
           ? `<span class="stock-na">—</span>`
           : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughRaw}" placeholder="0">`}
@@ -1507,6 +1614,7 @@
           <div class="stock-tab-note">${esc(lastSavedStr)}${esc(deductNote)}</div>
         </div>
       </div>
+      ${summaryHtml}
       <div class="stock-col-head">
         <span>SKU</span>
         <span style="text-align:center">🧊 Dough</span>
