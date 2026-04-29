@@ -693,7 +693,8 @@
   const SHAPE_MAX_LEAD      = 7;   // shape can happen up to N days before delivery
   const BFP_MIN_LEAD        = 1;   // BFP must happen at least N days before delivery
   const BFP_MAX_LEAD        = 3;   // BFP can happen up to N days before delivery
-  const SCHEDULE_LOOKAHEAD  = 14;  // days of deliveries to scan
+  const SCHEDULE_LOOKAHEAD  = 14;  // days of deliveries the scheduler scans
+  const FORECAST_LOOKAHEAD  = 7;   // days the Stock-tab forecast looks ahead
 
   // ─── STATE ────────────────────────────────────────────────────────────────
 
@@ -1499,9 +1500,9 @@
     // Strip "Twisted Sugar - " prefix to keep customer lists readable
     const compressCust = name => (name || '').replace(/^Twisted Sugar\s*-\s*/i, '');
 
-    // Build 14-day demand per canonical SKU from active deliveries
+    // Build forecast-window demand per canonical SKU from active deliveries
     const demandBySku = {};
-    for (let i = 0; i <= SCHEDULE_LOOKAHEAD; i++) {
+    for (let i = 0; i <= FORECAST_LOOKAHEAD; i++) {
       const ds = toDateStr(addDays(new Date(), i));
       allDeliveries
         .filter(d => d.date === ds && !['delivered','picked_up','cancelled'].includes(d.status))
@@ -1548,7 +1549,7 @@
     // Top summary card
     const summaryHtml = `
       <div class="stock-summary">
-        <span class="stock-summary-title">Next ${SCHEDULE_LOOKAHEAD} days</span>
+        <span class="stock-summary-title">Next ${FORECAST_LOOKAHEAD} days</span>
         ${summaryShortCount > 0
           ? `<span class="stock-summary-line short">🔴 ${summaryShortCount} SKU${summaryShortCount !== 1 ? 's' : ''} short — need ${summaryShortPretzels} more</span>`
           : ''}
@@ -1587,12 +1588,13 @@
       let fcStr = '';
       if (fc) {
         const caseStr = (n) => fc.caseSize > 0 ? ` (~${Math.ceil(n / fc.caseSize)} ${Math.ceil(n / fc.caseSize) !== 1 ? 'cases' : 'case'})` : '';
+        const dLabel  = `${FORECAST_LOOKAHEAD}d need`;
         if (fc.bucket === 'short') {
-          fcStr = `<span class="stock-forecast short">🔴 14d need ${fc.demand} · stock ${fc.stock} · short ${-fc.net}${caseStr(-fc.net)}</span>`;
+          fcStr = `<span class="stock-forecast short">🔴 ${dLabel} ${fc.demand} · stock ${fc.stock} · short ${-fc.net}${caseStr(-fc.net)}</span>`;
         } else if (fc.bucket === 'tight') {
-          fcStr = `<span class="stock-forecast tight">🟡 14d need ${fc.demand} · stock ${fc.stock} · just enough (+${fc.net})</span>`;
+          fcStr = `<span class="stock-forecast tight">🟡 ${dLabel} ${fc.demand} · stock ${fc.stock} · just enough (+${fc.net})</span>`;
         } else if (fc.bucket === 'surplus') {
-          fcStr = `<span class="stock-forecast surplus">🟢 14d need ${fc.demand} · stock ${fc.stock} · surplus +${fc.net}${caseStr(fc.net)}</span>`;
+          fcStr = `<span class="stock-forecast surplus">🟢 ${dLabel} ${fc.demand} · stock ${fc.stock} · surplus +${fc.net}${caseStr(fc.net)}</span>`;
         } else if (fc.bucket === 'none' && fc.stock > 0) {
           fcStr = `<span class="stock-forecast none">⚪ no upcoming orders · stock ${fc.stock}</span>`;
         }
