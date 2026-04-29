@@ -91,6 +91,7 @@
     }
     .stock-na    { font: 400 13px 'Manrope', sans-serif; color: var(--gray-3); text-align: center; }
     .stock-deduct { font: 400 11px 'Manrope', sans-serif; color: var(--green); }
+    .stock-deduct-list { font: 400 11px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 1px; line-height: 1.3; }
 
     /* ── Page content ──────────────────────────── */
     .content { padding: 12px 12px 100px; max-width: 640px; margin: 0 auto; }
@@ -1430,8 +1431,10 @@
 
     // Compute auto-deductions using the SAME logic as buildOptimalSchedule
     // (timestamp comparison + skuAliases) so the displayed numbers match the
-    // values the scheduler actually uses.
-    const deducted = {}; // canonical sku → pretzel count auto-deducted
+    // values the scheduler actually uses. Also collect per-customer breakdown
+    // so the user can gut-check against actual deliveries that went out.
+    const deducted       = {}; // canonical sku → total pretzels deducted
+    const deductDetails  = {}; // canonical sku → [{customer, qty}] (in chronological order)
     allDeliveries.forEach(d => {
       if (!['delivered','picked_up'].includes(d.status)) return;
       const useTs = d._confirmedAt && latestInventoryTs
@@ -1440,30 +1443,54 @@
       if (!useTs) return;
       let items = [];
       try { items = JSON.parse(d.lineItems || '[]'); } catch {}
+      const cust = d.customer || d.location || '?';
       items.forEach(({ sku, quantity }) => {
         let key = sku?.trim();
         if (!key) return;
         if (skuAliases[key]) key = skuAliases[key]; // resolve to canonical
-        deducted[key] = (deducted[key] || 0) + (Number(quantity) || 0);
+        const qty = Number(quantity) || 0;
+        if (qty <= 0) return;
+        deducted[key] = (deducted[key] || 0) + qty;
+        if (!deductDetails[key]) deductDetails[key] = [];
+        deductDetails[key].push({ customer: cust, qty });
       });
     });
+
+    // Display label for the snapshot date in human terms
+    const todayStr = toDateStr(new Date());
+    const yestStr  = toDateStr(addDays(new Date(), -1));
+    const sinceLabel = !latestInvDate ? ''
+      : latestInvDate === todayStr ? 'today'
+      : latestInvDate === yestStr  ? 'since yesterday'
+      : `since ${fmtShort(parseDate(latestInvDate))}`;
 
     const lastSavedStr = latestInvDate ? `Last count: ${fmtShort(parseDate(latestInvDate))}` : 'No count saved yet';
     const deductCount  = Object.values(deducted).filter(n => n > 0).length;
     const deductNote   = deductCount > 0
       ? ` · ${deductCount} SKU${deductCount > 1 ? 's' : ''} reduced for deliveries since count` : '';
 
+    // Strip "Twisted Sugar - " prefix to keep customer lists readable
+    const compressCust = name => (name || '').replace(/^Twisted Sugar\s*-\s*/i, '');
+
     const rows = allSkus.map(sku => {
       const isFohSku   = isFOH(sku);
       const doughRaw   = inv.coldFerment[sku] || 0;
       const frozenRaw  = inv.frozen[sku] || 0;
       const dedAmt     = deducted[sku] || 0;
+      const dedDetails = deductDetails[sku] || [];
       // Effective frozen = saved snapshot − auto-deducted (what the scheduler uses).
-      // Show this in the input so the user sees actual on-hand. Saving locks it in.
       const frozenEff  = Math.max(0, frozenRaw - dedAmt);
-      const dedStr     = dedAmt > 0
-        ? `<div class="stock-deduct">−${dedAmt} since count (was ${frozenRaw})</div>`
-        : '';
+
+      let dedStr = '';
+      if (dedAmt > 0) {
+        // Per-delivery breakdown: "Fisher 50, Hopkins 36, +1 more"
+        const MAX_SHOWN = 4;
+        const parts = dedDetails.slice(0, MAX_SHOWN)
+          .map(x => `${esc(compressCust(x.customer))} ${x.qty}`);
+        if (dedDetails.length > MAX_SHOWN) parts.push(`+${dedDetails.length - MAX_SHOWN} more`);
+        dedStr = `<div class="stock-deduct">−${dedAmt} delivered ${esc(sinceLabel)} (was ${frozenRaw})</div>
+                  <div class="stock-deduct-list">${parts.join(', ')}</div>`;
+      }
       return `<div class="stock-row">
         <div><span class="stock-sku">${esc(sku)}</span>${dedStr}</div>
         ${isFohSku
