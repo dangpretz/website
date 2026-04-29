@@ -1422,43 +1422,54 @@
   function renderStockTab() {
     const inv = getLatestInventory();
 
-    // Compute auto-deducted amounts for display (fulfilled deliveries since last snapshot)
+    // Find the latest inventory snapshot date for header display
     const latestInvDate = Object.keys(productionState)
       .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
                     Object.keys(productionState[ds].frozen      || {}).length > 0)
       .sort().pop() || null;
 
-    const deducted = {}; // sku → pretzel count auto-deducted
-    if (latestInvDate) {
-      allDeliveries
-        .filter(d => ['delivered','picked_up'].includes(d.status) && d.date >= latestInvDate)
-        .forEach(delivery => {
-          let items = [];
-          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
-          items.forEach(({ sku, quantity }) => {
-            const key = sku?.trim();
-            if (key) deducted[key] = (deducted[key] || 0) + (Number(quantity) || 0);
-          });
-        });
-    }
+    // Compute auto-deductions using the SAME logic as buildOptimalSchedule
+    // (timestamp comparison + skuAliases) so the displayed numbers match the
+    // values the scheduler actually uses.
+    const deducted = {}; // canonical sku → pretzel count auto-deducted
+    allDeliveries.forEach(d => {
+      if (!['delivered','picked_up'].includes(d.status)) return;
+      const useTs = d._confirmedAt && latestInventoryTs
+        ? d._confirmedAt > latestInventoryTs
+        : (latestInvDate && d.date >= latestInvDate);
+      if (!useTs) return;
+      let items = [];
+      try { items = JSON.parse(d.lineItems || '[]'); } catch {}
+      items.forEach(({ sku, quantity }) => {
+        let key = sku?.trim();
+        if (!key) return;
+        if (skuAliases[key]) key = skuAliases[key]; // resolve to canonical
+        deducted[key] = (deducted[key] || 0) + (Number(quantity) || 0);
+      });
+    });
 
     const lastSavedStr = latestInvDate ? `Last count: ${fmtShort(parseDate(latestInvDate))}` : 'No count saved yet';
     const deductCount  = Object.values(deducted).filter(n => n > 0).length;
     const deductNote   = deductCount > 0
-      ? ` · ${deductCount} SKU${deductCount > 1 ? 's' : ''} adjusted for confirmed deliveries` : '';
+      ? ` · ${deductCount} SKU${deductCount > 1 ? 's' : ''} reduced for deliveries since count` : '';
 
     const rows = allSkus.map(sku => {
-      const isFohSku  = isFOH(sku);
-      const doughVal  = inv.coldFerment[sku] || 0;
-      const frozenVal = inv.frozen[sku] || 0;
-      const dedAmt    = deducted[sku] || 0;
-      const dedStr    = dedAmt > 0 ? `<div class="stock-deduct">−${dedAmt} delivered</div>` : '';
+      const isFohSku   = isFOH(sku);
+      const doughRaw   = inv.coldFerment[sku] || 0;
+      const frozenRaw  = inv.frozen[sku] || 0;
+      const dedAmt     = deducted[sku] || 0;
+      // Effective frozen = saved snapshot − auto-deducted (what the scheduler uses).
+      // Show this in the input so the user sees actual on-hand. Saving locks it in.
+      const frozenEff  = Math.max(0, frozenRaw - dedAmt);
+      const dedStr     = dedAmt > 0
+        ? `<div class="stock-deduct">−${dedAmt} since count (was ${frozenRaw})</div>`
+        : '';
       return `<div class="stock-row">
         <div><span class="stock-sku">${esc(sku)}</span>${dedStr}</div>
         ${isFohSku
           ? `<span class="stock-na">—</span>`
-          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughVal}" placeholder="0">`}
-        <input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenVal}" placeholder="0">
+          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughRaw}" placeholder="0">`}
+        <input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenEff}" placeholder="0">
       </div>`;
     }).join('');
 
