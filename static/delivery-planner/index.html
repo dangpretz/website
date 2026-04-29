@@ -265,6 +265,43 @@
       margin-left: 4px; opacity: 0.6;
     }
 
+    /* Contact line (Square-imported orders) */
+    .card-contact, .card-address {
+      font: 400 12px 'Manrope', sans-serif; color: #aaa;
+      margin: 4px 0 0; line-height: 1.4;
+    }
+    .card-address { margin-top: 2px; }
+    .contact-link { color: #aaa; text-decoration: none; }
+    .contact-link:hover, .contact-link:focus { color: #fff; text-decoration: underline; }
+
+    /* Square import badge */
+    .sq-badge {
+      display: inline-block; margin-left: 6px;
+      padding: 1px 6px; border-radius: 4px;
+      background: #2c4a6b; color: #cce4ff;
+      font: 600 10px 'Manrope', sans-serif;
+      letter-spacing: 0.3px; text-transform: uppercase;
+      vertical-align: middle;
+    }
+
+    /* Manager: Sync from Square button */
+    .sync-square-btn {
+      background: none; border: 1px solid #444; color: #ccc;
+      padding: 6px 12px; border-radius: 6px; cursor: pointer;
+      font: 600 12px 'Manrope', sans-serif;
+      margin-left: 8px;
+    }
+    .sync-square-btn:hover { background: #333; color: #fff; }
+    .sync-square-btn:disabled { opacity: 0.5; cursor: default; }
+    .sync-toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #2a2a2a; color: #fff; padding: 10px 16px; border-radius: 8px;
+      font: 600 13px 'Manrope', sans-serif; z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .sync-toast.error { background: #6b1a1a; }
+    .sync-toast.success { background: #1a4a1a; }
+
     /* Overflow menu */
     .overflow-wrap { position: relative; }
     .overflow-btn {
@@ -574,7 +611,10 @@
     <div class="max-1100">
       <div class="schedule-header">
         <h2>SCHEDULED DELIVERIES &amp; PICKUPS</h2>
-        <button class="new-order-btn" id="new-order-btn">+ New Order</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="sync-square-btn" id="sync-square-btn" hidden title="Pull catering orders from Square">↻ Sync from Square</button>
+          <button class="new-order-btn" id="new-order-btn">+ New Order</button>
+        </div>
       </div>
       <div class="week-nav" id="week-nav">
         <button class="week-nav-btn" id="week-prev" aria-label="Previous">
@@ -771,6 +811,69 @@
 
     const LOG_PATH = '/dangpretz/delivery-planner';
     const TEMPLATE_LOG_PATH = '/dangpretz/delivery-templates';
+    const WORKER_BASE = 'https://dpc-catering-checkout.drew-f39.workers.dev';
+
+    // Admin-token bootstrap: read from ?adminToken=… on first manager visit,
+    // persist in localStorage, and clean the URL. Token absence just hides
+    // manager-only actions (Sync from Square button).
+    function readAdminToken() {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('adminToken');
+      if (fromUrl) {
+        try { localStorage.setItem('dpc-admin-token', fromUrl); } catch (_) {}
+        params.delete('adminToken');
+        const cleanQs = params.toString();
+        const cleanUrl = window.location.pathname + (cleanQs ? '?' + cleanQs : '') + window.location.hash;
+        window.history.replaceState({}, '', cleanUrl);
+        return fromUrl;
+      }
+      try { return localStorage.getItem('dpc-admin-token') || ''; } catch (_) { return ''; }
+    }
+    const ADMIN_TOKEN = readAdminToken();
+
+    function showSyncToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'sync-toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
+
+    async function syncFromSquare() {
+      const btn = document.getElementById('sync-square-btn');
+      if (!ADMIN_TOKEN) { showSyncToast('No admin token configured', 'error'); return; }
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = 'Syncing…';
+      try {
+        const resp = await fetch(`${WORKER_BASE}/admin/import-catering?token=${encodeURIComponent(ADMIN_TOKEN)}&days=90`, { method: 'POST' });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        const { synced = 0, fetched = 0, skipped = 0, failed = 0, unmappedNames = [] } = data;
+        const summary = `Synced ${synced}/${fetched}` + (skipped ? ` · ${skipped} skipped` : '') + (failed ? ` · ${failed} failed` : '');
+        showSyncToast(summary, failed ? 'error' : 'success');
+        if (unmappedNames.length) {
+          // eslint-disable-next-line no-console -- visibility for manager
+          console.warn('Unmapped Square SKUs (add to SQUARE_NAME_MAP in worker):', unmappedNames);
+        }
+        await loadRecords();
+      } catch (err) {
+        showSyncToast('Sync failed: ' + err.message, 'error');
+        // eslint-disable-next-line no-console
+        console.error('Sync failed', err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
+    }
+
+    // Wire button + reveal it only when an admin token is available
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('sync-square-btn');
+      if (!btn) return;
+      if (ADMIN_TOKEN) btn.hidden = false;
+      btn.addEventListener('click', syncFromSquare);
+    });
 
     // Maps known aliases (lowercase) → canonical name. null = exclude from customer list.
     const CUSTOMER_ALIASES = {
@@ -1214,6 +1317,24 @@
 
     const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+    /** Compact contact + address line — shown on Square-imported orders */
+    function renderContactLine(row) {
+      const phone = row.contactPhone || '';
+      const email = row.contactEmail || '';
+      const address = row.address || '';
+      const type = (row.type || 'delivery').toLowerCase();
+      const parts = [];
+      if (phone) parts.push(`<a href="tel:${escapeHtml(phone)}" class="contact-link">📞 ${escapeHtml(phone)}</a>`);
+      if (email) parts.push(`<a href="mailto:${escapeHtml(email)}" class="contact-link">✉️ ${escapeHtml(email)}</a>`);
+      let html = '';
+      if (parts.length) html += `<div class="card-contact">${parts.join(' · ')}</div>`;
+      if (type === 'delivery' && address) {
+        const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+        html += `<div class="card-address"><a href="${mapsUrl}" target="_blank" rel="noopener" class="contact-link">🚚 ${escapeHtml(address)}</a></div>`;
+      }
+      return html;
+    }
+
     function renderDeliveryCard(row) {
       const type = (row.type || 'delivery').toLowerCase();
       const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
@@ -1227,6 +1348,9 @@
       if (items.length) {
         pillsHtml = '<div class="card-items">' + items.map((it) => `<span class="item-pill">${escapeHtml(it.sku || '—')} ×${escapeHtml(String(it.quantity || 0))}</span>`).join('') + '</div>';
       }
+      const contactHtml = renderContactLine(row);
+      const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
+      const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
       const isConfirmed = status === 'delivered' || status === 'picked_up';
       const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : '';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
@@ -1240,7 +1364,7 @@
       return `
         <div class="delivery-card status-${escapeHtml(status)}" data-delivery-id="${id}">
           <div class="card-customer">
-            <span>${escapeHtml(customer)}${recurrenceHtml}</span>
+            <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</span>
             <div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
@@ -1252,6 +1376,7 @@
           </div>
           <span class="type-badge ${type}">${typeLabel}</span>
           ${pillsHtml}
+          ${contactHtml}
           ${barcodeHtml}
           <div class="card-actions-row">
             ${scanBtnHtml}
@@ -1280,12 +1405,16 @@
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
+      const contactHtml = renderContactLine(row);
+      const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
+      const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
       return `
         <div class="daily-card status-${escapeHtml(status)}" data-delivery-id="${id}">
           <div class="daily-main">
-            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}</div>
+            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</div>
             <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>
             ${pillsHtml}
+            ${contactHtml}
             ${barcodeHtml}
             ${confirmedHtml}
           </div>

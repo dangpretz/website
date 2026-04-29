@@ -534,6 +534,77 @@ async function handleImportCatering(request, env) {
   });
 }
 
+// ─── Webhook signature verification ───────────────────────────────
+// Square signs each webhook payload with HMAC-SHA256 of (request URL + raw body),
+// using the subscription's signature key. Returns the body string on success
+// (caller re-uses it for parsing) or false on mismatch.
+async function verifySquareSignature(request, signatureKey) {
+  const sigHeader = request.headers.get('x-square-hmacsha256-signature');
+  if (!sigHeader || !signatureKey) return false;
+  const body = await request.text();
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(signatureKey),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(request.url + body));
+  const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return expected === sigHeader ? body : false;
+}
+
+async function handleSquareWebhook(request, env) {
+  if (!env.SQUARE_WEBHOOK_SIGNATURE_KEY) {
+    return json({ error: 'webhook key not configured' }, 503);
+  }
+  const body = await verifySquareSignature(request, env.SQUARE_WEBHOOK_SIGNATURE_KEY);
+  if (!body) return json({ error: 'bad signature' }, 401);
+
+  let payload;
+  try { payload = JSON.parse(body); } catch (_) { return json({ error: 'bad json' }, 400); }
+
+  // Resolve order ID from event payload (varies by event type)
+  const orderId =
+    payload.data?.object?.order?.id              // order.* events
+    || payload.data?.object?.invoice?.order_id   // invoice.* events
+    || null;
+
+  if (!orderId) {
+    // Acknowledge so Square doesn't retry — nothing to do
+    return json({ ok: true, skipped: 'no order id in payload', event_type: payload.type });
+  }
+
+  // Fetch fresh order state — webhook payloads are sometimes partial
+  const sqRes = await fetch(`${SQUARE_BASE}/orders/${orderId}`, {
+    headers: {
+      'Square-Version': '2025-01-23',
+      Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+    },
+  });
+  const sqData = await sqRes.json();
+  if (!sqRes.ok) {
+    // eslint-disable-next-line no-console -- worker diagnostics
+    console.error('Webhook order fetch failed:', orderId, sqData);
+    // Return 200 anyway — Square retries non-2xx for 24h, we don't want a storm.
+    // Manual sync button is the recovery path.
+    return json({ ok: true, error: 'order fetch failed', orderId });
+  }
+
+  const order = sqData.order || sqData;
+  let result;
+  try {
+    result = await syncSquareOrderToDelivery(order);
+  } catch (err) {
+    // eslint-disable-next-line no-console -- worker diagnostics
+    console.error('Webhook sync failed:', orderId, err);
+    return json({ ok: true, error: err.message, orderId });
+  }
+
+  return json({ ok: true, eventType: payload.type, ...result });
+}
+
 async function sendOrderAlert({
   customer,
   fulfillment,
@@ -599,6 +670,16 @@ export default {
         // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Import catering error:', err);
         return json({ error: err.message || 'Import failed' }, 500);
+      }
+    }
+    if (url.pathname === '/webhooks/square' && request.method === 'POST') {
+      try {
+        return await handleSquareWebhook(request, env);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('Square webhook error:', err);
+        // Return 200 so Square doesn't retry — failures captured in logs
+        return json({ ok: true, error: err.message }, 200);
       }
     }
     // ── end Square sync routing ──
