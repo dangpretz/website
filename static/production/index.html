@@ -709,7 +709,26 @@
   let viewMode        = 'day';
 
   let extraType = null, extraDate = null, extraValue = 1;
-  let dayTab = 'shape'; // active tab in day view: 'shape' | 'bfp' | 'stock'
+  // Role from ?role=shape | ?role=bfp | (default = manager). Used to scope the
+  // UI so the dough team and BFP team can't see/edit each other's schedule.
+  const _roleParam = new URLSearchParams(window.location.search).get('role');
+  const userRole   = _roleParam === 'shape' ? 'shape'
+                  : _roleParam === 'bfp'   ? 'bfp'
+                  : 'manager';
+  if (userRole === 'shape')    document.title = 'Shape · Production';
+  else if (userRole === 'bfp') document.title = 'BFP · Production';
+
+  // Role badge — small pill in the top nav so the team knows what they're seeing.
+  // Manager has no badge (everything is visible).
+  if (userRole !== 'manager') {
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;top:8px;right:62px;padding:2px 8px;border-radius:10px;background:var(--red);color:#fff;font:700 10px Manrope,sans-serif;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:101';
+    badge.textContent = userRole === 'shape' ? '🥨 Shape' : '🔥 BFP';
+    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(badge));
+    if (document.body) document.body.appendChild(badge);
+  }
+
+  let dayTab = userRole === 'bfp' ? 'bfp' : 'shape'; // 'shape' | 'bfp' | 'stock' (manager only)
 
   // Inline logging state
   // loggedPretzels[type][dateStr][sku] = current pretzel count (local, mid-edit)
@@ -1483,11 +1502,15 @@
 
   function renderDayView() {
     const dateStr    = toDateStr(currentDate);
+    // Stock tab is manager-only; force back to the role's home tab if a team
+    // role somehow lands here.
+    if (dayTab === 'stock' && userRole !== 'manager') {
+      dayTab = userRole === 'bfp' ? 'bfp' : 'shape';
+    }
     if (dayTab === 'stock') return renderStockTab();
 
     const type       = dayTab; // 'shape' or 'bfp'
     const dayState   = productionState[dateStr] || {};
-    // A team has activity for the day if it has scheduled items OR logged completions
     const hasShape = (schedule.shape[dateStr] || []).length > 0
                   || (dayState.shapeDone || []).length > 0;
     const hasBfp   = (schedule.bfp[dateStr]   || []).length > 0
@@ -1500,10 +1523,13 @@
     }
     const teamHas = type === 'shape' ? hasShape : hasBfp;
     if (!teamHas) {
-      const other = type === 'shape' ? 'BFP' : 'Shape';
-      return `<div class="no-prod" style="padding:32px 20px">Nothing for ${type === 'shape' ? 'Shape' : 'BFP'} today.<br>
-        <span style="font-size:13px;color:var(--gray-3)">Check the ${other} tab.</span>
-      </div>`;
+      const teamLabel  = type === 'shape' ? 'Shape' : 'BFP';
+      const otherLabel = type === 'shape' ? 'BFP'   : 'Shape';
+      // Only manager has tabs to switch to; teams just see "nothing for you today"
+      const hint = userRole === 'manager'
+        ? `<span style="font-size:13px;color:var(--gray-3)">Check the ${otherLabel} tab.</span>`
+        : `<span style="font-size:13px;color:var(--gray-3)">All clear — nothing assigned to you today.</span>`;
+      return `<div class="no-prod" style="padding:32px 20px">Nothing for ${teamLabel} today.<br>${hint}</div>`;
     }
     return renderTeamCard(type, dateStr);
   }
@@ -1893,9 +1919,11 @@
       const bItems   = schedule.bfp[ds]   || [];
       const sTotal   = sItems.reduce((s, x) => s + x.batches, 0);
       const bTotal   = bItems.reduce((s, x) => s + x.batches, 0);
-      const isEmpty  = sTotal === 0 && bTotal === 0;
       const sStatus  = getTeamStatus('shape', ds);
       const bStatus  = getTeamStatus('bfp', ds);
+      const showShape = userRole === 'manager' || userRole === 'shape';
+      const showBfp   = userRole === 'manager' || userRole === 'bfp';
+      const isEmpty   = (showShape ? sTotal : 0) + (showBfp ? bTotal : 0) === 0;
 
       if (i === 0) html += `<div class="week-section-lbl">This week</div>`;
       else if (i === 7) html += `<div class="week-section-lbl">Next week</div>`;
@@ -1911,8 +1939,8 @@
           <div class="week-row-sub">${esc(fmtShort(d))}${isEmpty ? ' — no production' : ''}</div>
         </div>
         <div class="week-row-right">
-          <span class="week-team-line">${shapeText}</span>
-          <span class="week-team-line">${bfpText}</span>
+          ${showShape ? `<span class="week-team-line">${shapeText}</span>` : ''}
+          ${showBfp   ? `<span class="week-team-line">${bfpText}</span>`   : ''}
           <span class="week-chevron">›</span>
         </div>
       </div>`;
@@ -1951,7 +1979,8 @@
   function render() {
     updateNav();
 
-    // Consolidated overdue panel (one block, merged by SKU, pretzel-first display)
+    // Consolidated overdue panel (one block, merged by SKU, pretzel-first display).
+    // Filtered by role — team views only see their own team's overdue items.
     let overdueHtml = '';
     if (schedule.overdue.length > 0) {
       const mergeBySku = (items) => {
@@ -1963,25 +1992,31 @@
           return `${esc(sku)} · <strong>${p}</strong> pretzel${p !== 1 ? 's' : ''} (${b} batch${b !== 1 ? 'es' : ''})`;
         }).join(' · ');
       };
-      const shapeOver = schedule.overdue.filter(o => o.team === 'shape');
-      const bfpOver   = schedule.overdue.filter(o => o.team === 'bfp');
-      const groupHtml = (items, label) => items.length === 0 ? '' :
+      const showShape  = userRole === 'manager' || userRole === 'shape';
+      const showBfp    = userRole === 'manager' || userRole === 'bfp';
+      const shapeOver  = showShape ? schedule.overdue.filter(o => o.team === 'shape') : [];
+      const bfpOver    = showBfp   ? schedule.overdue.filter(o => o.team === 'bfp')   : [];
+      const visibleSet = new Set([...shapeOver, ...bfpOver].map(o => `${o.team}:${o.sku}`));
+      const groupHtml  = (items, label) => items.length === 0 ? '' :
         `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ${mergeBySku(items)}</div>`;
-      const distinctCount = new Set(schedule.overdue.map(o => `${o.team}:${o.sku}`)).size;
-      overdueHtml = `<div class="overdue-banner">
-        <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${distinctCount} overdue — production window${distinctCount > 1 ? 's have' : ' has'} closed</div>
-        ${groupHtml(shapeOver, 'Shape')}
-        ${groupHtml(bfpOver, 'BFP')}
-      </div>`;
+      if (visibleSet.size > 0) {
+        overdueHtml = `<div class="overdue-banner">
+          <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">🚨 ${visibleSet.size} overdue — production window${visibleSet.size > 1 ? 's have' : ' has'} closed</div>
+          ${groupHtml(shapeOver, 'Shape')}
+          ${groupHtml(bfpOver, 'BFP')}
+        </div>`;
+      }
     }
 
-    // Unconfigured SKU warnings
-    const unconfigHtml = (schedule.unconfigured || []).map(sku =>
-      `<div class="alert-banner" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <span>⚠️ New SKU in orders: <strong>${esc(sku)}</strong></span>
-        <button class="btn-link" data-cfg-btn data-sku="${esc(sku)}" style="white-space:nowrap">Set up →</button>
-      </div>`
-    ).join('');
+    // Unconfigured SKU warnings — manager only (configuring is an admin task)
+    const unconfigHtml = userRole === 'manager'
+      ? (schedule.unconfigured || []).map(sku =>
+          `<div class="alert-banner" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span>⚠️ New SKU in orders: <strong>${esc(sku)}</strong></span>
+            <button class="btn-link" data-cfg-btn data-sku="${esc(sku)}" style="white-space:nowrap">Set up →</button>
+          </div>`
+        ).join('')
+      : '';
 
     // Unconfirmed deliveries today
     const todayStr = toDateStr(new Date());
@@ -1992,34 +2027,36 @@
       ? `<div class="alert-banner">📦 ${unconfirmed.length} delivery${unconfirmed.length !== 1 ? 'ies' : 'y'} today not yet confirmed — <a href="../delivery-planner/index.html">Go to planner →</a></div>`
       : '';
 
-    // Possible-duplicate deliveries — multiple ACTIVE deliveries to same customer
-    // on same date. Usually means an Edit went through as a Duplicate by mistake.
-    const dupGroups = {};
-    allDeliveries.forEach(d => {
-      if (['delivered','picked_up','cancelled'].includes(d.status)) return;
-      if (!d.date || d.date < todayStr) return;
-      const cust = d.customer || d.location || '?';
-      const key = `${d.date}|${cust}`;
-      if (!dupGroups[key]) dupGroups[key] = [];
-      dupGroups[key].push(d);
-    });
-    const dups = Object.entries(dupGroups).filter(([,arr]) => arr.length >= 2);
-    const dupHtml = dups.length > 0
-      ? `<div class="alert-banner" style="background:#fff3cd;color:#856404">
-          ⚠️ ${dups.length} possible duplicate delivery${dups.length > 1 ? 's' : ''} —
-          ${dups.map(([key,arr]) => {
-            const [date, cust] = key.split('|');
-            return `<strong>${esc(cust)}</strong> on ${esc(date)} (${arr.length}×)`;
-          }).join(', ')} —
-          <a href="../delivery-planner/index.html">Review →</a>
-        </div>`
-      : '';
+    // Possible-duplicate deliveries — manager only (data-quality flag, not workflow)
+    let dupHtml = '';
+    if (userRole === 'manager') {
+      const dupGroups = {};
+      allDeliveries.forEach(d => {
+        if (['delivered','picked_up','cancelled'].includes(d.status)) return;
+        if (!d.date || d.date < todayStr) return;
+        const cust = d.customer || d.location || '?';
+        const key = `${d.date}|${cust}`;
+        if (!dupGroups[key]) dupGroups[key] = [];
+        dupGroups[key].push(d);
+      });
+      const dups = Object.entries(dupGroups).filter(([,arr]) => arr.length >= 2);
+      if (dups.length > 0) {
+        dupHtml = `<div class="alert-banner" style="background:#fff3cd;color:#856404">
+            ⚠️ ${dups.length} possible duplicate delivery${dups.length > 1 ? 's' : ''} —
+            ${dups.map(([key,arr]) => {
+              const [date, cust] = key.split('|');
+              return `<strong>${esc(cust)}</strong> on ${esc(date)} (${arr.length}×)`;
+            }).join(', ')} —
+            <a href="../delivery-planner/index.html">Review →</a>
+          </div>`;
+      }
+    }
 
     document.getElementById('alert-area').innerHTML = overdueHtml + unconfigHtml + dupHtml + unconfirmedHtml;
 
-    // Tab bar — only shown in day view; update active state
+    // Tab bar — manager only (team roles see only their own card)
     const tabBar = document.getElementById('tab-bar');
-    tabBar.style.display = viewMode === 'week' ? 'none' : 'flex';
+    tabBar.style.display = (viewMode === 'week' || userRole !== 'manager') ? 'none' : 'flex';
     document.querySelectorAll('.tab-btn').forEach(btn =>
       btn.classList.toggle('active', btn.dataset.tab === dayTab));
 
