@@ -541,11 +541,15 @@
     </div>
     <div class="sheet-body" style="padding:20px">
       <select class="extra-sku-select" id="extra-sku-select"></select>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
-        <span id="extra-batches-lbl" style="font:700 16px 'Manrope',sans-serif;color:var(--dark)">Batches</span>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:4px 0;gap:12px">
+        <div style="flex:1">
+          <span id="extra-batches-lbl" style="font:700 16px 'Manrope',sans-serif;color:var(--dark)">Pretzels</span>
+          <div id="extra-hint" style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3);margin-top:3px"></div>
+        </div>
         <div class="stepper-lg">
           <button class="step-btn" id="extra-dec">−</button>
-          <span class="step-val" id="extra-val">1</span>
+          <input type="number" id="extra-val" min="0" inputmode="numeric" value="0"
+                 style="width:80px;text-align:center;border:1.5px solid var(--gray-2);border-radius:8px;padding:4px 6px;font:800 20px 'Manrope',sans-serif !important;background:var(--white);margin:0 6px">
           <button class="step-btn" id="extra-inc">+</button>
         </div>
       </div>
@@ -709,7 +713,9 @@
   let currentDate     = new Date();
   let viewMode        = 'day';
 
-  let extraType = null, extraDate = null, extraValue = 1;
+  let extraType = null, extraDate = null;
+  // extraValuePretzels = current pretzel count in the extra sheet's input (not batches)
+  let extraValuePretzels = 0;
 
   // ─── i18n ─────────────────────────────────────────────────────────────────
   // Language source of truth: ?lang= URL param > localStorage > browser locale > 'en'
@@ -822,7 +828,7 @@
       // Add unscheduled
       extra_title:    'Add Unscheduled Batch',
       extra_sub:      'Last-minute order or walk-in',
-      extra_batches:  'Batches',
+      extra_batches:  'Pretzels',
       extra_save:     'Save Batch',
       // Week view
       no_prod_lookahead: ({n}) => `No production scheduled in the next ${n} days.`,
@@ -930,7 +936,7 @@
       cfg_alias_label:'Mapear al producto canónico',
       extra_title:    'Agregar tanda extra',
       extra_sub:      'Pedido de último momento',
-      extra_batches:  'Tandas',
+      extra_batches:  'Pretzels',
       extra_save:     'Guardar tanda',
       no_prod_lookahead: ({n}) => `Sin producción en los próximos ${n} días.`,
       this_week:      'Esta semana',
@@ -2355,28 +2361,58 @@
 
   // ─── EXTRA / UNSCHEDULED BATCH SHEET ─────────────────────────────────────
 
+  function updateExtraHint() {
+    const sku = document.getElementById('extra-sku-select').value;
+    const bs  = getBatchSize(sku);
+    const stepDelta = getStepDelta(extraType, sku);
+    const hintEl = document.getElementById('extra-hint');
+    if (!hintEl) return;
+    if (!sku || !bs) { hintEl.textContent = ''; return; }
+    const batches = bs > 0 ? (extraValuePretzels / bs).toFixed(2).replace(/\.?0+$/, '') : 0;
+    const unitLabel = extraType === 'bfp' && getTraySize(sku) > 0
+      ? t('tray_of', { n: stepDelta })
+      : t('batch_of', { n: bs });
+    const equivLabel = appLang === 'es'
+      ? `≈ ${batches} ${batches !== '1' ? 'tandas' : 'tanda'} · +/- = ${unitLabel}`
+      : `≈ ${batches} batch${batches !== '1' ? 'es' : ''} · +/- = ${unitLabel}`;
+    hintEl.textContent = equivLabel;
+  }
+
   function openExtraSheet(type, dateStr) {
     extraType  = type;
     extraDate  = dateStr;
-    extraValue = 1;
+    extraValuePretzels = 0;
 
+    const teamLabel = type === 'shape' ? t('shape_label') : t('bfp_label');
     document.getElementById('extra-title').textContent =
-      `${type === 'shape' ? 'Shape' : 'BFP'} — Unscheduled Batch`;
+      `${teamLabel} — ${t('extra_title')}`;
     document.getElementById('extra-sub').textContent =
-      `${dateStr} · Last-minute or walk-in order`;
-    document.getElementById('extra-val').textContent = '1';
+      `${dateStr} · ${t('extra_sub')}`;
+    document.getElementById('extra-val').value = '0';
 
     // Populate SKU dropdown (includes in-app configured SKUs)
     document.getElementById('extra-sku-select').innerHTML =
       allProductionSkus().map(sku => `<option value="${esc(sku)}">${esc(sku)}</option>`).join('');
+
+    // Default to one step's worth so users see what + does
+    const sku = document.getElementById('extra-sku-select').value;
+    extraValuePretzels = getStepDelta(type, sku) || 0;
+    document.getElementById('extra-val').value = String(extraValuePretzels);
+    updateExtraHint();
 
     document.getElementById('extra-overlay').classList.add('open');
   }
 
   async function saveExtra() {
     const sku = document.getElementById('extra-sku-select').value;
-    if (!sku || extraValue <= 0) { alert('Select a SKU and quantity.'); return; }
-    if (!confirm(`Log ${extraValue} extra batch${extraValue !== 1 ? 'es' : ''} of ${sku} for ${extraDate}?`)) return;
+    if (!sku || extraValuePretzels <= 0) { alert(t('select_sku_qty') === 'select_sku_qty' ? 'Select a SKU and quantity.' : t('select_sku_qty')); return; }
+    const bs = getBatchSize(sku);
+    if (!bs) { alert('Batch size not configured for this SKU.'); return; }
+    const batchEquiv = extraValuePretzels / bs; // fractional ok
+    const promptMsg = appLang === 'es'
+      ? `¿Registrar ${extraValuePretzels} pretzels extra de ${sku} para ${extraDate}?`
+      : `Log ${extraValuePretzels} extra pretzels of ${sku} for ${extraDate}?`;
+    if (!confirm(promptMsg)) return;
 
     const saveBtn = document.getElementById('extra-save');
     saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…';
@@ -2384,7 +2420,7 @@
       await appendLog(PRODUCTION_LOG, {
         action:      extraType === 'shape' ? 'shape_done' : 'bfp_done',
         date:        extraDate,
-        completions: JSON.stringify([{ sku, batches: extraValue }]),
+        completions: JSON.stringify([{ sku, batches: batchEquiv }]),
         workers:     getWorkers(extraType, extraDate),
         timeStamp:   new Date().toISOString(),
       });
@@ -2393,7 +2429,7 @@
       schedule = buildOptimalSchedule();
       render();
     } catch (e) {
-      saveBtn.disabled = false; saveBtn.textContent = 'Save Batch';
+      saveBtn.disabled = false; saveBtn.textContent = t('extra_save');
       alert('Error saving: ' + e.message);
     }
   }
@@ -2592,13 +2628,34 @@
       document.getElementById('extra-overlay').classList.remove('open');
   });
   document.getElementById('extra-dec').addEventListener('click', () => {
-    if (extraValue <= 1) return;
-    extraValue--;
-    document.getElementById('extra-val').textContent = extraValue;
+    const sku = document.getElementById('extra-sku-select').value;
+    const step = getStepDelta(extraType, sku);
+    if (!step) return;
+    extraValuePretzels = Math.max(0, extraValuePretzels - step);
+    document.getElementById('extra-val').value = String(extraValuePretzels);
+    updateExtraHint();
   });
   document.getElementById('extra-inc').addEventListener('click', () => {
-    extraValue++;
-    document.getElementById('extra-val').textContent = extraValue;
+    const sku = document.getElementById('extra-sku-select').value;
+    const step = getStepDelta(extraType, sku);
+    if (!step) return;
+    extraValuePretzels = extraValuePretzels + step;
+    document.getElementById('extra-val').value = String(extraValuePretzels);
+    updateExtraHint();
+  });
+  document.getElementById('extra-val').addEventListener('input', () => {
+    extraValuePretzels = Math.max(0, parseInt(document.getElementById('extra-val').value, 10) || 0);
+    updateExtraHint();
+  });
+  document.getElementById('extra-val').addEventListener('focus', () => {
+    document.getElementById('extra-val').select();
+  });
+  // When SKU changes, reset the value to one step (so the user sees a sensible default)
+  document.getElementById('extra-sku-select').addEventListener('change', () => {
+    const sku = document.getElementById('extra-sku-select').value;
+    extraValuePretzels = getStepDelta(extraType, sku) || 0;
+    document.getElementById('extra-val').value = String(extraValuePretzels);
+    updateExtraHint();
   });
 
   // Configure SKU sheet
