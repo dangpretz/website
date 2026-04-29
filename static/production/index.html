@@ -1258,7 +1258,22 @@
         };
       }
     });
-    const items = Object.values(itemMap);
+    // Sort items: overdue first (oldest delivery), then urgent (must do today),
+    // then pulling-ahead, then completed/done. Earliest delivery date is the
+    // tiebreak within each priority bucket.
+    const priorityRank = it => {
+      if (it.isOverdue)        return 0;
+      if (it.urgent)            return 1;
+      if (it.needBatches > 0)   return 2;
+      return 3; // already done / no remaining work
+    };
+    const items = Object.values(itemMap).sort((a, b) => {
+      const ra = priorityRank(a), rb = priorityRank(b);
+      if (ra !== rb) return ra - rb;
+      const ad = a.deliveryDates.length ? a.deliveryDates[0] : '9999-99-99';
+      const bd = b.deliveryDates.length ? b.deliveryDates[0] : '9999-99-99';
+      return ad.localeCompare(bd);
+    });
 
     const totalNeed   = items.reduce((s, d) => s + d.needBatches, 0);
     const totalMade   = items.reduce((s, d) => s + d.madeBatches, 0);
