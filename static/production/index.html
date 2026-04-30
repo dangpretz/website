@@ -1508,8 +1508,11 @@
           snaps.forEach(sn => {
             const k = (sn.sku || '').trim(); // normalize keys to match delivery line items
             if (!k) return;
-            if (sn.coldFerment > 0) cf[k] = Number(sn.coldFerment);
-            if (sn.frozen > 0)      fr[k] = Number(sn.frozen);
+            // Allow zero values to overwrite older non-zero values (user setting an
+            // SKU back to 0 must propagate). The previous `if (n > 0)` guard caused
+            // stale counts when an SKU was explicitly cleared.
+            cf[k] = Number(sn.coldFerment) || 0;
+            fr[k] = Number(sn.frozen)      || 0;
           });
           s.coldFerment = cf; s.frozen = fr;
         } catch {}
@@ -1588,11 +1591,77 @@
 
   function getLatestInventory() {
     const cf = {}, fr = {};
+    // Iterate ascending so the latest snapshot wins per SKU. Allow zero values
+    // to overwrite — a user explicitly clearing an SKU's stock must propagate.
     Object.keys(productionState).sort().forEach(ds => {
       const s = productionState[ds];
-      Object.entries(s.coldFerment || {}).forEach(([sku, n]) => { if (n > 0) cf[sku] = n; });
-      Object.entries(s.frozen      || {}).forEach(([sku, n]) => { if (n > 0) fr[sku] = n; });
+      Object.entries(s.coldFerment || {}).forEach(([sku, n]) => { cf[sku] = Number(n) || 0; });
+      Object.entries(s.frozen      || {}).forEach(([sku, n]) => { fr[sku] = Number(n) || 0; });
     });
+    return { coldFerment: cf, frozen: fr };
+  }
+
+  // Effective inventory: snapshot + work logged AFTER the snapshot date, minus
+  // confirmed-delivery outflows. Used for the "Raw materials" line so the user
+  // sees stock that reflects today's shape/BFP work and confirmed deliveries.
+  // shape_done    → coldFerment += batches × batchSize
+  // bfp_done      → coldFerment -= batches × batchSize, frozen += batches × batchSize
+  // confirmed delivery → frozen -= delivery quantity
+  function getEffectiveInventory() {
+    const inv = getLatestInventory();
+    const cf = { ...inv.coldFerment };
+    const fr = { ...inv.frozen };
+
+    // Find snapshot anchor date (last day with a snapshot)
+    const latestInvDate = Object.keys(productionState)
+      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
+                    Object.keys(productionState[ds].frozen      || {}).length > 0)
+      .sort().pop() || null;
+
+    // Apply shape/BFP completions from dates AFTER the snapshot
+    Object.entries(productionState).forEach(([ds, s]) => {
+      if (latestInvDate && ds <= latestInvDate) return; // skip pre-snapshot dates
+      (s.shapeDone || []).forEach(c => {
+        const bs = getBatchSize(c.sku);
+        if (!bs) return;
+        cf[c.sku] = (cf[c.sku] || 0) + (Number(c.batches) || 0) * bs;
+      });
+      (s.bfpDone || []).forEach(c => {
+        const bs = getBatchSize(c.sku);
+        if (!bs) return;
+        const p = (Number(c.batches) || 0) * bs;
+        cf[c.sku] = Math.max(0, (cf[c.sku] || 0) - p);
+        fr[c.sku] = (fr[c.sku] || 0) + p;
+      });
+    });
+
+    // Subtract confirmed deliveries that landed after the snapshot
+    if (latestInvDate) {
+      allDeliveries
+        .filter(d => {
+          if (!['delivered','picked_up'].includes(d.status)) return false;
+          if (d._confirmedAt && latestInventoryTs) {
+            return d._confirmedAt > latestInventoryTs;
+          }
+          return d.date >= latestInvDate;
+        })
+        .forEach(delivery => {
+          let items = [];
+          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+          items.forEach(({ sku, quantity }) => {
+            let key = sku?.trim();
+            if (!key) return;
+            if (skuAliases[key]) key = skuAliases[key];
+            if (fr[key] == null) return;
+            fr[key] = Math.max(0, fr[key] - (Number(quantity) || 0));
+          });
+        });
+    }
+
+    // Round to whole pretzels — chained log entries can accumulate FP drift
+    Object.keys(cf).forEach(k => { cf[k] = Math.max(0, Math.round(cf[k])); });
+    Object.keys(fr).forEach(k => { fr[k] = Math.max(0, Math.round(fr[k])); });
+
     return { coldFerment: cf, frozen: fr };
   }
 
@@ -1657,42 +1726,14 @@
       });
     }
 
-    // Sort each SKU's items by delivery date (FIFO for completion attribution)
+    // Sort each SKU's items by delivery date (FIFO for inventory + completion attribution)
     Object.values(bySkuItems).forEach(arr => arr.sort((a,b) => a.deliveryDate.localeCompare(b.deliveryDate)));
 
-    // Step 2: Subtract completed work (FIFO — earliest delivery cleared first)
-    const doneSku = { shape: {}, bfp: {} };
-    Object.values(productionState).forEach(state => {
-      (state.shapeDone || []).forEach(c => {
-        doneSku.shape[c.sku] = (doneSku.shape[c.sku] || 0) + (Number(c.batches) || 0);
-      });
-      (state.bfpDone || []).forEach(c => {
-        doneSku.bfp[c.sku] = (doneSku.bfp[c.sku] || 0) + (Number(c.batches) || 0);
-      });
-    });
-
-    // Subtract completions in pretzels (shape_done/bfp_done are batches → multiply by batchSize)
-    Object.entries(doneSku.shape).forEach(([sku, batches]) => {
-      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftP = batches * getBatchSize(sku);
-      for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.shapeLeftP, leftP);
-        item.shapeLeftP -= take; leftP -= take;
-        if (leftP <= 0) break;
-      }
-    });
-    Object.entries(doneSku.bfp).forEach(([sku, batches]) => {
-      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftP = batches * getBatchSize(sku);
-      for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.bfpLeftP, leftP);
-        item.bfpLeftP -= take; leftP -= take;
-        if (leftP <= 0) break;
-      }
-    });
-
-    // Step 2b: Subtract on-hand inventory (FIFO, same logic as completions)
-    // cold-ferment dough → reduces shape demand; frozen pretzels → reduces BFP demand
+    // Step 2: Subtract on-hand inventory FIRST (FIFO).
+    // Order matters: inventory must be subtracted before completions so completions
+    // only consume genuinely remaining demand. Otherwise a logged batch can be
+    // attributed to a delivery already covered by frozen/cold-ferment, becoming a
+    // "phantom" — `made` grows but `need` doesn't shrink, inflating the displayed total.
     const latestInv = getLatestInventory();
 
     // Auto-deduct quantities from fulfilled deliveries on/after the last inventory snapshot
@@ -1748,6 +1789,38 @@
       for (const item of bySkuItems[sku]) {
         const take = Math.min(item.shapeLeftP, leftP);
         item.shapeLeftP -= take; leftP -= take;
+        if (leftP <= 0) break;
+      }
+    });
+
+    // Step 3: Subtract completed work (FIFO — earliest delivery cleared first).
+    // Now that inventory is already gone, completions land on real remaining demand.
+    const doneSku = { shape: {}, bfp: {} };
+    Object.values(productionState).forEach(state => {
+      (state.shapeDone || []).forEach(c => {
+        doneSku.shape[c.sku] = (doneSku.shape[c.sku] || 0) + (Number(c.batches) || 0);
+      });
+      (state.bfpDone || []).forEach(c => {
+        doneSku.bfp[c.sku] = (doneSku.bfp[c.sku] || 0) + (Number(c.batches) || 0);
+      });
+    });
+
+    // Subtract completions in pretzels (shape_done/bfp_done are batches → multiply by batchSize)
+    Object.entries(doneSku.shape).forEach(([sku, batches]) => {
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftP = batches * getBatchSize(sku);
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.shapeLeftP, leftP);
+        item.shapeLeftP -= take; leftP -= take;
+        if (leftP <= 0) break;
+      }
+    });
+    Object.entries(doneSku.bfp).forEach(([sku, batches]) => {
+      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
+      let leftP = batches * getBatchSize(sku);
+      for (const item of bySkuItems[sku]) {
+        const take = Math.min(item.bfpLeftP, leftP);
+        item.bfpLeftP -= take; leftP -= take;
         if (leftP <= 0) break;
       }
     });
@@ -2039,7 +2112,7 @@
       <div class="batch-total ${isOver ? 'over' : 'ok'}">
         <div class="batch-total-left">
           <span class="batch-total-num">${totalOrigP}</span>
-          <span class="batch-total-lbl">${t('total_pretzels_label', { b: totalOrig })}</span>
+          <span class="batch-total-lbl">${t('total_pretzels_label', { b: fmtBatches(totalOrig) })}</span>
         </div>
         <div style="text-align:right">
           <span class="batch-status ${isOver ? 'status-over' : 'status-ok'}">
@@ -2142,12 +2215,14 @@
         // Hide cards with no actionable work today AND no progress today.
         // Prior-day work alone (e.g., yesterday finished it) doesn't justify
         // a card on today's view — there's nothing to act on.
-        const totalBatches = d.needBatches + d.madeBatches;
-        return totalBatches > 0.01 || d.madeBatches > 0.01;
+        return d.needBatches > 0.01 || d.madeBatches > 0.01;
       })
       .map(d => {
         const bs    = getBatchSize(d.sku);
-        const totalBatches = d.needBatches + d.madeBatches;
+        // Target = max(scheduled need, what's been made). Logging never grows the
+        // ceiling: if you produce 8 of 7 scheduled, ceiling expands to 8 (overproduce).
+        // Otherwise it stays at the scheduled need so the user sees a stable target.
+        const totalBatches = Math.max(d.needBatches, d.madeBatches);
         // Round to whole pretzels — totalBatches can be FP-ish (4.6666...006)
         // from chained reversal operations. Workers see integer counts.
         const origP = Math.round(totalBatches * bs);
@@ -2252,8 +2327,10 @@
     // Cheese chip for BBK SKUs
     const cheeseChip = isCoating(d.sku) ? `<div class="wcard-cheese">${t('cheese_chip')}</div>` : '';
 
-    // Detail panel content
-    const fullInv  = getLatestInventory();
+    // Detail panel content — use effective inventory so the displayed dough/frozen
+    // reflects today's shape & BFP work and any confirmed deliveries since the
+    // last stock count, not just the raw snapshot.
+    const fullInv  = getEffectiveInventory();
     const dough    = fullInv.coldFerment[d.sku] || 0;
     const frozen   = fullInv.frozen[d.sku]      || 0;
     const delivStr = d.deliveryDates.length > 0
@@ -2615,7 +2692,9 @@
       if (section === 'shape')  snaps[sku].coldFerment = n;
       if (section === 'frozen') snaps[sku].frozen      = n;
     });
-    const snapArr = Object.values(snaps).filter(s => s.coldFerment > 0 || s.frozen > 0);
+    // Save ALL SKUs the user touched, including zeros — clearing an SKU to 0
+    // must propagate so getLatestInventory can overwrite older non-zero values.
+    const snapArr = Object.values(snaps);
     const saveBtn = document.getElementById('stock-save');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…'; }
     try {
