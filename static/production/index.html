@@ -2183,12 +2183,14 @@
       .map(d => {
         const bs    = getBatchSize(d.sku);
         const totalBatches = d.needBatches + d.madeBatches;
-        const origP = totalBatches * bs;
+        // Round to whole pretzels — totalBatches can be FP-ish (4.6666...006)
+        // from chained reversal operations. Workers see integer counts.
+        const origP = Math.round(totalBatches * bs);
         const madeP = Math.round(d.madeBatches * bs);
         const priorMade = priorBySku[d.sku] || 0;
         const priorDate = priorLatestDate[d.sku] || null;
         let bucket;
-        if (madeP >= origP && origP > 0)        bucket = 'done';
+        if (madeP >= origP - 0.5 && origP > 0)  bucket = 'done';
         else if (d.madeBatches > 0)              bucket = 'progress';
         else if (d.isOverdue)                    bucket = 'overdue';
         else                                      bucket = 'pending';
@@ -2276,11 +2278,13 @@
       : t('logged_today');
     const custStr  = (d.orders || []).map(esc).join(' · ');
 
-    // Status indicator (re-used for save state)
-    const isDone = madeP >= origP && origP > 0;
-    const isOverLog = madeP > origP;
+    // Status indicator (re-used for save state). Epsilon tolerance: anything
+    // within half a pretzel of the target is FP noise from chained operations.
+    const overBy = Math.round(madeP - origP);
+    const isDone    = madeP >= origP - 0.5 && origP > 0;
+    const isOverLog = overBy > 0;
     const stepStatus = isOverLog
-      ? `<span class="wstep-status over" id="rls-${esc(type)}-${esc(d.sku)}">+${madeP - origP}</span>`
+      ? `<span class="wstep-status over" id="rls-${esc(type)}-${esc(d.sku)}">+${overBy}</span>`
       : isDone
       ? `<span class="wstep-status done" id="rls-${esc(type)}-${esc(d.sku)}">✅</span>`
       : `<span class="wstep-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
@@ -2705,25 +2709,33 @@
     const schedBatches = sched ? sched.batches : 0;
     const madeBatches  = completedRow ? (Number(completedRow.batches) || 0) : 0;
     const origP = Math.round((schedBatches + madeBatches) * bs);
-    // Update the "/ N" suffix
-    const ofEl = document.querySelector(`#rli-${type}-${sku}`)?.parentElement?.querySelector('.row-log-of');
-    if (ofEl) ofEl.textContent = `/ ${origP}`;
+    // Update the "/ N" suffix on both card variants:
+    //   manager view: <span class="row-log-of">/ N</span>
+    //   worker view:  <span class="of"> / N</span> inside .wmetric-value
+    const inputEl = document.getElementById(`rli-${type}-${sku}`);
+    const parent  = inputEl?.parentElement;
+    if (parent) {
+      const ofEl = parent.querySelector('.row-log-of, .of');
+      if (ofEl) ofEl.textContent = ofEl.classList.contains('row-log-of') ? `/ ${origP}` : ` / ${origP}`;
+    }
     // Update input value (unless caller is the input itself, mid-keystroke)
     if (!skipInput) {
-      const inp = document.getElementById(`rli-${type}-${sku}`);
+      const inp = inputEl;
       if (inp && document.activeElement !== inp) inp.value = cur;
     }
     // Decrement button disabled when at zero
     const decBtns = document.querySelectorAll(`[data-log-step][data-key="${type}|${dateStr}|${sku}"][data-delta="-1"]`);
     decBtns.forEach(b => { b.disabled = cur <= 0; });
-    // Status indicator — only show "saving…" when a debounced save is pending
+    // Status indicator — only show "saving…" when a debounced save is pending.
+    // Epsilon tolerance: ignore sub-pretzel FP drift from chained operations.
     const statusEl = document.getElementById(`rls-${type}-${sku}`);
     if (statusEl) {
       const isPending = saveTimers[`${type}|${dateStr}|${sku}`] != null;
-      if (cur > origP && origP > 0) {
+      const overBy = Math.round(cur - origP);
+      if (overBy > 0 && origP > 0) {
         statusEl.className = 'row-log-status over';
-        statusEl.textContent = `+${cur - origP}`;
-      } else if (cur >= origP && origP > 0) {
+        statusEl.textContent = `+${overBy}`;
+      } else if (cur >= origP - 0.5 && origP > 0) {
         statusEl.className = 'row-log-status done';
         statusEl.textContent = '✅';
       } else if (isPending) {
