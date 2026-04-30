@@ -2157,6 +2157,9 @@
     });
     completedRows.forEach(c => {
       const made = Number(c.batches) || 0;
+      // Skip net-zero entries (e.g., a +1 followed by a -1 leaves the sku
+      // in the merged log but with zero work — not actionable for today)
+      if (Math.abs(made) < 0.01 && !itemMap[c.sku]) return;
       if (itemMap[c.sku]) {
         itemMap[c.sku].madeBatches = made;
       } else {
@@ -2169,20 +2172,28 @@
       }
     });
 
-    const items = Object.values(itemMap).map(d => {
-      const bs    = getBatchSize(d.sku);
-      const totalBatches = d.needBatches + d.madeBatches;
-      const origP = totalBatches * bs;
-      const madeP = Math.round(d.madeBatches * bs);
-      const priorMade = priorBySku[d.sku] || 0;
-      const priorDate = priorLatestDate[d.sku] || null;
-      let bucket;
-      if (madeP >= origP && origP > 0)        bucket = 'done';
-      else if (d.madeBatches > 0)              bucket = 'progress';
-      else if (d.isOverdue)                    bucket = 'overdue';
-      else                                      bucket = 'pending';
-      return { ...d, bucket, totalBatches, origP, madeP, priorMade, priorDate };
-    });
+    const items = Object.values(itemMap)
+      .filter(d => {
+        // Hide cards with no actionable work today AND no progress today.
+        // Prior-day work alone (e.g., yesterday finished it) doesn't justify
+        // a card on today's view — there's nothing to act on.
+        const totalBatches = d.needBatches + d.madeBatches;
+        return totalBatches > 0.01 || d.madeBatches > 0.01;
+      })
+      .map(d => {
+        const bs    = getBatchSize(d.sku);
+        const totalBatches = d.needBatches + d.madeBatches;
+        const origP = totalBatches * bs;
+        const madeP = Math.round(d.madeBatches * bs);
+        const priorMade = priorBySku[d.sku] || 0;
+        const priorDate = priorLatestDate[d.sku] || null;
+        let bucket;
+        if (madeP >= origP && origP > 0)        bucket = 'done';
+        else if (d.madeBatches > 0)              bucket = 'progress';
+        else if (d.isOverdue)                    bucket = 'overdue';
+        else                                      bucket = 'pending';
+        return { ...d, bucket, totalBatches, origP, madeP, priorMade, priorDate };
+      });
 
     // Sort within each bucket by earliest delivery date
     return items.sort((a, b) => {
