@@ -517,22 +517,25 @@
     body.role-worker .topnav { display: none; }
     body.role-worker .tab-bar { display: none !important; }
 
-    /* Single-line worker header */
+    /* Worker header — two rows: identity on top, date nav below */
     .worker-header {
       position: sticky; top: 0; z-index: 100;
       background: var(--dark); color: var(--white);
-      display: flex; align-items: center;
-      padding: 14px 14px; gap: 10px;
+      display: none; flex-direction: column;
       border-bottom: 2px solid var(--red);
     }
     body.role-worker .worker-header { display: flex !important; }
+    .worker-header-row1 {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px 8px;
+    }
+    .worker-header-row2 {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 10px 10px;
+    }
     .worker-header-name {
       font-family: 'Paytone One', sans-serif; font-size: 17px;
       color: var(--white); white-space: nowrap;
-    }
-    .worker-header-date {
-      font: 400 13px 'Manrope', sans-serif; color: #aaa;
-      white-space: nowrap;
     }
     .worker-header-spacer { flex: 1; }
     .worker-lang-pill {
@@ -548,6 +551,41 @@
       border-radius: 18px;
     }
     .worker-refresh-btn:active { background: rgba(255,255,255,0.16); }
+
+    /* Date nav row */
+    .worker-nav-arrow {
+      width: 36px; height: 36px; padding: 0;
+      background: none; border: none; color: var(--white);
+      font-size: 24px; font-weight: 700; cursor: pointer;
+      border-radius: 18px; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .worker-nav-arrow:active { background: rgba(255,255,255,0.10); }
+    .worker-date-btn {
+      flex: 1; background: none; border: none; color: var(--white);
+      cursor: pointer; padding: 4px 8px; border-radius: 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .worker-date-btn:active { background: rgba(255,255,255,0.06); }
+    .worker-date-label { font: 700 14px 'Manrope', sans-serif; color: var(--white); }
+    .worker-date-label.is-today { color: var(--amber); }
+    .worker-date-sub   { font: 400 11px 'Manrope', sans-serif; color: #aaa; }
+    .worker-week-btn {
+      background: rgba(255,255,255,0.08); border: none; color: #ccc;
+      font: 700 12px 'Manrope', sans-serif; letter-spacing: 0.4px;
+      padding: 6px 12px; border-radius: 16px; cursor: pointer; flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    .worker-week-btn.active { background: var(--amber); color: var(--dark); }
+
+    /* Walk-in extra-batch button on dark page bg */
+    body.role-worker .log-btn-extra {
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(255,255,255,0.15);
+      color: #ccc;
+    }
+    body.role-worker .log-btn-extra:active { background: rgba(255,255,255,0.12); }
 
     /* Hide the floating role-corner pill — replaced by header text */
     body.role-worker .role-corner-pill { display: none !important; }
@@ -750,15 +788,25 @@
   <button class="week-toggle" id="refresh-btn" aria-label="Refresh data" title="Reload deliveries + production data">↻</button>
 </nav>
 
-<!-- Worker header — single calm line; only rendered for ?role=shape|bfp -->
+<!-- Worker header — calm two-row layout; only rendered for ?role=shape|bfp -->
 <div class="worker-header" id="worker-header" style="display:none">
-  <span class="worker-header-name" id="worker-header-name"></span>
-  <span class="worker-header-date" id="worker-header-date"></span>
-  <span class="worker-header-spacer"></span>
-  <button class="worker-lang-pill" id="worker-lang-btn" aria-label="Switch language">
-    <span id="worker-lang-es">ES</span> · <span id="worker-lang-en">EN</span>
-  </button>
-  <button class="worker-refresh-btn" id="worker-refresh-btn" aria-label="Refresh data" title="↻">↻</button>
+  <div class="worker-header-row1">
+    <span class="worker-header-name" id="worker-header-name"></span>
+    <span class="worker-header-spacer"></span>
+    <button class="worker-lang-pill" id="worker-lang-btn" aria-label="Switch language">
+      <span id="worker-lang-es">ES</span> · <span id="worker-lang-en">EN</span>
+    </button>
+    <button class="worker-refresh-btn" id="worker-refresh-btn" aria-label="Refresh data" title="↻">↻</button>
+  </div>
+  <div class="worker-header-row2">
+    <button class="worker-nav-arrow" id="worker-prev" aria-label="Previous day">‹</button>
+    <button class="worker-date-btn" id="worker-date-btn" aria-label="Go to today">
+      <span class="worker-date-label" id="worker-date-label"></span>
+      <span class="worker-date-sub"   id="worker-date-sub"></span>
+    </button>
+    <button class="worker-nav-arrow" id="worker-next" aria-label="Next day">›</button>
+    <button class="worker-week-btn"  id="worker-week-btn" aria-label="Week view">Sem</button>
+  </div>
 </div>
 
 <div class="content">
@@ -2746,21 +2794,35 @@
     const sub      = document.getElementById('date-sub');
     const wt       = document.getElementById('week-toggle');
 
+    let labelText, subText, isToday = false, isWeek = false;
     if (viewMode === 'week') {
-      label.textContent = t('week_view');
-      label.classList.remove('is-today');
-      sub.textContent = t('next_n_days', { n: SCHEDULE_LOOKAHEAD });
-      wt.classList.add('active');
+      labelText = t('week_view');
+      subText = t('next_n_days', { n: SCHEDULE_LOOKAHEAD });
+      isWeek = true;
     } else {
       const diff = Math.round((parseDate(curStr) - parseDate(todayStr)) / 86400000);
-      if (diff === 0)       { label.textContent = t('today_label');     label.classList.add('is-today'); }
-      else if (diff === 1)  { label.textContent = t('tomorrow_label');  label.classList.remove('is-today'); }
-      else if (diff === -1) { label.textContent = t('yesterday_label'); label.classList.remove('is-today'); }
-      else                  { label.textContent = fmtFull(currentDate); label.classList.remove('is-today'); }
-      sub.textContent = diff === 0 ? fmtFull(currentDate)
-        : diff > 0 ? t('days_away', { n: diff }) : t('days_ago', { n: -diff });
-      wt.classList.remove('active');
+      if (diff === 0)       { labelText = t('today_label');     isToday = true; }
+      else if (diff === 1)  { labelText = t('tomorrow_label');  }
+      else if (diff === -1) { labelText = t('yesterday_label'); }
+      else                  { labelText = fmtFull(currentDate); }
+      subText = diff === 0 ? fmtFull(currentDate)
+              : diff > 0 ? t('days_away', { n: diff }) : t('days_ago', { n: -diff });
     }
+
+    // Manager nav
+    if (label && sub && wt) {
+      label.textContent = labelText;
+      label.classList.toggle('is-today', isToday);
+      sub.textContent   = subText;
+      wt.classList.toggle('active', isWeek);
+    }
+    // Worker header date row (mirror of the same data)
+    const wLbl = document.getElementById('worker-date-label');
+    const wSub = document.getElementById('worker-date-sub');
+    const wWk  = document.getElementById('worker-week-btn');
+    if (wLbl) { wLbl.textContent = labelText; wLbl.classList.toggle('is-today', isToday); }
+    if (wSub) { wSub.textContent = subText; }
+    if (wWk)  { wWk.classList.toggle('active', isWeek); }
   }
 
   // ─── MAIN RENDER ──────────────────────────────────────────────────────────
@@ -3118,6 +3180,30 @@
     viewMode = viewMode === 'week' ? 'day' : 'week';
     render();
   });
+  // Worker header nav buttons: same actions as manager nav
+  const wPrev = document.getElementById('worker-prev');
+  const wNext = document.getElementById('worker-next');
+  const wDate = document.getElementById('worker-date-btn');
+  const wWeek = document.getElementById('worker-week-btn');
+  if (wPrev) wPrev.addEventListener('click', () => {
+    if (viewMode === 'week') { viewMode = 'day'; }
+    else { currentDate = addDays(currentDate, -1); }
+    render();
+  });
+  if (wNext) wNext.addEventListener('click', () => {
+    if (viewMode === 'week') return;
+    currentDate = addDays(currentDate, 1);
+    render();
+  });
+  if (wDate) wDate.addEventListener('click', () => {
+    currentDate = new Date();
+    viewMode = 'day';
+    render();
+  });
+  if (wWeek) wWeek.addEventListener('click', () => {
+    viewMode = viewMode === 'week' ? 'day' : 'week';
+    render();
+  });
   document.getElementById('refresh-btn').addEventListener('click', async () => {
     const btn = document.getElementById('refresh-btn');
     btn.disabled = true; btn.textContent = '…';
@@ -3138,18 +3224,17 @@
     const lb = document.getElementById('lang-btn');
     if (lb) lb.textContent = appLang === 'en' ? 'ES' : 'EN';
 
-    // Worker header — set role name, date, and active-lang highlight
+    // Worker header — set role name + active-lang highlight (date is set by updateNav)
     if (userRole !== 'manager') {
       const teamLabel = userRole === 'shape' ? t('header_shape_team') : t('header_bfp_team');
       const emoji     = userRole === 'shape' ? '🥨' : '🔥';
-      const today     = new Date();
-      const dateText  = today.toLocaleDateString(_localeStr(), { weekday: 'short', month: 'short', day: 'numeric' });
       setHTML('worker-header-name', `${emoji} ${esc(teamLabel)}`);
-      setText('worker-header-date', `· ${dateText}`);
       const esEl = document.getElementById('worker-lang-es');
       const enEl = document.getElementById('worker-lang-en');
       if (esEl) esEl.className = appLang === 'es' ? 'active-lang' : '';
       if (enEl) enEl.className = appLang === 'en' ? 'active-lang' : '';
+      const wb = document.getElementById('worker-week-btn');
+      if (wb) wb.textContent = appLang === 'es' ? 'Sem' : 'Week';
     }
 
     // Tab bar
