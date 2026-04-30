@@ -1561,10 +1561,17 @@
     if (fromLog && fromLog > 0) return Math.max(1, fromLog);
     return Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
   };
-  // saveWorkers updates BOTH localStorage (instant local feedback) and the
-  // production log (so the next reload on every device picks up the new count).
+  // saveWorkers updates THREE things:
+  //   1. productionState in-memory  (so the next getWorkers/render() call sees
+  //      the new value immediately — getWorkers prefers log-derived state over
+  //      localStorage, so without this the UI shows the stale value until the
+  //      next loadProduction)
+  //   2. localStorage              (per-device fallback + offline)
+  //   3. production log            (synced across devices, fire-and-forget)
   const saveWorkers = (type, date, n) => {
     const v = Math.max(1, n);
+    if (!productionState[date]) productionState[date] = {};
+    productionState[date][type === 'shape' ? 'shapeWorkers' : 'bfpWorkers'] = v;
     localStorage.setItem(`prod-${type}-workers-${date}`, String(v));
     appendLog(PRODUCTION_LOG, {
       action:    'workers_config',
