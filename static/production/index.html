@@ -7,6 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#18181a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="DPC Pretzels">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -505,6 +511,229 @@
       .sku-name  { font-size: 18px; }
       .batch-total-num { font-size: 32px; }
     }
+
+    /* ───────────────── Worker view (UIUX redesign) ───────────────── */
+    /* When body has role-shape or role-bfp, hide manager chrome */
+    body.role-worker .topnav { display: none; }
+    body.role-worker .tab-bar { display: none !important; }
+
+    /* Single-line worker header */
+    .worker-header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--dark); color: var(--white);
+      display: flex; align-items: center;
+      padding: 14px 14px; gap: 10px;
+      border-bottom: 2px solid var(--red);
+    }
+    body.role-worker .worker-header { display: flex !important; }
+    .worker-header-name {
+      font-family: 'Paytone One', sans-serif; font-size: 17px;
+      color: var(--white); white-space: nowrap;
+    }
+    .worker-header-date {
+      font: 400 13px 'Manrope', sans-serif; color: #aaa;
+      white-space: nowrap;
+    }
+    .worker-header-spacer { flex: 1; }
+    .worker-lang-pill {
+      background: rgba(255,255,255,0.08); border: none; color: #ccc;
+      font: 700 12px 'Manrope', sans-serif; letter-spacing: 0.5px;
+      padding: 6px 10px; border-radius: 16px; cursor: pointer;
+    }
+    .worker-lang-pill .active-lang { color: var(--white); font-weight: 800; }
+    .worker-refresh-btn {
+      width: 36px; height: 36px; padding: 0;
+      background: rgba(255,255,255,0.08); border: none;
+      color: var(--white); font-size: 16px; cursor: pointer;
+      border-radius: 18px;
+    }
+    .worker-refresh-btn:active { background: rgba(255,255,255,0.16); }
+
+    /* Hide the floating role-corner pill — replaced by header text */
+    body.role-worker .role-corner-pill { display: none !important; }
+
+    /* Status section headers above grouped cards */
+    .status-section-label {
+      font: 700 11px 'Manrope', sans-serif; color: var(--gray-3);
+      text-transform: uppercase; letter-spacing: 0.7px;
+      padding: 16px 4px 8px;
+    }
+    .status-section-label.pending  { color: var(--red); }
+    .status-section-label.progress { color: #0C447C; }
+    .status-section-label.done     { color: var(--green); }
+
+    /* SKU card — worker view variant */
+    .wcard {
+      position: relative; background: var(--white); border-radius: 14px;
+      margin-bottom: 10px; overflow: hidden;
+      padding: 14px 14px 14px 19px;
+    }
+    .wcard::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 5px; background: var(--wcard-stripe, var(--gray-3));
+    }
+    .wcard.status-overdue  { background: #FCEBEB; }
+    .wcard.status-pending  { background: var(--white); }
+    .wcard.status-progress { background: #E6F1FB; }
+    .wcard.status-done     { background: #EAF3DE; }
+
+    .wcard-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 4px;
+    }
+    .wcard-name { font: 800 17px 'Manrope', sans-serif; color: var(--dark); }
+    .wcard-cheese {
+      display: inline-block; margin-top: 4px;
+      font: 600 11px 'Manrope', sans-serif; color: #6b3a06;
+      background: #fef3d6; padding: 2px 8px; border-radius: 10px;
+    }
+    .wcard-pill {
+      font: 700 11px 'Manrope', sans-serif;
+      padding: 3px 10px; border-radius: 12px;
+      white-space: nowrap;
+    }
+    .wcard-pill.overdue  { background: rgba(196,30,30,0.12); color: var(--red); }
+    .wcard-pill.pending  { background: rgba(0,0,0,0.06); color: var(--gray-4); }
+    .wcard-pill.progress { background: rgba(12,68,124,0.12); color: #0C447C; }
+    .wcard-pill.done     { background: rgba(42,122,42,0.18); color: var(--green); }
+
+    /* Twin metric boxes */
+    .wcard-metrics {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      margin-top: 10px;
+    }
+    .wmetric {
+      background: rgba(255,255,255,0.6); border-radius: 10px;
+      padding: 10px 10px 8px; text-align: center;
+    }
+    .wcard.status-pending .wmetric { background: rgba(0,0,0,0.03); }
+    .wmetric-label {
+      font: 700 10px 'Manrope', sans-serif; color: var(--gray-4);
+      letter-spacing: 0.6px; margin-bottom: 4px;
+    }
+    .wmetric-value {
+      font: 700 22px 'Manrope', sans-serif; color: var(--dark);
+      line-height: 1.1;
+    }
+    .wmetric-value .of { color: var(--gray-3); font-weight: 600; }
+    .wmetric-input {
+      width: 70px; padding: 0 4px; text-align: center;
+      font: 800 22px 'Manrope', sans-serif !important;
+      color: var(--dark); border: 1.5px solid transparent;
+      border-radius: 6px; background: rgba(255,255,255,0.7);
+      -moz-appearance: textfield;
+    }
+    .wmetric-input::-webkit-outer-spin-button,
+    .wmetric-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .wmetric-input:focus { border-color: var(--red); outline: none; background: var(--white); }
+
+    /* TANDAS pips */
+    .pip-row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px; min-height: 12px; }
+    .pip {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: rgba(0,0,0,0.12); flex-shrink: 0;
+    }
+    .pip.filled { background: var(--wcard-stripe, var(--gray-3)); }
+    .pip.partial {
+      background: linear-gradient(90deg, var(--wcard-stripe, var(--gray-3)) 50%, rgba(0,0,0,0.12) 50%);
+    }
+    .pip-overflow { font: 600 10px 'Manrope', sans-serif; color: var(--gray-4); margin-left: 4px; align-self: center; }
+
+    /* PRETZELS bar */
+    .pbar {
+      height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px;
+      overflow: hidden; margin-top: 8px;
+    }
+    .pbar-fill { height: 100%; background: var(--wcard-stripe, var(--gray-3)); transition: width 0.3s ease; }
+
+    /* Stepper */
+    .wstepper {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 12px;
+    }
+    .wstep-btn {
+      width: 52px; height: 52px; flex-shrink: 0;
+      border: 1.5px solid var(--gray-2); border-radius: 12px;
+      background: var(--white); color: var(--dark);
+      font: 700 26px 'Manrope', sans-serif; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .wstep-btn:active { background: var(--gray-1); }
+    .wstep-btn:disabled { opacity: 0.35; cursor: default; }
+    .wstep-center {
+      flex: 1; text-align: center;
+      font: 800 17px 'Manrope', sans-serif; color: var(--dark);
+    }
+    .wstep-status {
+      font: 700 12px 'Manrope', sans-serif; flex-shrink: 0;
+      min-width: 32px; text-align: center;
+    }
+    .wstep-status.saving { color: var(--gray-3); font-weight: 600; }
+    .wstep-status.saved  { color: var(--green); }
+    .wstep-status.done   { color: var(--green); }
+    .wstep-status.over   { color: var(--red); }
+    .wstep-status.error  { color: var(--red); }
+
+    .whelper {
+      font: 400 11px 'Manrope', sans-serif; color: var(--gray-4);
+      text-align: center; margin-top: 8px;
+    }
+    .wdetails-toggle {
+      display: inline-block; font: 600 11px 'Manrope', sans-serif;
+      color: var(--gray-4); margin-top: 6px; cursor: pointer;
+      background: none; border: none; padding: 4px 0;
+    }
+    .wdetails-panel {
+      font: 400 11px 'Manrope', sans-serif; color: var(--gray-4);
+      margin-top: 4px; line-height: 1.5;
+      padding: 6px 8px; background: rgba(0,0,0,0.03); border-radius: 6px;
+    }
+
+    /* Compact "Listo" card variant */
+    .wcard-compact {
+      padding: 10px 14px 10px 19px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .wcard-compact .wcard-check { font-size: 18px; color: var(--green); flex-shrink: 0; }
+    .wcard-compact .wcard-compact-text {
+      flex: 1; font: 600 13px 'Manrope', sans-serif; color: var(--dark);
+    }
+    .wcard-compact .wcard-compact-text strong { font-weight: 800; }
+    .wcard-compact .wcard-expand-hint {
+      font: 400 10px 'Manrope', sans-serif; color: var(--gray-3);
+    }
+
+    /* Day progress meter (worker view top) */
+    .wmeter {
+      background: var(--white); border-radius: 12px; padding: 12px 14px;
+      margin: 12px 0;
+    }
+    .wmeter-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font: 600 13px 'Manrope', sans-serif; color: var(--dark);
+      margin-bottom: 6px;
+    }
+    .wmeter-row .pretzels { color: var(--gray-4); font-weight: 500; }
+    .wmeter-bar {
+      height: 8px; background: rgba(0,0,0,0.07);
+      border-radius: 4px; overflow: hidden;
+    }
+    .wmeter-fill { height: 100%; background: #639922; transition: width 0.4s ease; }
+
+    /* Completion celebration banner */
+    .celebrate-banner {
+      background: #EAF3DE; border-radius: 12px; padding: 16px;
+      margin: 12px 0; text-align: center;
+      animation: fadeIn 0.5s ease;
+    }
+    .celebrate-banner-title {
+      font: 800 18px 'Manrope', sans-serif; color: #173404;
+      margin-bottom: 4px;
+    }
+    .celebrate-banner-sub {
+      font: 400 13px 'Manrope', sans-serif; color: #173404; opacity: 0.85;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
@@ -520,6 +749,17 @@
   <button class="week-toggle" id="lang-btn" aria-label="Switch language">EN</button>
   <button class="week-toggle" id="refresh-btn" aria-label="Refresh data" title="Reload deliveries + production data">↻</button>
 </nav>
+
+<!-- Worker header — single calm line; only rendered for ?role=shape|bfp -->
+<div class="worker-header" id="worker-header" style="display:none">
+  <span class="worker-header-name" id="worker-header-name"></span>
+  <span class="worker-header-date" id="worker-header-date"></span>
+  <span class="worker-header-spacer"></span>
+  <button class="worker-lang-pill" id="worker-lang-btn" aria-label="Switch language">
+    <span id="worker-lang-es">ES</span> · <span id="worker-lang-en">EN</span>
+  </button>
+  <button class="worker-refresh-btn" id="worker-refresh-btn" aria-label="Refresh data" title="↻">↻</button>
+</div>
 
 <div class="content">
   <div id="alert-area"></div>
@@ -664,8 +904,10 @@
     'bulk dangerous dip (25 srv)',
   ]);
 
+  // Only BBK variants need the extra cheese-on-top step during bake. Spicy Bee
+  // is a regular bake (the heat/spice is in the dough/glaze, no post-bake step).
   const BAKE_GROUPS = {
-    coating: ['10oz bbk', '10oz spicy bee', '6.5oz bbk', '6.5oz spicy bee'],
+    coating: ['10oz bbk', '6.5oz bbk', '4oz twist bbk'],
   };
 
   // ─── RUNTIME SKU HELPERS ─────────────────────────────────────────────────
@@ -676,6 +918,19 @@
   const getCaseSize     = sku => (skuConfig[sku]?.caseSize > 0 ? skuConfig[sku].caseSize : 0) || CASE_SIZES[sku] || 0;
   const isFOH           = sku => skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has(sku.toLowerCase()) || FOH_SKUS.has(sku);
   const isCoating       = sku => skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku);
+  // Per-SKU stripe color (worker view) — regex priority. Returns CSS color string.
+  const getStripeColor = (sku) => {
+    const s = (sku || '').toLowerCase();
+    if (/^catering:/i.test(sku) || /catering/i.test(s))  return '#5F5E5A';
+    if (/spicy/.test(s))                                  return '#A32D2D';
+    if (/bees|honey/.test(s))                             return '#EF9F27';
+    if (/bbk/.test(s))                                    return '#633806';
+    if (/mammoth/.test(s))                                return '#854F0B';
+    if (/mustache/.test(s))                               return '#D85A30';
+    if (/twist/.test(s))                                  return '#985E26';
+    if (/plain|bombs/.test(s))                            return '#BA7517';
+    return '#5F5E5A';
+  };
 
   // Step size for the inline +/- logger:
   //   shape: full batch (workers shape whole batches)
@@ -718,12 +973,18 @@
   let extraValuePretzels = 0;
 
   // ─── i18n ─────────────────────────────────────────────────────────────────
-  // Language source of truth: ?lang= URL param > localStorage > browser locale > 'en'
-  const _langParam = new URLSearchParams(window.location.search).get('lang');
-  const _langStored = (() => { try { return localStorage.getItem('prod-lang'); } catch { return null; } })();
-  const _langBrowser = (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
-  let appLang = ['en','es'].includes(_langParam) ? _langParam
+  // Language source of truth (priority): ?lang= URL param > localStorage >
+  // worker-role default (Spanish, since BOH workers are mostly Spanish-first) >
+  // browser locale > 'en'
+  const _urlSearch    = new URLSearchParams(window.location.search);
+  const _langParam    = _urlSearch.get('lang');
+  const _roleParamRaw = _urlSearch.get('role');
+  const _isWorkerView = _roleParamRaw === 'shape' || _roleParamRaw === 'bfp';
+  const _langStored   = (() => { try { return localStorage.getItem('prod-lang'); } catch { return null; } })();
+  const _langBrowser  = (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+  let appLang = ['en','es'].includes(_langParam)  ? _langParam
               : ['en','es'].includes(_langStored) ? _langStored
+              : _isWorkerView ? 'es'
               : _langBrowser;
 
   const I18N = {
@@ -845,6 +1106,32 @@
       // Misc
       foh_only:       ({list}) => `FOH only (not scheduled): ${list}`,
       tomorrow_pending:({n}) => `${n} batch${n !== 1 ? 'es' : ''} scheduled tomorrow — earliest item not yet in production window`,
+      // Phase A — UIUX redesign keys
+      header_shape_team: 'Shape Team',
+      header_bfp_team:   'BFP Team',
+      section_pending:   'PENDING TODAY',
+      section_progress:  'IN PROGRESS',
+      section_done:      'DONE',
+      pill_overdue:      'Overdue',
+      pill_pending:      'Pending',
+      pill_progress:     'In progress',
+      pill_done:         'Done',
+      metric_tandas:     'BATCHES',
+      metric_pretzels:   'PRETZELS',
+      stepper_count:     ({n, total}) => `${n} / ${total} batches`,
+      helper_tap_batch:  ({n}) => `1 tap = 1 batch · ${n} pretzels`,
+      helper_tap_tray:   ({n}) => `1 tap = 1 tray · ${n} pretzels`,
+      done_summary:      ({n, total, p}) => `${n}/${total} batches · ${p} pretzels · logged today`,
+      details_link:      'Details',
+      details_raw:       'Raw materials',
+      details_for_delivery: 'For delivery',
+      walkin_unknown:    'Ask Drew to add this variety',
+      celebrate_title:   '🎉 Day complete!',
+      celebrate_sub:     'Good work. You can close the app.',
+      meter_summary:     ({m, total, p, ptotal}) => `${m} of ${total} batches done · ${p} / ${ptotal} pretzels`,
+      cheese_chip:       '🧀 cheese topping while baking',
+      ahead_note:        ({n}) => `Ahead of schedule · ${n} already frozen`,
+      capacity_extra:    ({n}) => `${n} extra batches scheduled`,
     },
     es: {
       shape_card:     'Formar y fermentar',
@@ -951,6 +1238,32 @@
       no_prod_day:    'sin producción',
       foh_only:       ({list}) => `Solo mostrador (no programado): ${list}`,
       tomorrow_pending:({n}) => `${n} ${n !== 1 ? 'tandas' : 'tanda'} programada${n !== 1 ? 's' : ''} mañana — fuera de ventana hoy`,
+      // Phase A — UIUX redesign keys
+      header_shape_team: 'Equipo de Masa',
+      header_bfp_team:   'Equipo HCE',
+      section_pending:   'PENDIENTE HOY',
+      section_progress:  'EN PROGRESO',
+      section_done:      'LISTO',
+      pill_overdue:      'Atrasado',
+      pill_pending:      'Pendiente',
+      pill_progress:     'En progreso',
+      pill_done:         'Listo',
+      metric_tandas:     'TANDAS',
+      metric_pretzels:   'PRETZELS',
+      stepper_count:     ({n, total}) => `${n} / ${total} tandas`,
+      helper_tap_batch:  ({n}) => `1 toque = 1 tanda · ${n} pretzels`,
+      helper_tap_tray:   ({n}) => `1 toque = 1 bandeja · ${n} pretzels`,
+      done_summary:      ({n, total, p}) => `${n}/${total} tandas · ${p} pretzels · registrado hoy`,
+      details_link:      'Detalles',
+      details_raw:       'Materia prima',
+      details_for_delivery: 'Para entrega',
+      walkin_unknown:    'Pídele a Drew que añada esta variedad',
+      celebrate_title:   '🎉 ¡Día completado!',
+      celebrate_sub:     'Buen trabajo. Ya puedes cerrar la app.',
+      meter_summary:     ({m, total, p, ptotal}) => `${m} de ${total} tandas hechas · ${p} / ${ptotal} pretzels`,
+      cheese_chip:       '🧀 cubrir con queso al hornear',
+      ahead_note:        ({n}) => `Adelantado · ya hay ${n} congelados`,
+      capacity_extra:    ({n}) => `${n} ${n !== 1 ? 'tandas' : 'tanda'} extra programada${n !== 1 ? 's' : ''}`,
     },
   };
 
@@ -970,14 +1283,17 @@
   else if (userRole === 'bfp')   document.title = appLang === 'es' ? 'HCE · Producción'    : 'BFP · Production';
   else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
 
-  // Role badge — small pill in the top nav so the team knows what they're seeing.
-  // Manager has no badge (everything is visible).
+  // Set body class for role-aware CSS hiding (handled in stylesheet).
+  // Worker views (shape/bfp) get their own simplified header — no floating
+  // corner pill anymore (replaced by the inline header text).
   if (userRole !== 'manager') {
-    const badge = document.createElement('div');
-    badge.style.cssText = 'position:absolute;top:8px;right:62px;padding:2px 8px;border-radius:10px;background:var(--red);color:#fff;font:700 10px Manrope,sans-serif;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:101';
-    badge.textContent = userRole === 'shape' ? '🥨 Shape' : '🔥 BFP';
-    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(badge));
-    if (document.body) document.body.appendChild(badge);
+    const setBody = () => {
+      document.body.classList.add('role-worker', `role-${userRole}`);
+      const wh = document.getElementById('worker-header');
+      if (wh) wh.style.display = 'flex';
+    };
+    if (document.body) setBody();
+    else document.addEventListener('DOMContentLoaded', setBody);
   }
 
   let dayTab = userRole === 'bfp' ? 'bfp' : 'shape'; // 'shape' | 'bfp' | 'stock' (manager only)
@@ -1739,6 +2055,234 @@
     </div>`;
   }
 
+  // ─── WORKER DAY VIEW (UIUX redesign) ─────────────────────────────────────
+  // Calm, Spanish-first, status-grouped layout. See plan file for design intent.
+
+  // Build the same itemMap as renderTeamCard does — schedule-current + completed,
+  // sorted by priority. Returns rich items with status bucket attached.
+  function buildWorkerItems(type, dateStr) {
+    const dayState       = productionState[dateStr] || {};
+    const scheduledItems = schedule[type][dateStr] || [];
+    const doneKey        = type === 'shape' ? 'shapeDone' : 'bfpDone';
+    const completedRows  = dayState[doneKey] || [];
+
+    const itemMap = {};
+    scheduledItems.forEach(item => {
+      itemMap[item.sku] = { ...item, needBatches: item.batches, madeBatches: 0 };
+    });
+    completedRows.forEach(c => {
+      const made = Number(c.batches) || 0;
+      if (itemMap[c.sku]) {
+        itemMap[c.sku].madeBatches = made;
+      } else {
+        itemMap[c.sku] = {
+          sku: c.sku,
+          batches: 0, needBatches: 0, madeBatches: made,
+          deliveryDates: [], orders: [],
+          urgent: false, isOverdue: false, overloaded: false,
+        };
+      }
+    });
+
+    const items = Object.values(itemMap).map(d => {
+      const bs    = getBatchSize(d.sku);
+      const totalBatches = d.needBatches + d.madeBatches;
+      const origP = totalBatches * bs;
+      const madeP = Math.round(d.madeBatches * bs);
+      let bucket;
+      if (madeP >= origP && origP > 0)        bucket = 'done';
+      else if (d.madeBatches > 0)              bucket = 'progress';
+      else if (d.isOverdue)                    bucket = 'overdue';
+      else                                      bucket = 'pending';
+      return { ...d, bucket, totalBatches, origP, madeP };
+    });
+
+    // Sort within each bucket by earliest delivery date
+    return items.sort((a, b) => {
+      const order = { overdue: 0, pending: 1, progress: 2, done: 3 };
+      if (order[a.bucket] !== order[b.bucket]) return order[a.bucket] - order[b.bucket];
+      const ad = a.deliveryDates[0] || '9999';
+      const bd = b.deliveryDates[0] || '9999';
+      return ad.localeCompare(bd);
+    });
+  }
+
+  // SKU card — compact "Listo" variant when complete (collapsed if not expanded).
+  // Expanded by tapping. Same DOM hooks as the full card so the stepper still wires.
+  const expandedDoneCards = new Set(); // SKU keys that are expanded despite being done
+
+  function renderWorkerCard(type, dateStr, d) {
+    const bs        = getBatchSize(d.sku);
+    const stepDelta = getStepDelta(type, d.sku);
+    const stripe    = getStripeColor(d.sku);
+    const stepperKey = `${type}|${dateStr}|${d.sku}`;
+    const totalBatches = d.totalBatches;
+    const origP     = d.origP;
+    const madeP     = d.madeP;
+    const madeBatches = d.madeBatches;
+
+    // Compact done card (unless user has expanded it for editing)
+    if (d.bucket === 'done' && !expandedDoneCards.has(d.sku)) {
+      const stripeStyle = `--wcard-stripe:${stripe}`;
+      return `<div class="wcard wcard-compact status-done" style="${stripeStyle}" data-expand-sku="${esc(d.sku)}">
+        <span class="wcard-check">✅</span>
+        <span class="wcard-compact-text"><strong>${esc(d.sku)}</strong> · ${t('done_summary', { n: madeBatches, total: totalBatches, p: madeP })}</span>
+        <span class="wcard-expand-hint">↓</span>
+      </div>`;
+    }
+
+    // Status pill
+    const pillKey = d.bucket === 'overdue' ? 'pill_overdue'
+                  : d.bucket === 'progress' ? 'pill_progress'
+                  : d.bucket === 'done'     ? 'pill_done'
+                                             : 'pill_pending';
+    const pillIcon = d.bucket === 'overdue' ? '🚨 '
+                   : d.bucket === 'progress' ? '⏳ '
+                   : d.bucket === 'done'     ? '✅ '
+                                              : '';
+
+    // TANDAS pips: total = ceil(total batches), filled = floor(made), partial if fractional
+    const totalPipCount = Math.max(1, Math.ceil(totalBatches));
+    const filledPips    = Math.floor(madeBatches);
+    const hasPartial    = (madeBatches % 1) > 0.1;
+    const MAX_PIPS = 12;
+    let pipsHtml = '';
+    const pipCount = Math.min(totalPipCount, MAX_PIPS);
+    for (let i = 0; i < pipCount; i++) {
+      let cls = 'pip';
+      if (i < filledPips)                                         cls += ' filled';
+      else if (i === filledPips && hasPartial)                    cls += ' partial';
+      pipsHtml += `<span class="${cls}"></span>`;
+    }
+    if (totalPipCount > MAX_PIPS) {
+      pipsHtml += `<span class="pip-overflow">+${totalPipCount - MAX_PIPS}</span>`;
+    }
+
+    // PRETZELS bar fill
+    const barPct = origP > 0 ? Math.min(100, Math.round((madeP / origP) * 100)) : 0;
+
+    // Helper line — team-aware step unit
+    const helper = (type === 'bfp' && getTraySize(d.sku) > 0)
+      ? t('helper_tap_tray', { n: stepDelta })
+      : t('helper_tap_batch', { n: bs });
+
+    // Cheese chip for BBK SKUs
+    const cheeseChip = isCoating(d.sku) ? `<div class="wcard-cheese">${t('cheese_chip')}</div>` : '';
+
+    // Detail panel content
+    const fullInv  = getLatestInventory();
+    const dough    = fullInv.coldFerment[d.sku] || 0;
+    const frozen   = fullInv.frozen[d.sku]      || 0;
+    const delivStr = d.deliveryDates.length > 0
+      ? d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ')
+      : t('logged_today');
+    const custStr  = (d.orders || []).map(esc).join(' · ');
+
+    // Status indicator (re-used for save state)
+    const isDone = madeP >= origP && origP > 0;
+    const isOverLog = madeP > origP;
+    const stepStatus = isOverLog
+      ? `<span class="wstep-status over" id="rls-${esc(type)}-${esc(d.sku)}">+${madeP - origP}</span>`
+      : isDone
+      ? `<span class="wstep-status done" id="rls-${esc(type)}-${esc(d.sku)}">✅</span>`
+      : `<span class="wstep-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
+
+    return `<div class="wcard status-${d.bucket}" style="--wcard-stripe:${stripe}">
+      <div class="wcard-head">
+        <div>
+          <div class="wcard-name">${esc(d.sku)}</div>
+          ${cheeseChip}
+        </div>
+        <span class="wcard-pill ${d.bucket}">${pillIcon}${t(pillKey)}</span>
+      </div>
+
+      <div class="wcard-metrics">
+        <div class="wmetric">
+          <div class="wmetric-label">${t('metric_tandas')}</div>
+          <div class="wmetric-value"><strong>${madeBatches}</strong><span class="of"> / ${totalBatches}</span></div>
+          <div class="pip-row">${pipsHtml}</div>
+        </div>
+        <div class="wmetric">
+          <div class="wmetric-label">${t('metric_pretzels')}</div>
+          <div class="wmetric-value">
+            <input type="number" class="wmetric-input" min="0" inputmode="numeric"
+                   value="${madeP}"
+                   data-log-input data-key="${esc(stepperKey)}"
+                   id="rli-${esc(type)}-${esc(d.sku)}">
+            <span class="of"> / ${origP}</span>
+          </div>
+          <div class="pbar"><div class="pbar-fill" style="width:${barPct}%"></div></div>
+        </div>
+      </div>
+
+      <div class="wstepper">
+        <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" ${madeP <= 0 ? 'disabled' : ''}>−</button>
+        <div class="wstep-center">${t('stepper_count', { n: madeBatches, total: totalBatches })}</div>
+        <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1">+</button>
+        ${stepStatus}
+      </div>
+
+      <div class="whelper">${esc(helper)}</div>
+      <button class="wdetails-toggle" data-details-toggle data-sku="${esc(d.sku)}">ⓘ ${t('details_link')}</button>
+      <div class="wdetails-panel" id="wdp-${esc(type)}-${esc(d.sku)}" style="display:none">
+        <div>${t('details_raw')}: 🧊 ${dough} ${t('dough_label')} · ❄️ ${frozen} ${t('frozen_label')}</div>
+        <div>${t('details_for_delivery')}: ${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
+      </div>
+    </div>`;
+  }
+
+  function renderWorkerDayView(type, dateStr) {
+    const items = buildWorkerItems(type, dateStr);
+
+    // Day meter: this team's totals
+    const totalBatches = items.reduce((s, d) => s + d.totalBatches, 0);
+    const madeBatches  = items.reduce((s, d) => s + d.madeBatches, 0);
+    const totalP       = items.reduce((s, d) => s + d.origP, 0);
+    const madeP        = items.reduce((s, d) => s + d.madeP, 0);
+    const meterPct     = totalP > 0 ? Math.min(100, Math.round((madeP / totalP) * 100)) : 0;
+    const meterHtml    = totalP > 0 ? `
+      <div class="wmeter">
+        <div class="wmeter-row">
+          <span><strong>${madeBatches}</strong> / ${totalBatches} ${appLang === 'es' ? 'tandas hechas' : 'batches done'}</span>
+          <span class="pretzels">${madeP} / ${totalP} pretzels</span>
+        </div>
+        <div class="wmeter-bar"><div class="wmeter-fill" style="width:${meterPct}%"></div></div>
+      </div>` : '';
+
+    // Group items by bucket
+    const groups = {
+      pending:  items.filter(d => d.bucket === 'overdue' || d.bucket === 'pending'),
+      progress: items.filter(d => d.bucket === 'progress'),
+      done:     items.filter(d => d.bucket === 'done'),
+    };
+
+    const allDone = items.length > 0 && groups.done.length === items.length;
+    const celebrate = allDone ? `
+      <div class="celebrate-banner">
+        <div class="celebrate-banner-title">${t('celebrate_title')}</div>
+        <div class="celebrate-banner-sub">${t('celebrate_sub')}</div>
+      </div>` : '';
+
+    let sectionsHtml = '';
+    if (groups.pending.length > 0) {
+      sectionsHtml += `<div class="status-section-label pending">${t('section_pending')}</div>`;
+      sectionsHtml += groups.pending.map(d => renderWorkerCard(type, dateStr, d)).join('');
+    }
+    if (groups.progress.length > 0) {
+      sectionsHtml += `<div class="status-section-label progress">${t('section_progress')}</div>`;
+      sectionsHtml += groups.progress.map(d => renderWorkerCard(type, dateStr, d)).join('');
+    }
+    if (groups.done.length > 0) {
+      sectionsHtml += `<div class="status-section-label done">${t('section_done')}</div>`;
+      sectionsHtml += groups.done.map(d => renderWorkerCard(type, dateStr, d)).join('');
+    }
+
+    // Walk-in button at the bottom
+    const extraBtn = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">${t('add_unsched')}</button>`;
+
+    return meterHtml + celebrate + sectionsHtml + extraBtn;
+  }
+
   // ─── RENDER DAY VIEW ──────────────────────────────────────────────────────
 
   function renderDayView() {
@@ -1771,6 +2315,8 @@
         : `<span style="font-size:13px;color:var(--gray-3)">${t('all_clear')}</span>`;
       return `<div class="no-prod" style="padding:32px 20px">${t('nothing_for', { team: teamLabel })}<br>${hint}</div>`;
     }
+    // Worker view: status-grouped sections + day meter; manager view: existing card
+    if (userRole !== 'manager') return renderWorkerDayView(type, dateStr);
     return renderTeamCard(type, dateStr);
   }
 
@@ -2295,7 +2841,11 @@
       }
     }
 
-    document.getElementById('alert-area').innerHTML = overdueHtml + unconfigHtml + dupHtml + unconfirmedHtml;
+    // Worker views see no banners (calmer UX). Per-card 🚨 tag still surfaces overdue work.
+    const alertHtml = userRole === 'manager'
+      ? (overdueHtml + unconfigHtml + dupHtml + unconfirmedHtml)
+      : '';
+    document.getElementById('alert-area').innerHTML = alertHtml;
 
     // Tab bar — manager only (team roles see only their own card)
     const tabBar = document.getElementById('tab-bar');
@@ -2347,6 +2897,21 @@
     });
     document.querySelectorAll('[data-cfg-btn]').forEach(btn => {
       btn.addEventListener('click', () => openCfgSheet(btn.dataset.sku));
+    });
+    // Worker view: details toggle + done-card-expand
+    document.querySelectorAll('[data-details-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sku = btn.dataset.sku;
+        const type = userRole === 'bfp' ? 'bfp' : 'shape';
+        const panel = document.getElementById(`wdp-${type}-${sku}`);
+        if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      });
+    });
+    document.querySelectorAll('[data-expand-sku]').forEach(card => {
+      card.addEventListener('click', () => {
+        expandedDoneCards.add(card.dataset.expandSku);
+        render();
+      });
     });
     const stockSaveBtn = document.getElementById('stock-save');
     if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
@@ -2573,6 +3138,20 @@
     const lb = document.getElementById('lang-btn');
     if (lb) lb.textContent = appLang === 'en' ? 'ES' : 'EN';
 
+    // Worker header — set role name, date, and active-lang highlight
+    if (userRole !== 'manager') {
+      const teamLabel = userRole === 'shape' ? t('header_shape_team') : t('header_bfp_team');
+      const emoji     = userRole === 'shape' ? '🥨' : '🔥';
+      const today     = new Date();
+      const dateText  = today.toLocaleDateString(_localeStr(), { weekday: 'short', month: 'short', day: 'numeric' });
+      setHTML('worker-header-name', `${emoji} ${esc(teamLabel)}`);
+      setText('worker-header-date', `· ${dateText}`);
+      const esEl = document.getElementById('worker-lang-es');
+      const enEl = document.getElementById('worker-lang-en');
+      if (esEl) esEl.className = appLang === 'es' ? 'active-lang' : '';
+      if (enEl) enEl.className = appLang === 'en' ? 'active-lang' : '';
+    }
+
     // Tab bar
     const tShape = document.querySelector('.tab-btn[data-tab="shape"]');
     const tBfp   = document.querySelector('.tab-btn[data-tab="bfp"]');
@@ -2608,7 +3187,7 @@
     setText('extra-cancel',      t('cancel'));
   }
   syncLangBtn();
-  document.getElementById('lang-btn').addEventListener('click', () => {
+  function flipLang() {
     appLang = appLang === 'en' ? 'es' : 'en';
     try { localStorage.setItem('prod-lang', appLang); } catch {}
     syncLangBtn();
@@ -2617,7 +3196,41 @@
     else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
     schedule = buildOptimalSchedule();
     render();
+  }
+  document.getElementById('lang-btn').addEventListener('click', flipLang);
+  const wLang = document.getElementById('worker-lang-btn');
+  if (wLang) wLang.addEventListener('click', flipLang);
+  const wRef = document.getElementById('worker-refresh-btn');
+  if (wRef) wRef.addEventListener('click', async () => {
+    wRef.disabled = true; wRef.textContent = '…';
+    try {
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus()]);
+      schedule = buildOptimalSchedule();
+      render();
+    } finally {
+      wRef.disabled = false; wRef.textContent = '↻';
+    }
   });
+
+  // Auto-refresh — visibility regain + soft 60s interval. Both gated by
+  // active input focus + pending save (so we don't clobber typing).
+  const _isInputBusy = () =>
+    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val')
+    || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null);
+
+  async function softRefresh() {
+    if (_isInputBusy()) return;
+    try {
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus()]);
+      schedule = buildOptimalSchedule();
+      // Skip render if user just started typing during the network call
+      if (!_isInputBusy()) render();
+    } catch (_) { /* network blip — next interval will retry */ }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') softRefresh();
+  });
+  setInterval(softRefresh, 60_000);
 
   // Extra sheet
   document.getElementById('extra-save').addEventListener('click', saveExtra);

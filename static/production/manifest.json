@@ -1,0 +1,14 @@
+{
+  "name": "Dangerous Pretzel — Production",
+  "short_name": "DPC Pretzels",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#18181a",
+  "theme_color": "#18181a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
