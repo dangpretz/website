@@ -1539,14 +1539,41 @@
         } catch {}
         return;
       }
+      // Worker count is set by the manager (or anyone with the stepper) and
+      // synced via this action so all devices see the same daily capacity.
+      if (action === 'workers_config') {
+        const n = Math.max(1, Number(row.workers) || 1);
+        if (row.type === 'shape') s.shapeWorkers = n;
+        else if (row.type === 'bfp') s.bfpWorkers = n;
+        return;
+      }
     });
     return state;
   }
 
   // ─── WORKER PERSISTENCE ───────────────────────────────────────────────────
 
-  const getWorkers  = (type, date) => Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
-  const saveWorkers = (type, date, n) => localStorage.setItem(`prod-${type}-workers-${date}`, String(Math.max(1, n)));
+  // Worker count: prefer the synced value from the production log so all
+  // devices (manager + Shape tablet + BFP tablet) see the same daily capacity.
+  // Falls back to per-device localStorage (legacy + offline edits).
+  const getWorkers = (type, date) => {
+    const fromLog = (productionState[date] || {})[type === 'shape' ? 'shapeWorkers' : 'bfpWorkers'];
+    if (fromLog && fromLog > 0) return Math.max(1, fromLog);
+    return Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
+  };
+  // saveWorkers updates BOTH localStorage (instant local feedback) and the
+  // production log (so the next reload on every device picks up the new count).
+  const saveWorkers = (type, date, n) => {
+    const v = Math.max(1, n);
+    localStorage.setItem(`prod-${type}-workers-${date}`, String(v));
+    appendLog(PRODUCTION_LOG, {
+      action:    'workers_config',
+      type,
+      date,
+      workers:   String(v),
+      timeStamp: new Date().toISOString(),
+    }).catch((e) => console.error('workers_config save failed:', e));
+  };
 
   // ─── LATEST INVENTORY SNAPSHOT ───────────────────────────────────────────
   // Returns the most recent cold-ferment and frozen counts per SKU across all
@@ -1926,59 +1953,18 @@
   function renderTeamCard(type, dateStr) {
     const isBFP    = type === 'bfp';
     const title    = isBFP ? t('bfp_card') : t('shape_card');
-    const dayState = productionState[dateStr] || {};
     const workers  = getWorkers(type, dateStr);
     const capacity = workers * BATCHES_PER_WORKER;
-    const doneKey  = isBFP ? 'bfpDone' : 'shapeDone';
-    const fullInv  = getLatestInventory(); // both dough + frozen for display
 
-    // Build unified items list: scheduled + already-completed (so completed SKUs
-    // still appear with their stepper showing "✓ Done")
-    const scheduledItems = schedule[type][dateStr] || [];
-    const completedRows  = dayState[doneKey] || [];
-    const itemMap = {};
-    scheduledItems.forEach(item => {
-      itemMap[item.sku] = { ...item, needBatches: item.batches, madeBatches: 0 };
-    });
-    completedRows.forEach(c => {
-      const made = Number(c.batches) || 0;
-      if (itemMap[c.sku]) {
-        itemMap[c.sku].madeBatches = made;
-      } else {
-        // Completed but no longer scheduled (fully done or unscheduled add)
-        itemMap[c.sku] = {
-          sku: c.sku,
-          batches: 0, needBatches: 0, madeBatches: made,
-          deliveryDates: [], orders: [],
-          urgent: false, isOverdue: false, overloaded: false,
-        };
-      }
-    });
-    // Sort items: overdue first (oldest delivery), then urgent (must do today),
-    // then pulling-ahead, then completed/done. Earliest delivery date is the
-    // tiebreak within each priority bucket.
-    const priorityRank = it => {
-      if (it.isOverdue)        return 0;
-      if (it.urgent)            return 1;
-      if (it.needBatches > 0)   return 2;
-      return 3; // already done / no remaining work
-    };
-    const items = Object.values(itemMap).sort((a, b) => {
-      const ra = priorityRank(a), rb = priorityRank(b);
-      if (ra !== rb) return ra - rb;
-      const ad = a.deliveryDates.length ? a.deliveryDates[0] : '9999-99-99';
-      const bd = b.deliveryDates.length ? b.deliveryDates[0] : '9999-99-99';
-      return ad.localeCompare(bd);
-    });
+    // Reuse the worker-view item builder — filters zero-net and adds bucket+priorMade
+    const items = buildWorkerItems(type, dateStr);
 
-    const totalNeed   = items.reduce((s, d) => s + d.needBatches, 0);
+    const totalOrig   = items.reduce((s, d) => s + d.totalBatches, 0);
     const totalMade   = items.reduce((s, d) => s + d.madeBatches, 0);
-    const totalOrig   = totalNeed + totalMade; // original demand for today
-    const totalNeedP  = items.reduce((s, d) => s + d.needBatches * getBatchSize(d.sku), 0);
-    const totalMadeP  = items.reduce((s, d) => s + d.madeBatches * getBatchSize(d.sku), 0);
-    const totalOrigP  = totalNeedP + totalMadeP;
-    const isOver      = totalOrig > capacity;
-    const spare       = capacity - totalOrig;
+    const totalOrigP  = items.reduce((s, d) => s + d.origP, 0);
+    const totalMadeP  = items.reduce((s, d) => s + d.madeP, 0);
+    const isOver      = totalOrig > capacity + 0.5;
+    const spare       = Math.max(0, capacity - Math.ceil(totalOrig));
 
     // Status badge — pretzel-based
     let badgeClass, badgeText;
@@ -2013,101 +1999,30 @@
         </div>
       </div>`;
 
-    // SKU block — team-aware display:
-    //   Shape leads with batches (workers think in batches)
-    //   BFP leads with pretzels + cases (wholesale shipping unit)
-    const renderBlock = d => {
-      const bs        = getBatchSize(d.sku);
-      const cs        = getCaseSize(d.sku);
-      const stepDelta = getStepDelta(type, d.sku);
-      const dough     = fullInv.coldFerment[d.sku] || 0;
-      const frozen    = fullInv.frozen[d.sku]      || 0;
-      const totalBatches = d.needBatches + d.madeBatches;
-      const origP     = totalBatches * bs;
-      const madeP     = Math.round(d.madeBatches * bs);
-      const origCases = cs > 0 ? Math.ceil(origP / cs) : 0;
-      const madeCases = cs > 0 ? Math.ceil(madeP / cs) : 0;
-
-      const tagHtml = d.isOverdue
-        ? `<span class="sku-tag sku-tag-urgent">${t('overdue')}</span>`
-        : d.urgent
-        ? `<span class="sku-tag sku-tag-urgent">${t('must_do_today')}</span>`
-        : d.needBatches > 0
-        ? `<span class="sku-tag sku-tag-ahead">${t('pulling_ahead')}</span>`
-        : `<span class="sku-tag sku-tag-ahead" style="background:#e8f5e8;color:var(--green)">${t('done')}</span>`;
-      const delivStr = d.deliveryDates.length > 0
-        ? d.deliveryDates.map(ds => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`).join(' + ')
-        : t('logged_today');
-      const custStr  = d.orders.length > 0 ? d.orders.map(esc).join(' · ') : '';
-      const isDone   = madeP >= origP && origP > 0;
-      const isOverLog = madeP > origP;
-      const loggerClass = isOverLog ? 'over' : isDone ? 'done' : '';
-      const loggerStatus = isOverLog
-        ? `<span class="row-log-status over" id="rls-${esc(type)}-${esc(d.sku)}">+${madeP - origP}</span>`
-        : isDone
-        ? `<span class="row-log-status done" id="rls-${esc(type)}-${esc(d.sku)}">✅</span>`
-        : `<span class="row-log-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
-      const stepperKey = `${type}|${dateStr}|${d.sku}`;
-      const stepUnit   = type === 'bfp' && getTraySize(d.sku) > 0
-        ? t('tray_of', { n: stepDelta })
-        : t('batch_of', { n: bs });
-
-      // "Need today" line — team-specific lead
-      let needLineHtml = '';
-      if (origP > 0) {
-        if (type === 'shape') {
-          needLineHtml = `<div class="sku-block-need">${t('batches_today_lead', { b: totalBatches, p: origP })}</div>`;
-        } else {
-          needLineHtml = `<div class="sku-block-need">${t('pretzels_today', { p: origP, b: totalBatches, bs, hasCases: origCases > 0, cases: origCases, cs })}</div>`;
-        }
-      }
-
-      // "Made today" sublabel — team-specific
-      const madeSubLabel = type === 'shape'
-        ? t('made_sub_shape', { made: d.madeBatches, total: totalBatches, b: totalBatches, unit: stepUnit })
-        : t('made_sub_bfp',   { mc: madeCases, tc: origCases, hasCases: origCases > 0, unit: stepUnit });
-
-      return `<div class="sku-block">
-        <div class="sku-block-head">
-          <span class="sku-block-name">${esc(d.sku)}</span>
-          ${tagHtml}
-        </div>
-        ${needLineHtml}
-        <div class="sku-block-meta">${esc(delivStr)}${custStr ? ' · ' + custStr : ''}</div>
-        <div class="sku-block-onhand">
-          <span class="ohi ${dough > 0 ? '' : 'zero'}">🧊 ${dough} ${t('dough_label')}</span>
-          <span class="ohi ${frozen > 0 ? '' : 'zero'}">❄️ ${frozen} ${t('frozen_label')}</span>
-        </div>
-        <div class="row-logger ${loggerClass}">
-          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" title="-1 ${stepUnit}" ${madeP <= 0 ? 'disabled' : ''}>−</button>
-          <div class="row-log-display">
-            <div class="row-log-numbers">
-              <input type="number" class="row-log-input" min="0" inputmode="numeric"
-                     value="${madeP}"
-                     data-log-input data-key="${esc(stepperKey)}"
-                     id="rli-${esc(type)}-${esc(d.sku)}">
-              <span class="row-log-of">/ ${origP}</span>
-            </div>
-            <div class="row-log-label">${t('pretzels_made')} · ${madeSubLabel}</div>
-          </div>
-          <button class="row-log-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1" title="+1 ${stepUnit}">+</button>
-          ${loggerStatus}
-        </div>
-      </div>`;
+    // Group items by bucket and render each via the unified worker-card component.
+    // Status grouping replaces the old BFP "Standard / + Coating step" split — the
+    // cheese chip on each coating card already conveys the same info.
+    const groups = {
+      pending:  items.filter(d => d.bucket === 'overdue' || d.bucket === 'pending'),
+      progress: items.filter(d => d.bucket === 'progress'),
+      done:     items.filter(d => d.bucket === 'done'),
     };
-
     let skuHtml = '';
     if (items.length === 0) {
       skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">${t('no_prod_extra')}</div>`;
-    } else if (isBFP) {
-      const coating  = items.filter(d => isCoating(d.sku));
-      const standard = items.filter(d => !isCoating(d.sku));
-      const standardLabel = appLang === 'es' ? 'Estándar' : 'Standard';
-      const coatingLabel  = appLang === 'es' ? '+ Con cobertura' : '+ Coating step';
-      if (standard.length > 0) { skuHtml += coating.length > 0 ? `<div class="group-label">${standardLabel}</div>` : ''; skuHtml += standard.map(renderBlock).join(''); }
-      if (coating.length > 0)  { skuHtml += `<div class="group-label">${coatingLabel}</div>${coating.map(renderBlock).join('')}`; }
     } else {
-      skuHtml = items.map(renderBlock).join('');
+      if (groups.pending.length > 0) {
+        skuHtml += `<div class="status-section-label pending">${t('section_pending')}</div>`;
+        skuHtml += groups.pending.map(d => renderWorkerCard(type, dateStr, d)).join('');
+      }
+      if (groups.progress.length > 0) {
+        skuHtml += `<div class="status-section-label progress">${t('section_progress')}</div>`;
+        skuHtml += groups.progress.map(d => renderWorkerCard(type, dateStr, d)).join('');
+      }
+      if (groups.done.length > 0) {
+        skuHtml += `<div class="status-section-label done">${t('section_done')}</div>`;
+        skuHtml += groups.done.map(d => renderWorkerCard(type, dateStr, d)).join('');
+      }
     }
 
     // Total panel — pretzel-based
