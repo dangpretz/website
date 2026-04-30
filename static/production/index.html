@@ -1169,7 +1169,7 @@
       stepper_count:     ({n, total}) => `${n} / ${total} batches`,
       helper_tap_batch:  ({n}) => `1 tap = 1 batch · ${n} pretzels`,
       helper_tap_tray:   ({n}) => `1 tap = 1 tray · ${n} pretzels`,
-      done_summary:      ({n, total, p}) => `${n}/${total} batches · ${p} pretzels · logged today`,
+      done_summary:      ({n, total, p}) => `${n}/${total} batches · ${p} pretzels · completed`,
       details_link:      'Details',
       details_raw:       'Raw materials',
       details_for_delivery: 'For delivery',
@@ -1301,7 +1301,7 @@
       stepper_count:     ({n, total}) => `${n} / ${total} tandas`,
       helper_tap_batch:  ({n}) => `1 toque = 1 tanda · ${n} pretzels`,
       helper_tap_tray:   ({n}) => `1 toque = 1 bandeja · ${n} pretzels`,
-      done_summary:      ({n, total, p}) => `${n}/${total} tandas · ${p} pretzels · registrado hoy`,
+      done_summary:      ({n, total, p}) => `${n}/${total} tandas · ${p} pretzels · completado`,
       details_link:      'Detalles',
       details_raw:       'Materia prima',
       details_for_delivery: 'Para entrega',
@@ -1360,7 +1360,10 @@
   const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  const toDateStr   = d => d.toISOString().slice(0, 10);
+  // Date string in production's local time (America/Denver), not UTC. Workers
+  // shaping at 9pm Mountain (= 3am UTC) should still get the LOCAL day, not
+  // tomorrow's UTC day. en-CA locale gives ISO-style YYYY-MM-DD output.
+  const toDateStr   = d => d.toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
   const parseDate   = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
   const addDays     = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
   const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
