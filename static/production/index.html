@@ -1328,6 +1328,16 @@
   };
   const _localeStr = () => appLang === 'es' ? 'es-MX' : 'en-US';
 
+  // Batch counts can be fractional from typed pretzel inputs (e.g., 47 pretzels
+  // in a batch of 72 = 0.65 batches). Round to whole when very close, else
+  // show 1 decimal — pretzels remain the precise truth in the display.
+  const fmtBatches = (n) => {
+    if (n == null || isNaN(n)) return '0';
+    const rounded = Math.round(n);
+    if (Math.abs(n - rounded) < 0.05) return String(rounded);
+    return (Math.round(n * 10) / 10).toFixed(1);
+  };
+
   // Role from ?role=shape | ?role=bfp | (default = manager). Used to scope the
   // UI so the dough team and BFP team can't see/edit each other's schedule.
   const _roleParam = new URLSearchParams(window.location.search).get('role');
@@ -2203,7 +2213,7 @@
       const stripeStyle = `--wcard-stripe:${stripe}`;
       return `<div class="wcard wcard-compact status-done" style="${stripeStyle}" data-expand-sku="${esc(d.sku)}">
         <span class="wcard-check">✅</span>
-        <span class="wcard-compact-text"><strong>${esc(d.sku)}</strong> · ${t('done_summary', { n: madeBatches, total: totalBatches, p: madeP })}</span>
+        <span class="wcard-compact-text"><strong>${esc(d.sku)}</strong> · ${t('done_summary', { n: fmtBatches(madeBatches), total: fmtBatches(totalBatches), p: madeP })}</span>
         <span class="wcard-expand-hint">↓</span>
       </div>`;
     }
@@ -2265,10 +2275,9 @@
       : `<span class="wstep-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
 
     // Prior-day rollover cue: only show when previous-date completions exist
-    const priorRounded = Math.round((d.priorMade || 0) * 100) / 100;
-    const priorChip = priorRounded > 0
+    const priorChip = (d.priorMade || 0) > 0.01
       ? `<div class="wcard-prior-note">${t('prior_done', {
-            n: priorRounded,
+            n: fmtBatches(d.priorMade),
             date: d.priorDate ? `${fmtDay(parseDate(d.priorDate))} ${fmtShort(parseDate(d.priorDate))}` : '',
           })}</div>`
       : '';
@@ -2286,7 +2295,7 @@
       <div class="wcard-metrics">
         <div class="wmetric">
           <div class="wmetric-label">${t('metric_tandas')}</div>
-          <div class="wmetric-value"><strong>${madeBatches}</strong><span class="of"> / ${totalBatches}</span></div>
+          <div class="wmetric-value"><strong>${fmtBatches(madeBatches)}</strong><span class="of"> / ${fmtBatches(totalBatches)}</span></div>
           <div class="pip-row">${pipsHtml}</div>
         </div>
         <div class="wmetric">
@@ -2304,7 +2313,7 @@
 
       <div class="wstepper">
         <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" ${madeP <= 0 ? 'disabled' : ''}>−</button>
-        <div class="wstep-center">${t('stepper_count', { n: madeBatches, total: totalBatches })}</div>
+        <div class="wstep-center">${t('stepper_count', { n: fmtBatches(madeBatches), total: fmtBatches(totalBatches) })}</div>
         <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1">+</button>
         ${stepStatus}
       </div>
@@ -2330,7 +2339,7 @@
     const meterHtml    = totalP > 0 ? `
       <div class="wmeter">
         <div class="wmeter-row">
-          <span><strong>${madeBatches}</strong> / ${totalBatches} ${appLang === 'es' ? 'tandas hechas' : 'batches done'}</span>
+          <span><strong>${fmtBatches(madeBatches)}</strong> / ${fmtBatches(totalBatches)} ${appLang === 'es' ? 'tandas hechas' : 'batches done'}</span>
           <span class="pretzels">${madeP} / ${totalP} pretzels</span>
         </div>
         <div class="wmeter-bar"><div class="wmeter-fill" style="width:${meterPct}%"></div></div>
