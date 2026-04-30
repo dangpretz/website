@@ -952,6 +952,25 @@
     'bees bats':            0,  // unknown
   };
 
+  // Pretzels per baking sheet (tray) — BFP team's natural unit. They pull
+  // trays out of the fridge and load them into the oven. SkuConfig override
+  // takes priority via getTraySize.
+  const TRAY_SIZES = {
+    '21oz mammoth pretzel':  2,
+    '10oz mustache':         4,
+    '10oz plain':            4,
+    '10oz bbk':              4,
+    '10oz spicy bee':        4,
+    '6.5oz plain':           9,
+    '6.5oz bbk':             9,
+    '6.5oz spicy bee':       9,
+    '4oz twist plain':      12,
+    '4oz twist bbk':        12,
+    '4oz twist spicy bee':  12,
+    'bees bats':             6,
+    'plain bombs':           0,  // not specified — BFP shows pretzels only
+  };
+
   const FOH_SKUS = new Set([
     '3oz cheese dip',
     'bulk dangerous dip (25 srv)',
@@ -967,7 +986,7 @@
   // skuConfig (loaded from log) overrides/extends hardcoded BATCH_SIZES.
 
   const getBatchSize    = sku => (skuConfig[sku]?.batchSize > 0 ? skuConfig[sku].batchSize : 0) || BATCH_SIZES[sku] || 0;
-  const getTraySize     = sku => skuConfig[sku]?.traySize > 0 ? skuConfig[sku].traySize : 0;
+  const getTraySize     = sku => (skuConfig[sku]?.traySize > 0 ? skuConfig[sku].traySize : 0) || TRAY_SIZES[sku] || 0;
   const getCaseSize     = sku => (skuConfig[sku]?.caseSize > 0 ? skuConfig[sku].caseSize : 0) || CASE_SIZES[sku] || 0;
   const isFOH           = sku => skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has(sku.toLowerCase()) || FOH_SKUS.has(sku);
   const isCoating       = sku => skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku);
@@ -1063,9 +1082,15 @@
       // Production
       pretzels_today: ({p, b, bs, hasCases, cases, cs}) =>
         `<strong>${p}</strong> pretzels left today <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'batches' : 'batch'} of ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cases' : 'case'} of ${cs}` : ''})</span>`,
+      pretzels_today_trays: ({p, t, ts, hasCases, cases, cs}) =>
+        `<strong>${p}</strong> pretzels left today <span style="color:var(--gray-3);font-weight:600">(${t} ${t !== 1 ? 'trays' : 'tray'} of ${ts}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cases' : 'case'} of ${cs}` : ''})</span>`,
+      pretzels_today_only: ({p, hasCases, cases, cs}) =>
+        `<strong>${p}</strong> pretzels left today${hasCases ? ` <span style="color:var(--gray-3);font-weight:600">(~${cases} ${cases !== 1 ? 'cases' : 'case'} of ${cs})</span>` : ''}`,
       batches_today_lead: ({b, p}) =>
         `<strong>${b}</strong> ${b !== 1 ? 'batches' : 'batch'} left today <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
       prior_done: ({n, date}) => `↪ ${n} ${n !== 1 ? 'batches' : 'batch'} already done${date ? ' on ' + date : ''}`,
+      prior_done_trays: ({n, date}) => `↪ ${n} ${n !== 1 ? 'trays' : 'tray'} already done${date ? ' on ' + date : ''}`,
+      prior_done_pretzels: ({n, date}) => `↪ ${n} pretzels already done${date ? ' on ' + date : ''}`,
       pretzels_made:  'pretzels made today',
       total_today_pretzels: ({p, b}) => `${p} pretzels today (${b} batch${b !== 1 ? 'es' : ''})`,
       total_today_batches:  ({b, p}) => `${b} batches today (${p} pretzels)`,
@@ -1171,11 +1196,16 @@
       pill_progress:     'In progress',
       pill_done:         'Done',
       metric_tandas:     'BATCHES',
+      metric_trays:      'TRAYS',
       metric_pretzels:   'PRETZELS',
       stepper_count:     ({n, total}) => `${n} / ${total} batches`,
+      stepper_count_trays: ({n, total}) => `${n} / ${total} trays`,
+      stepper_count_pretzels: ({n, total}) => `${n} / ${total} pretzels`,
       helper_tap_batch:  ({n}) => `1 tap = 1 batch · ${n} pretzels`,
       helper_tap_tray:   ({n}) => `1 tap = 1 tray · ${n} pretzels`,
       done_summary:      ({n, total, p}) => `${n}/${total} batches · ${p} pretzels · completed`,
+      done_summary_trays: ({n, total, p}) => `${n}/${total} trays · ${p} pretzels · completed`,
+      done_summary_pretzels: ({p}) => `${p} pretzels · completed`,
       details_link:      'Details',
       details_raw:       'Raw materials',
       details_for_delivery: 'For delivery',
@@ -1205,9 +1235,15 @@
       worker_cap:     ({w, c}) => `${w} trabajador${w !== 1 ? 'es' : ''} · ${c} tandas máx`,
       pretzels_today: ({p, b, bs, hasCases, cases, cs}) =>
         `<strong>${p}</strong> pretzels pendientes hoy <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'tandas' : 'tanda'} de ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cajas' : 'caja'} de ${cs}` : ''})</span>`,
+      pretzels_today_trays: ({p, t, ts, hasCases, cases, cs}) =>
+        `<strong>${p}</strong> pretzels pendientes hoy <span style="color:var(--gray-3);font-weight:600">(${t} ${t !== 1 ? 'bandejas' : 'bandeja'} de ${ts}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cajas' : 'caja'} de ${cs}` : ''})</span>`,
+      pretzels_today_only: ({p, hasCases, cases, cs}) =>
+        `<strong>${p}</strong> pretzels pendientes hoy${hasCases ? ` <span style="color:var(--gray-3);font-weight:600">(~${cases} ${cases !== 1 ? 'cajas' : 'caja'} de ${cs})</span>` : ''}`,
       batches_today_lead: ({b, p}) =>
         `<strong>${b}</strong> ${b !== 1 ? 'tandas' : 'tanda'} pendiente${b !== 1 ? 's' : ''} hoy <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
       prior_done: ({n, date}) => `↪ ${n} ${n !== 1 ? 'tandas' : 'tanda'} ya ${n !== 1 ? 'hechas' : 'hecha'}${date ? ' el ' + date : ''}`,
+      prior_done_trays: ({n, date}) => `↪ ${n} ${n !== 1 ? 'bandejas ya hechas' : 'bandeja ya hecha'}${date ? ' el ' + date : ''}`,
+      prior_done_pretzels: ({n, date}) => `↪ ${n} pretzels ya hechos${date ? ' el ' + date : ''}`,
       pretzels_made:  'pretzels hechos hoy',
       total_today_pretzels: ({p, b}) => `${p} pretzels hoy (${b} ${b !== 1 ? 'tandas' : 'tanda'})`,
       total_today_batches:  ({b, p}) => `${b} ${b !== 1 ? 'tandas' : 'tanda'} hoy (${p} pretzels)`,
@@ -1304,11 +1340,16 @@
       pill_progress:     'En progreso',
       pill_done:         'Listo',
       metric_tandas:     'TANDAS',
+      metric_trays:      'BANDEJAS',
       metric_pretzels:   'PRETZELS',
       stepper_count:     ({n, total}) => `${n} / ${total} tandas`,
+      stepper_count_trays: ({n, total}) => `${n} / ${total} bandejas`,
+      stepper_count_pretzels: ({n, total}) => `${n} / ${total} pretzels`,
       helper_tap_batch:  ({n}) => `1 toque = 1 tanda · ${n} pretzels`,
       helper_tap_tray:   ({n}) => `1 toque = 1 bandeja · ${n} pretzels`,
       done_summary:      ({n, total, p}) => `${n}/${total} tandas · ${p} pretzels · completado`,
+      done_summary_trays: ({n, total, p}) => `${n}/${total} bandejas · ${p} pretzels · completado`,
+      done_summary_pretzels: ({p}) => `${p} pretzels · completado`,
       details_link:      'Detalles',
       details_raw:       'Materia prima',
       details_for_delivery: 'Para entrega',
@@ -2213,6 +2254,7 @@
 
   function renderWorkerCard(type, dateStr, d) {
     const bs        = getBatchSize(d.sku);
+    const ts        = getTraySize(d.sku);
     const stepDelta = getStepDelta(type, d.sku);
     const stripe    = getStripeColor(d.sku);
     const stepperKey = `${type}|${dateStr}|${d.sku}`;
@@ -2221,12 +2263,34 @@
     const madeP     = d.madeP;
     const madeBatches = d.madeBatches;
 
+    // BFP team thinks in TRAYS (baking sheets). Shape thinks in BATCHES.
+    // For BFP: derive tray counts from pretzel totals (more reliable than
+    // batch math, since batch sizes can be FP-drifted from chained ops).
+    // If a BFP SKU has no traySize, fall back to pretzel-only display.
+    const isBFP    = type === 'bfp';
+    const useTrays = isBFP && ts > 0;
+    const totalUnits = useTrays
+      ? Math.ceil(origP / ts)
+      : Math.ceil(totalBatches);
+    const madeUnits = useTrays
+      ? Math.floor(madeP / ts)
+      : Math.floor(madeBatches);
+    const partialUnit = useTrays
+      ? ((madeP % ts) > 0.5 * ts && madeUnits < totalUnits)
+      : ((madeBatches % 1) > 0.1);
+    const dispMade  = useTrays ? madeUnits : fmtBatches(madeBatches);
+    const dispTotal = useTrays ? totalUnits : fmtBatches(totalBatches);
+    const metricKey = useTrays ? 'metric_trays' : 'metric_tandas';
+    const stepperKey_  = useTrays ? 'stepper_count_trays' : 'stepper_count';
+    const helperKey    = useTrays ? 'helper_tap_tray' : 'helper_tap_batch';
+
     // Compact done card (unless user has expanded it for editing)
     if (d.bucket === 'done' && !expandedDoneCards.has(d.sku)) {
       const stripeStyle = `--wcard-stripe:${stripe}`;
+      const summaryKey = useTrays ? 'done_summary_trays' : 'done_summary';
       return `<div class="wcard wcard-compact status-done" style="${stripeStyle}" data-expand-sku="${esc(d.sku)}">
         <span class="wcard-check">✅</span>
-        <span class="wcard-compact-text"><strong>${esc(d.sku)}</strong> · ${t('done_summary', { n: fmtBatches(madeBatches), total: fmtBatches(totalBatches), p: madeP })}</span>
+        <span class="wcard-compact-text"><strong>${esc(d.sku)}</strong> · ${t(summaryKey, { n: dispMade, total: dispTotal, p: madeP })}</span>
         <span class="wcard-expand-hint">↓</span>
       </div>`;
     }
@@ -2241,30 +2305,25 @@
                    : d.bucket === 'done'     ? '✅ '
                                               : '';
 
-    // TANDAS pips: total = ceil(total batches), filled = floor(made), partial if fractional
-    const totalPipCount = Math.max(1, Math.ceil(totalBatches));
-    const filledPips    = Math.floor(madeBatches);
-    const hasPartial    = (madeBatches % 1) > 0.1;
+    // Pips: one per unit (tray for BFP, batch for Shape)
     const MAX_PIPS = 12;
     let pipsHtml = '';
-    const pipCount = Math.min(totalPipCount, MAX_PIPS);
+    const pipCount = Math.max(1, Math.min(totalUnits, MAX_PIPS));
     for (let i = 0; i < pipCount; i++) {
       let cls = 'pip';
-      if (i < filledPips)                                         cls += ' filled';
-      else if (i === filledPips && hasPartial)                    cls += ' partial';
+      if (i < madeUnits)                                  cls += ' filled';
+      else if (i === madeUnits && partialUnit)            cls += ' partial';
       pipsHtml += `<span class="${cls}"></span>`;
     }
-    if (totalPipCount > MAX_PIPS) {
-      pipsHtml += `<span class="pip-overflow">+${totalPipCount - MAX_PIPS}</span>`;
+    if (totalUnits > MAX_PIPS) {
+      pipsHtml += `<span class="pip-overflow">+${totalUnits - MAX_PIPS}</span>`;
     }
 
     // PRETZELS bar fill
     const barPct = origP > 0 ? Math.min(100, Math.round((madeP / origP) * 100)) : 0;
 
-    // Helper line — team-aware step unit
-    const helper = (type === 'bfp' && getTraySize(d.sku) > 0)
-      ? t('helper_tap_tray', { n: stepDelta })
-      : t('helper_tap_batch', { n: bs });
+    // Helper line: ts for trays, bs for batches
+    const helper = t(helperKey, { n: useTrays ? ts : bs });
 
     // Cheese chip for BBK SKUs
     const cheeseChip = isCoating(d.sku) ? `<div class="wcard-cheese">${t('cheese_chip')}</div>` : '';
@@ -2289,10 +2348,15 @@
       ? `<span class="wstep-status done" id="rls-${esc(type)}-${esc(d.sku)}">✅</span>`
       : `<span class="wstep-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
 
-    // Prior-day rollover cue: only show when previous-date completions exist
+    // Prior-day rollover cue: only show when previous-date completions exist.
+    // For BFP, convert priorMade (in batches) to trays (priorMade*bs/ts).
+    const priorMadeUnits = useTrays
+      ? ((d.priorMade || 0) * bs) / Math.max(1, ts)
+      : (d.priorMade || 0);
+    const priorKey = useTrays ? 'prior_done_trays' : 'prior_done';
     const priorChip = (d.priorMade || 0) > 0.01
-      ? `<div class="wcard-prior-note">${t('prior_done', {
-            n: fmtBatches(d.priorMade),
+      ? `<div class="wcard-prior-note">${t(priorKey, {
+            n: useTrays ? Math.round(priorMadeUnits) : fmtBatches(d.priorMade),
             date: d.priorDate ? `${fmtDay(parseDate(d.priorDate))} ${fmtShort(parseDate(d.priorDate))}` : '',
           })}</div>`
       : '';
@@ -2309,8 +2373,8 @@
 
       <div class="wcard-metrics">
         <div class="wmetric">
-          <div class="wmetric-label">${t('metric_tandas')}</div>
-          <div class="wmetric-value"><strong>${fmtBatches(madeBatches)}</strong><span class="of"> / ${fmtBatches(totalBatches)}</span></div>
+          <div class="wmetric-label">${t(metricKey)}</div>
+          <div class="wmetric-value"><strong>${dispMade}</strong><span class="of"> / ${dispTotal}</span></div>
           <div class="pip-row">${pipsHtml}</div>
         </div>
         <div class="wmetric">
@@ -2328,7 +2392,7 @@
 
       <div class="wstepper">
         <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" ${madeP <= 0 ? 'disabled' : ''}>−</button>
-        <div class="wstep-center">${t('stepper_count', { n: fmtBatches(madeBatches), total: fmtBatches(totalBatches) })}</div>
+        <div class="wstep-center">${t(stepperKey_, { n: dispMade, total: dispTotal })}</div>
         <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="1">+</button>
         ${stepStatus}
       </div>
