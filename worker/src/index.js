@@ -345,36 +345,59 @@ function formatSquareAddress(addr) {
 }
 
 // Sync a single Square order to the delivery planner log.
-// Returns a small report describing what happened.
-async function syncSquareOrderToDelivery(squareOrder) {
+// Optional invoiceCtx lets us sync invoiced orders that have no fulfillment
+// — date/recipient come from the invoice instead.
+async function syncSquareOrderToDelivery(squareOrder, invoiceCtx = null) {
   const id = squareOrder.id;
   if (!id) return { skipped: 'no order id' };
 
-  // Find the first PICKUP or DELIVERY fulfillment (catering signal)
+  // Find the first PICKUP or DELIVERY fulfillment if any
   const ful = (squareOrder.fulfillments || []).find(
     (f) => f && (f.type === 'PICKUP' || f.type === 'DELIVERY'),
   );
-  if (!ful) return { orderId: id, skipped: 'no pickup/delivery fulfillment' };
 
-  // Resolve fulfillment date — try schedule first, fall back to note parse
-  const pickupAt = ful.pickup_details?.pickup_at;
-  const deliverAt = ful.delivery_details?.deliver_at;
+  // Resolve fulfillment date — fulfillment > invoice due_date > note
+  const pickupAt = ful?.pickup_details?.pickup_at;
+  const deliverAt = ful?.delivery_details?.deliver_at;
   let scheduledIso = pickupAt || deliverAt || null;
   if (!scheduledIso) {
     const parsed = parseOrderNote(squareOrder.note);
     if (parsed?.iso_scheduled_at) scheduledIso = parsed.iso_scheduled_at;
   }
+  if (!scheduledIso && invoiceCtx?.dueDate) {
+    // Invoice due_date is a YYYY-MM-DD string — anchor to noon Mountain
+    scheduledIso = `${invoiceCtx.dueDate}T12:00:00-06:00`;
+  }
   if (!scheduledIso) return { orderId: id, skipped: 'no fulfillment date' };
   const date = scheduledIso.slice(0, 10);
 
-  // Customer / contact from fulfillment recipient (more reliable than note)
+  // Customer / contact — prefer fulfillment recipient, fall back to invoice
   const recipient =
-    ful.pickup_details?.recipient || ful.delivery_details?.recipient || {};
-  const customer = recipient.display_name || squareOrder.customer_id || 'Square Order';
+    ful?.pickup_details?.recipient ||
+    ful?.delivery_details?.recipient ||
+    invoiceCtx?.recipient ||
+    {};
+  // Drop placeholder family names like "NA" / "N/A" / "-"
+  const cleanFamily = /^(na|n\/a|-+|none)$/i.test(recipient.family_name || '') ? '' : (recipient.family_name || '');
+  const personName = [recipient.given_name, cleanFamily].filter(Boolean).join(' ').trim();
+  const company = recipient.company_name || invoiceCtx?.recipient?.company_name || '';
+  // For B2B catering, prefer "Person · Company" or just Company if no person
+  const customer =
+    recipient.display_name
+    || (personName && company ? `${personName} · ${company}` : (personName || company))
+    || invoiceCtx?.title
+    || squareOrder.customer_id
+    || 'Square Order';
   const phone = recipient.phone_number || '';
   const email = recipient.email_address || '';
+  // Invoice orders without fulfillment default to delivery (caterings usually deliver)
+  // unless an explicit pickup signal exists in the note
+  const isPickup = ful?.type === 'PICKUP' || /pickup/i.test(squareOrder.note || '');
+  const inferredType = ful?.type ? ful.type : (isPickup ? 'PICKUP' : 'DELIVERY');
   const address =
-    ful.type === 'DELIVERY' ? formatSquareAddress(recipient.address) : '';
+    inferredType === 'DELIVERY'
+      ? formatSquareAddress(recipient.address)
+      : '';
 
   // Map line items, dropping the synthetic "Delivery Fee"
   const rawItems = squareOrder.line_items || [];
@@ -401,12 +424,16 @@ async function syncSquareOrderToDelivery(squareOrder) {
   // Status mapping
   let status = 'scheduled';
   let action = 'update'; // upsert via deliveryId
-  if (squareOrder.state === 'CANCELED' || ful.state === 'CANCELED') {
+  if (squareOrder.state === 'CANCELED' || ful?.state === 'CANCELED') {
     action = 'delete'; // remove from planner active set
     status = 'cancelled';
-  } else if (ful.state === 'COMPLETED') {
-    status = ful.type === 'PICKUP' ? 'picked_up' : 'delivered';
+  } else if (ful?.state === 'COMPLETED') {
+    status = inferredType === 'PICKUP' ? 'picked_up' : 'delivered';
   }
+
+  // Capture description / note for the planner (invoice description often
+  // has setup-time hints e.g. "320 day - Setup by 1:55")
+  const orderNote = squareOrder.note || invoiceCtx?.description || '';
 
   // Build URL params for sheet-logger (delivery-planner appendLog format)
   const params = new URLSearchParams({
@@ -414,16 +441,17 @@ async function syncSquareOrderToDelivery(squareOrder) {
     deliveryId: `sq_${id}`,
     customer,
     date,
-    type: ful.type.toLowerCase(),
+    type: inferredType.toLowerCase(),
     lineItems: JSON.stringify(mappedItems),
     status,
     timeStamp: new Date().toISOString(),
-    _source: 'square',
+    _source: invoiceCtx ? 'square-invoice' : 'square',
     _squareOrderId: id,
   });
-  if (phone)   params.set('contactPhone', phone);
-  if (email)   params.set('contactEmail', email);
-  if (address) params.set('address', address);
+  if (phone)     params.set('contactPhone', phone);
+  if (email)     params.set('contactEmail', email);
+  if (address)   params.set('address', address);
+  if (orderNote) params.set('notes', orderNote.slice(0, 500));
 
   const resp = await fetch(
     `${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}?${params.toString()}`,
@@ -435,11 +463,12 @@ async function syncSquareOrderToDelivery(squareOrder) {
     deliveryId: `sq_${id}`,
     customer,
     date,
-    type: ful.type.toLowerCase(),
+    type: inferredType.toLowerCase(),
     status,
     action,
     items: mappedItems.length,
     unmappedItems: unmappedNames,
+    via: invoiceCtx ? 'invoice' : 'order',
     ok: resp.ok,
     httpStatus: resp.status,
   };
@@ -485,12 +514,184 @@ async function fetchSquareCateringOrders(env, { sinceDays = 90 } = {}) {
     if (pageCount > 20) break;
   } while (cursor);
 
-  // Keep only orders that look like catering: have a PICKUP or DELIVERY fulfillment
-  return all.filter((o) =>
-    (o.fulfillments || []).some(
+  // Strict catering filter — retail Square POS orders also set schedule_type=SCHEDULED
+  // for pickup, so that signal alone is too loose. Real catering signals:
+  //   1. source.name === 'DPC Website' (our catering form / payment-link flow)
+  //   2. Any line item name starts with "Catering:" (your catering catalog convention)
+  // AND the fulfillment date (if present) is not in the past — manager doesn't
+  // want past retail-style orders polluting the planner.
+  // Invoice-flow orders are handled separately by fetchSquareInvoiceOrders.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  return all.filter((o) => {
+    const isCatering =
+      o.source?.name === 'DPC Website'
+      || (o.line_items || []).some((li) => /^catering:/i.test(li.name || ''));
+    if (!isCatering) return false;
+    // Skip past fulfillments
+    const ful = (o.fulfillments || []).find(
       (f) => f && (f.type === 'PICKUP' || f.type === 'DELIVERY'),
-    ),
-  );
+    );
+    const at = ful?.pickup_details?.pickup_at || ful?.delivery_details?.deliver_at;
+    if (at && at.slice(0, 10) < todayStr) return false;
+    return true;
+  });
+}
+
+// Search Square invoices and return paired (order, invoiceCtx) for each one
+// linked to a real catering order. Status filter: SENT/SCHEDULED/PARTIALLY_PAID/PAID
+// — anything that's still operationally pending fulfillment.
+async function fetchSquareInvoiceOrders(env, { onlyFutureDays = null } = {}) {
+  const locationId = env.SQUARE_LOCATION_ID || 'LEJ3PDZ9V6NYN';
+  const out = [];
+  let cursor;
+  let pageCount = 0;
+  do {
+    const r = await fetch(`${SQUARE_BASE}/invoices/search`, {
+      method: 'POST',
+      headers: {
+        'Square-Version': '2025-01-23',
+        Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: { filter: { location_ids: [locationId] } },
+        limit: 100,
+        cursor,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      throw new Error(`Square invoices.search failed: ${JSON.stringify(data).slice(0, 300)}`);
+    }
+    for (const inv of (data.invoices || [])) {
+      // Skip drafts / cancelled / failed — only sync invoices that represent real bookings
+      if (!['UNPAID','SCHEDULED','PARTIALLY_PAID','PAID','PAYMENT_PENDING'].includes(inv.status)) continue;
+      const dueDate = inv.payment_requests?.[0]?.due_date;
+      if (!dueDate) continue;
+      // Skip past deliveries by default (manager only cares about upcoming)
+      if (onlyFutureDays != null) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (dueDate < today) continue;
+        // Cap at N days into the future so we don't sync invoices for events 6 months out
+        const cap = new Date(Date.now() + onlyFutureDays * 86400e3).toISOString().slice(0, 10);
+        if (dueDate > cap) continue;
+      }
+      if (!inv.order_id) continue;
+
+      // Fetch the order
+      const oRes = await fetch(`${SQUARE_BASE}/orders/${inv.order_id}`, {
+        headers: {
+          'Square-Version': '2025-01-23',
+          Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        },
+      });
+      const oData = await oRes.json();
+      if (!oRes.ok || !oData.order) continue;
+
+      out.push({
+        order: oData.order,
+        invoiceCtx: {
+          invoiceId: inv.id,
+          dueDate,
+          recipient: inv.primary_recipient || {},
+          title: inv.title || '',
+          description: inv.description || '',
+          status: inv.status,
+        },
+      });
+    }
+    cursor = data.cursor;
+    pageCount += 1;
+    if (pageCount > 10) break; // safety cap
+  } while (cursor);
+  return out;
+}
+
+// TEMP debug helper — fetches a Square order or invoice for inspection.
+// Remove once invoice import flow is dialed in.
+async function handleInspectSquare(request, env) {
+  const authErr = checkAdminToken(request, env);
+  if (authErr) return authErr;
+  const url = new URL(request.url);
+  const orderId = url.searchParams.get('order');
+  const invoiceId = url.searchParams.get('invoice');
+
+  if (orderId) {
+    const r = await fetch(`${SQUARE_BASE}/orders/${orderId}`, {
+      headers: { 'Square-Version': '2025-01-23', Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}` },
+    });
+    return json(await r.json());
+  }
+  if (invoiceId) {
+    const r = await fetch(`${SQUARE_BASE}/invoices/${invoiceId}`, {
+      headers: { 'Square-Version': '2025-01-23', Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}` },
+    });
+    return json(await r.json());
+  }
+  // List recent invoices
+  const r = await fetch(`${SQUARE_BASE}/invoices/search`, {
+    method: 'POST',
+    headers: {
+      'Square-Version': '2025-01-23',
+      Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: { filter: { location_ids: [env.SQUARE_LOCATION_ID || 'LEJ3PDZ9V6NYN'] } },
+      limit: 50,
+    }),
+  });
+  return json(await r.json());
+}
+
+// Clean up planner entries from past too-loose syncs. Walks the delivery log,
+// finds all sq_* entries, appends a `delete` action for each. Run once after
+// fixing the filter; subsequent imports will only re-add true catering orders.
+async function handleCleanupSquare(request, env) {
+  const authErr = checkAdminToken(request, env);
+  if (authErr) return authErr;
+
+  // Pull all delivery log entries
+  const logRes = await fetch(`${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}`);
+  if (!logRes.ok) {
+    return json({ error: 'failed to fetch delivery log' }, 502);
+  }
+  const logs = await logRes.json();
+
+  // Resolve to current state, find sq_* entries that are still active
+  const byId = {};
+  for (const row of logs || []) {
+    const id = row.deliveryId;
+    if (!id || !id.startsWith('sq_')) continue;
+    const action = row.action;
+    if (action === 'delete') { delete byId[id]; continue; }
+    byId[id] = row;
+  }
+
+  const toDelete = Object.keys(byId);
+  const results = [];
+  for (const deliveryId of toDelete) {
+    const params = new URLSearchParams({
+      action: 'delete',
+      deliveryId,
+      timeStamp: new Date().toISOString(),
+      _source: 'square-cleanup',
+    });
+    try {
+      const r = await fetch(
+        `${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}?${params.toString()}`,
+        { method: 'POST' },
+      );
+      results.push({ deliveryId, ok: r.ok, status: r.status });
+    } catch (err) {
+      results.push({ deliveryId, error: err.message });
+    }
+  }
+
+  return json({
+    cleaned: toDelete.length,
+    results,
+  });
 }
 
 async function handleImportCatering(request, env) {
@@ -498,17 +699,43 @@ async function handleImportCatering(request, env) {
   if (authErr) return authErr;
 
   const url = new URL(request.url);
-  const sinceDays = Math.max(1, Math.min(365, parseInt(url.searchParams.get('days'), 10) || 90));
+  const sinceDays  = Math.max(1, Math.min(365, parseInt(url.searchParams.get('days'), 10) || 90));
+  const futureDays = Math.max(1, Math.min(365, parseInt(url.searchParams.get('futureDays'), 10) || 60));
 
-  let orders;
+  // Two paths in parallel: catering-form orders + invoiced orders
+  let orders = [];
+  let invoiceItems = [];
+  const errors = [];
   try {
     orders = await fetchSquareCateringOrders(env, { sinceDays });
   } catch (err) {
-    return json({ error: err.message }, 500);
+    errors.push(`orders: ${err.message}`);
+  }
+  try {
+    invoiceItems = await fetchSquareInvoiceOrders(env, { onlyFutureDays: futureDays });
+  } catch (err) {
+    errors.push(`invoices: ${err.message}`);
   }
 
   const results = [];
+  // Track which order IDs we've already synced (avoid double-sync if the same
+  // order appears in both paths). Invoices first — they carry the date for
+  // catering orders that have no fulfillment object.
+  const seen = new Set();
+
+  for (const { order, invoiceCtx } of invoiceItems) {
+    if (seen.has(order.id)) continue;
+    seen.add(order.id);
+    try {
+      const r = await syncSquareOrderToDelivery(order, invoiceCtx);
+      results.push(r);
+    } catch (err) {
+      results.push({ orderId: order.id, error: err.message });
+    }
+  }
   for (const o of orders) {
+    if (seen.has(o.id)) continue;
+    seen.add(o.id);
     try {
       const r = await syncSquareOrderToDelivery(o);
       results.push(r);
@@ -517,7 +744,6 @@ async function handleImportCatering(request, env) {
     }
   }
 
-  // Aggregate counters for a quick scan
   const synced  = results.filter((r) => r.ok).length;
   const skipped = results.filter((r) => r.skipped).length;
   const failed  = results.filter((r) => r.error || r.ok === false).length;
@@ -525,10 +751,12 @@ async function handleImportCatering(request, env) {
 
   return json({
     sinceDays,
-    fetched: orders.length,
+    futureDays,
+    fetched: { orders: orders.length, invoices: invoiceItems.length },
     synced,
     skipped,
     failed,
+    errors,
     unmappedNames: allUnmapped,
     results,
   });
@@ -670,6 +898,19 @@ export default {
         // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Import catering error:', err);
         return json({ error: err.message || 'Import failed' }, 500);
+      }
+    }
+    if (url.pathname === '/admin/inspect-square' && request.method === 'GET') {
+      try { return await handleInspectSquare(request, env); }
+      catch (err) { return json({ error: err.message }, 500); }
+    }
+    if (url.pathname === '/admin/cleanup-square' && request.method === 'POST') {
+      try {
+        return await handleCleanupSquare(request, env);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('Cleanup square error:', err);
+        return json({ error: err.message || 'Cleanup failed' }, 500);
       }
     }
     if (url.pathname === '/webhooks/square' && request.method === 'POST') {
