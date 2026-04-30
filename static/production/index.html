@@ -2018,13 +2018,15 @@
     if (items.length === 0) {
       skuHtml = `<div style="font:400 14px 'Manrope',sans-serif;color:var(--gray-3);padding:6px 0 12px">${t('no_prod_extra')}</div>`;
     } else {
-      if (groups.pending.length > 0) {
-        skuHtml += `<div class="status-section-label pending">${t('section_pending')}</div>`;
-        skuHtml += groups.pending.map(d => renderWorkerCard(type, dateStr, d)).join('');
-      }
+      // In-progress at the top so the worker's active focus stays visible
+      // (avoids the card sliding to the bottom of a long pending list).
       if (groups.progress.length > 0) {
         skuHtml += `<div class="status-section-label progress">${t('section_progress')}</div>`;
         skuHtml += groups.progress.map(d => renderWorkerCard(type, dateStr, d)).join('');
+      }
+      if (groups.pending.length > 0) {
+        skuHtml += `<div class="status-section-label pending">${t('section_pending')}</div>`;
+        skuHtml += groups.pending.map(d => renderWorkerCard(type, dateStr, d)).join('');
       }
       if (groups.done.length > 0) {
         skuHtml += `<div class="status-section-label done">${t('section_done')}</div>`;
@@ -2361,13 +2363,14 @@
       </div>` : '';
 
     let sectionsHtml = '';
-    if (groups.pending.length > 0) {
-      sectionsHtml += `<div class="status-section-label pending">${t('section_pending')}</div>`;
-      sectionsHtml += groups.pending.map(d => renderWorkerCard(type, dateStr, d)).join('');
-    }
+    // In-progress at the top (worker's active focus); pending after; done last.
     if (groups.progress.length > 0) {
       sectionsHtml += `<div class="status-section-label progress">${t('section_progress')}</div>`;
       sectionsHtml += groups.progress.map(d => renderWorkerCard(type, dateStr, d)).join('');
+    }
+    if (groups.pending.length > 0) {
+      sectionsHtml += `<div class="status-section-label pending">${t('section_pending')}</div>`;
+      sectionsHtml += groups.pending.map(d => renderWorkerCard(type, dateStr, d)).join('');
     }
     if (groups.done.length > 0) {
       sectionsHtml += `<div class="status-section-label done">${t('section_done')}</div>`;
