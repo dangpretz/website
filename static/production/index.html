@@ -625,6 +625,11 @@
       font: 600 11px 'Manrope', sans-serif; color: #6b3a06;
       background: #fef3d6; padding: 2px 8px; border-radius: 10px;
     }
+    .wcard-prior-note {
+      font: 600 12px 'Manrope', sans-serif;
+      color: #2a7a2a;
+      margin: -2px 0 6px;
+    }
     .wcard-pill {
       font: 700 11px 'Manrope', sans-serif;
       padding: 3px 10px; border-radius: 12px;
@@ -1057,9 +1062,10 @@
       worker_cap:     ({w, c}) => `${w} worker${w !== 1 ? 's' : ''} · ${c} batch cap`,
       // Production
       pretzels_today: ({p, b, bs, hasCases, cases, cs}) =>
-        `<strong>${p}</strong> pretzels needed today <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'batches' : 'batch'} of ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cases' : 'case'} of ${cs}` : ''})</span>`,
+        `<strong>${p}</strong> pretzels left today <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'batches' : 'batch'} of ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cases' : 'case'} of ${cs}` : ''})</span>`,
       batches_today_lead: ({b, p}) =>
-        `<strong>${b}</strong> ${b !== 1 ? 'batches' : 'batch'} needed today <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
+        `<strong>${b}</strong> ${b !== 1 ? 'batches' : 'batch'} left today <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
+      prior_done: ({n, date}) => `↪ ${n} ${n !== 1 ? 'batches' : 'batch'} already done${date ? ' on ' + date : ''}`,
       pretzels_made:  'pretzels made today',
       total_today_pretzels: ({p, b}) => `${p} pretzels today (${b} batch${b !== 1 ? 'es' : ''})`,
       total_today_batches:  ({b, p}) => `${b} batches today (${p} pretzels)`,
@@ -1198,9 +1204,10 @@
       batch_capacity: ({n}) => `${n} tandas de capacidad`,
       worker_cap:     ({w, c}) => `${w} trabajador${w !== 1 ? 'es' : ''} · ${c} tandas máx`,
       pretzels_today: ({p, b, bs, hasCases, cases, cs}) =>
-        `<strong>${p}</strong> pretzels para hoy <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'tandas' : 'tanda'} de ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cajas' : 'caja'} de ${cs}` : ''})</span>`,
+        `<strong>${p}</strong> pretzels pendientes hoy <span style="color:var(--gray-3);font-weight:600">(${b} ${b !== 1 ? 'tandas' : 'tanda'} de ${bs}${hasCases ? ` · ~${cases} ${cases !== 1 ? 'cajas' : 'caja'} de ${cs}` : ''})</span>`,
       batches_today_lead: ({b, p}) =>
-        `<strong>${b}</strong> ${b !== 1 ? 'tandas' : 'tanda'} para hoy <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
+        `<strong>${b}</strong> ${b !== 1 ? 'tandas' : 'tanda'} pendiente${b !== 1 ? 's' : ''} hoy <span style="color:var(--gray-3);font-weight:600">(${p} pretzels)</span>`,
+      prior_done: ({n, date}) => `↪ ${n} ${n !== 1 ? 'tandas' : 'tanda'} ya ${n !== 1 ? 'hechas' : 'hecha'}${date ? ' el ' + date : ''}`,
       pretzels_made:  'pretzels hechos hoy',
       total_today_pretzels: ({p, b}) => `${p} pretzels hoy (${b} ${b !== 1 ? 'tandas' : 'tanda'})`,
       total_today_batches:  ({b, p}) => `${b} ${b !== 1 ? 'tandas' : 'tanda'} hoy (${p} pretzels)`,
@@ -2117,6 +2124,23 @@
     const doneKey        = type === 'shape' ? 'shapeDone' : 'bfpDone';
     const completedRows  = dayState[doneKey] || [];
 
+    // Sum prior-day completions per SKU so we can show "↪ N batches already done"
+    // when work was carried over from yesterday/earlier. Per type only — Shape
+    // worker only sees Shape's prior work, BFP only BFP's.
+    const priorBySku = {};
+    const priorLatestDate = {};
+    Object.entries(productionState).forEach(([d, st]) => {
+      if (d >= dateStr) return; // past dates only
+      (st[doneKey] || []).forEach(c => {
+        const n = Number(c.batches) || 0;
+        if (!n) return;
+        priorBySku[c.sku] = (priorBySku[c.sku] || 0) + n;
+        if (!priorLatestDate[c.sku] || d > priorLatestDate[c.sku]) {
+          priorLatestDate[c.sku] = d;
+        }
+      });
+    });
+
     const itemMap = {};
     scheduledItems.forEach(item => {
       itemMap[item.sku] = { ...item, needBatches: item.batches, madeBatches: 0 };
@@ -2140,12 +2164,14 @@
       const totalBatches = d.needBatches + d.madeBatches;
       const origP = totalBatches * bs;
       const madeP = Math.round(d.madeBatches * bs);
+      const priorMade = priorBySku[d.sku] || 0;
+      const priorDate = priorLatestDate[d.sku] || null;
       let bucket;
       if (madeP >= origP && origP > 0)        bucket = 'done';
       else if (d.madeBatches > 0)              bucket = 'progress';
       else if (d.isOverdue)                    bucket = 'overdue';
       else                                      bucket = 'pending';
-      return { ...d, bucket, totalBatches, origP, madeP };
+      return { ...d, bucket, totalBatches, origP, madeP, priorMade, priorDate };
     });
 
     // Sort within each bucket by earliest delivery date
@@ -2238,6 +2264,15 @@
       ? `<span class="wstep-status done" id="rls-${esc(type)}-${esc(d.sku)}">✅</span>`
       : `<span class="wstep-status" id="rls-${esc(type)}-${esc(d.sku)}"></span>`;
 
+    // Prior-day rollover cue: only show when previous-date completions exist
+    const priorRounded = Math.round((d.priorMade || 0) * 100) / 100;
+    const priorChip = priorRounded > 0
+      ? `<div class="wcard-prior-note">${t('prior_done', {
+            n: priorRounded,
+            date: d.priorDate ? `${fmtDay(parseDate(d.priorDate))} ${fmtShort(parseDate(d.priorDate))}` : '',
+          })}</div>`
+      : '';
+
     return `<div class="wcard status-${d.bucket}" style="--wcard-stripe:${stripe}">
       <div class="wcard-head">
         <div>
@@ -2246,6 +2281,7 @@
         </div>
         <span class="wcard-pill ${d.bucket}">${pillIcon}${t(pillKey)}</span>
       </div>
+      ${priorChip}
 
       <div class="wcard-metrics">
         <div class="wmetric">
