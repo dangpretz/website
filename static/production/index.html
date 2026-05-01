@@ -1729,47 +1729,23 @@
     // Sort each SKU's items by delivery date (FIFO for inventory + completion attribution)
     Object.values(bySkuItems).forEach(arr => arr.sort((a,b) => a.deliveryDate.localeCompare(b.deliveryDate)));
 
-    // Step 2: Subtract on-hand inventory FIRST (FIFO).
-    // Order matters: inventory must be subtracted before completions so completions
-    // only consume genuinely remaining demand. Otherwise a logged batch can be
-    // attributed to a delivery already covered by frozen/cold-ferment, becoming a
-    // "phantom" — `made` grows but `need` doesn't shrink, inflating the displayed total.
-    const latestInv = getLatestInventory();
-
-    // Auto-deduct quantities from fulfilled deliveries on/after the last inventory snapshot
-    // so confirming a delivery in the planner automatically reduces frozen counts here
-    const latestInvDate = Object.keys(productionState)
-      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
-                    Object.keys(productionState[ds].frozen      || {}).length > 0)
-      .sort().pop() || null;
-
-    if (latestInvDate) {
-      allDeliveries
-        .filter(d => {
-          if (!['delivered','picked_up'].includes(d.status)) return false;
-          // Prefer timestamp comparison: only deduct if delivery was confirmed AFTER
-          // the latest stock count (otherwise the user's count already reflects it)
-          if (d._confirmedAt && latestInventoryTs) {
-            return d._confirmedAt > latestInventoryTs;
-          }
-          // Fallback to date-level comparison if timestamps aren't available
-          return d.date >= latestInvDate;
-        })
-        .forEach(delivery => {
-          let items = [];
-          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
-          items.forEach(({ sku, quantity }) => {
-            let key = sku?.trim();
-            if (!key) return;
-            if (skuAliases[key]) key = skuAliases[key]; // resolve to canonical
-            if (latestInv.frozen[key] == null) return;
-            latestInv.frozen[key] = Math.max(0, (latestInv.frozen[key] || 0) - (Number(quantity) || 0));
-          });
-        });
-    }
+    // Step 2: Subtract effective inventory from per-delivery demand.
+    //
+    // Effective inventory = snapshot + flows since snapshot:
+    //   coldFerment_now = snapshot.cf + shape_done - bfp_done
+    //   frozen_now      = snapshot.frozen + bfp_done - delivered
+    //
+    // This is the SAME state the user sees in "Raw materials" (getEffectiveInventory).
+    // Using it here means a single source of truth: scheduler demand and displayed
+    // inventory always agree. It also fixes the bees-bats class of bug — bfp_done
+    // produces frozen pretzels that cover BOTH shape and bfp demand for future
+    // deliveries, not just today's BFP work. The previous "subtract shape_done from
+    // shape demand, subtract bfp_done from bfp demand" treated the two flows as
+    // parallel when they're actually sequential (shape→bfp→frozen→delivered).
+    const latestInv = getEffectiveInventory();
 
     // Frozen runs first: finished pretzels in freezer satisfy BOTH shape and BFP
-    // demand (they're already done — no shaping or baking needed). All in pretzels.
+    // demand (they're already shaped AND baked).
     Object.entries(latestInv.frozen).forEach(([sku, pretzels]) => {
       if (!bySkuItems[sku] || !getBatchSize(sku)) return;
       let leftP = pretzels;
@@ -1789,38 +1765,6 @@
       for (const item of bySkuItems[sku]) {
         const take = Math.min(item.shapeLeftP, leftP);
         item.shapeLeftP -= take; leftP -= take;
-        if (leftP <= 0) break;
-      }
-    });
-
-    // Step 3: Subtract completed work (FIFO — earliest delivery cleared first).
-    // Now that inventory is already gone, completions land on real remaining demand.
-    const doneSku = { shape: {}, bfp: {} };
-    Object.values(productionState).forEach(state => {
-      (state.shapeDone || []).forEach(c => {
-        doneSku.shape[c.sku] = (doneSku.shape[c.sku] || 0) + (Number(c.batches) || 0);
-      });
-      (state.bfpDone || []).forEach(c => {
-        doneSku.bfp[c.sku] = (doneSku.bfp[c.sku] || 0) + (Number(c.batches) || 0);
-      });
-    });
-
-    // Subtract completions in pretzels (shape_done/bfp_done are batches → multiply by batchSize)
-    Object.entries(doneSku.shape).forEach(([sku, batches]) => {
-      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftP = batches * getBatchSize(sku);
-      for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.shapeLeftP, leftP);
-        item.shapeLeftP -= take; leftP -= take;
-        if (leftP <= 0) break;
-      }
-    });
-    Object.entries(doneSku.bfp).forEach(([sku, batches]) => {
-      if (!bySkuItems[sku] || !getBatchSize(sku)) return;
-      let leftP = batches * getBatchSize(sku);
-      for (const item of bySkuItems[sku]) {
-        const take = Math.min(item.bfpLeftP, leftP);
-        item.bfpLeftP -= take; leftP -= take;
         if (leftP <= 0) break;
       }
     });
@@ -1885,21 +1829,17 @@
       }
     });
 
-    // Step 3: Schedule each pool. Each item is placed ONLY on the day its window
-    // closes (daysLeft = 0) — overdue items (window already closed) are forced
-    // to today, and same-day-window items appear on their last possible day.
-    // No opportunistic pre-loading of future-deadline items into earlier days.
+    // Step 3: Greedy schedule each pool. For BFP, an optional `ctx` enforces a
+    // dough constraint — BFP can't bake more than the dough on hand at the
+    // start of that day (initial cold-ferment + previous days' scheduled shape).
+    // Same-day shape→BFP isn't possible because dough needs ≥1 day to ferment.
     //
-    // Why no pre-load: with cold-ferment ≥1 day and frozen lasting weeks, there's
-    // no production benefit to making things early. Pre-loading just inflates
-    // today's count past what's strictly required and confuses "must do today"
-    // with "could do today". If a manager wants to pull tomorrow's work forward,
-    // that's an explicit decision (use "+ Add Unscheduled Batch"), not a default.
-    //
-    // For BFP, an optional `ctx` enforces a dough constraint — BFP can't bake
-    // more than the dough on hand at the start of that day (initial cold-ferment
-    // + previous days' scheduled shape). Same-day shape→BFP isn't possible
-    // because dough needs ≥1 day to ferment.
+    // Capacity policy:
+    //   effectiveCap = max(workerCapacity, mustDoTotal)
+    //   - mustDoTotal ≤ workerCapacity → fills remaining cap with non-must-do
+    //     items (smooths load by pulling tomorrow's work forward when slack).
+    //   - mustDoTotal > workerCapacity → all must-do still fits, no backfill,
+    //     over-cap warning fires (the legitimate kind: deadline cluster).
     function schedulePool(pool, type, ctx = null) {
       const sched   = {};
       const lookahead = type === 'shape'
@@ -1959,10 +1899,6 @@
 
         for (const a of annotated) {
           if (cap <= 0) break;
-          // Only schedule items whose window closes today (daysLeft === 0).
-          // Items with daysLeft > 0 wait for their own last-possible day —
-          // no pre-loading future-deadline work onto today.
-          if (a.daysLeft > 0) continue;
           let take = Math.min(a.left, cap);
 
           // BFP dough constraint: cap take by available dough for this SKU
