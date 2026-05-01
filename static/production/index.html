@@ -2420,13 +2420,16 @@
 
     // Per-delivery coverage: which orders are already covered by current stock,
     // which need production. Same FIFO logic as the planner's badges.
-    // Only TODAY-AND-FORWARD deliveries are considered — past unconfirmed
-    // ghost orders (someone forgot to mark delivered) shouldn't eat current
-    // inventory FIFO. The scheduler already filters this way.
+    // Window: today through FORECAST_LOOKAHEAD days out — matches the forecast
+    // line above so the coverage list and the "7d need / stock / short" line
+    // describe the same set of deliveries. Past unconfirmed ghost orders
+    // (someone forgot to mark delivered) don't eat current inventory FIFO.
     const todayDateStr = toDateStr(new Date());
+    const horizonStr   = toDateStr(addDays(new Date(), FORECAST_LOOKAHEAD));
     const activeDeliveries = allDeliveries.filter(d =>
       !['delivered','picked_up','cancelled'].includes(d.status) &&
-      (d.date || '') >= todayDateStr);
+      (d.date || '') >= todayDateStr &&
+      (d.date || '') <= horizonStr);
     const deliveryCoverage = attributeDeliveryCoverage({
       activeDeliveries, inventoryReport: report, skuAliases,
     });
