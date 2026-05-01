@@ -238,6 +238,18 @@
     .delivery-card.status-scheduled { border-left-color: #666; }
     .delivery-card.status-delivered,
     .delivery-card.status-picked_up { opacity: 0.5; border-left-color: #4a4; }
+
+    /* Stock-coverage badge — same vocabulary as production app stock tab.
+       Says whether this order is already in stock or still needs production. */
+    .coverage-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font: 700 10px 'Manrope', sans-serif; letter-spacing: 0.3px;
+      margin-right: 6px; white-space: nowrap;
+    }
+    .coverage-badge.cov-ready     { background: #2d5a3a; color: #c8f0d4; }
+    .coverage-badge.cov-baking    { background: #6b5a1a; color: #fff3cd; }
+    .coverage-badge.cov-partial   { background: #1e3f6e; color: #cce5ff; }
+    .coverage-badge.cov-unstarted { background: #6e1e1e; color: #f8d7da; }
     .delivery-card .card-customer {
       font: 700 13px 'Manrope', sans-serif; color: #fff; margin-bottom: 4px;
       display: flex; align-items: center; justify-content: space-between; gap: 6px;
@@ -808,8 +820,15 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+    import {
+      makeSkuMeta,
+      resolveProductionLogs,
+      getInventoryReport,
+      attributeDeliveryCoverage,
+    } from '../../scripts/inventory.js';
 
     const LOG_PATH = '/dangpretz/delivery-planner';
+    const PRODUCTION_LOG_PATH = '/dangpretz/production';
     const TEMPLATE_LOG_PATH = '/dangpretz/delivery-templates';
     const WORKER_BASE = 'https://dpc-catering-checkout.drew-f39.workers.dev';
 
@@ -1335,12 +1354,27 @@
       return html;
     }
 
+    function renderCoverageBadge(row) {
+      const cov = row._coverage;
+      if (!cov || !cov.aggregateStatus) return '';
+      const isConfirmed = ['delivered','picked_up'].includes(row.status);
+      if (isConfirmed) return ''; // already shipped — no point flagging
+      const LABEL = {
+        ready:     '✅ Ready',
+        baking:    '🍞 Baking',
+        partial:   '🔧 Partial',
+        unstarted: '🔴 To make',
+      };
+      return `<span class="coverage-badge cov-${cov.aggregateStatus}" title="Stock attribution from production app">${LABEL[cov.aggregateStatus] || ''}</span>`;
+    }
+
     function renderDeliveryCard(row) {
       const type = (row.type || 'delivery').toLowerCase();
       const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
       const customer = row.customer || row.location || '—';
       const status = row.status || 'scheduled';
       const id = escapeHtml(row.deliveryId || '');
+      const covBadgeHtml = renderCoverageBadge(row);
       let pillsHtml = '';
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) { items = []; } }
@@ -1374,7 +1408,7 @@
               </div>
             </div>
           </div>
-          <span class="type-badge ${type}">${typeLabel}</span>
+          <span class="type-badge ${type}">${typeLabel}</span>${covBadgeHtml}
           ${pillsHtml}
           ${contactHtml}
           ${barcodeHtml}
@@ -1392,6 +1426,7 @@
       const customer = row.customer || row.location || '—';
       const status = row.status || 'scheduled';
       const id = escapeHtml(row.deliveryId || '');
+      const covBadgeHtml = renderCoverageBadge(row);
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
       else if (row.sku && row.volume != null) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
@@ -1412,7 +1447,7 @@
         <div class="daily-card status-${escapeHtml(status)}" data-delivery-id="${id}">
           <div class="daily-main">
             <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</div>
-            <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>
+            <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>${covBadgeHtml}
             ${pillsHtml}
             ${contactHtml}
             ${barcodeHtml}
@@ -1529,8 +1564,52 @@
 
     async function loadRecords() {
       try {
-        const logs = await fetchLog(LOG_PATH);
+        // Fetch deliveries (primary) and production log (for coverage badges) in parallel.
+        const [logs, productionLogs] = await Promise.all([
+          fetchLog(LOG_PATH),
+          fetchLog(PRODUCTION_LOG_PATH).catch(() => []), // coverage is best-effort; planner still works without it
+        ]);
+
         const deliveries = resolveDeliveriesFromLogs(logs);
+
+        // Compute per-delivery coverage via the shared module. Same FIFO logic
+        // as the production app's stock tab — green/yellow/blue/red badges
+        // tell the manager at-a-glance which orders are ready vs need work.
+        // Passes the planner's already-resolved `deliveries` (rather than
+        // re-resolving via the shared resolver) so deliveryId values match
+        // between the coverage map and the rendered cards.
+        try {
+          const prodResolved = resolveProductionLogs(productionLogs);
+          const meta = makeSkuMeta(prodResolved.skuConfig);
+          const inventoryReport = getInventoryReport({
+            productionLogs: prodResolved.productionLogs,
+            productionState: prodResolved.state,
+            allDeliveries: deliveries,
+            skuAliases: prodResolved.skuAliases,
+            latestInventoryTs: prodResolved.latestInventoryTs,
+            getBatchSize: meta.getBatchSize,
+          });
+          // Today-and-forward only — past unconfirmed ghost orders shouldn't
+          // eat current inventory FIFO. Mirrors stock-tab filter.
+          const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+          const activeDeliveries = deliveries.filter(d =>
+            !['delivered','picked_up','cancelled'].includes(d.status) &&
+            (d.date || '') >= today);
+          const coverage = attributeDeliveryCoverage({
+            activeDeliveries,
+            inventoryReport,
+            skuAliases: prodResolved.skuAliases,
+          });
+          // Stash coverage on each delivery row so renderers can pick it up.
+          deliveries.forEach(d => {
+            const cov = coverage.get(d.deliveryId);
+            if (cov) d._coverage = cov;
+          });
+        } catch (covErr) {
+          // Coverage is non-blocking; if it fails the planner still works.
+          console.warn('coverage computation skipped:', covErr);
+        }
+
         currentDeliveries = deliveries;
         updateCustomerSelect(deliveries);
         renderTotalsBySku(deliveries);
