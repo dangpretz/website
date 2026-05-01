@@ -98,6 +98,14 @@
     .stock-na    { font: 400 13px 'Manrope', sans-serif; color: var(--gray-3); text-align: center; }
     .stock-deduct { font: 400 11px 'Manrope', sans-serif; color: var(--green); }
     .stock-deduct-list { font: 400 11px 'Manrope', sans-serif; color: var(--gray-4); margin-top: 1px; line-height: 1.3; }
+    /* Aging dough indicator (5+ days) */
+    .stock-aging {
+      display: inline-block; margin-left: 6px;
+      font: 700 11px 'Manrope', sans-serif;
+      color: #856404; background: #fff3cd; border-radius: 4px;
+      padding: 1px 6px;
+    }
+    .stock-aging.critical { color: var(--red); background: #FCEBEB; }
 
     /* Forecast badge per SKU row */
     .stock-forecast {
@@ -1602,73 +1610,178 @@
     return { coldFerment: cf, frozen: fr };
   }
 
-  // Effective inventory: checkpoint snapshot + events with timestamp > snapshot.
-  // This is the single source of truth for inventory state used by the worker
-  // card display, the scheduler, and the stock form pre-fill.
+  // ─── INVENTORY REPORT ─────────────────────────────────────────────────────
+  // SINGLE SOURCE OF TRUTH for all inventory state. Every consumer (worker card,
+  // scheduler, stock form, forecast, banners) reads from this one function.
   //
-  // Ledger:
-  //   shape_done +N      → cf += N × batchSize           (dough produced)
-  //   bfp_done   +N      → cf -= N × batchSize (cap 0)   (dough consumed)
-  //                        fr += N × batchSize           (frozen produced)
-  //   confirmed delivery → fr -= delivery quantity       (frozen shipped)
+  // Ledger (events after snapshot timestamp):
+  //   shape_done +N      → cf += N × batchSize             (dough produced; pushed to age queue)
+  //   bfp_done   +N      → cf -= N × batchSize (cap 0)     (dough consumed FIFO)
+  //                        fr += N × batchSize             (frozen produced)
+  //   confirmed delivery → fr -= delivery quantity (cap 0) (frozen shipped)
   //
-  // Timestamp comparison (not date) so a same-day snapshot taken mid-day
-  // correctly excludes pre-snapshot events while crediting post-snapshot ones.
-  function getEffectiveInventory() {
-    const inv = getLatestInventory();
-    const cf = { ...inv.coldFerment };
-    const fr = { ...inv.frozen };
+  // Returns:
+  //   effective:           { coldFerment, frozen } — current state
+  //   doughQueue:          sku → [{ts, pretzels}]  — FIFO age queue (oldest first)
+  //   flowsSinceSnapshot:  { shape, bfp, delivered } — for "since-count" labels
+  //   alerts.agingDough:   batches of dough ≥5 days old (manager attention)
+  //   snapshot:            { date, timestamp, raw } — last counted state
+  //
+  // NOTE on age-tracking limitations: snapshot dough has no shape timestamp;
+  // we tag it with the snapshot timestamp as a conservative lower bound. Real
+  // dough could be older (was shaped before count). After 5 days from the
+  // snapshot, the alert fires regardless. Manager taking regular counts keeps
+  // the queue honest.
+  function getInventoryReport() {
+    const inv          = getLatestInventory();
+    const cf           = { ...inv.coldFerment };
+    const fr           = { ...inv.frozen };
+    const snapshotRaw  = { coldFerment: { ...inv.coldFerment }, frozen: { ...inv.frozen } };
+    const latestInvDate = Object.keys(productionState)
+      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
+                    Object.keys(productionState[ds].frozen      || {}).length > 0)
+      .sort().pop() || null;
 
-    // Walk raw production logs and apply only events after the snapshot timestamp.
-    // If no snapshot exists yet, all events apply (latestInventoryTs === null).
-    productionLogs.forEach(row => {
+    // Seed dough queue with snapshot cf — conservative ts = snapshot timestamp
+    const doughQueue = {};
+    const seedTs     = latestInventoryTs || new Date(0).toISOString();
+    Object.entries(cf).forEach(([sku, p]) => {
+      doughQueue[sku] = p > 0 ? [{ ts: seedTs, pretzels: p }] : [];
+    });
+
+    const flowShape     = {};
+    const flowBfp       = {};
+    const flowDelivered = {};
+
+    // Walk events in TIMESTAMP order (defensive against out-of-order log writes)
+    const sortedLogs = [...productionLogs].sort(
+      (a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || '')
+    );
+
+    sortedLogs.forEach(row => {
       const ts = row.timeStamp || '';
-      if (latestInventoryTs && ts <= latestInventoryTs) return;
+      if (latestInventoryTs && ts <= latestInventoryTs) return; // pre-snapshot — already counted
+
       if (row.action === 'shape_done') {
         let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
         comps.forEach(c => {
-          const bs = getBatchSize(c.sku);
+          let key = (c.sku || '').trim();
+          if (!key) return;
+          if (skuAliases[key]) key = skuAliases[key];
+          const bs = getBatchSize(key);
           if (!bs) return;
-          cf[c.sku] = (cf[c.sku] || 0) + (Number(c.batches) || 0) * bs;
+          const batches = Number(c.batches) || 0;
+          const p       = batches * bs;
+          cf[key]       = (cf[key] || 0) + p;
+          flowShape[key] = (flowShape[key] || 0) + batches;
+          if (!doughQueue[key]) doughQueue[key] = [];
+          if (p >= 0) {
+            doughQueue[key].push({ ts, pretzels: p });
+          } else {
+            // Negative shape (correction): shrink the most recent entry first
+            let toRemove = -p;
+            while (toRemove > 0 && doughQueue[key].length > 0) {
+              const last = doughQueue[key][doughQueue[key].length - 1];
+              const take = Math.min(last.pretzels, toRemove);
+              last.pretzels -= take;
+              toRemove      -= take;
+              if (last.pretzels <= 0) doughQueue[key].pop();
+            }
+          }
         });
       } else if (row.action === 'bfp_done') {
         let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
         comps.forEach(c => {
-          const bs = getBatchSize(c.sku);
+          let key = (c.sku || '').trim();
+          if (!key) return;
+          if (skuAliases[key]) key = skuAliases[key];
+          const bs = getBatchSize(key);
           if (!bs) return;
-          const p = (Number(c.batches) || 0) * bs;
-          cf[c.sku] = Math.max(0, (cf[c.sku] || 0) - p);
-          fr[c.sku] = (fr[c.sku] || 0) + p;
+          const batches = Number(c.batches) || 0;
+          const p       = batches * bs;
+          cf[key]       = Math.max(0, (cf[key] || 0) - p);
+          fr[key]       = (fr[key] || 0) + p;
+          flowBfp[key]  = (flowBfp[key] || 0) + batches;
+          if (!doughQueue[key]) doughQueue[key] = [];
+          if (p >= 0) {
+            // BFP consumes oldest dough first (FIFO)
+            let toConsume = p;
+            while (toConsume > 0 && doughQueue[key].length > 0) {
+              const oldest = doughQueue[key][0];
+              const take   = Math.min(oldest.pretzels, toConsume);
+              oldest.pretzels -= take;
+              toConsume       -= take;
+              if (oldest.pretzels <= 0) doughQueue[key].shift();
+            }
+          } else {
+            // Negative BFP (correction): add back to front (oldest position)
+            // Approximation: original ts unknown, use this row's ts.
+            doughQueue[key].unshift({ ts, pretzels: -p });
+          }
         });
       }
     });
 
-    // Subtract confirmed deliveries that landed after the snapshot.
-    // Uses the delivery's _confirmedAt (set when a confirm row resolves the
-    // delivery to delivered/picked_up status) — the same gate the planner uses.
+    // Subtract confirmed deliveries from frozen + record per-customer breakdown
     allDeliveries
       .filter(d => {
         if (!['delivered','picked_up'].includes(d.status)) return false;
-        if (!latestInventoryTs) return true; // no snapshot yet — count all confirmed
+        if (!latestInventoryTs) return true;
         return d._confirmedAt && d._confirmedAt > latestInventoryTs;
       })
       .forEach(delivery => {
         let items = [];
         try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+        const cust = delivery.customer || delivery.location || '?';
         items.forEach(({ sku, quantity }) => {
           let key = sku?.trim();
           if (!key) return;
           if (skuAliases[key]) key = skuAliases[key];
-          if (fr[key] == null) return;
-          fr[key] = Math.max(0, fr[key] - (Number(quantity) || 0));
+          const qty = Number(quantity) || 0;
+          if (qty <= 0) return;
+          if (fr[key] != null) fr[key] = Math.max(0, fr[key] - qty);
+          if (!flowDelivered[key]) flowDelivered[key] = [];
+          flowDelivered[key].push({ customer: cust, qty, confirmedAt: delivery._confirmedAt || '' });
         });
       });
 
-    // Round to whole pretzels — chained log entries can accumulate FP drift.
+    // Round to whole pretzels (FP drift from chained log entries)
     Object.keys(cf).forEach(k => { cf[k] = Math.max(0, Math.round(cf[k])); });
     Object.keys(fr).forEach(k => { fr[k] = Math.max(0, Math.round(fr[k])); });
 
-    return { coldFerment: cf, frozen: fr };
+    // Compute aging dough alerts. Threshold: ≥5 days = warn, ≥6 days = critical.
+    const now = Date.now();
+    const agingDough = [];
+    Object.entries(doughQueue).forEach(([sku, queue]) => {
+      queue.forEach(entry => {
+        if (entry.pretzels <= 0) return;
+        const ageMs   = now - new Date(entry.ts).getTime();
+        const ageDays = ageMs / 86400000;
+        if (ageDays >= 5) {
+          agingDough.push({
+            sku,
+            ageDays:  Math.floor(ageDays),
+            pretzels: Math.round(entry.pretzels),
+            critical: ageDays >= 6,
+          });
+        }
+      });
+    });
+    agingDough.sort((a, b) => b.ageDays - a.ageDays); // oldest first
+
+    return {
+      effective:          { coldFerment: cf, frozen: fr },
+      doughQueue,
+      flowsSinceSnapshot: { shape: flowShape, bfp: flowBfp, delivered: flowDelivered },
+      alerts:             { agingDough },
+      snapshot:           { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
+    };
+  }
+
+  // Thin wrapper for existing call sites that only need the effective state.
+  // All new code should prefer getInventoryReport() for the full picture.
+  function getEffectiveInventory() {
+    return getInventoryReport().effective;
   }
 
   // ─── BUILD OPTIMAL SCHEDULE ───────────────────────────────────────────────
@@ -1962,6 +2075,11 @@
           cap -= take;
         }
 
+        // Sort each item's deliveryDates so the most urgent (overdue/earliest)
+        // shows first in the card label "For delivery: X + Y + Z".
+        dayItems.forEach(it => {
+          it.deliveryDates.sort((a, b) => a.localeCompare(b));
+        });
         if (dayItems.length > 0) sched[dayStr] = dayItems;
       }
       return sched;
@@ -2470,38 +2588,20 @@
   // ─── RENDER STOCK TAB ─────────────────────────────────────────────────────
 
   function renderStockTab() {
-    const inv = getLatestInventory();
+    // Single source of truth — every number on this tab routes through here.
+    const report          = getInventoryReport();
+    const inv             = report.snapshot.raw;            // raw snapshot for "was X" labels only
+    const latestInvDate   = report.snapshot.date;
+    const flowDelivered   = report.flowsSinceSnapshot.delivered;
 
-    // Find the latest inventory snapshot date for header display
-    const latestInvDate = Object.keys(productionState)
-      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
-                    Object.keys(productionState[ds].frozen      || {}).length > 0)
-      .sort().pop() || null;
-
-    // Compute auto-deductions using the SAME logic as buildOptimalSchedule
-    // (timestamp comparison + skuAliases) so the displayed numbers match the
-    // values the scheduler actually uses. Also collect per-customer breakdown
-    // so the user can gut-check against actual deliveries that went out.
-    const deducted       = {}; // canonical sku → total pretzels deducted
-    const deductDetails  = {}; // canonical sku → [{customer, qty}] (in chronological order)
-    allDeliveries.forEach(d => {
-      if (!['delivered','picked_up'].includes(d.status)) return;
-      const useTs = d._confirmedAt && latestInventoryTs
-        ? d._confirmedAt > latestInventoryTs
-        : (latestInvDate && d.date >= latestInvDate);
-      if (!useTs) return;
-      let items = [];
-      try { items = JSON.parse(d.lineItems || '[]'); } catch {}
-      const cust = d.customer || d.location || '?';
-      items.forEach(({ sku, quantity }) => {
-        let key = sku?.trim();
-        if (!key) return;
-        if (skuAliases[key]) key = skuAliases[key]; // resolve to canonical
-        const qty = Number(quantity) || 0;
-        if (qty <= 0) return;
-        deducted[key] = (deducted[key] || 0) + qty;
-        if (!deductDetails[key]) deductDetails[key] = [];
-        deductDetails[key].push({ customer: cust, qty });
+    // Per-SKU "delivered since" totals derived from the report (no parallel calc).
+    const deducted      = {};
+    const deductDetails = {};
+    Object.entries(flowDelivered).forEach(([sku, list]) => {
+      list.forEach(({ customer, qty }) => {
+        deducted[sku] = (deducted[sku] || 0) + qty;
+        if (!deductDetails[sku]) deductDetails[sku] = [];
+        deductDetails[sku].push({ customer, qty });
       });
     });
 
@@ -2546,11 +2646,10 @@
 
     allSkus.forEach(sku => {
       if (isFOH(sku)) return; // FOH SKUs aren't part of production forecast
-      const doughRaw  = inv.coldFerment[sku] || 0;
-      const frozenRaw = inv.frozen[sku]      || 0;
-      const dedAmt    = deducted[sku] || 0;
-      const frozenEff = Math.max(0, frozenRaw - dedAmt);
-      const stock     = doughRaw + frozenEff;
+      // Use effective inventory — same numbers as worker card and scheduler.
+      const doughEff  = report.effective.coldFerment[sku] || 0;
+      const frozenEff = report.effective.frozen[sku] || 0;
+      const stock     = doughEff + frozenEff;
       const demand    = demandBySku[sku] || 0;
       const net       = stock - demand;
       const cs        = getCaseSize(sku);
@@ -2584,23 +2683,27 @@
           : ''}
       </div>`;
 
-    // Pre-fill stock inputs with EFFECTIVE inventory — what the system expects
-    // given the last snapshot plus all events since (shape, BFP, deliveries).
-    // The manager confirms or adjusts based on physical count rather than
-    // re-typing every number from scratch (and accidentally zeroing out work).
-    const eff = getEffectiveInventory();
+    // Aging-dough indicator per SKU (oldest entry's age, if ≥5 days).
+    const oldestDoughAge = {};
+    Object.entries(report.doughQueue).forEach(([sku, queue]) => {
+      const oldest = queue.find(e => e.pretzels > 0);
+      if (!oldest) return;
+      const ageDays = Math.floor((Date.now() - new Date(oldest.ts).getTime()) / 86400000);
+      if (ageDays >= 5) oldestDoughAge[sku] = ageDays;
+    });
 
     const rows = allSkus.map(sku => {
       const isFohSku   = isFOH(sku);
-      const doughRaw   = inv.coldFerment[sku] || 0; // raw snapshot (informational, used in delivered-since label)
-      const frozenRaw  = inv.frozen[sku] || 0;
+      const frozenRaw  = inv.frozen[sku] || 0; // raw snapshot value, used only in "(was N)" label
       const dedAmt     = deducted[sku] || 0;
       const dedDetails = deductDetails[sku] || [];
-      // Effective values used to pre-populate the inputs. Same numbers the
-      // worker card and scheduler see — single source of truth.
-      const doughDisplay  = eff.coldFerment[sku] || 0;
-      const frozenDisplay = eff.frozen[sku] || 0;
+      // Pre-fill inputs with effective values — same source of truth as worker
+      // card, scheduler, and forecast above. Manager confirms or adjusts based
+      // on physical count rather than retyping from scratch.
+      const doughDisplay  = report.effective.coldFerment[sku] || 0;
+      const frozenDisplay = report.effective.frozen[sku] || 0;
       const fc         = forecasts[sku];
+      const ageDays    = oldestDoughAge[sku];
 
       let dedStr = '';
       if (dedAmt > 0) {
@@ -2612,6 +2715,11 @@
         dedStr = `<div class="stock-deduct">${t('delivered', { n: dedAmt, w: frozenRaw, when: sinceLabel })}</div>
                   <div class="stock-deduct-list">${parts.join(', ')}</div>`;
       }
+
+      // Inline aging indicator next to dough number if oldest dough is ≥5 days old.
+      const ageBadge = ageDays != null
+        ? `<span class="stock-aging${ageDays >= 6 ? ' critical' : ''}" title="Oldest dough ${ageDays} days old">⏳ ${ageDays}d</span>`
+        : '';
 
       // Forecast indicator
       let fcStr = '';
@@ -2633,7 +2741,7 @@
       }
 
       return `<div class="stock-row">
-        <div><span class="stock-sku">${esc(sku)}</span>${dedStr}${fcStr}</div>
+        <div><span class="stock-sku">${esc(sku)}</span>${ageBadge}${dedStr}${fcStr}</div>
         ${isFohSku
           ? `<span class="stock-na">—</span>`
           : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" placeholder="0">`}
@@ -3020,9 +3128,32 @@
       }
     }
 
+    // Aging-dough banner — manager only. Reads from getInventoryReport() so the
+    // numbers match the stock tab's per-row aging indicator exactly.
+    let agingDoughHtml = '';
+    if (userRole === 'manager') {
+      const inventoryReport = getInventoryReport();
+      const aging = inventoryReport.alerts.agingDough;
+      if (aging.length > 0) {
+        const items = aging.map(a => {
+          const bs = getBatchSize(a.sku) || 1;
+          const batches = (a.pretzels / bs).toFixed(1).replace(/\.0$/, '');
+          return `<strong>${esc(a.sku)}</strong> · ${a.pretzels}p (~${batches} batches) · ${a.ageDays}d old`;
+        }).join(' · ');
+        const hasCritical = aging.some(a => a.critical);
+        const bg = hasCritical ? '#FCEBEB' : '#fff3cd';
+        const fg = hasCritical ? 'var(--red)' : '#856404';
+        const icon = hasCritical ? '🔴' : '🟡';
+        const label = hasCritical
+          ? (appLang === 'es' ? 'Masa pasada — descartar o usar hoy:' : 'Aging dough past 6 days — discard or use today:')
+          : (appLang === 'es' ? 'Masa envejeciendo — usar pronto:'    : 'Aging dough — use soon:');
+        agingDoughHtml = `<div class="alert-banner" style="background:${bg};color:${fg}"><strong>${icon} ${label}</strong> ${items}</div>`;
+      }
+    }
+
     // Worker views see no banners (calmer UX). Per-card 🚨 tag still surfaces overdue work.
     const alertHtml = userRole === 'manager'
-      ? (overdueHtml + unconfigHtml + dupHtml + unconfirmedHtml)
+      ? (overdueHtml + agingDoughHtml + unconfigHtml + dupHtml + unconfirmedHtml)
       : '';
     document.getElementById('alert-area').innerHTML = alertHtml;
 
