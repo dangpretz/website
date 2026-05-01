@@ -1033,6 +1033,7 @@
   let allDeliveries   = [];
   let allSkus         = []; // master list from delivery-planner/skus.json
   let productionState = {};
+  let productionLogs  = []; // raw production log rows — kept for timestamp-precise effective inventory
   let skuConfig       = {}; // { sku: { batchSize, type } } — from sku_config log entries
   let skuAliases      = {}; // { oldSku: canonicalSku } — from sku_alias log entries
   let latestInventoryTs = null; // ISO timestamp of latest inventory snapshot
@@ -1601,64 +1602,69 @@
     return { coldFerment: cf, frozen: fr };
   }
 
-  // Effective inventory: snapshot + work logged AFTER the snapshot date, minus
-  // confirmed-delivery outflows. Used for the "Raw materials" line so the user
-  // sees stock that reflects today's shape/BFP work and confirmed deliveries.
-  // shape_done    → coldFerment += batches × batchSize
-  // bfp_done      → coldFerment -= batches × batchSize, frozen += batches × batchSize
-  // confirmed delivery → frozen -= delivery quantity
+  // Effective inventory: checkpoint snapshot + events with timestamp > snapshot.
+  // This is the single source of truth for inventory state used by the worker
+  // card display, the scheduler, and the stock form pre-fill.
+  //
+  // Ledger:
+  //   shape_done +N      → cf += N × batchSize           (dough produced)
+  //   bfp_done   +N      → cf -= N × batchSize (cap 0)   (dough consumed)
+  //                        fr += N × batchSize           (frozen produced)
+  //   confirmed delivery → fr -= delivery quantity       (frozen shipped)
+  //
+  // Timestamp comparison (not date) so a same-day snapshot taken mid-day
+  // correctly excludes pre-snapshot events while crediting post-snapshot ones.
   function getEffectiveInventory() {
     const inv = getLatestInventory();
     const cf = { ...inv.coldFerment };
     const fr = { ...inv.frozen };
 
-    // Find snapshot anchor date (last day with a snapshot)
-    const latestInvDate = Object.keys(productionState)
-      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
-                    Object.keys(productionState[ds].frozen      || {}).length > 0)
-      .sort().pop() || null;
-
-    // Apply shape/BFP completions from dates AFTER the snapshot
-    Object.entries(productionState).forEach(([ds, s]) => {
-      if (latestInvDate && ds <= latestInvDate) return; // skip pre-snapshot dates
-      (s.shapeDone || []).forEach(c => {
-        const bs = getBatchSize(c.sku);
-        if (!bs) return;
-        cf[c.sku] = (cf[c.sku] || 0) + (Number(c.batches) || 0) * bs;
-      });
-      (s.bfpDone || []).forEach(c => {
-        const bs = getBatchSize(c.sku);
-        if (!bs) return;
-        const p = (Number(c.batches) || 0) * bs;
-        cf[c.sku] = Math.max(0, (cf[c.sku] || 0) - p);
-        fr[c.sku] = (fr[c.sku] || 0) + p;
-      });
+    // Walk raw production logs and apply only events after the snapshot timestamp.
+    // If no snapshot exists yet, all events apply (latestInventoryTs === null).
+    productionLogs.forEach(row => {
+      const ts = row.timeStamp || '';
+      if (latestInventoryTs && ts <= latestInventoryTs) return;
+      if (row.action === 'shape_done') {
+        let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
+        comps.forEach(c => {
+          const bs = getBatchSize(c.sku);
+          if (!bs) return;
+          cf[c.sku] = (cf[c.sku] || 0) + (Number(c.batches) || 0) * bs;
+        });
+      } else if (row.action === 'bfp_done') {
+        let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
+        comps.forEach(c => {
+          const bs = getBatchSize(c.sku);
+          if (!bs) return;
+          const p = (Number(c.batches) || 0) * bs;
+          cf[c.sku] = Math.max(0, (cf[c.sku] || 0) - p);
+          fr[c.sku] = (fr[c.sku] || 0) + p;
+        });
+      }
     });
 
-    // Subtract confirmed deliveries that landed after the snapshot
-    if (latestInvDate) {
-      allDeliveries
-        .filter(d => {
-          if (!['delivered','picked_up'].includes(d.status)) return false;
-          if (d._confirmedAt && latestInventoryTs) {
-            return d._confirmedAt > latestInventoryTs;
-          }
-          return d.date >= latestInvDate;
-        })
-        .forEach(delivery => {
-          let items = [];
-          try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
-          items.forEach(({ sku, quantity }) => {
-            let key = sku?.trim();
-            if (!key) return;
-            if (skuAliases[key]) key = skuAliases[key];
-            if (fr[key] == null) return;
-            fr[key] = Math.max(0, fr[key] - (Number(quantity) || 0));
-          });
+    // Subtract confirmed deliveries that landed after the snapshot.
+    // Uses the delivery's _confirmedAt (set when a confirm row resolves the
+    // delivery to delivered/picked_up status) — the same gate the planner uses.
+    allDeliveries
+      .filter(d => {
+        if (!['delivered','picked_up'].includes(d.status)) return false;
+        if (!latestInventoryTs) return true; // no snapshot yet — count all confirmed
+        return d._confirmedAt && d._confirmedAt > latestInventoryTs;
+      })
+      .forEach(delivery => {
+        let items = [];
+        try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+        items.forEach(({ sku, quantity }) => {
+          let key = sku?.trim();
+          if (!key) return;
+          if (skuAliases[key]) key = skuAliases[key];
+          if (fr[key] == null) return;
+          fr[key] = Math.max(0, fr[key] - (Number(quantity) || 0));
         });
-    }
+      });
 
-    // Round to whole pretzels — chained log entries can accumulate FP drift
+    // Round to whole pretzels — chained log entries can accumulate FP drift.
     Object.keys(cf).forEach(k => { cf[k] = Math.max(0, Math.round(cf[k])); });
     Object.keys(fr).forEach(k => { fr[k] = Math.max(0, Math.round(fr[k])); });
 
@@ -2565,14 +2571,22 @@
           : ''}
       </div>`;
 
+    // Pre-fill stock inputs with EFFECTIVE inventory — what the system expects
+    // given the last snapshot plus all events since (shape, BFP, deliveries).
+    // The manager confirms or adjusts based on physical count rather than
+    // re-typing every number from scratch (and accidentally zeroing out work).
+    const eff = getEffectiveInventory();
+
     const rows = allSkus.map(sku => {
       const isFohSku   = isFOH(sku);
-      const doughRaw   = inv.coldFerment[sku] || 0;
+      const doughRaw   = inv.coldFerment[sku] || 0; // raw snapshot (informational, used in delivered-since label)
       const frozenRaw  = inv.frozen[sku] || 0;
       const dedAmt     = deducted[sku] || 0;
       const dedDetails = deductDetails[sku] || [];
-      // Effective frozen = saved snapshot − auto-deducted (what the scheduler uses).
-      const frozenEff  = Math.max(0, frozenRaw - dedAmt);
+      // Effective values used to pre-populate the inputs. Same numbers the
+      // worker card and scheduler see — single source of truth.
+      const doughDisplay  = eff.coldFerment[sku] || 0;
+      const frozenDisplay = eff.frozen[sku] || 0;
       const fc         = forecasts[sku];
 
       let dedStr = '';
@@ -2609,8 +2623,8 @@
         <div><span class="stock-sku">${esc(sku)}</span>${dedStr}${fcStr}</div>
         ${isFohSku
           ? `<span class="stock-na">—</span>`
-          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughRaw}" placeholder="0">`}
-        <input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenEff}" placeholder="0">
+          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" placeholder="0">`}
+        <input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" placeholder="0">
       </div>`;
     }).join('');
 
@@ -3235,9 +3249,10 @@
 
   async function loadProduction() {
     const logs = await fetchLog(PRODUCTION_LOG);
-    productionState = resolveProductionLogs(logs);
+    productionLogs = Array.isArray(logs) ? logs : [];
+    productionState = resolveProductionLogs(productionLogs);
     // Capture latest inventory timestamp for auto-deduct timing decisions
-    const invLogs = (logs || []).filter(l => l.action === 'inventory');
+    const invLogs = productionLogs.filter(l => l.action === 'inventory');
     invLogs.sort((a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || ''));
     latestInventoryTs = invLogs.length ? invLogs[invLogs.length - 1].timeStamp : null;
   }
