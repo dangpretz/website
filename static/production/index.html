@@ -1885,10 +1885,21 @@
       }
     });
 
-    // Step 3: Greedy schedule each pool. For BFP, an optional `ctx` enforces a
-    // dough constraint — BFP can't bake more than the dough on hand at the
-    // start of that day (initial cold-ferment + previous days' scheduled shape).
-    // Same-day shape→BFP isn't possible because dough needs ≥1 day to ferment.
+    // Step 3: Schedule each pool. Each item is placed ONLY on the day its window
+    // closes (daysLeft = 0) — overdue items (window already closed) are forced
+    // to today, and same-day-window items appear on their last possible day.
+    // No opportunistic pre-loading of future-deadline items into earlier days.
+    //
+    // Why no pre-load: with cold-ferment ≥1 day and frozen lasting weeks, there's
+    // no production benefit to making things early. Pre-loading just inflates
+    // today's count past what's strictly required and confuses "must do today"
+    // with "could do today". If a manager wants to pull tomorrow's work forward,
+    // that's an explicit decision (use "+ Add Unscheduled Batch"), not a default.
+    //
+    // For BFP, an optional `ctx` enforces a dough constraint — BFP can't bake
+    // more than the dough on hand at the start of that day (initial cold-ferment
+    // + previous days' scheduled shape). Same-day shape→BFP isn't possible
+    // because dough needs ≥1 day to ferment.
     function schedulePool(pool, type, ctx = null) {
       const sched   = {};
       const lookahead = type === 'shape'
@@ -1948,6 +1959,10 @@
 
         for (const a of annotated) {
           if (cap <= 0) break;
+          // Only schedule items whose window closes today (daysLeft === 0).
+          // Items with daysLeft > 0 wait for their own last-possible day —
+          // no pre-loading future-deadline work onto today.
+          if (a.daysLeft > 0) continue;
           let take = Math.min(a.left, cap);
 
           // BFP dough constraint: cap take by available dough for this SKU
