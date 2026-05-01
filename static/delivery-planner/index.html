@@ -292,19 +292,30 @@
       font: 700 13px 'Manrope', sans-serif; color: #fff; margin-bottom: 4px;
       display: flex; align-items: center; justify-content: space-between; gap: 6px;
     }
-    .delivery-card > .type-badge { margin: 4px 0 2px; }
+    /* Subline below customer name: combines coverage status + delivery type
+       into one compact secondary row. Replaces the previous standalone
+       type-badge + floating coverage-badge stacking that wrapped weirdly. */
+    .card-subline {
+      display: flex; align-items: center; gap: 6px;
+      margin: 2px 0 6px; flex-wrap: wrap;
+      font: 600 10px 'Manrope', sans-serif;
+      color: #888; text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .card-subline .type-tag { color: #aaa; }
     .delivery-card .card-items { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
     .delivery-card .item-pill {
       font: 400 10px 'Manrope', sans-serif; background: #333; color: #ccc;
       padding: 2px 6px; border-radius: 3px; white-space: nowrap;
     }
     .delivery-card .card-actions-row {
-      display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px;
+      display: flex; align-items: stretch; gap: 6px; margin-top: 6px;
     }
+    .delivery-card .card-actions-row > button { flex: 1; }
     .delivery-card .confirm-btn {
-      padding: 4px 10px; font: 700 10px 'Manrope', sans-serif; color: #C41E1E;
+      padding: 6px 10px; font: 700 11px 'Manrope', sans-serif; color: #C41E1E;
       background: none; border: 1px solid #C41E1E; border-radius: 3px; cursor: pointer;
       transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
     }
     .delivery-card .confirm-btn:hover { background: #C41E1E; color: #fff; }
     .delivery-card .card-confirmed {
@@ -1477,7 +1488,10 @@
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
       const isConfirmed = status === 'delivered' || status === 'picked_up';
-      const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : '';
+      // Compact button label — full "Confirm Delivery" wrapped to two lines on
+      // narrow columns. Type still visible via the subline + the icon.
+      const confirmBtnLabel = type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm';
+      const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${confirmBtnLabel}</button>` : '';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
       const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
@@ -1499,7 +1513,7 @@
               </div>
             </div>
           </div>
-          <span class="type-badge ${type}">${typeLabel}</span>${covBadgeHtml}
+          <div class="card-subline">${covBadgeHtml}<span class="type-tag">${typeLabel}</span></div>
           ${pillsHtml}
           ${contactHtml}
           ${barcodeHtml}
@@ -1538,7 +1552,7 @@
         <div class="daily-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="daily-main">
             <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</div>
-            <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>${covBadgeHtml}
+            <div class="card-subline">${covBadgeHtml}<span class="type-tag">${typeLabel}</span></div>
             ${pillsHtml}
             ${contactHtml}
             ${barcodeHtml}
@@ -1546,7 +1560,7 @@
           </div>
           <div class="daily-actions">
             ${scanBtnHtml}
-            ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">Confirm ${typeLabel}</button>` : ''}
+            ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm'}</button>` : ''}
             <div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
