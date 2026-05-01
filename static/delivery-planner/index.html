@@ -233,16 +233,27 @@
     }
     .delivery-card {
       background: #1A1A1A; border-radius: 6px; padding: 10px; margin-bottom: 6px;
-      border-left: 3px solid #444; position: relative;
+      border-left: 4px solid #444; position: relative;
     }
     .delivery-card.status-scheduled { border-left-color: #666; }
     .delivery-card.status-delivered,
     .delivery-card.status-picked_up { opacity: 0.5; border-left-color: #4a4; }
+    /* Coverage drives the card's left border color when status is unconfirmed.
+       Order matters: rules below status-* so cov-* wins for unconfirmed cards.
+       Confirmed cards keep the green "shipped" tint. */
+    .delivery-card.cov-ready     { border-left-color: #4a4;    }
+    .delivery-card.cov-baking    { border-left-color: #b59f3b; }
+    .delivery-card.cov-partial   { border-left-color: #4a86c8; }
+    .delivery-card.cov-unstarted { border-left-color: #c44;    }
+    .daily-card.cov-ready        { border-left-color: #4a4;    }
+    .daily-card.cov-baking       { border-left-color: #b59f3b; }
+    .daily-card.cov-partial      { border-left-color: #4a86c8; }
+    .daily-card.cov-unstarted    { border-left-color: #c44;    }
 
-    /* Stock-coverage badge — same vocabulary as production app stock tab.
-       Says whether this order is already in stock or still needs production. */
+    /* Aggregate coverage badge — secondary now that the card border carries the
+       same info. Shrunken to a label-only inline tag. */
     .coverage-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      display: inline-block; padding: 1px 7px; border-radius: 9px;
       font: 700 10px 'Manrope', sans-serif; letter-spacing: 0.3px;
       margin-right: 6px; white-space: nowrap;
     }
@@ -251,14 +262,32 @@
     .coverage-badge.cov-partial   { background: #1e3f6e; color: #cce5ff; }
     .coverage-badge.cov-unstarted { background: #6e1e1e; color: #f8d7da; }
 
-    /* Per-line coverage indicator on item pills. Subtle 3px left border so
-       the manager can see at a glance which SKUs in an order are ready vs
-       which still need production. FOH/unconfigured SKUs render as gray. */
-    .item-pill.cov-ready     { border-left: 3px solid #4a4; padding-left: 6px; }
-    .item-pill.cov-baking    { border-left: 3px solid #b59f3b; padding-left: 6px; }
-    .item-pill.cov-partial   { border-left: 3px solid #4a86c8; padding-left: 6px; }
-    .item-pill.cov-unstarted { border-left: 3px solid #c44; padding-left: 6px; }
-    .item-pill.cov-foh       { opacity: 0.55; }
+    /* Per-line item pills: leading colored dot + subtle background tint so
+       each SKU's coverage status is glanceable. FOH/unconfigured SKUs render
+       dimmed with no dot — they aren't produced in-house. */
+    .item-pill                  { display: inline-flex; align-items: center; gap: 5px; }
+    .item-pill::before          { display: none; content: ''; }
+    .item-pill.cov-ready,
+    .item-pill.cov-baking,
+    .item-pill.cov-partial,
+    .item-pill.cov-unstarted    { padding-left: 6px; }
+    .item-pill.cov-ready::before,
+    .item-pill.cov-baking::before,
+    .item-pill.cov-partial::before,
+    .item-pill.cov-unstarted::before {
+      display: inline-block;
+      width: 7px; height: 7px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .item-pill.cov-ready     { background: #1e3a26; }
+    .item-pill.cov-ready::before     { background: #4a4; }
+    .item-pill.cov-baking    { background: #3b341a; }
+    .item-pill.cov-baking::before    { background: #b59f3b; }
+    .item-pill.cov-partial   { background: #1c2a44; }
+    .item-pill.cov-partial::before   { background: #4a86c8; }
+    .item-pill.cov-unstarted { background: #3b1a1a; }
+    .item-pill.cov-unstarted::before { background: #c44; }
+    .item-pill.cov-foh       { opacity: 0.45; font-style: italic; }
     .delivery-card .card-customer {
       font: 700 13px 'Manrope', sans-serif; color: #fff; margin-bottom: 4px;
       display: flex; align-items: center; justify-content: space-between; gap: 6px;
@@ -1363,6 +1392,15 @@
       return html;
     }
 
+    // Returns a coverage class for the card root (e.g. 'cov-ready') so the
+    // whole card's left border carries the status. Empty for confirmed/unknown.
+    function cardCoverageClass(row) {
+      const cov = row._coverage;
+      if (!cov || !cov.aggregateStatus) return '';
+      if (['delivered','picked_up'].includes(row.status)) return '';
+      return ` cov-${cov.aggregateStatus}`;
+    }
+
     function renderCoverageBadge(row) {
       const cov = row._coverage;
       if (!cov || !cov.aggregateStatus) return '';
@@ -1449,7 +1487,7 @@
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
       return `
-        <div class="delivery-card status-${escapeHtml(status)}" data-delivery-id="${id}">
+        <div class="delivery-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="card-customer">
             <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</span>
             <div class="overflow-wrap">
@@ -1497,7 +1535,7 @@
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
       return `
-        <div class="daily-card status-${escapeHtml(status)}" data-delivery-id="${id}">
+        <div class="daily-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="daily-main">
             <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</div>
             <span class="type-badge ${type}" style="margin-bottom:6px">${typeLabel}</span>${covBadgeHtml}
