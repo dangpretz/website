@@ -1865,6 +1865,17 @@
         const workers  = getWorkers(type, dayStr);
         const capacity = workers * BATCHES_PER_WORKER;
 
+        // Capacity accounts for work already completed on this day & team —
+        // those batches occupied worker time and shouldn't be backfilled
+        // again. Without this, completing a batch would just cause the
+        // scheduler to pull another non-must-do batch onto today, growing
+        // the day's total past capacity instead of leaving the worker idle
+        // (or letting the work fall to a future day).
+        const doneKey = type === 'shape' ? 'shapeDone' : 'bfpDone';
+        const madeOnDay = ((productionState[dayStr] || {})[doneKey] || [])
+          .reduce((s, c) => s + (Number(c.batches) || 0), 0);
+        const remainingCap = Math.max(0, capacity - madeOnDay);
+
         // For BFP: at the start of each day, add yesterday's scheduled shape
         // output to the dough balance (1-day cold-ferment minimum)
         if (type === 'bfp' && ctx && i > 0) {
@@ -1895,9 +1906,11 @@
             return a.deliveryDate.localeCompare(b.deliveryDate);             // earliest delivery tiebreak
           });
 
-        // Always fit must-do items even if over capacity
+        // Always fit must-do items even if over capacity. Cap is the day's
+        // REMAINING capacity (after subtracting work already done today) so
+        // backfill doesn't overload the day past its budget.
         const mustDoTotal = annotated.filter(a => a.daysLeft === 0).reduce((s, a) => s + a.left, 0);
-        const effectiveCap = Math.max(capacity, mustDoTotal);
+        const effectiveCap = Math.max(remainingCap, mustDoTotal);
         const isOverloaded = mustDoTotal > capacity;
 
         let cap = effectiveCap;
