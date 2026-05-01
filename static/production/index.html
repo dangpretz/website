@@ -107,6 +107,35 @@
     }
     .stock-aging.critical { color: var(--red); background: #FCEBEB; }
 
+    /* Per-delivery coverage list (expandable under each stock row) */
+    .coverage-details {
+      margin-top: 6px;
+      font: 400 11px 'Manrope', sans-serif;
+      color: var(--gray-4);
+    }
+    .coverage-details > summary {
+      cursor: pointer; user-select: none;
+      font: 600 11px 'Manrope', sans-serif;
+      color: var(--gray-3);
+      padding: 2px 0;
+    }
+    .coverage-details[open] > summary { color: var(--dark); }
+    .coverage-list { margin: 4px 0 0; padding: 0; list-style: none; }
+    .coverage-row {
+      display: grid; grid-template-columns: 60px 1fr auto;
+      gap: 8px; align-items: center;
+      padding: 3px 0; border-top: 1px solid #f0f0f0;
+      font: 500 11px 'Manrope', sans-serif;
+    }
+    .coverage-row:first-child { border-top: none; }
+    .coverage-row .cov-date  { color: var(--gray-3); }
+    .coverage-row .cov-cust  { color: var(--dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .coverage-row .cov-state { font: 700 10px 'Manrope', sans-serif; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+    .coverage-row.cov-ready     .cov-state { background: #d4edda; color: #155724; }
+    .coverage-row.cov-baking    .cov-state { background: #fff3cd; color: #856404; }
+    .coverage-row.cov-partial   .cov-state { background: #cce5ff; color: #004085; }
+    .coverage-row.cov-unstarted .cov-state { background: #f8d7da; color: #721c24; }
+
     /* Forecast badge per SKU row */
     .stock-forecast {
       display: block; font: 600 11px 'Manrope', sans-serif;
@@ -2391,8 +2420,13 @@
 
     // Per-delivery coverage: which orders are already covered by current stock,
     // which need production. Same FIFO logic as the planner's badges.
+    // Only TODAY-AND-FORWARD deliveries are considered — past unconfirmed
+    // ghost orders (someone forgot to mark delivered) shouldn't eat current
+    // inventory FIFO. The scheduler already filters this way.
+    const todayDateStr = toDateStr(new Date());
     const activeDeliveries = allDeliveries.filter(d =>
-      !['delivered','picked_up','cancelled'].includes(d.status));
+      !['delivered','picked_up','cancelled'].includes(d.status) &&
+      (d.date || '') >= todayDateStr);
     const deliveryCoverage = attributeDeliveryCoverage({
       activeDeliveries, inventoryReport: report, skuAliases,
     });
@@ -2539,6 +2573,37 @@
         ? `<span class="stock-aging${ageDays >= DOUGH_AGE_FAIL_DAYS ? ' critical' : ''}" title="Oldest dough ${ageDays} days old">⏳ ${ageDays}d</span>`
         : '';
 
+      // Per-delivery coverage list — expandable so the row stays compact by default.
+      // Each entry tells the manager whether that delivery is covered by stock,
+      // covered by dough (just needs BFP), partial, or not started yet.
+      const skuCoverage = coverageBySku[sku] || [];
+      let coverageHtml = '';
+      if (skuCoverage.length > 0) {
+        const STATUS_LABEL = appLang === 'es'
+          ? { ready: '✅ listo', baking: '🍞 hornear', partial: '🔧 parcial', unstarted: '🔴 producir' }
+          : { ready: '✅ ready', baking: '🍞 baking',  partial: '🔧 partial', unstarted: '🔴 to make' };
+        const summaryLabel = appLang === 'es'
+          ? `Cobertura (${skuCoverage.length} entregas)`
+          : `Coverage (${skuCoverage.length} deliveries)`;
+        const items = skuCoverage.map(c => {
+          const dateLabel = c.date ? fmtShort(parseDate(c.date)) : '—';
+          const cust = compressCust(c.customer || '—');
+          const detail = c.status === 'ready'   ? `${c.qty}p ${appLang === 'es' ? 'congelado' : 'frozen'}`
+                       : c.status === 'baking'  ? `${c.qty}p ${appLang === 'es' ? 'en masa' : 'in dough'}`
+                       : c.status === 'partial' ? `${c.frozenP + c.doughP}p ${appLang === 'es' ? 'cubierto' : 'covered'}, ${c.needShapeP}p ${appLang === 'es' ? 'por hacer' : 'to shape'}`
+                       :                          `${c.qty}p ${appLang === 'es' ? 'sin empezar' : 'not started'}`;
+          return `<li class="coverage-row cov-${c.status}">
+            <span class="cov-date">${esc(dateLabel)}</span>
+            <span class="cov-cust" title="${esc(c.customer)}">${esc(cust)} · ${esc(detail)}</span>
+            <span class="cov-state">${STATUS_LABEL[c.status]}</span>
+          </li>`;
+        }).join('');
+        coverageHtml = `<details class="coverage-details">
+          <summary>${esc(summaryLabel)}</summary>
+          <ul class="coverage-list">${items}</ul>
+        </details>`;
+      }
+
       // Forecast indicator
       let fcStr = '';
       if (fc) {
@@ -2559,7 +2624,7 @@
       }
 
       return `<div class="stock-row">
-        <div><span class="stock-sku">${esc(sku)}</span>${ageBadge}${dedStr}${fcStr}</div>
+        <div><span class="stock-sku">${esc(sku)}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
         ${isFohSku
           ? `<span class="stock-na">—</span>`
           : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" placeholder="0">`}
