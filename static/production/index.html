@@ -924,6 +924,13 @@
 
 <script type="module">
   import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+  import {
+    BATCH_SIZES, CASE_SIZES, TRAY_SIZES, FOH_SKUS, BAKE_GROUPS,
+    DOUGH_AGE_WARN_DAYS, DOUGH_AGE_FAIL_DAYS,
+    makeSkuMeta,
+    resolveDeliveries, resolveProductionLogs,
+    getInventoryReport, attributeDeliveryCoverage,
+  } from '../../scripts/inventory.js';
 
   // ╔══════════════════════════════════════════════════════════════════════════╗
   // ║ ARCHITECTURE                                                             ║
@@ -986,65 +993,7 @@
   const DELIVERY_LOG   = '/dangpretz/delivery-planner';
   const PRODUCTION_LOG = '/dangpretz/production';
 
-  const BATCH_SIZES = {
-    '21oz mammoth pretzel': 24,
-    '10oz mustache':        48,
-    '10oz plain':           48,
-    '10oz bbk':             48,
-    '10oz spicy bee':       48,
-    '6.5oz plain':          72,
-    '6.5oz bbk':            72,
-    '6.5oz spicy bee':      72,
-    'plain bombs':          72,
-    'bees bats':            72,
-  };
-
-  // Pretzels per case — wholesale shipping unit. Per-SKU override via skuConfig.
-  const CASE_SIZES = {
-    '21oz mammoth pretzel': 25,
-    '10oz mustache':        48,
-    '10oz plain':           48,
-    '10oz bbk':             48,
-    '10oz spicy bee':       48,
-    '6.5oz plain':          72,
-    '6.5oz bbk':            72,
-    '6.5oz spicy bee':      72,
-    '4oz twist plain':      52,
-    '4oz twist bbk':        52,
-    '4oz twist spicy bee':  52,
-    'plain bombs':          0,  // unknown
-    'bees bats':            0,  // unknown
-  };
-
-  // Pretzels per baking sheet (tray) — BFP team's natural unit. They pull
-  // trays out of the fridge and load them into the oven. SkuConfig override
-  // takes priority via getTraySize.
-  const TRAY_SIZES = {
-    '21oz mammoth pretzel':  2,
-    '10oz mustache':         4,
-    '10oz plain':            4,
-    '10oz bbk':              4,
-    '10oz spicy bee':        4,
-    '6.5oz plain':           9,
-    '6.5oz bbk':             9,
-    '6.5oz spicy bee':       9,
-    '4oz twist plain':      12,
-    '4oz twist bbk':        12,
-    '4oz twist spicy bee':  12,
-    'bees bats':             6,
-    'plain bombs':           0,  // not specified — BFP shows pretzels only
-  };
-
-  const FOH_SKUS = new Set([
-    '3oz cheese dip',
-    'bulk dangerous dip (25 srv)',
-  ]);
-
-  // Only BBK variants need the extra cheese-on-top step during bake. Spicy Bee
-  // is a regular bake (the heat/spice is in the dough/glaze, no post-bake step).
-  const BAKE_GROUPS = {
-    coating: ['10oz bbk', '6.5oz bbk', '4oz twist bbk'],
-  };
+  // BATCH_SIZES, CASE_SIZES, TRAY_SIZES, FOH_SKUS, BAKE_GROUPS imported from shared module.
 
   // ─── RUNTIME SKU HELPERS ─────────────────────────────────────────────────
   // skuConfig (loaded from log) overrides/extends hardcoded BATCH_SIZES.
@@ -1094,8 +1043,7 @@
   const BFP_MAX_LEAD        = 3;   // BFP can happen up to N days before delivery
   const SCHEDULE_LOOKAHEAD  = 14;  // days of deliveries the scheduler scans
   const FORECAST_LOOKAHEAD  = 7;   // days the Stock-tab forecast looks ahead
-  const DOUGH_AGE_WARN_DAYS = 5;   // yellow aging-dough banner at this age
-  const DOUGH_AGE_FAIL_DAYS = 6;   // red banner — dough should be discarded or used today
+  // DOUGH_AGE_WARN_DAYS, DOUGH_AGE_FAIL_DAYS imported from shared module.
 
   // ─── STATE ────────────────────────────────────────────────────────────────
 
@@ -1502,157 +1450,9 @@
 
   // ─── RESOLVE DELIVERIES ───────────────────────────────────────────────────
 
-  /**
-   * Reduce a delivery-planner log into the current state of every delivery.
-   * Each row is one of: create / update / confirm / status / delete / barcodes.
-   * Last write wins per id.
-   *
-   * `_confirmedAt` is set on confirm or status→delivered/picked_up rows. The
-   * inventory layer compares this against the latest snapshot timestamp to
-   * decide whether to subtract a delivery's quantity from frozen.
-   *
-   * @param {Array<Object>} logs
-   * @returns {Array<Object>}  allDeliveries, each with `status` and (when relevant) `_confirmedAt`
-   */
-  function resolveDeliveries(logs) {
-    const byId = {};
-    if (!Array.isArray(logs)) return [];
-    logs.forEach((row, idx) => {
-      const id = row.deliveryId || `legacy-${idx}`;
-      if (row.action === 'delete') { delete byId[id]; return; }
-      if (row.action === 'barcodes') return;
-      if (row.action === 'confirm') {
-        if (byId[id]) {
-          byId[id].status = (byId[id].type || 'delivery').toLowerCase() === 'pickup'
-            ? 'picked_up' : 'delivered';
-          byId[id]._confirmedAt = row.timeStamp || ''; // for inventory auto-deduct timing
-        }
-        return;
-      }
-      if (row.action === 'status') {
-        if (byId[id]) {
-          byId[id].status = row.status || 'scheduled';
-          if (['delivered','picked_up'].includes(byId[id].status))
-            byId[id]._confirmedAt = row.timeStamp || '';
-        }
-        return;
-      }
-      if (row.action === 'update') {
-        const prev = byId[id];
-        byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
-        if (prev?.barcodes) byId[id].barcodes = prev.barcodes;
-        return;
-      }
-      byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
-    });
-    return Object.values(byId);
-  }
-
-  // ─── RESOLVE PRODUCTION LOGS ──────────────────────────────────────────────
-
-  /**
-   * Reduce production-log rows into a per-date state map plus the global
-   * `skuConfig` and `skuAliases` dictionaries.
-   *
-   * Per-date keys merged into `state[dateStr]`:
-   *   - `coldFerment`, `frozen` from inventory snapshots (last snapshot of
-   *     that date wins entirely — this is correct because a count is a full
-   *     replacement, not a partial update).
-   *   - `shapeDone`, `bfpDone` from shape_done/bfp_done rows (accumulated
-   *     across the day, so multiple +1/−1 logs on the same date sum cleanly).
-   *   - `shapeWorkers`, `bfpWorkers` from workers_config rows.
-   *
-   * The raw log array (sorted by timestamp) is also kept in `productionLogs`
-   * so {@link getInventoryReport} can do timestamp-precise event accounting
-   * within a single date.
-   *
-   * @param {Array<Object>} logs
-   * @returns {Object<string, Object>}  productionState keyed by YYYY-MM-DD
-   */
-  function resolveProductionLogs(logs) {
-    const state = {};
-    skuConfig  = {}; // reset before repopulating from log
-    skuAliases = {};
-    if (!Array.isArray(logs)) return state;
-    logs.forEach(row => {
-      const { date, action } = row;
-      if (!action) return;
-
-      // SKU config entries are global (not date-keyed)
-      if (action === 'sku_config') {
-        if (row.sku) skuConfig[row.sku] = {
-          batchSize: Number(row.batchSize) || 0,
-          traySize:  Number(row.traySize)  || 0,
-          caseSize:  Number(row.caseSize)  || 0,
-          type:      row.type || 'standard',
-        };
-        return;
-      }
-
-      // SKU alias: maps an old/alternate SKU name to a canonical one
-      if (action === 'sku_alias') {
-        const from = (row.from || '').trim();
-        const to   = (row.to   || '').trim();
-        if (from && to) skuAliases[from] = to;
-        return;
-      }
-
-      if (!date) return;
-      if (!state[date]) state[date] = {};
-      const s = state[date];
-
-      if (action === 'inventory') {
-        try {
-          const snaps = JSON.parse(row.snapshots || '[]');
-          const cf = {}, fr = {};
-          snaps.forEach(sn => {
-            const k = (sn.sku || '').trim(); // normalize keys to match delivery line items
-            if (!k) return;
-            // Allow zero values to overwrite older non-zero values (user setting an
-            // SKU back to 0 must propagate). The previous `if (n > 0)` guard caused
-            // stale counts when an SKU was explicitly cleared.
-            cf[k] = Number(sn.coldFerment) || 0;
-            fr[k] = Number(sn.frozen)      || 0;
-          });
-          s.coldFerment = cf; s.frozen = fr;
-        } catch {}
-        return;
-      }
-      if (action === 'shape_done') {
-        try {
-          const incoming = JSON.parse(row.completions || '[]');
-          const merged = {};
-          (s.shapeDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-          incoming.forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-          s.shapeDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
-          s.shapeWorkers = Number(row.workers) || 1;
-          s.shapeTime    = row.timeStamp;
-        } catch {}
-        return;
-      }
-      if (action === 'bfp_done') {
-        try {
-          const incoming = JSON.parse(row.completions || '[]');
-          const merged = {};
-          (s.bfpDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-          incoming.forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-          s.bfpDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
-          s.bfpWorkers = Number(row.workers) || 1;
-          s.bfpTime    = row.timeStamp;
-        } catch {}
-        return;
-      }
-      // Worker count is set by the manager (or anyone with the stepper) and
-      // synced via this action so all devices see the same daily capacity.
-      if (action === 'workers_config') {
-        const n = Math.max(1, Number(row.workers) || 1);
-        if (row.type === 'shape') s.shapeWorkers = n;
-        else if (row.type === 'bfp') s.bfpWorkers = n;
-        return;
-      }
-    });
-    return state;
-  }
+  // resolveDeliveries and resolveProductionLogs imported from shared module
+  // (../../scripts/inventory.js). The shared resolveProductionLogs returns
+  // an object — this module unpacks it in loadProduction().
 
   // ─── WORKER PERSISTENCE ───────────────────────────────────────────────────
 
@@ -1685,215 +1485,30 @@
     }).catch((e) => console.error('workers_config save failed:', e));
   };
 
-  // ─── LATEST INVENTORY SNAPSHOT ───────────────────────────────────────────
-  /**
-   * INTERNAL HELPER. Do not call from rendering or scheduling code.
-   * Use {@link getInventoryReport} instead.
-   *
-   * Returns the most recent cold-ferment and frozen counts per SKU across all
-   * snapshots (ascending date sort → latest date wins per SKU). Zero values
-   * overwrite older non-zero values so explicit clearing propagates.
-   *
-   * @returns {{coldFerment: Object<string, number>, frozen: Object<string, number>}}
-   */
-  function getLatestInventory() {
-    const cf = {}, fr = {};
-    // Iterate ascending so the latest snapshot wins per SKU. Allow zero values
-    // to overwrite — a user explicitly clearing an SKU's stock must propagate.
-    Object.keys(productionState).sort().forEach(ds => {
-      const s = productionState[ds];
-      Object.entries(s.coldFerment || {}).forEach(([sku, n]) => { cf[sku] = Number(n) || 0; });
-      Object.entries(s.frozen      || {}).forEach(([sku, n]) => { fr[sku] = Number(n) || 0; });
-    });
-    return { coldFerment: cf, frozen: fr };
-  }
-
   // ─── INVENTORY REPORT ─────────────────────────────────────────────────────
+  // The heavy lifting now lives in /scripts/inventory.js so the planner can
+  // share it. These thin wrappers feed module-scope state into the pure
+  // helpers exported there.
 
   /**
-   * SINGLE SOURCE OF TRUTH for all inventory state. Every consumer of "what's
-   * on hand?" routes through this function — worker card "Raw materials" line,
-   * stock form input pre-fill, stock forecast, scheduler demand math, and the
-   * aging-dough banner. All four read from the same call here, so their
-   * numbers can never diverge.
+   * SINGLE SOURCE OF TRUTH for all inventory state. Calls the shared
+   * implementation with this module's loaded state.
    *
-   * If you find yourself computing inventory anywhere else (e.g. raw frozen
-   * minus delivered, or summing shape_done events), STOP — extend this report
-   * instead.
-   *
-   * **Ledger** (events with `timeStamp > snapshot.timeStamp`):
-   * - `shape_done +N` → cf += N×bs, pushed to dough age queue
-   * - `bfp_done   +N` → cf -= N×bs (cap 0, FIFO consumes oldest first)
-   *                  →  fr += N×bs
-   * - confirmed delivery → fr -= qty (cap 0)
-   *
-   * **Age-tracking limitation**: snapshot dough has no shape timestamp; we
-   * tag it with the snapshot's own timestamp as a conservative lower bound.
-   * Real dough could be older (shaped before the count) but the age queue
-   * won't reflect that. Regular stock counts keep the queue honest.
-   *
-   * @returns {{
-   *   effective: {coldFerment: Object<string,number>, frozen: Object<string,number>},
-   *   doughQueue: Object<string, Array<{ts: string, pretzels: number}>>,
-   *   flowsSinceSnapshot: {
-   *     shape: Object<string, number>,
-   *     bfp: Object<string, number>,
-   *     delivered: Object<string, Array<{customer: string, qty: number, confirmedAt: string}>>
-   *   },
-   *   alerts: {agingDough: Array<{sku: string, ageDays: number, pretzels: number, critical: boolean}>},
-   *   snapshot: {date: string|null, timestamp: string|null, raw: {coldFerment: Object, frozen: Object}}
-   * }}
+   * @returns full inventory report (see /scripts/inventory.js for the shape).
    */
-  function getInventoryReport() {
-    const inv          = getLatestInventory();
-    const cf           = { ...inv.coldFerment };
-    const fr           = { ...inv.frozen };
-    const snapshotRaw  = { coldFerment: { ...inv.coldFerment }, frozen: { ...inv.frozen } };
-    const latestInvDate = Object.keys(productionState)
-      .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
-                    Object.keys(productionState[ds].frozen      || {}).length > 0)
-      .sort().pop() || null;
-
-    // Seed dough queue with snapshot cf — conservative ts = snapshot timestamp
-    const doughQueue = {};
-    const seedTs     = latestInventoryTs || new Date(0).toISOString();
-    Object.entries(cf).forEach(([sku, p]) => {
-      doughQueue[sku] = p > 0 ? [{ ts: seedTs, pretzels: p }] : [];
+  function getInventoryReportLocal() {
+    return getInventoryReport({
+      productionLogs,
+      productionState,
+      allDeliveries,
+      skuAliases,
+      latestInventoryTs,
+      getBatchSize,
     });
-
-    const flowShape     = {};
-    const flowBfp       = {};
-    const flowDelivered = {};
-
-    // Walk events in TIMESTAMP order (defensive against out-of-order log writes)
-    const sortedLogs = [...productionLogs].sort(
-      (a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || '')
-    );
-
-    sortedLogs.forEach(row => {
-      const ts = row.timeStamp || '';
-      if (latestInventoryTs && ts <= latestInventoryTs) return; // pre-snapshot — already counted
-
-      if (row.action === 'shape_done') {
-        let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
-        comps.forEach(c => {
-          let key = (c.sku || '').trim();
-          if (!key) return;
-          if (skuAliases[key]) key = skuAliases[key];
-          const bs = getBatchSize(key);
-          if (!bs) return;
-          const batches = Number(c.batches) || 0;
-          const p       = batches * bs;
-          cf[key]       = (cf[key] || 0) + p;
-          flowShape[key] = (flowShape[key] || 0) + batches;
-          if (!doughQueue[key]) doughQueue[key] = [];
-          if (p >= 0) {
-            doughQueue[key].push({ ts, pretzels: p });
-          } else {
-            // Negative shape (correction): shrink the most recent entry first
-            let toRemove = -p;
-            while (toRemove > 0 && doughQueue[key].length > 0) {
-              const last = doughQueue[key][doughQueue[key].length - 1];
-              const take = Math.min(last.pretzels, toRemove);
-              last.pretzels -= take;
-              toRemove      -= take;
-              if (last.pretzels <= 0) doughQueue[key].pop();
-            }
-          }
-        });
-      } else if (row.action === 'bfp_done') {
-        let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
-        comps.forEach(c => {
-          let key = (c.sku || '').trim();
-          if (!key) return;
-          if (skuAliases[key]) key = skuAliases[key];
-          const bs = getBatchSize(key);
-          if (!bs) return;
-          const batches = Number(c.batches) || 0;
-          const p       = batches * bs;
-          cf[key]       = Math.max(0, (cf[key] || 0) - p);
-          fr[key]       = (fr[key] || 0) + p;
-          flowBfp[key]  = (flowBfp[key] || 0) + batches;
-          if (!doughQueue[key]) doughQueue[key] = [];
-          if (p >= 0) {
-            // BFP consumes oldest dough first (FIFO)
-            let toConsume = p;
-            while (toConsume > 0 && doughQueue[key].length > 0) {
-              const oldest = doughQueue[key][0];
-              const take   = Math.min(oldest.pretzels, toConsume);
-              oldest.pretzels -= take;
-              toConsume       -= take;
-              if (oldest.pretzels <= 0) doughQueue[key].shift();
-            }
-          } else {
-            // Negative BFP (correction): add back to front (oldest position)
-            // Approximation: original ts unknown, use this row's ts.
-            doughQueue[key].unshift({ ts, pretzels: -p });
-          }
-        });
-      }
-    });
-
-    // Subtract confirmed deliveries from frozen + record per-customer breakdown
-    allDeliveries
-      .filter(d => {
-        if (!['delivered','picked_up'].includes(d.status)) return false;
-        if (!latestInventoryTs) return true;
-        return d._confirmedAt && d._confirmedAt > latestInventoryTs;
-      })
-      .forEach(delivery => {
-        let items = [];
-        try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
-        const cust = delivery.customer || delivery.location || '?';
-        items.forEach(({ sku, quantity }) => {
-          let key = sku?.trim();
-          if (!key) return;
-          if (skuAliases[key]) key = skuAliases[key];
-          const qty = Number(quantity) || 0;
-          if (qty <= 0) return;
-          if (fr[key] != null) fr[key] = Math.max(0, fr[key] - qty);
-          if (!flowDelivered[key]) flowDelivered[key] = [];
-          flowDelivered[key].push({ customer: cust, qty, confirmedAt: delivery._confirmedAt || '' });
-        });
-      });
-
-    // Round to whole pretzels (FP drift from chained log entries)
-    Object.keys(cf).forEach(k => { cf[k] = Math.max(0, Math.round(cf[k])); });
-    Object.keys(fr).forEach(k => { fr[k] = Math.max(0, Math.round(fr[k])); });
-
-    // Compute aging dough alerts. Thresholds are business rules at top of file.
-    const now = Date.now();
-    const agingDough = [];
-    Object.entries(doughQueue).forEach(([sku, queue]) => {
-      queue.forEach(entry => {
-        if (entry.pretzels <= 0) return;
-        const ageMs   = now - new Date(entry.ts).getTime();
-        const ageDays = ageMs / 86400000;
-        if (ageDays >= DOUGH_AGE_WARN_DAYS) {
-          agingDough.push({
-            sku,
-            ageDays:  Math.floor(ageDays),
-            pretzels: Math.round(entry.pretzels),
-            critical: ageDays >= DOUGH_AGE_FAIL_DAYS,
-          });
-        }
-      });
-    });
-    agingDough.sort((a, b) => b.ageDays - a.ageDays); // oldest first
-
-    return {
-      effective:          { coldFerment: cf, frozen: fr },
-      doughQueue,
-      flowsSinceSnapshot: { shape: flowShape, bfp: flowBfp, delivered: flowDelivered },
-      alerts:             { agingDough },
-      snapshot:           { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
-    };
   }
 
-  // Thin wrapper for existing call sites that only need the effective state.
-  // All new code should prefer getInventoryReport() for the full picture.
   function getEffectiveInventory() {
-    return getInventoryReport().effective;
+    return getInventoryReportLocal().effective;
   }
 
   // ─── BUILD OPTIMAL SCHEDULE ───────────────────────────────────────────────
@@ -2769,10 +2384,33 @@
 
   function renderStockTab() {
     // Single source of truth — every number on this tab routes through here.
-    const report          = getInventoryReport();
+    const report          = getInventoryReportLocal();
     const inv             = report.snapshot.raw;            // raw snapshot for "was X" labels only
     const latestInvDate   = report.snapshot.date;
     const flowDelivered   = report.flowsSinceSnapshot.delivered;
+
+    // Per-delivery coverage: which orders are already covered by current stock,
+    // which need production. Same FIFO logic as the planner's badges.
+    const activeDeliveries = allDeliveries.filter(d =>
+      !['delivered','picked_up','cancelled'].includes(d.status));
+    const deliveryCoverage = attributeDeliveryCoverage({
+      activeDeliveries, inventoryReport: report, skuAliases,
+    });
+    // Group coverage entries per SKU for the per-row expandable list.
+    const coverageBySku = {};
+    deliveryCoverage.forEach((cov, deliveryId) => {
+      Object.values(cov.lines).forEach(line => {
+        if (!coverageBySku[line.sku]) coverageBySku[line.sku] = [];
+        coverageBySku[line.sku].push({
+          deliveryId,
+          date: cov.date,
+          customer: cov.customer,
+          ...line,
+        });
+      });
+    });
+    Object.values(coverageBySku).forEach(arr => arr.sort((a, b) =>
+      (a.date || '').localeCompare(b.date || '')));
 
     // Per-SKU "delivered since" totals derived from the report (no parallel calc).
     const deducted      = {};
@@ -3308,11 +2946,11 @@
       }
     }
 
-    // Aging-dough banner — manager only. Reads from getInventoryReport() so the
+    // Aging-dough banner — manager only. Reads from getInventoryReportLocal() so the
     // numbers match the stock tab's per-row aging indicator exactly.
     let agingDoughHtml = '';
     if (userRole === 'manager') {
-      const inventoryReport = getInventoryReport();
+      const inventoryReport = getInventoryReportLocal();
       const aging = inventoryReport.alerts.agingDough;
       if (aging.length > 0) {
         const items = aging.map(a => {
@@ -3574,11 +3212,12 @@
   async function loadProduction() {
     const logs = await fetchLog(PRODUCTION_LOG);
     productionLogs = Array.isArray(logs) ? logs : [];
-    productionState = resolveProductionLogs(productionLogs);
-    // Capture latest inventory timestamp for auto-deduct timing decisions
-    const invLogs = productionLogs.filter(l => l.action === 'inventory');
-    invLogs.sort((a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || ''));
-    latestInventoryTs = invLogs.length ? invLogs[invLogs.length - 1].timeStamp : null;
+    // Shared resolver returns the full bundle — unpack into module-scope state.
+    const resolved = resolveProductionLogs(productionLogs);
+    productionState   = resolved.state;
+    skuConfig         = resolved.skuConfig;
+    skuAliases        = resolved.skuAliases;
+    latestInventoryTs = resolved.latestInventoryTs;
   }
 
   async function loadSkus() {
