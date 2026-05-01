@@ -925,6 +925,62 @@
 <script type="module">
   import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
+  // ╔══════════════════════════════════════════════════════════════════════════╗
+  // ║ ARCHITECTURE                                                             ║
+  // ╠══════════════════════════════════════════════════════════════════════════╣
+  // ║                                                                          ║
+  // ║  RAW LOGS  (Google Sheets via sheet-logger)                              ║
+  // ║   ├── delivery-planner: create/update/confirm/status/delete/barcodes     ║
+  // ║   └── production:       inventory/shape_done/bfp_done/                   ║
+  // ║                         sku_config/sku_alias/workers_config              ║
+  // ║                                                                          ║
+  // ║  RESOLUTION  (one-time per page load)                                    ║
+  // ║   ├── resolveDeliveries     → allDeliveries[] (status, _confirmedAt)     ║
+  // ║   └── resolveProductionLogs → productionState (per-date) + skuConfig     ║
+  // ║                              + skuAliases + productionLogs (raw, kept    ║
+  // ║                              for timestamp-precise inventory math)       ║
+  // ║                                                                          ║
+  // ║  PURE DERIVATIONS  (run on every render)                                 ║
+  // ║   ├── getInventoryReport()  → SINGLE SOURCE OF TRUTH for inventory       ║
+  // ║   │   { effective, doughQueue, flowsSinceSnapshot, alerts, snapshot }    ║
+  // ║   ├── buildOptimalSchedule  → schedule.{shape, bfp, overdue, ...}        ║
+  // ║   └── buildWorkerItems      → per-day per-SKU display items              ║
+  // ║                                                                          ║
+  // ║  RENDER                                                                  ║
+  // ║   ├── renderTeamCard / renderWorkerDayView / renderWorkerCard            ║
+  // ║   ├── renderStockTab        (forecast, inputs, "delivered since" labels) ║
+  // ║   └── banners               (overdue, aging dough, unconfigured, etc.)   ║
+  // ║                                                                          ║
+  // ║ INVARIANTS                                                               ║
+  // ║                                                                          ║
+  // ║  1. ALL inventory questions go through getInventoryReport().             ║
+  // ║     If you find yourself reading getLatestInventory() or computing       ║
+  // ║     "raw frozen − delivered" anywhere outside that function, STOP —      ║
+  // ║     route through getInventoryReport() instead.                          ║
+  // ║                                                                          ║
+  // ║  2. Demand for a delivery = qty − inventory_attributed_FIFO. Computed    ║
+  // ║     once inside buildOptimalSchedule, using report.effective. Don't      ║
+  // ║     re-derive it elsewhere.                                              ║
+  // ║                                                                          ║
+  // ║  3. Daily capacity = workers × BATCHES_PER_WORKER − completions logged   ║
+  // ║     on that day. The −completions is what stops the scheduler from      ║
+  // ║     pulling more work onto today as the team finishes batches.           ║
+  // ║                                                                          ║
+  // ║  4. Display ceiling = max(needBatches, madeBatches). Logging never       ║
+  // ║     inflates the visible "of N" total — it only fills it in.             ║
+  // ║                                                                          ║
+  // ║ INVENTORY LEDGER (events after snapshot timestamp)                       ║
+  // ║                                                                          ║
+  // ║   shape_done +N  → cf += N×bs (also appended to dough age queue)         ║
+  // ║   bfp_done   +N  → cf -= N×bs (cap 0, FIFO from oldest)                  ║
+  // ║                  → fr += N×bs                                            ║
+  // ║   delivery confirmed → fr -= delivery qty (cap 0)                        ║
+  // ║                                                                          ║
+  // ║ Snapshot establishes a checkpoint. All flows since are layered on top.   ║
+  // ║ Same-day events use timestamp comparison (not date), so a mid-day count  ║
+  // ║ correctly excludes pre-count events while crediting post-count ones.     ║
+  // ╚══════════════════════════════════════════════════════════════════════════╝
+
   // ─── CONFIG ───────────────────────────────────────────────────────────────
 
   const DELIVERY_LOG   = '/dangpretz/delivery-planner';
@@ -1028,6 +1084,9 @@
     ...Object.keys(skuConfig).filter(s => !isFOH(s) && getBatchSize(s) > 0),
   ])];
 
+  // ─── BUSINESS RULES ───────────────────────────────────────────────────────
+  // Edit these to match operational reality. Each is a single source of truth
+  // for the rule it represents — no other place hardcodes these numbers.
   const BATCHES_PER_WORKER  = 5;   // batches per worker per day (cap)
   const SHAPE_MIN_LEAD      = 2;   // shape must happen at least N days before delivery
   const SHAPE_MAX_LEAD      = 7;   // shape can happen up to N days before delivery
@@ -1035,6 +1094,8 @@
   const BFP_MAX_LEAD        = 3;   // BFP can happen up to N days before delivery
   const SCHEDULE_LOOKAHEAD  = 14;  // days of deliveries the scheduler scans
   const FORECAST_LOOKAHEAD  = 7;   // days the Stock-tab forecast looks ahead
+  const DOUGH_AGE_WARN_DAYS = 5;   // yellow aging-dough banner at this age
+  const DOUGH_AGE_FAIL_DAYS = 6;   // red banner — dough should be discarded or used today
 
   // ─── STATE ────────────────────────────────────────────────────────────────
 
@@ -1441,6 +1502,18 @@
 
   // ─── RESOLVE DELIVERIES ───────────────────────────────────────────────────
 
+  /**
+   * Reduce a delivery-planner log into the current state of every delivery.
+   * Each row is one of: create / update / confirm / status / delete / barcodes.
+   * Last write wins per id.
+   *
+   * `_confirmedAt` is set on confirm or status→delivered/picked_up rows. The
+   * inventory layer compares this against the latest snapshot timestamp to
+   * decide whether to subtract a delivery's quantity from frozen.
+   *
+   * @param {Array<Object>} logs
+   * @returns {Array<Object>}  allDeliveries, each with `status` and (when relevant) `_confirmedAt`
+   */
   function resolveDeliveries(logs) {
     const byId = {};
     if (!Array.isArray(logs)) return [];
@@ -1476,8 +1549,26 @@
   }
 
   // ─── RESOLVE PRODUCTION LOGS ──────────────────────────────────────────────
-  // Accumulation fix: merges all entries per date instead of last-write-wins.
 
+  /**
+   * Reduce production-log rows into a per-date state map plus the global
+   * `skuConfig` and `skuAliases` dictionaries.
+   *
+   * Per-date keys merged into `state[dateStr]`:
+   *   - `coldFerment`, `frozen` from inventory snapshots (last snapshot of
+   *     that date wins entirely — this is correct because a count is a full
+   *     replacement, not a partial update).
+   *   - `shapeDone`, `bfpDone` from shape_done/bfp_done rows (accumulated
+   *     across the day, so multiple +1/−1 logs on the same date sum cleanly).
+   *   - `shapeWorkers`, `bfpWorkers` from workers_config rows.
+   *
+   * The raw log array (sorted by timestamp) is also kept in `productionLogs`
+   * so {@link getInventoryReport} can do timestamp-precise event accounting
+   * within a single date.
+   *
+   * @param {Array<Object>} logs
+   * @returns {Object<string, Object>}  productionState keyed by YYYY-MM-DD
+   */
   function resolveProductionLogs(logs) {
     const state = {};
     skuConfig  = {}; // reset before repopulating from log
@@ -1595,9 +1686,16 @@
   };
 
   // ─── LATEST INVENTORY SNAPSHOT ───────────────────────────────────────────
-  // Returns the most recent cold-ferment and frozen counts per SKU across all
-  // logged dates (ascending sort → latest date wins per SKU).
-
+  /**
+   * INTERNAL HELPER. Do not call from rendering or scheduling code.
+   * Use {@link getInventoryReport} instead.
+   *
+   * Returns the most recent cold-ferment and frozen counts per SKU across all
+   * snapshots (ascending date sort → latest date wins per SKU). Zero values
+   * overwrite older non-zero values so explicit clearing propagates.
+   *
+   * @returns {{coldFerment: Object<string, number>, frozen: Object<string, number>}}
+   */
   function getLatestInventory() {
     const cf = {}, fr = {};
     // Iterate ascending so the latest snapshot wins per SKU. Allow zero values
@@ -1611,27 +1709,41 @@
   }
 
   // ─── INVENTORY REPORT ─────────────────────────────────────────────────────
-  // SINGLE SOURCE OF TRUTH for all inventory state. Every consumer (worker card,
-  // scheduler, stock form, forecast, banners) reads from this one function.
-  //
-  // Ledger (events after snapshot timestamp):
-  //   shape_done +N      → cf += N × batchSize             (dough produced; pushed to age queue)
-  //   bfp_done   +N      → cf -= N × batchSize (cap 0)     (dough consumed FIFO)
-  //                        fr += N × batchSize             (frozen produced)
-  //   confirmed delivery → fr -= delivery quantity (cap 0) (frozen shipped)
-  //
-  // Returns:
-  //   effective:           { coldFerment, frozen } — current state
-  //   doughQueue:          sku → [{ts, pretzels}]  — FIFO age queue (oldest first)
-  //   flowsSinceSnapshot:  { shape, bfp, delivered } — for "since-count" labels
-  //   alerts.agingDough:   batches of dough ≥5 days old (manager attention)
-  //   snapshot:            { date, timestamp, raw } — last counted state
-  //
-  // NOTE on age-tracking limitations: snapshot dough has no shape timestamp;
-  // we tag it with the snapshot timestamp as a conservative lower bound. Real
-  // dough could be older (was shaped before count). After 5 days from the
-  // snapshot, the alert fires regardless. Manager taking regular counts keeps
-  // the queue honest.
+
+  /**
+   * SINGLE SOURCE OF TRUTH for all inventory state. Every consumer of "what's
+   * on hand?" routes through this function — worker card "Raw materials" line,
+   * stock form input pre-fill, stock forecast, scheduler demand math, and the
+   * aging-dough banner. All four read from the same call here, so their
+   * numbers can never diverge.
+   *
+   * If you find yourself computing inventory anywhere else (e.g. raw frozen
+   * minus delivered, or summing shape_done events), STOP — extend this report
+   * instead.
+   *
+   * **Ledger** (events with `timeStamp > snapshot.timeStamp`):
+   * - `shape_done +N` → cf += N×bs, pushed to dough age queue
+   * - `bfp_done   +N` → cf -= N×bs (cap 0, FIFO consumes oldest first)
+   *                  →  fr += N×bs
+   * - confirmed delivery → fr -= qty (cap 0)
+   *
+   * **Age-tracking limitation**: snapshot dough has no shape timestamp; we
+   * tag it with the snapshot's own timestamp as a conservative lower bound.
+   * Real dough could be older (shaped before the count) but the age queue
+   * won't reflect that. Regular stock counts keep the queue honest.
+   *
+   * @returns {{
+   *   effective: {coldFerment: Object<string,number>, frozen: Object<string,number>},
+   *   doughQueue: Object<string, Array<{ts: string, pretzels: number}>>,
+   *   flowsSinceSnapshot: {
+   *     shape: Object<string, number>,
+   *     bfp: Object<string, number>,
+   *     delivered: Object<string, Array<{customer: string, qty: number, confirmedAt: string}>>
+   *   },
+   *   alerts: {agingDough: Array<{sku: string, ageDays: number, pretzels: number, critical: boolean}>},
+   *   snapshot: {date: string|null, timestamp: string|null, raw: {coldFerment: Object, frozen: Object}}
+   * }}
+   */
   function getInventoryReport() {
     const inv          = getLatestInventory();
     const cf           = { ...inv.coldFerment };
@@ -1749,7 +1861,7 @@
     Object.keys(cf).forEach(k => { cf[k] = Math.max(0, Math.round(cf[k])); });
     Object.keys(fr).forEach(k => { fr[k] = Math.max(0, Math.round(fr[k])); });
 
-    // Compute aging dough alerts. Threshold: ≥5 days = warn, ≥6 days = critical.
+    // Compute aging dough alerts. Thresholds are business rules at top of file.
     const now = Date.now();
     const agingDough = [];
     Object.entries(doughQueue).forEach(([sku, queue]) => {
@@ -1757,12 +1869,12 @@
         if (entry.pretzels <= 0) return;
         const ageMs   = now - new Date(entry.ts).getTime();
         const ageDays = ageMs / 86400000;
-        if (ageDays >= 5) {
+        if (ageDays >= DOUGH_AGE_WARN_DAYS) {
           agingDough.push({
             sku,
             ageDays:  Math.floor(ageDays),
             pretzels: Math.round(entry.pretzels),
-            critical: ageDays >= 6,
+            critical: ageDays >= DOUGH_AGE_FAIL_DAYS,
           });
         }
       });
@@ -1785,14 +1897,48 @@
   }
 
   // ─── BUILD OPTIMAL SCHEDULE ───────────────────────────────────────────────
-  // Greedy rolling-window scheduler. Runs on every data load.
-  //
-  // Priority sort per day:
-  //   1. daysLeft = 0 (must do today — last day in window)
-  //   2. daysLeft ASC (most urgent next)
-  //   3. totalSkuRunSize DESC (consolidate large runs)
-  //   4. deliveryDate ASC (earlier delivery breaks ties)
 
+  /**
+   * Greedy rolling-window scheduler. Runs on every data load.
+   *
+   * **Pipeline**
+   * 1. Collect demand per SKU per delivery date from active deliveries.
+   * 2. Subtract `getInventoryReport().effective` FIFO — frozen reduces both
+   *    shape and bfp demand (already shaped + baked); cold-ferment reduces
+   *    only shape demand.
+   * 3. Pool consolidation: ceil per SKU once (avoids per-delivery rounding
+   *    inflation), then distribute back to deliveries FIFO.
+   * 4. Force overdue items (window already closed) to today's slot, daysLeft=0.
+   * 5. `schedulePool` walks day-by-day, placing must-do items first then
+   *    backfilling capacity with earlier-window items if room remains.
+   *
+   * **Priority** (within a day)
+   * 1. `daysLeft === 0` — must-do today (window closes today or already closed)
+   * 2. `daysLeft ASC` — most urgent next
+   * 3. `runSize DESC` — consolidate large runs into earlier days
+   * 4. `deliveryDate ASC` — break ties FIFO
+   *
+   * **Capacity policy**
+   * - `effectiveCap = max(remainingCap, mustDoTotal)` where
+   *   `remainingCap = max(0, workers × BATCHES_PER_WORKER − completionsToday)`.
+   * - Must-do always fits (over-cap warning fires for legitimate deadline clusters).
+   * - Backfill respects the day's actual remaining hours.
+   *
+   * **BFP-only constraints**
+   * - Same-day shape→BFP: per business decision, NO hard guard. Manager
+   *   manages timing physically (4–6h gap). Today's effective cf is treated
+   *   as available for today's BFP.
+   * - Cross-day: `ctx.shapeSchedule[yesterday]` adds yesterday's planned shape
+   *   output to today's dough balance (1-day cold-ferment minimum).
+   *
+   * @returns {{
+   *   shape: Object<string, Array<Object>>,
+   *   bfp: Object<string, Array<Object>>,
+   *   overdue: Array<{team: string, sku: string, batches: number, windowEnd: string, deliveryDate: string}>,
+   *   foh: Array<string>,
+   *   unconfigured: Array<string>
+   * }}
+   */
   function buildOptimalSchedule() {
     const today    = new Date();
     const todayStr = toDateStr(today);
@@ -1948,17 +2094,30 @@
       }
     });
 
-    // Step 3: Greedy schedule each pool. For BFP, an optional `ctx` enforces a
-    // dough constraint — BFP can't bake more than the dough on hand at the
-    // start of that day (initial cold-ferment + previous days' scheduled shape).
-    // Same-day shape→BFP isn't possible because dough needs ≥1 day to ferment.
-    //
-    // Capacity policy:
-    //   effectiveCap = max(workerCapacity, mustDoTotal)
-    //   - mustDoTotal ≤ workerCapacity → fills remaining cap with non-must-do
-    //     items (smooths load by pulling tomorrow's work forward when slack).
-    //   - mustDoTotal > workerCapacity → all must-do still fits, no backfill,
-    //     over-cap warning fires (the legitimate kind: deadline cluster).
+    /**
+     * Greedy day-by-day allocator. Walks the pool of un-scheduled
+     * shape-or-BFP items and places each one on its earliest fit-day,
+     * subject to capacity and (for BFP) the rolling dough balance.
+     *
+     * **Capacity policy** (per day)
+     * - `remainingCap = max(0, workers × BATCHES_PER_WORKER − completionsToday)`
+     * - `effectiveCap = max(remainingCap, mustDoTotal)`
+     * - Must-do (window closes today) always fits — over-cap warning fires
+     *   for the legitimate "deadline cluster" case.
+     * - Non-must-do backfills only into actual remaining hours.
+     *
+     * **BFP-only constraints**
+     * - Same-day shape→BFP is allowed (manager manages timing physically).
+     * - `ctx.shapeSchedule[yesterday]` adds yesterday's planned shape output
+     *   to today's dough balance.
+     * - Items defer to a later day if there's no dough (overdue items
+     *   bypass — visibility takes priority over dough constraint).
+     *
+     * @param {Array<Object>} pool   per-delivery items with `left` pretzels
+     * @param {'shape'|'bfp'} type
+     * @param {{shapeSchedule: Object, initialDough: Object<string,number>}|null} ctx
+     * @returns {Object<string, Array<Object>>}  date → dayItems[]
+     */
     function schedulePool(pool, type, ctx = null) {
       const sched   = {};
       const lookahead = type === 'shape'
@@ -2252,8 +2411,29 @@
   // ─── WORKER DAY VIEW (UIUX redesign) ─────────────────────────────────────
   // Calm, Spanish-first, status-grouped layout. See plan file for design intent.
 
-  // Build the same itemMap as renderTeamCard does — schedule-current + completed,
-  // sorted by priority. Returns rich items with status bucket attached.
+  /**
+   * Build the per-SKU item list that drives both worker and manager day views.
+   * Merges:
+   *   - what the scheduler placed for `dateStr` (`needBatches`),
+   *   - what the team has logged completed on `dateStr` (`madeBatches`),
+   *   - what's been done on prior days (priorBySku, for the "↪ already done" cue).
+   *
+   * **Display invariant**: `totalBatches = max(needBatches, madeBatches)`.
+   * Logging never inflates the visible "of N" total — overproduction grows it,
+   * but normal logging just fills it in. This is the rule that stopped the
+   * "I logged 2, total went from 7 to 8" confusion.
+   *
+   * @param {'shape'|'bfp'} type
+   * @param {string} dateStr  YYYY-MM-DD in Mountain TZ
+   * @returns {Array<{
+   *   sku: string, bucket: 'overdue'|'pending'|'progress'|'done',
+   *   needBatches: number, madeBatches: number, totalBatches: number,
+   *   origP: number, madeP: number,
+   *   priorMade: number, priorDate: string|null,
+   *   deliveryDates: string[], orders: string[],
+   *   urgent: boolean, isOverdue: boolean, overloaded: boolean
+   * }>}
+   */
   function buildWorkerItems(type, dateStr) {
     const dayState       = productionState[dateStr] || {};
     const scheduledItems = schedule[type][dateStr] || [];
@@ -2683,13 +2863,13 @@
           : ''}
       </div>`;
 
-    // Aging-dough indicator per SKU (oldest entry's age, if ≥5 days).
+    // Aging-dough indicator per SKU (oldest entry's age, if past warn threshold).
     const oldestDoughAge = {};
     Object.entries(report.doughQueue).forEach(([sku, queue]) => {
       const oldest = queue.find(e => e.pretzels > 0);
       if (!oldest) return;
       const ageDays = Math.floor((Date.now() - new Date(oldest.ts).getTime()) / 86400000);
-      if (ageDays >= 5) oldestDoughAge[sku] = ageDays;
+      if (ageDays >= DOUGH_AGE_WARN_DAYS) oldestDoughAge[sku] = ageDays;
     });
 
     const rows = allSkus.map(sku => {
@@ -2716,9 +2896,9 @@
                   <div class="stock-deduct-list">${parts.join(', ')}</div>`;
       }
 
-      // Inline aging indicator next to dough number if oldest dough is ≥5 days old.
+      // Inline aging indicator next to SKU name if oldest dough is past warn threshold.
       const ageBadge = ageDays != null
-        ? `<span class="stock-aging${ageDays >= 6 ? ' critical' : ''}" title="Oldest dough ${ageDays} days old">⏳ ${ageDays}d</span>`
+        ? `<span class="stock-aging${ageDays >= DOUGH_AGE_FAIL_DAYS ? ' critical' : ''}" title="Oldest dough ${ageDays} days old">⏳ ${ageDays}d</span>`
         : '';
 
       // Forecast indicator
@@ -3145,7 +3325,7 @@
         const fg = hasCritical ? 'var(--red)' : '#856404';
         const icon = hasCritical ? '🔴' : '🟡';
         const label = hasCritical
-          ? (appLang === 'es' ? 'Masa pasada — descartar o usar hoy:' : 'Aging dough past 6 days — discard or use today:')
+          ? (appLang === 'es' ? `Masa pasada — descartar o usar hoy:` : `Aging dough past ${DOUGH_AGE_FAIL_DAYS} days — discard or use today:`)
           : (appLang === 'es' ? 'Masa envejeciendo — usar pronto:'    : 'Aging dough — use soon:');
         agingDoughHtml = `<div class="alert-banner" style="background:${bg};color:${fg}"><strong>${icon} ${label}</strong> ${items}</div>`;
       }
