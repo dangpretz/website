@@ -2431,7 +2431,7 @@
       (d.date || '') >= todayDateStr &&
       (d.date || '') <= horizonStr);
     const deliveryCoverage = attributeDeliveryCoverage({
-      activeDeliveries, inventoryReport: report, skuAliases,
+      activeDeliveries, inventoryReport: report, skuAliases, getBatchSize,
     });
     // Group coverage entries per SKU for the per-row expandable list.
     const coverageBySku = {};

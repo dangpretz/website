@@ -250,6 +250,15 @@
     .coverage-badge.cov-baking    { background: #6b5a1a; color: #fff3cd; }
     .coverage-badge.cov-partial   { background: #1e3f6e; color: #cce5ff; }
     .coverage-badge.cov-unstarted { background: #6e1e1e; color: #f8d7da; }
+
+    /* Per-line coverage indicator on item pills. Subtle 3px left border so
+       the manager can see at a glance which SKUs in an order are ready vs
+       which still need production. FOH/unconfigured SKUs render as gray. */
+    .item-pill.cov-ready     { border-left: 3px solid #4a4; padding-left: 6px; }
+    .item-pill.cov-baking    { border-left: 3px solid #b59f3b; padding-left: 6px; }
+    .item-pill.cov-partial   { border-left: 3px solid #4a86c8; padding-left: 6px; }
+    .item-pill.cov-unstarted { border-left: 3px solid #c44; padding-left: 6px; }
+    .item-pill.cov-foh       { opacity: 0.55; }
     .delivery-card .card-customer {
       font: 700 13px 'Manrope', sans-serif; color: #fff; margin-bottom: 4px;
       display: flex; align-items: center; justify-content: space-between; gap: 6px;
@@ -1365,7 +1374,51 @@
         partial:   '🔧 Partial',
         unstarted: '🔴 To make',
       };
-      return `<span class="coverage-badge cov-${cov.aggregateStatus}" title="Stock attribution from production app">${LABEL[cov.aggregateStatus] || ''}</span>`;
+      let label = LABEL[cov.aggregateStatus] || '';
+      // When the aggregate is "to make" but some lines are actually ready/baking,
+      // surface that — otherwise the manager would think nothing is ready.
+      if (cov.aggregateStatus === 'unstarted') {
+        const lines = Object.values(cov.lines || {});
+        const ready = lines.filter(l => l.status === 'ready' || l.status === 'baking').length;
+        if (lines.length > 1 && ready > 0) {
+          label += ` · ${ready} of ${lines.length} ready`;
+        }
+      }
+      return `<span class="coverage-badge cov-${cov.aggregateStatus}" title="Stock attribution from production app">${label}</span>`;
+    }
+
+    // Returns {className, tooltip} for a single line item pill.
+    // null means no coverage info — render plain pill.
+    function pillCoverageHint(row, lineSku) {
+      const cov = row._coverage;
+      if (!cov || !cov.lines) return { className: '', tooltip: '' };
+      const aliases = row._aliases || {};
+      const key = aliases[lineSku] || lineSku;
+      const line = cov.lines[key];
+      if (!line) {
+        // Not in the coverage map (FOH, unconfigured, or not produced) —
+        // render in a subdued gray so it's clearly out-of-band.
+        return { className: 'cov-foh', tooltip: 'Not produced in-house' };
+      }
+      const STATUS_TIP = {
+        ready:     `${line.qty}p in frozen — ready to ship`,
+        baking:    `${line.frozenP > 0 ? line.frozenP + 'p frozen, ' : ''}${line.doughP}p in dough — needs bake`,
+        partial:   `${line.frozenP + line.doughP}p covered (${line.frozenP}p frozen + ${line.doughP}p dough), ${line.needShapeP}p still to shape`,
+        unstarted: `${line.qty}p — no inventory, full production needed`,
+      };
+      return {
+        className: `cov-${line.status}`,
+        tooltip:   STATUS_TIP[line.status] || '',
+      };
+    }
+
+    function renderItemPill(row, item) {
+      const sku = item.sku || '—';
+      const qty = item.quantity || 0;
+      const hint = pillCoverageHint(row, sku);
+      const titleAttr = hint.tooltip ? ` title="${escapeHtml(hint.tooltip)}"` : '';
+      const cls = ['item-pill', hint.className].filter(Boolean).join(' ');
+      return `<span class="${cls}"${titleAttr}>${escapeHtml(sku)} ×${escapeHtml(String(qty))}</span>`;
     }
 
     function renderDeliveryCard(row) {
@@ -1380,7 +1433,7 @@
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) { items = []; } }
       else if (row.sku && row.volume != null) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
       if (items.length) {
-        pillsHtml = '<div class="card-items">' + items.map((it) => `<span class="item-pill">${escapeHtml(it.sku || '—')} ×${escapeHtml(String(it.quantity || 0))}</span>`).join('') + '</div>';
+        pillsHtml = '<div class="card-items">' + items.map((it) => renderItemPill(row, it)).join('') + '</div>';
       }
       const contactHtml = renderContactLine(row);
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
@@ -1430,7 +1483,7 @@
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
       else if (row.sku && row.volume != null) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
-      const pillsHtml = items.length ? '<div class="daily-items">' + items.map((it) => `<span class="item-pill">${escapeHtml(it.sku || '—')} × ${escapeHtml(String(it.quantity || 0))}</span>`).join('') + '</div>' : '';
+      const pillsHtml = items.length ? '<div class="daily-items">' + items.map((it) => renderItemPill(row, it)).join('') + '</div>' : '';
       const isConfirmed = status === 'delivered' || status === 'picked_up';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
@@ -1599,11 +1652,16 @@
             activeDeliveries,
             inventoryReport,
             skuAliases: prodResolved.skuAliases,
+            getBatchSize: meta.getBatchSize,
           });
-          // Stash coverage on each delivery row so renderers can pick it up.
+          // Stash coverage + alias resolver on each delivery row so renderers
+          // can color individual line item pills by per-SKU coverage status.
           deliveries.forEach(d => {
             const cov = coverage.get(d.deliveryId);
-            if (cov) d._coverage = cov;
+            if (cov) {
+              d._coverage = cov;
+              d._aliases  = prodResolved.skuAliases;
+            }
           });
         } catch (covErr) {
           // Coverage is non-blocking; if it fails the planner still works.

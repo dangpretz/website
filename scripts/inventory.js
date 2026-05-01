@@ -441,14 +441,18 @@ function statusFor(qty, frozenP, doughP) {
  * Returns Map<deliveryId, {sku→{qty, frozenP, doughP, needShapeP, needBfpP, status}, aggregateStatus}>.
  *
  * Each delivery may have multiple SKUs. `aggregateStatus` is the worst child
- * status — used for one-line UI badges.
+ * status — used for one-line UI badges. Lines whose SKU has no batchSize
+ * (FOH or unconfigured) are excluded entirely — they shouldn't drag the
+ * aggregate to "to make" since they aren't produced in-house.
  *
  * @param {Object} args
  * @param {Array}  args.activeDeliveries   Deliveries with status NOT in delivered/picked_up/cancelled.
  * @param {Object} args.inventoryReport    From getInventoryReport.
  * @param {Object} args.skuAliases
+ * @param {(sku: string) => number} [args.getBatchSize]  If provided, lines where
+ *        getBatchSize(canonicalSku) === 0 are skipped (FOH/unconfigured).
  */
-export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, skuAliases }) {
+export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, skuAliases, getBatchSize }) {
   // Build per-SKU FIFO queue of {deliveryId, qty}, sorted by date then timestamp.
   const sortedDeliveries = [...activeDeliveries].sort((a, b) => {
     const d = (a.date || '').localeCompare(b.date || '');
@@ -476,6 +480,9 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
       if (skuAliases[key]) key = skuAliases[key];
       const qty = Number(quantity) || 0;
       if (qty <= 0) return;
+      // Skip FOH/unconfigured SKUs — they aren't produced in-house, so
+      // they shouldn't drag the aggregate to "to make".
+      if (getBatchSize && getBatchSize(key) === 0) return;
       hasProductionSku = true;
 
       const fAvail = frozenLeft[key] || 0;
