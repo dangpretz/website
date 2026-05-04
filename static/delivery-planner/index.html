@@ -2160,6 +2160,20 @@
       await loadRecords();
       await loadRecurrences();
     })();
+
+    // Refresh deliveries + coverage badges whenever the tab regains focus.
+    // Fixes stale coverage state when the user updates inventory in the
+    // production app and returns to the planner without manually reloading.
+    // Cheap: just a re-fetch + re-render. No state migration.
+    let _lastVisibilityRefreshAt = 0;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      // Throttle: ignore if we already refreshed within the last 5 seconds.
+      const now = Date.now();
+      if (now - _lastVisibilityRefreshAt < 5000) return;
+      _lastVisibilityRefreshAt = now;
+      loadRecords().catch(err => console.warn('visibility refresh failed:', err));
+    });
   </script>
 </body>
 </html>
