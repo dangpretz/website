@@ -43,7 +43,7 @@ export const BATCH_SIZES = {
   '6.5oz bbk':            72,
   '6.5oz spicy bee':      72,
   'plain bombs':          72,
-  'bees bats':            72,
+  'bees bats':            48,
 };
 
 // Pretzels per case — wholesale shipping unit.
