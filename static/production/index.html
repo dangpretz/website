@@ -814,6 +814,40 @@
       font: 400 13px 'Manrope', sans-serif; color: #173404; opacity: 0.85;
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Schedule-diff toast — fired after a stock save to show the user how
+       the schedule responded across days. Pure observation; doesn't modify
+       any underlying state or other UI. */
+    .schedule-diff-toast {
+      position: fixed; left: 50%; top: 16px; transform: translateX(-50%);
+      max-width: min(520px, calc(100vw - 32px));
+      background: #1A1A1A; color: #fff;
+      border: 1px solid #2d5a3a; border-left: 4px solid #4a4;
+      border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+      padding: 12px 16px; z-index: 1000;
+      font: 500 13px 'Manrope', sans-serif;
+      animation: fadeIn 0.25s ease;
+      cursor: pointer;
+    }
+    .schedule-diff-toast.unchanged { border-left-color: #888; border-color: #444; }
+    .schedule-diff-toast.has-overdue { border-left-color: #c44; border-color: #6e1e1e; }
+    .schedule-diff-toast-title {
+      font: 800 14px 'Manrope', sans-serif; color: #fff;
+      margin-bottom: 6px;
+    }
+    .schedule-diff-toast-row {
+      display: grid; grid-template-columns: 110px 1fr;
+      gap: 10px; padding: 2px 0;
+      font: 500 12px 'Manrope', sans-serif; color: #ccc;
+    }
+    .schedule-diff-toast-row .day  { color: #aaa; }
+    .schedule-diff-toast-row .add  { color: #c8f0d4; }
+    .schedule-diff-toast-row .sub  { color: #f8d7da; }
+    .schedule-diff-toast-row .same { color: #888; }
+    .schedule-diff-toast-dismiss {
+      font: 600 11px 'Manrope', sans-serif; color: #888;
+      margin-top: 6px; text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -2669,6 +2703,9 @@
     const snapArr = Object.values(snaps);
     const saveBtn = document.getElementById('stock-save');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…'; }
+    // Capture the schedule BEFORE save so we can diff after rebuild.
+    // The diff toast is purely observational — it can't affect any state.
+    const prevSchedule = schedule;
     try {
       await appendLog(PRODUCTION_LOG, {
         action: 'inventory', date: toDateStr(new Date()),
@@ -2677,10 +2714,104 @@
       await loadProduction();
       schedule = buildOptimalSchedule();
       render();
+      // Surface what changed across days. Wrapped so a toast bug never
+      // breaks the save flow itself.
+      try { showScheduleDiffToast(diffSchedules(prevSchedule, schedule)); }
+      catch (toastErr) { console.warn('schedule diff toast skipped:', toastErr); }
     } catch (e) {
       alert('Error saving: ' + e.message);
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('save_stock'); }
     }
+  }
+
+  // ─── SCHEDULE DIFF (observation only) ─────────────────────────────────────
+
+  /**
+   * Compare two schedule objects (output of buildOptimalSchedule) and
+   * return per-day deltas in batches.
+   *
+   * Pure function. Doesn't mutate either input. Doesn't read any module
+   * state. The output is consumed only by showScheduleDiffToast.
+   *
+   * @param {Object} prev
+   * @param {Object} next
+   * @returns {Array<{date: string, deltaShape: number, deltaBfp: number, newOverdue: number}>}
+   *          One entry per day where ANY delta is non-zero, sorted by date.
+   */
+  function diffSchedules(prev, next) {
+    const sumBatches = items => (items || []).reduce((s, d) => s + (Number(d.batches) || 0), 0);
+    const dates = new Set([
+      ...Object.keys(prev?.shape || {}),
+      ...Object.keys(prev?.bfp   || {}),
+      ...Object.keys(next?.shape || {}),
+      ...Object.keys(next?.bfp   || {}),
+    ]);
+    const prevOverdue = new Set((prev?.overdue || []).map(o => `${o.team}:${o.sku}`));
+    const nextOverdue = (next?.overdue || []).filter(o => !prevOverdue.has(`${o.team}:${o.sku}`));
+    const out = [];
+    [...dates].sort().forEach(d => {
+      const deltaShape = sumBatches(next?.shape?.[d]) - sumBatches(prev?.shape?.[d]);
+      const deltaBfp   = sumBatches(next?.bfp?.[d])   - sumBatches(prev?.bfp?.[d]);
+      if (Math.abs(deltaShape) >= 0.01 || Math.abs(deltaBfp) >= 0.01) {
+        out.push({ date: d, deltaShape, deltaBfp });
+      }
+    });
+    return { perDay: out, newOverdue: nextOverdue };
+  }
+
+  /**
+   * Render the schedule-diff banner. Auto-dismisses after ~6s. Click to
+   * dismiss. Pure DOM injection — no other state touched.
+   */
+  function showScheduleDiffToast({ perDay, newOverdue }) {
+    // Remove any prior toast before showing a new one
+    document.querySelectorAll('.schedule-diff-toast').forEach(n => n.remove());
+
+    const toast = document.createElement('div');
+    toast.className = 'schedule-diff-toast';
+    if (newOverdue.length > 0) toast.classList.add('has-overdue');
+    if (perDay.length === 0 && newOverdue.length === 0) toast.classList.add('unchanged');
+
+    const titleText = perDay.length === 0 && newOverdue.length === 0
+      ? (appLang === 'es' ? '✓ Inventario guardado · sin cambios al cronograma' : '✓ Stock saved · schedule unchanged')
+      : (appLang === 'es' ? '✓ Inventario guardado · cronograma actualizado'   : '✓ Stock saved · schedule updated');
+
+    let rowsHtml = '';
+    if (newOverdue.length > 0) {
+      const list = newOverdue.map(o => `<strong>${esc(o.sku)}</strong>`).join(', ');
+      const label = appLang === 'es'
+        ? `🚨 Nuevo atrasado: ${list}`
+        : `🚨 New overdue: ${list}`;
+      rowsHtml += `<div class="schedule-diff-toast-row"><span class="day"></span><span class="sub">${label}</span></div>`;
+    }
+    perDay.forEach(({ date, deltaShape, deltaBfp }) => {
+      const total = deltaShape + deltaBfp;
+      const dayLabel = fmtFull(parseDate(date));
+      const sign = total > 0 ? `+${Math.round(total)}` : `${Math.round(total)}`;
+      const cls  = total > 0 ? 'add' : (total < 0 ? 'sub' : 'same');
+      const teamSuffix = (deltaShape !== 0 && deltaBfp !== 0)
+        ? ` (shape ${deltaShape > 0 ? '+' : ''}${Math.round(deltaShape)}, bfp ${deltaBfp > 0 ? '+' : ''}${Math.round(deltaBfp)})`
+        : (deltaShape !== 0 ? ' shape' : ' bfp');
+      const batchWord = (Math.abs(total) === 1) ? 'batch' : 'batches';
+      rowsHtml += `<div class="schedule-diff-toast-row">
+        <span class="day">${esc(dayLabel)}</span>
+        <span class="${cls}">${sign} ${batchWord}${teamSuffix}</span>
+      </div>`;
+    });
+    if (perDay.length === 0 && newOverdue.length === 0) {
+      rowsHtml = `<div class="schedule-diff-toast-row"><span class="day"></span><span class="same">${appLang === 'es' ? 'Todos los días iguales.' : 'All days unchanged.'}</span></div>`;
+    }
+    const dismiss = appLang === 'es' ? 'Toca para cerrar' : 'Tap to dismiss';
+    toast.innerHTML = `
+      <div class="schedule-diff-toast-title">${titleText}</div>
+      ${rowsHtml}
+      <div class="schedule-diff-toast-dismiss">${dismiss}</div>`;
+
+    document.body.appendChild(toast);
+    const remove = () => toast.remove();
+    toast.addEventListener('click', remove);
+    const ttl = (perDay.length === 0 && newOverdue.length === 0) ? 2500 : 6000;
+    setTimeout(remove, ttl);
   }
 
   // ─── INLINE LOGGER (TAP +/- ON SKU ROW) ───────────────────────────────────
