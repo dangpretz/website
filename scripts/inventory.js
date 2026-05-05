@@ -170,25 +170,40 @@ export function resolveProductionLogs(logs) {
   const productionLogs = Array.isArray(logs) ? logs : [];
   let latestInventoryTs = null;
 
+  // Pass 1: collect skuConfig + skuAliases. We need ALL aliases known
+  // before walking shape_done/bfp_done so completion entries logged under
+  // OLD aliased names (e.g. "Twist - Plain") get canonicalized to
+  // "4oz twist plain" — even if the alias row appears later in the log
+  // than the completion row.
   productionLogs.forEach(row => {
-    const { date, action } = row;
-    if (!action) return;
-
-    if (action === 'sku_config') {
+    if (row.action === 'sku_config') {
       if (row.sku) skuConfig[row.sku] = {
         batchSize: Number(row.batchSize) || 0,
         traySize:  Number(row.traySize)  || 0,
         caseSize:  Number(row.caseSize)  || 0,
         type:      row.type || 'standard',
       };
-      return;
-    }
-    if (action === 'sku_alias') {
+    } else if (row.action === 'sku_alias') {
       const from = (row.from || '').trim();
       const to   = (row.to   || '').trim();
       if (from && to) skuAliases[from] = to;
-      return;
     }
+  });
+
+  // Helper: canonicalize a sku via the now-fully-populated skuAliases.
+  const canonicalSku = (raw) => {
+    const k = (raw || '').trim();
+    return skuAliases[k] || k;
+  };
+
+  // Pass 2: walk events with aliases applied. Per-date state aggregates
+  // shape_done/bfp_done by canonical sku so the display layer never sees
+  // duplicate cards for the same product under old + new names.
+  productionLogs.forEach(row => {
+    const { date, action } = row;
+    if (!action) return;
+    if (action === 'sku_config' || action === 'sku_alias') return; // handled in pass 1
+
     if (!date) return;
     if (!state[date]) state[date] = {};
     const s = state[date];
@@ -198,7 +213,7 @@ export function resolveProductionLogs(logs) {
         const snaps = JSON.parse(row.snapshots || '[]');
         const cf = {}, fr = {};
         snaps.forEach(sn => {
-          const k = (sn.sku || '').trim();
+          const k = canonicalSku(sn.sku);
           if (!k) return;
           cf[k] = Number(sn.coldFerment) || 0;
           fr[k] = Number(sn.frozen)      || 0;
@@ -215,7 +230,11 @@ export function resolveProductionLogs(logs) {
         const incoming = JSON.parse(row.completions || '[]');
         const merged = {};
         (s.shapeDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-        incoming.forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+        incoming.forEach(c => {
+          const k = canonicalSku(c.sku);
+          if (!k) return;
+          merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
+        });
         s.shapeDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
         s.shapeWorkers = Number(row.workers) || 1;
         s.shapeTime    = row.timeStamp;
@@ -227,7 +246,11 @@ export function resolveProductionLogs(logs) {
         const incoming = JSON.parse(row.completions || '[]');
         const merged = {};
         (s.bfpDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-        incoming.forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+        incoming.forEach(c => {
+          const k = canonicalSku(c.sku);
+          if (!k) return;
+          merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
+        });
         s.bfpDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
         s.bfpWorkers = Number(row.workers) || 1;
         s.bfpTime    = row.timeStamp;
