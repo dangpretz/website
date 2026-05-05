@@ -1036,8 +1036,9 @@
   // ║     on that day. The −completions is what stops the scheduler from      ║
   // ║     pulling more work onto today as the team finishes batches.           ║
   // ║                                                                          ║
-  // ║  4. Display ceiling = max(needBatches, madeBatches). Logging never       ║
-  // ║     inflates the visible "of N" total — it only fills it in.             ║
+  // ║  4. Display target = needBatches + madeBatches per card (workload).      ║
+  // ║     Sum across cards = team's day-total workload. Spare = cap − sum.     ║
+  // ║     Stable denominator: as work happens, need ↓ and made ↑, sum fixed.   ║
   // ║                                                                          ║
   // ║ INVENTORY LEDGER (events after snapshot timestamp)                       ║
   // ║                                                                          ║
@@ -2096,10 +2097,11 @@
    *   - what the team has logged completed on `dateStr` (`madeBatches`),
    *   - what's been done on prior days (priorBySku, for the "↪ already done" cue).
    *
-   * **Display invariant**: `totalBatches = max(needBatches, madeBatches)`.
-   * Logging never inflates the visible "of N" total — overproduction grows it,
-   * but normal logging just fills it in. This is the rule that stopped the
-   * "I logged 2, total went from 7 to 8" confusion.
+   * **Display invariant**: `totalBatches = needBatches + madeBatches`.
+   * Today's target = remaining-to-do + already-done = team's workload for the
+   * day. Stable across the day (as need decreases, made grows, sum is fixed).
+   * Used as the "/N" denominator on cards AND as the basis for the team-total
+   * spare/over math, so done work correctly counts toward capacity used.
    *
    * @param {'shape'|'bfp'} type
    * @param {string} dateStr  YYYY-MM-DD in Mountain TZ
@@ -2165,10 +2167,24 @@
       })
       .map(d => {
         const bs    = getBatchSize(d.sku);
-        // Target = max(scheduled need, what's been made). Logging never grows the
-        // ceiling: if you produce 8 of 7 scheduled, ceiling expands to 8 (overproduce).
-        // Otherwise it stays at the scheduled need so the user sees a stable target.
-        const totalBatches = Math.max(d.needBatches, d.madeBatches);
+        // Today's TARGET (denominator on "X / Y batches" display) = the
+        // team's actual workload today = remaining work to do (needBatches,
+        // post-credit) + work already done today (madeBatches).
+        //
+        // Why workload, not max(need, made):
+        //   - max under-counts: a card with need=3 and made=2 has max=3, hiding
+        //     the 2 done batches that genuinely consumed worker time. The
+        //     team-total spare badge then claims spare capacity that doesn't
+        //     exist (the spent time is invisible to the math).
+        //   - workload = need + made stays stable across the day. As work is
+        //     logged, need decreases, made increases, the sum is fixed. This
+        //     gives the user a steady "2/5 → 3/5 → 4/5 → 5/5" progression
+        //     instead of the prior "2/3 → 3/3" denominator drop.
+        //   - Bucket detection: "done" still fires correctly. need=0 + made=N
+        //     → workload=N, made=N → done. Mid-progress (need>0) means real
+        //     work remains, so bucket stays "progress" until need actually
+        //     hits 0 (after credits absorb everything).
+        const totalBatches = d.needBatches + d.madeBatches;
         // Round to whole pretzels — totalBatches can be FP-ish (4.6666...006)
         // from chained reversal operations. Workers see integer counts.
         const origP = Math.round(totalBatches * bs);
@@ -3647,6 +3663,146 @@
     btn.addEventListener('click', () => { dayTab = btn.dataset.tab; render(); });
   });
 
+  // ─── SELF-TEST HARNESS ───────────────────────────────────────────────────
+  // Runs on `?selftest=1`. Builds synthetic items in the same shape buildWorkerItems
+  // produces, then verifies the day-total math (workload = need + made) plus
+  // bucket / spare / over derivations. Prints a pass/fail summary to a banner
+  // at the top of the page.
+  function runSelfTests() {
+    const tests = [];
+    const fmtBs = (n) => n; // batch counts are integers in tests
+
+    // Helper: synthesize an item the way buildWorkerItems would (workload-based).
+    const mkItem = ({ sku = 'test', need, made, bs = 48, isOverdue = false }) => {
+      const totalBatches = need + made;
+      const origP = Math.round(totalBatches * bs);
+      const madeP = Math.round(made * bs);
+      let bucket;
+      if (madeP >= origP - 0.5 && origP > 0) bucket = 'done';
+      else if (made > 0)                      bucket = 'progress';
+      else if (isOverdue)                     bucket = 'overdue';
+      else                                    bucket = 'pending';
+      return { sku, needBatches: need, madeBatches: made, totalBatches, origP, madeP, bucket };
+    };
+
+    // Helper: aggregate the way renderTeamCard does.
+    const aggregate = (items, capacity) => {
+      const totalOrig  = items.reduce((s, d) => s + d.totalBatches, 0);
+      const totalMade  = items.reduce((s, d) => s + d.madeBatches, 0);
+      const totalOrigP = items.reduce((s, d) => s + d.origP, 0);
+      const totalMadeP = items.reduce((s, d) => s + d.madeP, 0);
+      const isOver = totalOrig > capacity + 0.5;
+      const spare  = Math.max(0, capacity - Math.ceil(totalOrig));
+      return { totalOrig, totalMade, totalOrigP, totalMadeP, isOver, spare };
+    };
+
+    const expect = (label, actual, expected) => {
+      const pass = JSON.stringify(actual) === JSON.stringify(expected);
+      tests.push({ label, pass, actual, expected });
+    };
+
+    // T1 — Empty
+    {
+      const a = aggregate([], 15);
+      expect('T1 empty: total=0', a.totalOrig, 0);
+      expect('T1 empty: spare=cap', a.spare, 15);
+      expect('T1 empty: not over', a.isOver, false);
+    }
+    // T2 — Untouched mustDo
+    {
+      const items = [mkItem({ need: 3, made: 0 })];
+      const a = aggregate(items, 15);
+      expect('T2 untouched: total=3', a.totalOrig, 3);
+      expect('T2 untouched: spare=12', a.spare, 12);
+      expect('T2 untouched: bucket=pending', items[0].bucket, 'pending');
+    }
+    // T3 — Done
+    {
+      const items = [mkItem({ need: 0, made: 3 })];
+      const a = aggregate(items, 15);
+      expect('T3 done: total=3', a.totalOrig, 3);
+      expect('T3 done: spare=12', a.spare, 12);
+      expect('T3 done: bucket=done', items[0].bucket, 'done');
+    }
+    // T4 — Mid-progress (the user's exact case in spirit)
+    {
+      const items = [mkItem({ need: 3, made: 2 })];
+      const a = aggregate(items, 15);
+      expect('T4 mid: total=5 (workload, not max=3)', a.totalOrig, 5);
+      expect('T4 mid: spare=10', a.spare, 10);
+      expect('T4 mid: bucket=progress', items[0].bucket, 'progress');
+    }
+    // T5 — Over capacity
+    {
+      const items = [mkItem({ need: 10, made: 0 })];
+      const a = aggregate(items, 5);
+      expect('T5 over: total=10', a.totalOrig, 10);
+      expect('T5 over: isOver=true', a.isOver, true);
+      expect('T5 over: spare=0', a.spare, 0);
+    }
+    // T6 — Mid-progress + other card maxes capacity
+    {
+      const items = [mkItem({ need: 3, made: 2, sku: 'A' }), mkItem({ need: 10, made: 0, sku: 'B' })];
+      const a = aggregate(items, 15);
+      expect('T6 maxed: total=15', a.totalOrig, 15);
+      expect('T6 maxed: spare=0', a.spare, 0);
+      expect('T6 maxed: not over', a.isOver, false);
+    }
+    // T7 — User's reported scenario
+    {
+      const items = [
+        mkItem({ need: 1, made: 0, sku: '6.5oz plain', bs: 72 }),
+        mkItem({ need: 1, made: 0, sku: '10oz plain', bs: 48 }),
+        mkItem({ need: 4, made: 0, sku: 'plain bombs', bs: 72 }),
+        mkItem({ need: 3, made: 2, sku: '4oz twist plain', bs: 108 }),
+        mkItem({ need: 2, made: 0, sku: '4oz twist bbk', bs: 108 }),
+        mkItem({ need: 1, made: 0, sku: '4oz twist spicy bee', bs: 108 }),
+        mkItem({ need: 1, made: 0, sku: '6.5oz Bootlegger', bs: 72 }),
+      ];
+      const a = aggregate(items, 15);
+      expect('T7 user-scenario: total=15 (was 13 with max-based math)', a.totalOrig, 15);
+      expect('T7 user-scenario: spare=0 (was 2 with max-based math)', a.spare, 0);
+      expect('T7 user-scenario: not over', a.isOver, false);
+    }
+    // T8 — Done detection edge: madeP exactly equals origP
+    {
+      const items = [mkItem({ need: 0, made: 5, bs: 100 })];
+      expect('T8 exact done: bucket=done', items[0].bucket, 'done');
+    }
+    // T9 — Almost done (user expects to know more is needed)
+    {
+      const items = [mkItem({ need: 1, made: 4, bs: 100 })];
+      expect('T9 almost-done: bucket=progress (need=1>0)', items[0].bucket, 'progress');
+      expect('T9 almost-done: total=5 not 4', items[0].totalBatches, 5);
+    }
+    // T10 — Logging never grows the visible target inappropriately
+    {
+      // Imagine: schedule places need=3, team logs +1 → need decreases to 2,
+      // made=1. Workload=3 (same).
+      const before = mkItem({ need: 3, made: 0 });
+      const after  = mkItem({ need: 2, made: 1 });
+      expect('T10 stable target: total before = after', before.totalBatches, after.totalBatches);
+    }
+
+    // Render results banner
+    const passed = tests.filter(t => t.pass).length;
+    const failed = tests.length - passed;
+    const banner = document.createElement('div');
+    banner.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:9999;
+      padding:14px 20px;font:700 14px 'Manrope',sans-serif;
+      background:${failed === 0 ? '#d4edda' : '#f8d7da'};
+      color:${failed === 0 ? '#155724' : '#721c24'};
+      border-bottom:2px solid ${failed === 0 ? '#4a4' : '#c44'};`;
+    banner.innerHTML = `<div>${failed === 0 ? '✓' : '✗'} Self-test: ${passed}/${tests.length} passed</div>` +
+      tests.filter(t => !t.pass).map(t =>
+        `<div style="font:500 12px 'Manrope',monospace;margin-top:4px">FAIL — ${t.label} · expected ${JSON.stringify(t.expected)} · got ${JSON.stringify(t.actual)}</div>`
+      ).join('');
+    document.body.appendChild(banner);
+    // Also dump to console for CI / scripted checks
+    // eslint-disable-next-line no-console
+    console.log('Self-test results:', { passed, failed, tests });
+  }
+
   // ─── BOOT ─────────────────────────────────────────────────────────────────
 
   (async () => {
@@ -3654,6 +3810,9 @@
       await Promise.all([loadDeliveries(), loadProduction(), loadSkus()]);
       schedule = buildOptimalSchedule();
       render();
+      // Self-test mode: ?selftest=1 — synthesizes items and verifies the
+      // day-total / spare / bucket math without depending on live data.
+      if (_urlSearch.get('selftest') === '1') runSelfTests();
     } catch (e) {
       document.getElementById('main-view').innerHTML = `
         <div class="load-error">
