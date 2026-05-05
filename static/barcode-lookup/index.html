@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Barcode Lookup | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* v2 design system: #C41E1E red, #F5F0E8 cream, #1A1A1A dark */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    .site-nav {
+      background: #1A1A1A;
+      padding: 14px 5%;
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      border-bottom: 1px solid #333;
+    }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    .hero {
+      background: #1A1A1A;
+      text-align: center;
+      padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px);
+    }
+    .hero h1 {
+      font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif;
+      color: #fff;
+      margin: 0;
+    }
+
+    .section-cream {
+      background: #F5F0E8;
+      padding: clamp(32px, 5vw, 60px) 5%;
+      min-height: calc(100vh - 200px);
+    }
+    .max-800 { max-width: 800px; margin: 0 auto; }
+
+    /* ── No-token wall ── */
+    .token-wall {
+      background: #fff;
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .token-wall h2 { font: 700 20px 'Paytone One', sans-serif; color: #1A1A1A; margin: 0 0 12px; }
+    .token-wall p { font: 400 14px/1.6 'Manrope', sans-serif; color: #555; }
+    .token-wall code { background: #F5F0E8; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── Search bar ── */
+    .search-wrap {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .search-wrap input {
+      flex: 1;
+      font: 400 clamp(18px, 2vw, 22px)/1 'Manrope', sans-serif;
+      padding: 14px 18px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      color: #1A1A1A;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-wrap input:focus { border-color: #C41E1E; }
+    .search-wrap input:disabled { background: #f0f0f0; color: #999; }
+    .search-wrap button {
+      padding: 14px 24px;
+      font: 700 15px 'Manrope', sans-serif;
+      background: #C41E1E;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .search-wrap button:hover { background: #a01818; }
+    .search-wrap button:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* ── Status line ── */
+    .status-msg {
+      font: 400 13px 'Manrope', sans-serif;
+      margin-bottom: 24px;
+      min-height: 20px;
+    }
+    .status-msg.loading { color: #888; }
+    .status-msg.ready   { color: #2a7a2a; }
+    .status-msg.error   { color: #C41E1E; font-weight: 700; }
+
+    /* ── Result cards ── */
+    .result-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border-left: 4px solid #ddd;
+    }
+    .result-card.status-delivered,
+    .result-card.status-picked_up  { border-left-color: #2a7a2a; }
+    .result-card.status-scheduled  { border-left-color: #C41E1E; }
+    .result-card.status-cancelled  { border-left-color: #bbb; opacity: 0.7; }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .result-customer { font: 700 18px 'Manrope', sans-serif; color: #1A1A1A; }
+    .result-date { font: 400 14px 'Manrope', sans-serif; color: #666; }
+    .status-badge {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font: 700 11px 'Manrope', sans-serif;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .status-badge.status-scheduled  { background: #fde8e8; color: #C41E1E; }
+    .status-badge.status-delivered  { background: #e6f4e6; color: #2a7a2a; }
+    .status-badge.status-picked_up  { background: #e6f4e6; color: #2a7a2a; }
+    .status-badge.status-cancelled  { background: #eee;    color: #888; }
+
+    .result-section { margin-bottom: 14px; }
+    .result-section:last-child { margin-bottom: 0; }
+    .result-section-label {
+      font: 700 11px 'Manrope', sans-serif;
+      color: #999;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .line-items { display: flex; flex-direction: column; gap: 4px; }
+    .line-item {
+      display: flex;
+      gap: 8px;
+      font: 400 14px 'Manrope', sans-serif;
+      color: #1A1A1A;
+    }
+    .line-item .qty { color: #888; }
+    .line-item.empty { color: #bbb; font-style: italic; }
+
+    .barcodes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .barcode-chip {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      background: #F5F0E8;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 3px 8px;
+      color: #1A1A1A;
+    }
+    .barcodes .empty { font: 400 13px 'Manrope', sans-serif; color: #bbb; font-style: italic; }
+
+    /* ── No results ── */
+    .no-results {
+      text-align: center;
+      padding: 40px 20px;
+      font: 400 15px/1.6 'Manrope', sans-serif;
+      color: #888;
+    }
+    .no-results code { background: #F5F0E8; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>BARCODE LOOKUP.</h1>
+  </section>
+
+  <div class="section-cream">
+    <div class="max-800">
+
+      <!-- Main app -->
+      <div id="app">
+        <div class="search-wrap">
+          <input
+            id="barcode-input"
+            type="text"
+            placeholder="Scan or type a barcode…"
+            autocomplete="off"
+            spellcheck="false"
+            disabled
+          >
+          <button id="search-btn" disabled>Search</button>
+        </div>
+        <div id="status" class="status-msg loading">Loading delivery records…</div>
+        <div id="results"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog } from '../../scripts/sheet-logger.js';
+
+    const LOG_PATH = '/dangpretz/delivery-planner';
+
+    // --- Delivery resolver (copied from delivery planner — handles barcodes action) ---
+    function resolveDeliveriesFromLogs(logs) {
+      const byId = {};
+      if (!Array.isArray(logs)) return [];
+      logs.forEach((row, idx) => {
+        const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
+        if (row.action === 'delete') { delete byId[id]; return; }
+        if (row.action === 'barcodes') {
+          if (byId[id]) {
+            try { byId[id].barcodes = JSON.parse(row.barcodes || '[]'); } catch (_) { byId[id].barcodes = []; }
+          }
+          return;
+        }
+        if (row.action === 'confirm') {
+          if (byId[id]) {
+            byId[id].confirmation = {
+              confirmedBy: row.confirmedBy || '',
+              signatureData: row.signatureData || '',
+              confirmNote: row.confirmNote || '',
+              confirmTimestamp: row.confirmTimestamp || row.timeStamp || '',
+            };
+            const t = (byId[id].type || 'delivery').toLowerCase();
+            byId[id].status = t === 'pickup' ? 'picked_up' : 'delivered';
+          }
+          return;
+        }
+        if (row.action === 'status') {
+          if (byId[id]) {
+            let s = row.status || 'scheduled';
+            if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
+            byId[id].status = s;
+          }
+          return;
+        }
+        if (row.action === 'update') {
+          const prevBarcodes = byId[id] ? byId[id].barcodes : undefined;
+          const prevConfirmation = byId[id] ? byId[id].confirmation : undefined;
+          byId[id] = { ...row, deliveryId: id };
+          if (prevBarcodes) byId[id].barcodes = prevBarcodes;
+          if (prevConfirmation) byId[id].confirmation = prevConfirmation;
+          let s = row.status || 'scheduled';
+          if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
+          byId[id].status = s;
+          return;
+        }
+        const prevBarcodes = byId[id] ? byId[id].barcodes : undefined;
+        byId[id] = { ...row, deliveryId: id };
+        if (prevBarcodes) byId[id].barcodes = prevBarcodes;
+        let s = byId[id].status || 'scheduled';
+        if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
+        byId[id].status = s;
+      });
+      return Object.values(byId).sort((a, b) => {
+        const d = (a.date || '').localeCompare(b.date || '');
+        return d !== 0 ? d : (a.timeStamp || '').localeCompare(b.timeStamp || '');
+      });
+    }
+
+    // --- Helpers ---
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    let allDeliveries = [];
+
+    function setStatus(state, msg) {
+      const el = document.getElementById('status');
+      el.className = 'status-msg ' + state;
+      el.textContent = msg;
+    }
+
+    function setInputEnabled(enabled) {
+      document.getElementById('barcode-input').disabled = !enabled;
+      document.getElementById('search-btn').disabled = !enabled;
+    }
+
+    // --- Search ---
+    function search(query) {
+      const q = query.trim();
+      const container = document.getElementById('results');
+      if (!q) { container.innerHTML = ''; return; }
+
+      const matches = allDeliveries.filter(
+        (d) => Array.isArray(d.barcodes) && d.barcodes.includes(q),
+      );
+
+      if (matches.length === 0) {
+        container.innerHTML = `<div class="no-results">No delivery found for barcode <code>${escapeHtml(q)}</code>.</div>`;
+        return;
+      }
+
+      container.innerHTML = matches.map((d) => renderCard(d)).join('');
+    }
+
+    function renderCard(d) {
+      const customer = escapeHtml(d.customer || d.location || '—');
+      const date = escapeHtml(d.date || '—');
+      const status = d.status || 'scheduled';
+      const statusLabels = {
+        scheduled: 'Scheduled',
+        delivered: 'Delivered',
+        picked_up: 'Picked Up',
+        cancelled: 'Cancelled',
+      };
+      const statusLabel = escapeHtml(statusLabels[status] || status);
+
+      let items = [];
+      try { items = JSON.parse(d.lineItems || '[]'); } catch (_) {}
+      const itemsHtml = items.length
+        ? items.map((it) => `
+            <div class="line-item">
+              <span class="sku">${escapeHtml(it.sku || '—')}</span>
+              <span class="qty">× ${escapeHtml(String(it.quantity ?? '?'))}</span>
+            </div>`).join('')
+        : '<div class="line-item empty">No line items</div>';
+
+      const barcodes = Array.isArray(d.barcodes) ? d.barcodes : [];
+      const barcodesHtml = barcodes.length
+        ? barcodes.map((b) => `<code class="barcode-chip">${escapeHtml(b)}</code>`).join('')
+        : '<span class="empty">No barcodes on record</span>';
+
+      return `
+        <div class="result-card status-${escapeHtml(status)}">
+          <div class="result-header">
+            <span class="result-customer">${customer}</span>
+            <span class="result-date">${date}</span>
+            <span class="status-badge status-${escapeHtml(status)}">${statusLabel}</span>
+          </div>
+          <div class="result-section">
+            <div class="result-section-label">Order Items</div>
+            <div class="line-items">${itemsHtml}</div>
+          </div>
+          <div class="result-section">
+            <div class="result-section-label">All Barcodes on This Order</div>
+            <div class="barcodes">${barcodesHtml}</div>
+          </div>
+        </div>`;
+    }
+
+    // --- Wire input ---
+    function wireInput() {
+      const input = document.getElementById('barcode-input');
+      input.focus();
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') search(input.value);
+      });
+
+      document.getElementById('search-btn').addEventListener('click', () => {
+        search(input.value);
+      });
+
+      let debounceTimer;
+      input.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => search(input.value), 400);
+      });
+    }
+
+    // --- Init ---
+    async function init() {
+      setStatus('loading', 'Loading delivery records…');
+      try {
+        const logs = await fetchLog(LOG_PATH);
+        allDeliveries = resolveDeliveriesFromLogs(logs);
+        setStatus('ready', `${allDeliveries.length} deliveries loaded. Ready to scan.`);
+        setInputEnabled(true);
+        wireInput();
+      } catch (err) {
+        setStatus('error', 'Failed to load deliveries: ' + (err.message || 'unknown error'));
+      }
+    }
+
+    // --- Boot ---
+    init();
+  </script>
+</body>
+</html>
