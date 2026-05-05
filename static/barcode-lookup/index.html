@@ -198,15 +198,8 @@
   <div class="section-cream">
     <div class="max-800">
 
-      <!-- No-token wall -->
-      <div id="no-token-wall" class="token-wall" hidden>
-        <h2>Admin Access Required</h2>
-        <p>This page requires an admin token.<br>
-           Add <code>?adminToken=YOUR_TOKEN</code> to the URL to authenticate.</p>
-      </div>
-
       <!-- Main app -->
-      <div id="app" hidden>
+      <div id="app">
         <div class="search-wrap">
           <input
             id="barcode-input"
@@ -229,23 +222,6 @@
     import { fetchLog } from '../../scripts/sheet-logger.js';
 
     const LOG_PATH = '/dangpretz/delivery-planner';
-
-    // --- Admin token bootstrap (same pattern as delivery planner) ---
-    function readAdminToken() {
-      const params = new URLSearchParams(window.location.search);
-      const fromUrl = params.get('adminToken');
-      if (fromUrl) {
-        try { localStorage.setItem('dpc-admin-token', fromUrl); } catch (_) {}
-        params.delete('adminToken');
-        const cleanQs = params.toString();
-        const cleanUrl = window.location.pathname + (cleanQs ? '?' + cleanQs : '') + window.location.hash;
-        window.history.replaceState({}, '', cleanUrl);
-        return fromUrl;
-      }
-      try { return localStorage.getItem('dpc-admin-token') || ''; } catch (_) { return ''; }
-    }
-
-    const ADMIN_TOKEN = readAdminToken();
 
     // --- Delivery resolver (copied from delivery planner — handles barcodes action) ---
     function resolveDeliveriesFromLogs(logs) {
@@ -425,12 +401,7 @@
     }
 
     // --- Boot ---
-    if (!ADMIN_TOKEN) {
-      document.getElementById('no-token-wall').hidden = false;
-    } else {
-      document.getElementById('app').hidden = false;
-      init();
-    }
+    init();
   </script>
 </body>
 </html>
