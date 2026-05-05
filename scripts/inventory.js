@@ -32,7 +32,18 @@
 export const DOUGH_AGE_WARN_DAYS = 5;    // yellow aging-dough banner threshold
 export const DOUGH_AGE_FAIL_DAYS = 6;    // red banner — discard or use today
 
+// Cheese-dip production rules. Lead-time semantics: a batch must be ready
+// at least 2 days before the delivery it covers, but can be made up to 5
+// days ahead. After 5 days, cheese goes stale (mirrors the dough age queue
+// for shape work).
+export const CHEESE_MIN_LEAD = 2;        // make ≥ N days before delivery
+export const CHEESE_MAX_LEAD = 5;        // no more than N days before delivery
+export const CHEESE_BATCH_SIZE = 150;    // dips per batch
+export const CHEESE_DAILY_CAP = 1;       // max batches/day for FOH cheese maker
+
 // Pretzels per batch (per-SKU; skuConfig override takes priority).
+// 3oz cheese dip is in here at batchSize 150 — it's tracked production now,
+// not FOH-excluded as before.
 export const BATCH_SIZES = {
   '21oz mammoth pretzel': 24,
   '10oz mustache':        48,
@@ -44,6 +55,7 @@ export const BATCH_SIZES = {
   '6.5oz spicy bee':      72,
   'plain bombs':          432,
   'bees bats':            48,
+  '3oz cheese dip':       CHEESE_BATCH_SIZE,
 };
 
 // Pretzels per case — wholesale shipping unit.
@@ -81,8 +93,10 @@ export const TRAY_SIZES = {
 };
 
 // SKUs that aren't produced in-house (front-of-house pre-made / sourced).
+// Note: `3oz cheese dip` USED to be here but is now tracked production
+// (FOH makes it on-site in batches of 150). Only the bulk pre-mixed dip
+// is still external.
 export const FOH_SKUS = new Set([
-  '3oz cheese dip',
   'bulk dangerous dip (25 srv)',
 ]);
 
@@ -257,6 +271,25 @@ export function resolveProductionLogs(logs) {
       } catch {}
       return;
     }
+    if (action === 'cheese_done') {
+      // FOH cheese maker logs a batch (or partial batch via a stepper).
+      // Each batch = CHEESE_BATCH_SIZE dips → cf += N × CHEESE_BATCH_SIZE.
+      // Same accumulation pattern as shape_done/bfp_done.
+      try {
+        const incoming = JSON.parse(row.completions || '[]');
+        const merged = {};
+        (s.cheeseDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+        incoming.forEach(c => {
+          const k = canonicalSku(c.sku);
+          if (!k) return;
+          merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
+        });
+        s.cheeseDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+        s.cheeseWorkers = Number(row.workers) || 1;
+        s.cheeseTime    = row.timeStamp;
+      } catch {}
+      return;
+    }
     if (action === 'workers_config') {
       const n = Math.max(1, Number(row.workers) || 1);
       if (row.type === 'shape') s.shapeWorkers = n;
@@ -387,6 +420,35 @@ export function getInventoryReport(args) {
           }
         } else {
           doughQueue[key].unshift({ ts, pretzels: -p });
+        }
+      });
+    } else if (row.action === 'cheese_done') {
+      // FOH cheese batch: 1 batch = CHEESE_BATCH_SIZE dips; lives in cf
+      // (refrigerated) until consumed by deliveries or FOH walk-in.
+      // No separate "bake" stage — single-step product. Same dough-age
+      // queue mechanics so the 5-day shelf-life alert fires.
+      let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
+      comps.forEach(c => {
+        let key = (c.sku || '').trim();
+        if (!key) return;
+        if (skuAliases[key]) key = skuAliases[key];
+        const bs = getBatchSize(key);
+        if (!bs) return;
+        const batches = Number(c.batches) || 0;
+        const p       = batches * bs;
+        cf[key]       = (cf[key] || 0) + p;
+        if (!doughQueue[key]) doughQueue[key] = [];
+        if (p >= 0) {
+          doughQueue[key].push({ ts, pretzels: p });
+        } else {
+          let toRemove = -p;
+          while (toRemove > 0 && doughQueue[key].length > 0) {
+            const last = doughQueue[key][doughQueue[key].length - 1];
+            const take = Math.min(last.pretzels, toRemove);
+            last.pretzels -= take;
+            toRemove      -= take;
+            if (last.pretzels <= 0) doughQueue[key].pop();
+          }
         }
       });
     }
@@ -545,3 +607,167 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
 
   return coverage;
 }
+
+// ─── CHEESE-DIP PRODUCTION SCHEDULING ─────────────────────────────────────
+
+const CHEESE_SKU_KEY = '3oz cheese dip';
+
+// ISO-date helpers — keep cheese math purely string-based to avoid TZ pitfalls.
+function _parseISODate(s) {
+  const [y, m, d] = (s || '').split('-').map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+}
+function _addDaysISO(s, n) {
+  const dt = _parseISODate(s);
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * Schedule cheese-dip batches for the FOH cheese maker.
+ *
+ * Phantom-delivery model: combines per-day delivery demand (from active
+ * deliveries with `3oz cheese dip` line items) with a constant FOH walk-in
+ * rate (`fohDailyAvg`, fed in from the Square consumption endpoint), then
+ * walks forward day-by-day. When inventory would dip negative, schedules
+ * one batch on the LATEST valid day inside the [delivery − CHEESE_MAX_LEAD,
+ * delivery − CHEESE_MIN_LEAD] window. Honors the 1-batch/day capacity cap.
+ *
+ * Used by:
+ *   - production app (Cheese tab) — manager sees per-day "make a batch" cards.
+ *   - worker (/foh-cal.ics) — emits an iCalendar VEVENT per scheduled batch.
+ * Both call this exact function so the calendar and the manager view never
+ * disagree.
+ *
+ * @param {Object} args
+ * @param {Array}  args.deliveries          Resolved deliveries (active + confirmed).
+ * @param {Object} args.inventoryReport     From getInventoryReport.
+ * @param {number} args.fohDailyAvg         Average FOH walk-in cheese dips/day (Square).
+ * @param {string} args.today               'YYYY-MM-DD' (Mountain TZ).
+ * @param {Object} args.skuAliases          From resolveProductionLogs.
+ * @param {number} [args.lookaheadDays=14]  How far forward to plan.
+ * @returns {{
+ *   batches: Array<{date: string, dayIndex: number, covers: Array<{customer, qty, deliveryDate}>, foh: number, overdue: boolean}>,
+ *   demandByDate: Array<{date: string, delivery: number, foh: number, total: number}>,
+ *   startInventory: number,
+ *   fohDailyAvg: number,
+ * }}
+ */
+export function scheduleCheese({
+  deliveries, inventoryReport, fohDailyAvg, today, skuAliases, lookaheadDays = 14,
+}) {
+  const dailyAvg = Math.max(0, Number(fohDailyAvg) || 0);
+  // Look further than the user-visible horizon so the algorithm "sees" deliveries
+  // whose window straddles the edge (e.g. a delivery on day 16 has a window
+  // ending on day 14, which we still need to plan for).
+  const dayCount = lookaheadDays + CHEESE_MAX_LEAD + 1;
+
+  // Per-day demand. delivery from line items; foh constant (manager-tunable
+  // via Square consumption endpoint). We accumulate "covers" for each day
+  // so the calendar event can list which customers a batch is for.
+  const demand = Array.from({ length: dayCount }, (_, i) => ({
+    date:     _addDaysISO(today, i),
+    delivery: 0,
+    foh:      dailyAvg,
+    total:    dailyAvg,
+    covers:   [],   // [{ customer, qty, deliveryDate }]
+  }));
+
+  (deliveries || []).forEach(d => {
+    if (['delivered','picked_up','cancelled'].includes(d.status)) return;
+    if (!d.date || d.date < today) return; // past unconfirmed ghosts don't count
+    let lineItems = [];
+    try { lineItems = JSON.parse(d.lineItems || '[]'); } catch {}
+    let cheeseQty = 0;
+    lineItems.forEach(({ sku, quantity }) => {
+      let key = (sku || '').trim();
+      if (skuAliases && skuAliases[key]) key = skuAliases[key];
+      if (key !== CHEESE_SKU_KEY) return;
+      cheeseQty += Number(quantity) || 0;
+    });
+    if (cheeseQty <= 0) return;
+    // Find the day index for this delivery (today=0).
+    const dayIdx = (() => {
+      const ms = _parseISODate(d.date) - _parseISODate(today);
+      return Math.round(ms / 86400000);
+    })();
+    if (dayIdx < 0 || dayIdx >= dayCount) return;
+    demand[dayIdx].delivery += cheeseQty;
+    demand[dayIdx].total    += cheeseQty;
+    demand[dayIdx].covers.push({
+      customer: d.customer || d.location || '?',
+      qty:      cheeseQty,
+      deliveryDate: d.date,
+    });
+  });
+
+  // Starting inventory = effective cf for cheese (cheese_done credits live
+  // here too — same convention as dough). Frozen is unused for cheese
+  // (it's refrigerated, not frozen).
+  const startInventory = (inventoryReport?.effective?.coldFerment?.[CHEESE_SKU_KEY]) || 0;
+
+  // Walk forward. Track running stock. When stock would go negative on day i,
+  // schedule a batch on the latest valid day inside the [i-MAX_LEAD, i-MIN_LEAD]
+  // window. If no valid day exists (all in the past, or all already booked),
+  // mark it as overdue and force-place on today.
+  const batches = [];
+  const hasBatchOn = (dayIdx) => batches.some(b => b.dayIndex === dayIdx);
+
+  let inv = startInventory;
+  for (let i = 0; i < dayCount; i++) {
+    inv -= demand[i].total;
+    while (inv < 0) {
+      // Need 1 more batch placed on a day < i and within the window.
+      let placed = false;
+      const earliest = Math.max(0, i - CHEESE_MAX_LEAD);
+      const latest   = i - CHEESE_MIN_LEAD;
+      for (let j = latest; j >= earliest; j--) {
+        if (j < 0) break;
+        if (hasBatchOn(j)) continue;
+        batches.push({
+          date:      demand[j].date,
+          dayIndex:  j,
+          covers:    [...demand[i].covers],
+          foh:       demand[i].foh,
+          overdue:   false,
+          fillsDay:  i,
+        });
+        inv += CHEESE_BATCH_SIZE;
+        placed = true;
+        break;
+      }
+      if (!placed) {
+        // Window's all past or full. Force-place on today (or earliest open day)
+        // and flag overdue so the manager knows it's late.
+        for (let j = 0; j < i; j++) {
+          if (!hasBatchOn(j)) {
+            batches.push({
+              date:     demand[j].date,
+              dayIndex: j,
+              covers:   [...demand[i].covers],
+              foh:      demand[i].foh,
+              overdue:  true,
+              fillsDay: i,
+            });
+            inv += CHEESE_BATCH_SIZE;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          // Even today is full or i=0. Bail to avoid infinite loop.
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    batches: batches.sort((a, b) => a.dayIndex - b.dayIndex),
+    demandByDate: demand.slice(0, lookaheadDays + 1),
+    startInventory,
+    fohDailyAvg: dailyAvg,
+  };
+}
+
+export const CHEESE_KEY = CHEESE_SKU_KEY; // exported for callers that need the canonical SKU name
