@@ -42,7 +42,7 @@ export const BATCH_SIZES = {
   '6.5oz plain':          72,
   '6.5oz bbk':            72,
   '6.5oz spicy bee':      72,
-  'plain bombs':          72,
+  'plain bombs':          432,
   'bees bats':            48,
 };
 
