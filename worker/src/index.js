@@ -1,3 +1,14 @@
+import {
+  resolveDeliveries,
+  resolveProductionLogs,
+  getInventoryReport,
+  makeSkuMeta,
+  scheduleCheese,
+  CHEESE_BATCH_SIZE,
+  CHEESE_KEY,
+  CHEESE_MAX_LEAD,
+} from '../../scripts/inventory.js';
+
 const SQUARE_BASE = 'https://connect.squareup.com/v2';
 
 /**
@@ -862,6 +873,334 @@ async function sendOrderAlert({
   });
 }
 
+// ─── FOH cheese-dip consumption + iCalendar feed ─────────────────────────
+
+const PRODUCTION_LOG_PATH = '/dangpretz/production';
+
+/**
+ * Pull last N days of Square orders and count cheese-dip consumption.
+ * Counts:
+ *   1. Direct line items whose name matches "3oz cheese dip" or generic
+ *      "cheese dip" → quantity units.
+ *   2. Modifiers on other items whose name contains "cheese dip" → 1 each.
+ * Returns { daysSampled, cheeseDipUnits, dailyAvg, modifierNamesSeen }.
+ */
+async function fetchSquareCheeseConsumption(env, daysSampled = 28, debug = false) {
+  const locationId = env.SQUARE_LOCATION_ID || 'LEJ3PDZ9V6NYN';
+  const startAt = new Date(Date.now() - daysSampled * 86400e3).toISOString();
+  const orders = [];
+  let cursor;
+  let pageCount = 0;
+  do {
+    const res = await fetch(`${SQUARE_BASE}/orders/search`, {
+      method: 'POST',
+      headers: {
+        'Square-Version': '2025-01-23',
+        Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        location_ids: [locationId],
+        query: {
+          filter: {
+            date_time_filter: { created_at: { start_at: startAt } },
+            state_filter: { states: ['OPEN', 'COMPLETED'] }, // skip CANCELED — wasn't consumed
+          },
+          sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' },
+        },
+        limit: 500,
+        cursor,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(`Square search failed: ${JSON.stringify(data).slice(0, 300)}`);
+    orders.push(...(data.orders || []));
+    cursor = data.cursor;
+    pageCount += 1;
+    if (pageCount > 20) break;
+  } while (cursor);
+
+  // Cheese dip is sold under the brand name "Dangerous Dip" (the cheese-
+  // sauce variant). Match the standalone line item, the catering variant,
+  // and the modifier-on-pretzel pattern. Other dip flavors (Sweet Cream,
+  // Honey Mustard, etc.) are different products and explicitly NOT cheese
+  // dip. (Catering box descriptions also list dip counts, but parsing
+  // those is v2 work.)
+  const dangerousDipRe = /^(dangerous\s*dip)(\s*-\s*catering)?$/i;
+  let units = 0;
+  const directNamesSeen = new Set();
+  const modifierNamesSeen = new Set();
+  const sampleAllLineItemNames = new Set();
+  const sampleAllModifierNames = new Set();
+  orders.forEach((o) => {
+    (o.line_items || []).forEach((li) => {
+      const name = (li.name || '').trim();
+      const qty = parseInt(li.quantity, 10) || 0;
+      sampleAllLineItemNames.add(name);
+      // Direct line item match.
+      if (dangerousDipRe.test(name) && qty > 0) {
+        directNamesSeen.add(name);
+        units += qty;
+      }
+      // Modifier match — each modifier instance = parent qty cheese dips.
+      (li.modifiers || []).forEach((mod) => {
+        const mname = (mod.name || '').trim();
+        sampleAllModifierNames.add(mname);
+        if (dangerousDipRe.test(mname)) {
+          modifierNamesSeen.add(mname);
+          units += qty;
+        }
+      });
+    });
+  });
+
+  const dailyAvg = daysSampled > 0 ? units / daysSampled : 0;
+  const result = {
+    daysSampled,
+    cheeseDipUnits: units,
+    dailyAvg: Math.round(dailyAvg * 10) / 10, // 1 decimal
+    directNamesSeen: [...directNamesSeen],
+    modifierNamesSeen: [...modifierNamesSeen],
+    ordersScanned: orders.length,
+  };
+  if (debug) {
+    result.sampleLineItemNames = [...sampleAllLineItemNames].slice(0, 50);
+    result.sampleModifierNames = [...sampleAllModifierNames].slice(0, 50);
+  }
+  return result;
+}
+
+async function handleCheeseConsumption(request, env) {
+  const url = new URL(request.url);
+  const days = Math.max(1, Math.min(90, parseInt(url.searchParams.get('days'), 10) || 28));
+  const debug = url.searchParams.get('debug') === '1';
+  const result = await fetchSquareCheeseConsumption(env, days, debug);
+  return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      ...CORS_HEADERS,
+      'Cache-Control': 'public, max-age=3600', // 1 hour cache (also enforced upstream by myecalendar)
+    },
+  });
+}
+
+// ─── iCalendar feed for FOH ──────────────────────────────────────────────
+
+// Today as 'YYYY-MM-DD' in Mountain TZ (matches the production app).
+function todayMountain() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+}
+
+// Format a Date as iCal UTC timestamp (YYYYMMDDTHHMMSSZ) or all-day date (YYYYMMDD).
+function icsDateUTC(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return d.getUTCFullYear()
+    + pad(d.getUTCMonth() + 1)
+    + pad(d.getUTCDate())
+    + 'T'
+    + pad(d.getUTCHours())
+    + pad(d.getUTCMinutes())
+    + pad(d.getUTCSeconds())
+    + 'Z';
+}
+function icsDateAllDay(yyyymmdd) {
+  return yyyymmdd.replace(/-/g, '');
+}
+// RFC 5545 line folding: split lines to 75 octets, continuation prefixed by space.
+function icsFold(line) {
+  const out = [];
+  let s = line;
+  while (s.length > 75) {
+    out.push(s.slice(0, 75));
+    s = ' ' + s.slice(75);
+  }
+  out.push(s);
+  return out.join('\r\n');
+}
+// Escape iCal text fields (commas, semicolons, newlines).
+function icsEscape(s) {
+  return String(s ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function isCateringDelivery(d) {
+  if (!d) return false;
+  if (d._source === 'square-invoice') return true;
+  if ((d.deliveryId || '').startsWith('sq_')) {
+    let items = [];
+    try { items = JSON.parse(d.lineItems || '[]'); } catch {}
+    if (items.some((li) => /^catering:/i.test(li.name || ''))) return true;
+  }
+  return false;
+}
+
+function buildCheeseEvent({ batch, dtstamp }) {
+  const uid = `cheese-batch-${batch.date}@dangpretz`;
+  const lines = [
+    'BEGIN:VEVENT',
+    icsFold(`UID:${uid}`),
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${icsDateAllDay(batch.date)}`,
+    `DTEND;VALUE=DATE:${icsDateAllDay(addOneDay(batch.date))}`,
+    icsFold(`SUMMARY:${icsEscape(`🧀 Make 1 batch cheese dip${batch.overdue ? ' (overdue!)' : ''}`)}`),
+  ];
+  const coversList = batch.covers
+    .map((c) => `${c.customer} (${c.qty} for ${c.deliveryDate})`)
+    .join('; ');
+  const fohLine = batch.foh > 0 ? ` FOH walk-in covered: ~${Math.round(batch.foh * (CHEESE_MAX_LEAD - 1))} dips.` : '';
+  const desc = `Covers: ${coversList || 'FOH walk-in only'}.${fohLine} ~${CHEESE_BATCH_SIZE} dips/batch. Use within ${CHEESE_MAX_LEAD} days.`;
+  lines.push(icsFold(`DESCRIPTION:${icsEscape(desc)}`));
+  lines.push(icsFold('URL:https://drewfeller.com/static/production/'));
+  lines.push('END:VEVENT');
+  return lines.join('\r\n');
+}
+
+function addOneDay(yyyymmdd) {
+  const [y, m, d] = yyyymmdd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+function buildCateringEvent({ delivery, dtstamp }) {
+  const uid = `catering-${delivery.deliveryId}@dangpretz`;
+  // Pickup/delivery time if available, else 9 AM Mountain default for that date.
+  // Square stores pickup_at/deliver_at on the order's fulfillment; we don't
+  // have it here on the resolved delivery row directly. Fall back to 9 AM
+  // local for now (will refine when we plumb the time through).
+  const dateStr = delivery.date;
+  const dtStart = `${icsDateAllDay(dateStr)}T160000Z`; // 9 AM MDT (UTC-6) ≈ 16:00 UTC
+  const dtEnd   = `${icsDateAllDay(dateStr)}T170000Z`; // +1h hand-off window
+
+  let items = [];
+  try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+  const itemsList = items
+    .filter((li) => (Number(li.quantity) || 0) > 0)
+    .map((li) => `  - ${li.sku || '?'} × ${li.quantity || 0}`)
+    .join('\n');
+
+  const customer = delivery.customer || '?';
+  const isPickup = (delivery.type || 'delivery').toLowerCase() === 'pickup';
+  const location = isPickup
+    ? 'PICKUP — at shop'
+    : (delivery.address || '');
+
+  const summaryShort = items.length > 0
+    ? `${items[0].sku} × ${items[0].quantity}${items.length > 1 ? ` +${items.length - 1} more` : ''}`
+    : '';
+
+  const lines = [
+    'BEGIN:VEVENT',
+    icsFold(`UID:${uid}`),
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    icsFold(`SUMMARY:${icsEscape(`🥨 Catering: ${customer}${summaryShort ? ` (${summaryShort})` : ''}`)}`),
+  ];
+  if (location) lines.push(icsFold(`LOCATION:${icsEscape(location)}`));
+  const descParts = [];
+  descParts.push(`Customer: ${customer}`);
+  if (delivery.contactPhone) descParts.push(`Phone: ${delivery.contactPhone}`);
+  if (delivery.contactEmail) descParts.push(`Email: ${delivery.contactEmail}`);
+  descParts.push(`Type: ${isPickup ? 'Pickup' : 'Delivery'}`);
+  if (itemsList) descParts.push(`Items:\n${itemsList}`);
+  if (delivery.notes) descParts.push(`Notes: ${delivery.notes}`);
+  lines.push(icsFold(`DESCRIPTION:${icsEscape(descParts.join('\n'))}`));
+  lines.push(icsFold(`URL:https://drewfeller.com/static/delivery-planner/`));
+  lines.push('END:VEVENT');
+  return lines.join('\r\n');
+}
+
+async function handleFohCalendar(request, env) {
+  // Pull both logs in parallel.
+  const [delivRes, prodRes] = await Promise.all([
+    fetch(`${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}`),
+    fetch(`${SHEET_LOGGER_BASE}${PRODUCTION_LOG_PATH}`),
+  ]);
+  const deliveryLogs   = delivRes.ok   ? await delivRes.json()   : [];
+  const productionLogs = prodRes.ok    ? await prodRes.json()    : [];
+
+  const allDeliveries = resolveDeliveries(deliveryLogs);
+  const prod          = resolveProductionLogs(productionLogs);
+  const meta          = makeSkuMeta(prod.skuConfig);
+  const inventoryReport = getInventoryReport({
+    productionLogs: prod.productionLogs,
+    productionState: prod.state,
+    allDeliveries,
+    skuAliases: prod.skuAliases,
+    latestInventoryTs: prod.latestInventoryTs,
+    getBatchSize: meta.getBatchSize,
+  });
+
+  // Square FOH walk-in rate. Fail-soft: if Square errors, use 0.
+  let dailyAvg = 0;
+  try {
+    const c = await fetchSquareCheeseConsumption(env, 28);
+    dailyAvg = c.dailyAvg || 0;
+  } catch (_) { /* best-effort */ }
+
+  const today = todayMountain();
+
+  // Cheese batches.
+  const cheese = scheduleCheese({
+    deliveries: allDeliveries,
+    inventoryReport,
+    fohDailyAvg: dailyAvg,
+    today,
+    skuAliases: prod.skuAliases,
+    lookaheadDays: 14,
+  });
+
+  // Upcoming catering deliveries (next 30 days, scheduled status).
+  const horizon = (() => {
+    const dt = new Date(today);
+    dt.setUTCDate(dt.getUTCDate() + 30);
+    return dt.toISOString().slice(0, 10);
+  })();
+  const cateringDeliveries = allDeliveries.filter((d) => {
+    if (!d.date) return false;
+    if (d.date < today || d.date > horizon) return false;
+    if (['delivered','picked_up','cancelled'].includes(d.status)) return false;
+    return isCateringDelivery(d);
+  });
+
+  // Build .ics body
+  const dtstamp = icsDateUTC(new Date());
+  const events = [
+    ...cheese.batches.map((batch) => buildCheeseEvent({ batch, dtstamp })),
+    ...cateringDeliveries.map((delivery) => buildCateringEvent({ delivery, dtstamp })),
+  ];
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Dangerous Pretzel Co//FOH Schedule//EN',
+    icsFold('NAME:DPC FOH Schedule'),
+    icsFold('X-WR-CALNAME:DPC FOH Schedule'),
+    icsFold('DESCRIPTION:Cheese-dip batches and catering fulfillments'),
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+    'X-PUBLISHED-TTL:PT1H',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    ...events,
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n');
+
+  return new Response(ics, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/calendar; charset=utf-8',
+      'Cache-Control': 'public, max-age=300', // 5 min — myecalendar refreshes hourly anyway
+      ...CORS_HEADERS,
+    },
+  });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -924,6 +1263,28 @@ export default {
       }
     }
     // ── end Square sync routing ──
+
+    // ── FOH cheese-dip endpoints ──
+    if (url.pathname === '/cheese-consumption' && request.method === 'GET') {
+      try { return await handleCheeseConsumption(request, env); }
+      catch (err) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('Cheese consumption error:', err);
+        return json({ error: err.message || 'Cheese consumption failed' }, 500);
+      }
+    }
+    if (url.pathname === '/foh-cal.ics' && request.method === 'GET') {
+      try { return await handleFohCalendar(request, env); }
+      catch (err) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('FOH calendar error:', err);
+        return new Response(`# error: ${err.message || 'foh-cal failed'}`, {
+          status: 500,
+          headers: { 'Content-Type': 'text/plain', ...CORS_HEADERS },
+        });
+      }
+    }
+    // ── end FOH endpoints ──
 
     if (request.method !== 'POST') {
       return json({ error: 'Method not allowed' }, 405);
