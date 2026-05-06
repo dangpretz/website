@@ -1651,6 +1651,7 @@
             let key = sku.trim();
             if (skuAliases[key]) key = skuAliases[key]; // resolve old → canonical name
             if (isFOH(key)) { fohSeen.add(key); return; }
+            if (key === CHEESE_KEY) return; // cheese has its own pipeline (Cheese tab); shape/BFP teams don't make it
             if (!skuMap[key]) skuMap[key] = { pretzels: 0, orders: [] };
             skuMap[key].pretzels += Number(quantity) || 0;
             const cust = delivery.customer || delivery.location || '?';
