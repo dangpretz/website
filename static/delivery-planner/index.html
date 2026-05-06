@@ -874,7 +874,19 @@
       resolveProductionLogs,
       getInventoryReport,
       attributeDeliveryCoverage,
-    } from '../../scripts/inventory.js?v=2026-05-05-cheese';
+      isShapeOnlyDelivery,
+      expandBoxLineItems,
+    } from '../../scripts/inventory.js?v=2026-05-06-shapeonly';
+
+    // Feature flag — kept in sync with production app via the same key.
+    const SHAPE_ONLY_ENABLED = (() => {
+      try {
+        const u = new URLSearchParams(window.location.search).get('shapeonly');
+        if (u === '1' || u === 'on') localStorage.setItem('shapeOnly2026', 'on');
+        else if (u === '0' || u === 'off') localStorage.setItem('shapeOnly2026', 'off');
+        return localStorage.getItem('shapeOnly2026') === 'on';
+      } catch (_) { return false; }
+    })();
 
     const LOG_PATH = '/dangpretz/delivery-planner';
     const PRODUCTION_LOG_PATH = '/dangpretz/production';
@@ -1417,7 +1429,15 @@
       if (!cov || !cov.aggregateStatus) return '';
       const isConfirmed = ['delivered','picked_up'].includes(row.status);
       if (isConfirmed) return ''; // already shipped — no point flagging
-      const LABEL = {
+      // Shape-only deliveries (catering, FOH Placeholder) leave the pipeline
+      // at the dough stage — FOH bakes them fresh. Different status semantics:
+      // dough alone counts as ready, no "baking" wait state.
+      const shapeOnly = !!row._shapeOnly || cov.shapeOnly;
+      const LABEL = shapeOnly ? {
+        ready:     '✅ Dough ready',
+        partial:   '🔧 Partial dough',
+        unstarted: '🔴 Need to shape',
+      } : {
         ready:     '✅ Ready',
         baking:    '🍞 Baking',
         partial:   '🔧 Partial',
@@ -1433,7 +1453,10 @@
           label += ` · ${ready} of ${lines.length} ready`;
         }
       }
-      return `<span class="coverage-badge cov-${cov.aggregateStatus}" title="Stock attribution from production app">${label}</span>`;
+      const tip = shapeOnly
+        ? 'Shape-only — FOH bakes fresh from dough'
+        : 'Stock attribution from production app';
+      return `<span class="coverage-badge cov-${cov.aggregateStatus}" title="${tip}">${label}</span>`;
     }
 
     // Returns {className, tooltip} for a single line item pill.
@@ -1686,6 +1709,20 @@
         try {
           const prodResolved = resolveProductionLogs(productionLogs);
           const meta = makeSkuMeta(prodResolved.skuConfig);
+          // Shape-only feature: tag deliveries that should skip BFP (catering
+          // boxes, FOH Placeholder) and expand box line items so coverage math
+          // counts the right pretzels. Detection runs BEFORE expansion so the
+          // "Catering:" prefix still matches.
+          if (SHAPE_ONLY_ENABLED) {
+            for (const d of deliveries) {
+              d._shapeOnly = isShapeOnlyDelivery(d);
+              try {
+                const items = JSON.parse(d.lineItems || '[]');
+                const expanded = expandBoxLineItems(items, prodResolved.skuConfig);
+                if (expanded !== items) d.lineItems = JSON.stringify(expanded);
+              } catch (_) {}
+            }
+          }
           const inventoryReport = getInventoryReport({
             productionLogs: prodResolved.productionLogs,
             productionState: prodResolved.state,

@@ -1,3 +1,11 @@
+/* eslint-disable
+   no-underscore-dangle,
+   no-empty,
+   no-plusplus,
+   no-continue,
+   no-restricted-syntax,
+   max-len
+*/
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║ SHARED INVENTORY + DELIVERY COVERAGE MODULE                              ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
@@ -29,67 +37,67 @@
 // ─── BUSINESS RULES ───────────────────────────────────────────────────────
 // Edit these to match operational reality. Each is a single source of truth.
 
-export const DOUGH_AGE_WARN_DAYS = 5;    // yellow aging-dough banner threshold
-export const DOUGH_AGE_FAIL_DAYS = 6;    // red banner — discard or use today
+export const DOUGH_AGE_WARN_DAYS = 5; // yellow aging-dough banner threshold
+export const DOUGH_AGE_FAIL_DAYS = 6; // red banner — discard or use today
 
 // Cheese-dip production rules. Lead-time semantics: a batch must be ready
 // at least 2 days before the delivery it covers, but can be made up to 5
 // days ahead. After 5 days, cheese goes stale (mirrors the dough age queue
 // for shape work).
-export const CHEESE_MIN_LEAD = 2;        // make ≥ N days before delivery
-export const CHEESE_MAX_LEAD = 5;        // no more than N days before delivery
-export const CHEESE_BATCH_SIZE = 150;    // dips per batch
-export const CHEESE_DAILY_CAP = 1;       // max batches/day for FOH cheese maker
+export const CHEESE_MIN_LEAD = 2; // make ≥ N days before delivery
+export const CHEESE_MAX_LEAD = 5; // no more than N days before delivery
+export const CHEESE_BATCH_SIZE = 150; // dips per batch
+export const CHEESE_DAILY_CAP = 1; // max batches/day for FOH cheese maker
 
 // Pretzels per batch (per-SKU; skuConfig override takes priority).
 // 3oz cheese dip is in here at batchSize 150 — it's tracked production now,
 // not FOH-excluded as before.
 export const BATCH_SIZES = {
   '21oz mammoth pretzel': 24,
-  '10oz mustache':        48,
-  '10oz plain':           48,
-  '10oz bbk':             48,
-  '10oz spicy bee':       48,
-  '6.5oz plain':          72,
-  '6.5oz bbk':            72,
-  '6.5oz spicy bee':      72,
-  'plain bombs':          432,
-  'bees bats':            48,
-  '3oz cheese dip':       CHEESE_BATCH_SIZE,
+  '10oz mustache': 48,
+  '10oz plain': 48,
+  '10oz bbk': 48,
+  '10oz spicy bee': 48,
+  '6.5oz plain': 72,
+  '6.5oz bbk': 72,
+  '6.5oz spicy bee': 72,
+  'plain bombs': 432,
+  'bees bats': 48,
+  '3oz cheese dip': CHEESE_BATCH_SIZE,
 };
 
 // Pretzels per case — wholesale shipping unit.
 export const CASE_SIZES = {
   '21oz mammoth pretzel': 25,
-  '10oz mustache':        48,
-  '10oz plain':           48,
-  '10oz bbk':             48,
-  '10oz spicy bee':       48,
-  '6.5oz plain':          72,
-  '6.5oz bbk':            72,
-  '6.5oz spicy bee':      72,
-  '4oz twist plain':      52,
-  '4oz twist bbk':        52,
-  '4oz twist spicy bee':  52,
-  'plain bombs':          0,
-  'bees bats':            0,
+  '10oz mustache': 48,
+  '10oz plain': 48,
+  '10oz bbk': 48,
+  '10oz spicy bee': 48,
+  '6.5oz plain': 72,
+  '6.5oz bbk': 72,
+  '6.5oz spicy bee': 72,
+  '4oz twist plain': 52,
+  '4oz twist bbk': 52,
+  '4oz twist spicy bee': 52,
+  'plain bombs': 0,
+  'bees bats': 0,
 };
 
 // Pretzels per baking sheet (tray) — BFP team's natural unit.
 export const TRAY_SIZES = {
-  '21oz mammoth pretzel':  2,
-  '10oz mustache':         4,
-  '10oz plain':            4,
-  '10oz bbk':              4,
-  '10oz spicy bee':        4,
-  '6.5oz plain':           9,
-  '6.5oz bbk':             9,
-  '6.5oz spicy bee':       9,
-  '4oz twist plain':      12,
-  '4oz twist bbk':        12,
-  '4oz twist spicy bee':  12,
-  'bees bats':             6,
-  'plain bombs':           0,
+  '21oz mammoth pretzel': 2,
+  '10oz mustache': 4,
+  '10oz plain': 4,
+  '10oz bbk': 4,
+  '10oz spicy bee': 4,
+  '6.5oz plain': 9,
+  '6.5oz bbk': 9,
+  '6.5oz spicy bee': 9,
+  '4oz twist plain': 12,
+  '4oz twist bbk': 12,
+  '4oz twist spicy bee': 12,
+  'bees bats': 6,
+  'plain bombs': 0,
 };
 
 // SKUs that aren't produced in-house (front-of-house pre-made / sourced).
@@ -105,6 +113,75 @@ export const BAKE_GROUPS = {
   coating: ['10oz bbk', '6.5oz bbk', '4oz twist bbk'],
 };
 
+// ─── SHAPE-ONLY (CATERING / FOH) RULES ────────────────────────────────────
+// Some deliveries leave the production pipeline at the dough stage:
+//   - Catering boxes are baked + boxed fresh in the FOH store at fulfillment.
+//   - The "FOH Placeholder" customer represents FOH retail walk-in stock.
+// For those, shape team makes the dough; BFP team does NOT bake/freeze them.
+// Detection is automatic: ANY line item starting with "Catering:" OR a
+// customer name matching FOH_PLACEHOLDER_NAME (case-insensitive).
+
+export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
+
+// Default catering box → pretzel expansions, used when a per-box override
+// hasn't been written to skuConfig yet. Manager can override via the
+// production app's "Box mapping" tab — those entries take priority.
+//
+// User-confirmed mappings (2026-05-05):
+//   Catering: Salty Pretzel Box   → 15 × 6.5oz plain
+//   Catering: BBK Pretzel Box - 15 → 15 × 6.5oz bbk
+// Saint, Swell Cream, and dip-box mappings TBD (manager configures).
+export const DEFAULT_BOX_EXPANSIONS = {
+  'Catering: Salty Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
+  'Catering: BBK Pretzel Box - 15': [{ sku: '6.5oz bbk', multiplier: 15 }],
+};
+
+/**
+ * True if a delivery should be classified as shape-only (skip BFP).
+ * MUST be called BEFORE expanding box line items, since detection looks
+ * at the original "Catering: ..." prefixes.
+ */
+export function isShapeOnlyDelivery(d) {
+  if (!d) return false;
+  const customer = (d.customer || d.location || '').trim().toLowerCase();
+  if (customer === FOH_PLACEHOLDER_NAME.toLowerCase()) return true;
+  let items = [];
+  try { items = JSON.parse(d.lineItems || '[]'); } catch (_) {}
+  if (!Array.isArray(items)) return false;
+  return items.some((li) => /^catering:/i.test((li.sku || li.name || '').trim()));
+}
+
+/**
+ * Expand catering-box line items into their constituent pretzel/dip SKUs.
+ * Pure function. Lookups: skuConfig[box].expandsTo first, then DEFAULT_BOX_EXPANSIONS.
+ * Boxes with no mapping pass through unchanged (manager sees them as
+ * "New SKU in orders" and can set up via the box-mapping tab).
+ *
+ * @param {Array} lineItems  [{sku|name, quantity}]
+ * @param {Object} skuConfig
+ * @returns {Array} new line item array (does not mutate input)
+ */
+export function expandBoxLineItems(lineItems, skuConfig = {}) {
+  if (!Array.isArray(lineItems)) return [];
+  const out = [];
+  for (const li of lineItems) {
+    const key = (li.sku || li.name || '').trim();
+    const qty = Number(li.quantity) || 0;
+    if (!key || qty <= 0) { out.push(li); continue; }
+    const cfg = skuConfig[key];
+    const expansion = (cfg?.expandsTo && cfg.expandsTo.length ? cfg.expandsTo : null)
+      || DEFAULT_BOX_EXPANSIONS[key]
+      || null;
+    if (!expansion) { out.push(li); continue; }
+    for (const { sku: targetSku, multiplier } of expansion) {
+      const m = Number(multiplier) || 0;
+      if (!targetSku || m <= 0) continue;
+      out.push({ sku: targetSku, quantity: qty * m });
+    }
+  }
+  return out;
+}
+
 // ─── SKU META HELPER ──────────────────────────────────────────────────────
 
 /**
@@ -116,11 +193,11 @@ export const BAKE_GROUPS = {
  */
 export function makeSkuMeta(skuConfig = {}) {
   return {
-    getBatchSize: sku => (skuConfig[sku]?.batchSize > 0 ? skuConfig[sku].batchSize : 0) || BATCH_SIZES[sku] || 0,
-    getTraySize:  sku => (skuConfig[sku]?.traySize  > 0 ? skuConfig[sku].traySize  : 0) || TRAY_SIZES[sku]  || 0,
-    getCaseSize:  sku => (skuConfig[sku]?.caseSize  > 0 ? skuConfig[sku].caseSize  : 0) || CASE_SIZES[sku]  || 0,
-    isFOH:        sku => skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has((sku || '').toLowerCase()) || FOH_SKUS.has(sku),
-    isCoating:    sku => skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku),
+    getBatchSize: (sku) => (skuConfig[sku]?.batchSize > 0 ? skuConfig[sku].batchSize : 0) || BATCH_SIZES[sku] || 0,
+    getTraySize: (sku) => (skuConfig[sku]?.traySize > 0 ? skuConfig[sku].traySize : 0) || TRAY_SIZES[sku] || 0,
+    getCaseSize: (sku) => (skuConfig[sku]?.caseSize > 0 ? skuConfig[sku].caseSize : 0) || CASE_SIZES[sku] || 0,
+    isFOH: (sku) => (skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has((sku || '').toLowerCase()) || FOH_SKUS.has(sku)),
+    isCoating: (sku) => (skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku)),
   };
 }
 
@@ -134,8 +211,17 @@ export function makeSkuMeta(skuConfig = {}) {
  * its own resolver that adds barcodes for its UI. This shared resolver is
  * sufficient for inventory math (which only needs status, lineItems, date,
  * customer, _confirmedAt).
+ *
+ * @param {Array} logs
+ * @param {Object} [options]
+ * @param {boolean} [options.shapeOnlyEnabled=false]  Gate the new behavior.
+ *   When true: each resolved delivery gets a `_shapeOnly` flag (computed
+ *   BEFORE expansion, so "Catering:" prefix detection works), and box line
+ *   items are expanded per skuConfig + DEFAULT_BOX_EXPANSIONS.
+ * @param {Object} [options.skuConfig={}]  For box expansions.
  */
-export function resolveDeliveries(logs) {
+export function resolveDeliveries(logs, options = {}) {
+  const { shapeOnlyEnabled = false, skuConfig = {} } = options;
   const byId = {};
   if (!Array.isArray(logs)) return [];
   logs.forEach((row, idx) => {
@@ -153,8 +239,7 @@ export function resolveDeliveries(logs) {
     if (row.action === 'status') {
       if (byId[id]) {
         byId[id].status = row.status || 'scheduled';
-        if (['delivered','picked_up'].includes(byId[id].status))
-          byId[id]._confirmedAt = row.timeStamp || '';
+        if (['delivered', 'picked_up'].includes(byId[id].status)) byId[id]._confirmedAt = row.timeStamp || '';
       }
       return;
     }
@@ -166,7 +251,21 @@ export function resolveDeliveries(logs) {
     }
     byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
   });
-  return Object.values(byId);
+  const out = Object.values(byId);
+  if (shapeOnlyEnabled) {
+    for (const d of out) {
+      // Detect BEFORE expansion so the "Catering:" prefix check still matches.
+      d._shapeOnly = isShapeOnlyDelivery(d);
+      // Expand box line items in place. Original sheet row stays untouched;
+      // this only mutates the resolved record's lineItems string.
+      try {
+        const items = JSON.parse(d.lineItems || '[]');
+        const expanded = expandBoxLineItems(items, skuConfig);
+        if (expanded !== items) d.lineItems = JSON.stringify(expanded);
+      } catch (_) {}
+    }
+  }
+  return out;
 }
 
 // ─── PRODUCTION LOG RESOLUTION ────────────────────────────────────────────
@@ -189,17 +288,29 @@ export function resolveProductionLogs(logs) {
   // OLD aliased names (e.g. "Twist - Plain") get canonicalized to
   // "4oz twist plain" — even if the alias row appears later in the log
   // than the completion row.
-  productionLogs.forEach(row => {
+  productionLogs.forEach((row) => {
     if (row.action === 'sku_config') {
-      if (row.sku) skuConfig[row.sku] = {
-        batchSize: Number(row.batchSize) || 0,
-        traySize:  Number(row.traySize)  || 0,
-        caseSize:  Number(row.caseSize)  || 0,
-        type:      row.type || 'standard',
-      };
+      if (row.sku) {
+        // Optional `expandsTo` JSON column — used for catering box → pretzel
+        // expansion mappings. Parse safely; bad JSON falls back to no expansion.
+        let expandsTo = null;
+        if (row.expandsTo) {
+          try {
+            const parsed = JSON.parse(row.expandsTo);
+            if (Array.isArray(parsed)) expandsTo = parsed;
+          } catch (_) {}
+        }
+        skuConfig[row.sku] = {
+          batchSize: Number(row.batchSize) || 0,
+          traySize: Number(row.traySize) || 0,
+          caseSize: Number(row.caseSize) || 0,
+          type: row.type || 'standard',
+          ...(expandsTo ? { expandsTo } : {}),
+        };
+      }
     } else if (row.action === 'sku_alias') {
       const from = (row.from || '').trim();
-      const to   = (row.to   || '').trim();
+      const to = (row.to || '').trim();
       if (from && to) skuAliases[from] = to;
     }
   });
@@ -213,7 +324,7 @@ export function resolveProductionLogs(logs) {
   // Pass 2: walk events with aliases applied. Per-date state aggregates
   // shape_done/bfp_done by canonical sku so the display layer never sees
   // duplicate cards for the same product under old + new names.
-  productionLogs.forEach(row => {
+  productionLogs.forEach((row) => {
     const { date, action } = row;
     if (!action) return;
     if (action === 'sku_config' || action === 'sku_alias') return; // handled in pass 1
@@ -225,12 +336,13 @@ export function resolveProductionLogs(logs) {
     if (action === 'inventory') {
       try {
         const snaps = JSON.parse(row.snapshots || '[]');
-        const cf = {}, fr = {};
-        snaps.forEach(sn => {
+        const cf = {}; const
+          fr = {};
+        snaps.forEach((sn) => {
           const k = canonicalSku(sn.sku);
           if (!k) return;
           cf[k] = Number(sn.coldFerment) || 0;
-          fr[k] = Number(sn.frozen)      || 0;
+          fr[k] = Number(sn.frozen) || 0;
         });
         s.coldFerment = cf; s.frozen = fr;
       } catch {}
@@ -243,15 +355,15 @@ export function resolveProductionLogs(logs) {
       try {
         const incoming = JSON.parse(row.completions || '[]');
         const merged = {};
-        (s.shapeDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-        incoming.forEach(c => {
+        (s.shapeDone || []).forEach((c) => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+        incoming.forEach((c) => {
           const k = canonicalSku(c.sku);
           if (!k) return;
           merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
         });
-        s.shapeDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+        s.shapeDone = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
         s.shapeWorkers = Number(row.workers) || 1;
-        s.shapeTime    = row.timeStamp;
+        s.shapeTime = row.timeStamp;
       } catch {}
       return;
     }
@@ -259,15 +371,15 @@ export function resolveProductionLogs(logs) {
       try {
         const incoming = JSON.parse(row.completions || '[]');
         const merged = {};
-        (s.bfpDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-        incoming.forEach(c => {
+        (s.bfpDone || []).forEach((c) => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+        incoming.forEach((c) => {
           const k = canonicalSku(c.sku);
           if (!k) return;
           merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
         });
-        s.bfpDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+        s.bfpDone = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
         s.bfpWorkers = Number(row.workers) || 1;
-        s.bfpTime    = row.timeStamp;
+        s.bfpTime = row.timeStamp;
       } catch {}
       return;
     }
@@ -278,15 +390,15 @@ export function resolveProductionLogs(logs) {
       try {
         const incoming = JSON.parse(row.completions || '[]');
         const merged = {};
-        (s.cheeseDone || []).forEach(c => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-        incoming.forEach(c => {
+        (s.cheeseDone || []).forEach((c) => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
+        incoming.forEach((c) => {
           const k = canonicalSku(c.sku);
           if (!k) return;
           merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
         });
-        s.cheeseDone    = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+        s.cheeseDone = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
         s.cheeseWorkers = Number(row.workers) || 1;
-        s.cheeseTime    = row.timeStamp;
+        s.cheeseTime = row.timeStamp;
       } catch {}
       return;
     }
@@ -294,11 +406,12 @@ export function resolveProductionLogs(logs) {
       const n = Math.max(1, Number(row.workers) || 1);
       if (row.type === 'shape') s.shapeWorkers = n;
       else if (row.type === 'bfp') s.bfpWorkers = n;
-      return;
     }
   });
 
-  return { state, skuConfig, skuAliases, latestInventoryTs, productionLogs };
+  return {
+    state, skuConfig, skuAliases, latestInventoryTs, productionLogs,
+  };
 }
 
 // ─── INVENTORY HELPERS ────────────────────────────────────────────────────
@@ -308,11 +421,12 @@ export function resolveProductionLogs(logs) {
  * callers should use getInventoryReport().
  */
 export function getLatestInventory(productionState) {
-  const cf = {}, fr = {};
-  Object.keys(productionState).sort().forEach(ds => {
+  const cf = {}; const
+    fr = {};
+  Object.keys(productionState).sort().forEach((ds) => {
     const s = productionState[ds];
     Object.entries(s.coldFerment || {}).forEach(([sku, n]) => { cf[sku] = Number(n) || 0; });
-    Object.entries(s.frozen      || {}).forEach(([sku, n]) => { fr[sku] = Number(n) || 0; });
+    Object.entries(s.frozen || {}).forEach(([sku, n]) => { fr[sku] = Number(n) || 0; });
   });
   return { coldFerment: cf, frozen: fr };
 }
@@ -340,46 +454,46 @@ export function getInventoryReport(args) {
     skuAliases, latestInventoryTs, getBatchSize,
   } = args;
 
-  const inv          = getLatestInventory(productionState);
-  const cf           = { ...inv.coldFerment };
-  const fr           = { ...inv.frozen };
-  const snapshotRaw  = { coldFerment: { ...inv.coldFerment }, frozen: { ...inv.frozen } };
+  const inv = getLatestInventory(productionState);
+  const cf = { ...inv.coldFerment };
+  const fr = { ...inv.frozen };
+  const snapshotRaw = { coldFerment: { ...inv.coldFerment }, frozen: { ...inv.frozen } };
   const latestInvDate = Object.keys(productionState)
-    .filter(ds => Object.keys(productionState[ds].coldFerment || {}).length > 0 ||
-                  Object.keys(productionState[ds].frozen      || {}).length > 0)
+    .filter((ds) => Object.keys(productionState[ds].coldFerment || {}).length > 0
+                  || Object.keys(productionState[ds].frozen || {}).length > 0)
     .sort().pop() || null;
 
   // Seed dough queue with snapshot cf — conservative ts = snapshot timestamp.
   const doughQueue = {};
-  const seedTs     = latestInventoryTs || new Date(0).toISOString();
+  const seedTs = latestInventoryTs || new Date(0).toISOString();
   Object.entries(cf).forEach(([sku, p]) => {
     doughQueue[sku] = p > 0 ? [{ ts: seedTs, pretzels: p }] : [];
   });
 
-  const flowShape     = {};
-  const flowBfp       = {};
+  const flowShape = {};
+  const flowBfp = {};
   const flowDelivered = {};
 
   // Walk events in TIMESTAMP order (defensive against out-of-order log writes)
   const sortedLogs = [...(productionLogs || [])].sort(
-    (a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || '')
+    (a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || ''),
   );
 
-  sortedLogs.forEach(row => {
+  sortedLogs.forEach((row) => {
     const ts = row.timeStamp || '';
     if (latestInventoryTs && ts <= latestInventoryTs) return;
 
     if (row.action === 'shape_done') {
       let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
-      comps.forEach(c => {
+      comps.forEach((c) => {
         let key = (c.sku || '').trim();
         if (!key) return;
         if (skuAliases[key]) key = skuAliases[key];
         const bs = getBatchSize(key);
         if (!bs) return;
         const batches = Number(c.batches) || 0;
-        const p       = batches * bs;
-        cf[key]       = (cf[key] || 0) + p;
+        const p = batches * bs;
+        cf[key] = (cf[key] || 0) + p;
         flowShape[key] = (flowShape[key] || 0) + batches;
         if (!doughQueue[key]) doughQueue[key] = [];
         if (p >= 0) {
@@ -390,32 +504,32 @@ export function getInventoryReport(args) {
             const last = doughQueue[key][doughQueue[key].length - 1];
             const take = Math.min(last.pretzels, toRemove);
             last.pretzels -= take;
-            toRemove      -= take;
+            toRemove -= take;
             if (last.pretzels <= 0) doughQueue[key].pop();
           }
         }
       });
     } else if (row.action === 'bfp_done') {
       let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
-      comps.forEach(c => {
+      comps.forEach((c) => {
         let key = (c.sku || '').trim();
         if (!key) return;
         if (skuAliases[key]) key = skuAliases[key];
         const bs = getBatchSize(key);
         if (!bs) return;
         const batches = Number(c.batches) || 0;
-        const p       = batches * bs;
-        cf[key]       = Math.max(0, (cf[key] || 0) - p);
-        fr[key]       = (fr[key] || 0) + p;
-        flowBfp[key]  = (flowBfp[key] || 0) + batches;
+        const p = batches * bs;
+        cf[key] = Math.max(0, (cf[key] || 0) - p);
+        fr[key] = (fr[key] || 0) + p;
+        flowBfp[key] = (flowBfp[key] || 0) + batches;
         if (!doughQueue[key]) doughQueue[key] = [];
         if (p >= 0) {
           let toConsume = p;
           while (toConsume > 0 && doughQueue[key].length > 0) {
             const oldest = doughQueue[key][0];
-            const take   = Math.min(oldest.pretzels, toConsume);
+            const take = Math.min(oldest.pretzels, toConsume);
             oldest.pretzels -= take;
-            toConsume       -= take;
+            toConsume -= take;
             if (oldest.pretzels <= 0) doughQueue[key].shift();
           }
         } else {
@@ -428,15 +542,15 @@ export function getInventoryReport(args) {
       // No separate "bake" stage — single-step product. Same dough-age
       // queue mechanics so the 5-day shelf-life alert fires.
       let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
-      comps.forEach(c => {
+      comps.forEach((c) => {
         let key = (c.sku || '').trim();
         if (!key) return;
         if (skuAliases[key]) key = skuAliases[key];
         const bs = getBatchSize(key);
         if (!bs) return;
         const batches = Number(c.batches) || 0;
-        const p       = batches * bs;
-        cf[key]       = (cf[key] || 0) + p;
+        const p = batches * bs;
+        cf[key] = (cf[key] || 0) + p;
         if (!doughQueue[key]) doughQueue[key] = [];
         if (p >= 0) {
           doughQueue[key].push({ ts, pretzels: p });
@@ -446,7 +560,7 @@ export function getInventoryReport(args) {
             const last = doughQueue[key][doughQueue[key].length - 1];
             const take = Math.min(last.pretzels, toRemove);
             last.pretzels -= take;
-            toRemove      -= take;
+            toRemove -= take;
             if (last.pretzels <= 0) doughQueue[key].pop();
           }
         }
@@ -455,12 +569,12 @@ export function getInventoryReport(args) {
   });
 
   (allDeliveries || [])
-    .filter(d => {
-      if (!['delivered','picked_up'].includes(d.status)) return false;
+    .filter((d) => {
+      if (!['delivered', 'picked_up'].includes(d.status)) return false;
       if (!latestInventoryTs) return true;
       return d._confirmedAt && d._confirmedAt > latestInventoryTs;
     })
-    .forEach(delivery => {
+    .forEach((delivery) => {
       let items = [];
       try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
       const cust = delivery.customer || delivery.location || '?';
@@ -476,21 +590,21 @@ export function getInventoryReport(args) {
       });
     });
 
-  Object.keys(cf).forEach(k => { cf[k] = Math.max(0, Math.round(cf[k])); });
-  Object.keys(fr).forEach(k => { fr[k] = Math.max(0, Math.round(fr[k])); });
+  Object.keys(cf).forEach((k) => { cf[k] = Math.max(0, Math.round(cf[k])); });
+  Object.keys(fr).forEach((k) => { fr[k] = Math.max(0, Math.round(fr[k])); });
 
   // Aging dough alerts
   const now = Date.now();
   const agingDough = [];
   Object.entries(doughQueue).forEach(([sku, queue]) => {
-    queue.forEach(entry => {
+    queue.forEach((entry) => {
       if (entry.pretzels <= 0) return;
-      const ageMs   = now - new Date(entry.ts).getTime();
+      const ageMs = now - new Date(entry.ts).getTime();
       const ageDays = ageMs / 86400000;
       if (ageDays >= DOUGH_AGE_WARN_DAYS) {
         agingDough.push({
           sku,
-          ageDays:  Math.floor(ageDays),
+          ageDays: Math.floor(ageDays),
           pretzels: Math.round(entry.pretzels),
           critical: ageDays >= DOUGH_AGE_FAIL_DAYS,
         });
@@ -500,21 +614,30 @@ export function getInventoryReport(args) {
   agingDough.sort((a, b) => b.ageDays - a.ageDays);
 
   return {
-    effective:          { coldFerment: cf, frozen: fr },
+    effective: { coldFerment: cf, frozen: fr },
     doughQueue,
     flowsSinceSnapshot: { shape: flowShape, bfp: flowBfp, delivered: flowDelivered },
-    alerts:             { agingDough },
-    snapshot:           { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
+    alerts: { agingDough },
+    snapshot: { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
   };
 }
 
 // ─── DELIVERY COVERAGE ATTRIBUTION ────────────────────────────────────────
 
-const STATUS_RANK = { ready: 0, baking: 1, partial: 2, unstarted: 3 };
+const STATUS_RANK = {
+  ready: 0, baking: 1, partial: 2, unstarted: 3,
+};
 const WORST_STATUS = (a, b) => (STATUS_RANK[a] >= STATUS_RANK[b] ? a : b);
 
-function statusFor(qty, frozenP, doughP) {
+function statusFor(qty, frozenP, doughP, shapeOnly = false) {
   if (qty <= 0) return 'ready';
+  if (shapeOnly) {
+    // FOH bakes from dough at fulfillment time, so dough alone counts as ready.
+    // 'baking' isn't a meaningful state here — there's no BFP step to wait on.
+    if (frozenP + doughP >= qty) return 'ready';
+    if (frozenP + doughP > 0) return 'partial';
+    return 'unstarted';
+  }
   if (frozenP >= qty) return 'ready';
   if (frozenP + doughP >= qty) return 'baking';
   if (frozenP + doughP > 0) return 'partial';
@@ -537,7 +660,9 @@ function statusFor(qty, frozenP, doughP) {
  * @param {(sku: string) => number} [args.getBatchSize]  If provided, lines where
  *        getBatchSize(canonicalSku) === 0 are skipped (FOH/unconfigured).
  */
-export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, skuAliases, getBatchSize }) {
+export function attributeDeliveryCoverage({
+  activeDeliveries, inventoryReport, skuAliases, getBatchSize,
+}) {
   // Build per-SKU FIFO queue of {deliveryId, qty}, sorted by date then timestamp.
   const sortedDeliveries = [...activeDeliveries].sort((a, b) => {
     const d = (a.date || '').localeCompare(b.date || '');
@@ -546,11 +671,11 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
 
   // Track per-SKU remaining inventory as we walk deliveries
   const frozenLeft = { ...inventoryReport.effective.frozen };
-  const doughLeft  = { ...inventoryReport.effective.coldFerment };
+  const doughLeft = { ...inventoryReport.effective.coldFerment };
 
   const coverage = new Map();
 
-  sortedDeliveries.forEach(delivery => {
+  sortedDeliveries.forEach((delivery) => {
     const id = delivery.deliveryId;
     if (!id) return;
     let lineItems = [];
@@ -571,7 +696,7 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
       hasProductionSku = true;
 
       const fAvail = frozenLeft[key] || 0;
-      const dAvail = doughLeft[key]  || 0;
+      const dAvail = doughLeft[key] || 0;
 
       const frozenP = Math.min(fAvail, qty);
       frozenLeft[key] = fAvail - frozenP;
@@ -581,8 +706,10 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
       doughLeft[key] = dAvail - doughP;
 
       const needShapeP = Math.max(0, qty - frozenP - doughP);
-      const needBfpP   = Math.max(0, qty - frozenP);
-      const lineStatus = statusFor(qty, frozenP, doughP);
+      // Shape-only deliveries skip BFP: the FOH bakes them fresh, so once
+      // dough exists they're satisfied. needBfpP collapses to 0.
+      const needBfpP = delivery._shapeOnly ? 0 : Math.max(0, qty - frozenP);
+      const lineStatus = statusFor(qty, frozenP, doughP, delivery._shapeOnly);
 
       lines[key] = {
         sku: key,
@@ -598,8 +725,9 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
 
     coverage.set(id, {
       deliveryId: id,
-      date:       delivery.date || '',
-      customer:   delivery.customer || delivery.location || '',
+      date: delivery.date || '',
+      customer: delivery.customer || delivery.location || '',
+      shapeOnly: !!delivery._shapeOnly,
       lines,
       aggregateStatus: hasProductionSku ? aggregate : null,
     });
@@ -613,12 +741,12 @@ export function attributeDeliveryCoverage({ activeDeliveries, inventoryReport, s
 const CHEESE_SKU_KEY = '3oz cheese dip';
 
 // ISO-date helpers — keep cheese math purely string-based to avoid TZ pitfalls.
-function _parseISODate(s) {
+function parseISODate(s) {
   const [y, m, d] = (s || '').split('-').map(Number);
   return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
 }
-function _addDaysISO(s, n) {
-  const dt = _parseISODate(s);
+function addDaysISO(s, n) {
+  const dt = parseISODate(s);
   dt.setUTCDate(dt.getUTCDate() + n);
   return dt.toISOString().slice(0, 10);
 }
@@ -666,15 +794,15 @@ export function scheduleCheese({
   // via Square consumption endpoint). We accumulate "covers" for each day
   // so the calendar event can list which customers a batch is for.
   const demand = Array.from({ length: dayCount }, (_, i) => ({
-    date:     _addDaysISO(today, i),
+    date: addDaysISO(today, i),
     delivery: 0,
-    foh:      dailyAvg,
-    total:    dailyAvg,
-    covers:   [],   // [{ customer, qty, deliveryDate }]
+    foh: dailyAvg,
+    total: dailyAvg,
+    covers: [], // [{ customer, qty, deliveryDate }]
   }));
 
-  (deliveries || []).forEach(d => {
-    if (['delivered','picked_up','cancelled'].includes(d.status)) return;
+  (deliveries || []).forEach((d) => {
+    if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return;
     if (!d.date || d.date < today) return; // past unconfirmed ghosts don't count
     let lineItems = [];
     try { lineItems = JSON.parse(d.lineItems || '[]'); } catch {}
@@ -688,15 +816,15 @@ export function scheduleCheese({
     if (cheeseQty <= 0) return;
     // Find the day index for this delivery (today=0).
     const dayIdx = (() => {
-      const ms = _parseISODate(d.date) - _parseISODate(today);
+      const ms = parseISODate(d.date) - parseISODate(today);
       return Math.round(ms / 86400000);
     })();
     if (dayIdx < 0 || dayIdx >= dayCount) return;
     demand[dayIdx].delivery += cheeseQty;
-    demand[dayIdx].total    += cheeseQty;
+    demand[dayIdx].total += cheeseQty;
     demand[dayIdx].covers.push({
       customer: d.customer || d.location || '?',
-      qty:      cheeseQty,
+      qty: cheeseQty,
       deliveryDate: d.date,
     });
   });
@@ -711,7 +839,7 @@ export function scheduleCheese({
   // window. If no valid day exists (all in the past, or all already booked),
   // mark it as overdue and force-place on today.
   const batches = [];
-  const hasBatchOn = (dayIdx) => batches.some(b => b.dayIndex === dayIdx);
+  const hasBatchOn = (dayIdx) => batches.some((b) => b.dayIndex === dayIdx);
 
   let inv = startInventory;
   for (let i = 0; i < dayCount; i++) {
@@ -720,17 +848,17 @@ export function scheduleCheese({
       // Need 1 more batch placed on a day < i and within the window.
       let placed = false;
       const earliest = Math.max(0, i - CHEESE_MAX_LEAD);
-      const latest   = i - CHEESE_MIN_LEAD;
+      const latest = i - CHEESE_MIN_LEAD;
       for (let j = latest; j >= earliest; j--) {
         if (j < 0) break;
         if (hasBatchOn(j)) continue;
         batches.push({
-          date:      demand[j].date,
-          dayIndex:  j,
-          covers:    [...demand[i].covers],
-          foh:       demand[i].foh,
-          overdue:   false,
-          fillsDay:  i,
+          date: demand[j].date,
+          dayIndex: j,
+          covers: [...demand[i].covers],
+          foh: demand[i].foh,
+          overdue: false,
+          fillsDay: i,
         });
         inv += CHEESE_BATCH_SIZE;
         placed = true;
@@ -742,11 +870,11 @@ export function scheduleCheese({
         for (let j = 0; j < i; j++) {
           if (!hasBatchOn(j)) {
             batches.push({
-              date:     demand[j].date,
+              date: demand[j].date,
               dayIndex: j,
-              covers:   [...demand[i].covers],
-              foh:      demand[i].foh,
-              overdue:  true,
+              covers: [...demand[i].covers],
+              foh: demand[i].foh,
+              overdue: true,
               fillsDay: i,
             });
             inv += CHEESE_BATCH_SIZE;

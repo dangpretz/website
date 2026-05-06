@@ -996,7 +996,21 @@
     resolveDeliveries, resolveProductionLogs,
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese,
-  } from '../../scripts/inventory.js?v=2026-05-05-cheese';
+    isShapeOnlyDelivery,
+  } from '../../scripts/inventory.js?v=2026-05-06-shapeonly';
+
+  // Feature flag — shape-only catering + box expansion. Off by default; turn
+  // on per-device with ?shapeonly=1 (sticky via localStorage) or
+  // localStorage.setItem('shapeOnly2026','on') in dev tools. Set
+  // localStorage.shapeOnly2026 = 'off' to disable.
+  const SHAPE_ONLY_ENABLED = (() => {
+    try {
+      const url = new URLSearchParams(window.location.search).get('shapeonly');
+      if (url === '1' || url === 'on') localStorage.setItem('shapeOnly2026', 'on');
+      else if (url === '0' || url === 'off') localStorage.setItem('shapeOnly2026', 'off');
+      return localStorage.getItem('shapeOnly2026') === 'on';
+    } catch (_) { return false; }
+  })();
 
   // FOH cheese consumption — fetched from the worker on load. Updated on
   // every loadProduction() since the rate is stable across hours.
@@ -1119,6 +1133,7 @@
 
   // ─── STATE ────────────────────────────────────────────────────────────────
 
+  let deliveryLogs    = []; // raw delivery log rows — resolved on demand so skuConfig (loaded in parallel) can drive box expansion
   let allDeliveries   = [];
   let allSkus         = []; // master list from delivery-planner/skus.json
   let productionState = {};
@@ -1646,14 +1661,19 @@
         .forEach(delivery => {
           let items = [];
           try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+          // Shape-only deliveries (catering boxes, FOH Placeholder) don't go
+          // through BFP — FOH bakes them fresh from dough at fulfillment.
+          const isShapeOnly = !!delivery._shapeOnly;
           items.forEach(({ sku, quantity }) => {
             if (!sku) return;
             let key = sku.trim();
             if (skuAliases[key]) key = skuAliases[key]; // resolve old → canonical name
             if (isFOH(key)) { fohSeen.add(key); return; }
             if (key === CHEESE_KEY) return; // cheese has its own pipeline (Cheese tab); shape/BFP teams don't make it
-            if (!skuMap[key]) skuMap[key] = { pretzels: 0, orders: [] };
-            skuMap[key].pretzels += Number(quantity) || 0;
+            if (!skuMap[key]) skuMap[key] = { shapePretzels: 0, bfpPretzels: 0, orders: [] };
+            const q = Number(quantity) || 0;
+            skuMap[key].shapePretzels += q;
+            if (!isShapeOnly) skuMap[key].bfpPretzels += q;
             const cust = delivery.customer || delivery.location || '?';
             if (!skuMap[key].orders.includes(cust)) skuMap[key].orders.push(cust);
           });
@@ -1664,14 +1684,16 @@
         if (!batchSize) { unconfigured.add(sku); return; } // flag for warning UI
         if (!bySkuItems[sku]) bySkuItems[sku] = [];
         // Track demand in PRETZELS (shapeLeftP, bfpLeftP) so we can pool by SKU
-        // before ceiling — prevents per-delivery rounding from inflating batches
+        // before ceiling — prevents per-delivery rounding from inflating batches.
+        // For shape-only deliveries (catering, FOH Placeholder), bfpLeftP < shapeLeftP
+        // — we shape the dough but skip BFP since FOH bakes fresh.
         bySkuItems[sku].push({
-          sku, pretzels: data.pretzels, deliveryDate: delivDate,
+          sku, pretzels: data.shapePretzels, deliveryDate: delivDate,
           orders: data.orders,
           shapeWindow: { start: toDateStr(addDays(dd, -SHAPE_MAX_LEAD)), end: toDateStr(addDays(dd, -SHAPE_MIN_LEAD)) },
           bfpWindow:   { start: toDateStr(addDays(dd, -BFP_MAX_LEAD)),   end: toDateStr(addDays(dd, -BFP_MIN_LEAD))   },
-          shapeLeftP: data.pretzels, // remaining pretzel demand for shape
-          bfpLeftP:   data.pretzels, // remaining pretzel demand for BFP
+          shapeLeftP: data.shapePretzels, // remaining pretzel demand for shape
+          bfpLeftP:   data.bfpPretzels,   // remaining pretzel demand for BFP (zero for shape-only deliveries)
           shapeLeft:  0,             // batches (filled in after pooling)
           bfpLeft:    0,
           batches:    0,             // display batch count (filled in after pooling)
@@ -3568,9 +3590,24 @@
 
   // ─── DATA LOADING ─────────────────────────────────────────────────────────
 
+  // Re-resolve deliveries from raw logs using the latest skuConfig (for
+  // catering box expansion). Called after both deliveries + production are
+  // loaded, since loadDeliveries and loadProduction run in parallel and
+  // skuConfig isn't known until loadProduction completes.
+  function resolveDeliveriesNow() {
+    allDeliveries = resolveDeliveries(deliveryLogs, {
+      shapeOnlyEnabled: SHAPE_ONLY_ENABLED,
+      skuConfig,
+    });
+  }
+
   async function loadDeliveries() {
     const logs = await fetchLog(DELIVERY_LOG);
-    allDeliveries = resolveDeliveries(logs);
+    deliveryLogs = Array.isArray(logs) ? logs : [];
+    // First-pass resolution with whatever skuConfig is currently known
+    // (might be empty if loadProduction hasn't completed yet — that's fine,
+    // resolveDeliveriesNow() runs again at the end of init/refresh).
+    resolveDeliveriesNow();
   }
 
   async function loadProduction() {
@@ -3655,7 +3692,7 @@
     const btn = document.getElementById('refresh-btn');
     btn.disabled = true; btn.textContent = '…';
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]);
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
     } finally {
@@ -3736,7 +3773,7 @@
   if (wRef) wRef.addEventListener('click', async () => {
     wRef.disabled = true; wRef.textContent = '…';
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]);
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
     } finally {
@@ -3753,7 +3790,7 @@
   async function softRefresh() {
     if (_isInputBusy()) return;
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]);
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       // Skip render if user just started typing during the network call
       if (!_isInputBusy()) render();
@@ -3971,7 +4008,7 @@
 
   (async () => {
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]);
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
       // Self-test mode: ?selftest=1 — synthesizes items and verifies the
