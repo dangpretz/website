@@ -90,16 +90,16 @@ export const CASE_SIZES = {
 // order; manager picks per delivery line item in the planner form.
 export const CASE_SIZE_OPTIONS = {
   '21oz mammoth pretzel': [25],
-  '10oz mustache':        [48, 20],
-  '10oz plain':           [48, 20],
-  '10oz bbk':             [48, 20],
-  '10oz spicy bee':       [48, 20],
-  '6.5oz plain':          [72, 36],
-  '6.5oz bbk':            [72, 36],
-  '6.5oz spicy bee':      [72, 36],
-  '4oz twist plain':      [40],
-  '4oz twist bbk':        [40],
-  '4oz twist spicy bee':  [40],
+  '10oz mustache': [48, 20],
+  '10oz plain': [48, 20],
+  '10oz bbk': [48, 20],
+  '10oz spicy bee': [48, 20],
+  '6.5oz plain': [72, 36],
+  '6.5oz bbk': [72, 36],
+  '6.5oz spicy bee': [72, 36],
+  '4oz twist plain': [40],
+  '4oz twist bbk': [40],
+  '4oz twist spicy bee': [40],
 };
 
 /**

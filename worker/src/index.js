@@ -1221,6 +1221,325 @@ async function handleFohCalendar(request, env) {
   });
 }
 
+// ─── FOH CALENDAR EMAIL-INVITE SYNC ───────────────────────────────────────
+// myecalendar (the FOH tablet calendar) doesn't support iCal subscription
+// URLs — only the "invite an attendee" pattern. We send each VEVENT as a
+// METHOD:REQUEST iMIP email; updates resend with a bumped SEQUENCE; deleted
+// events get a METHOD:CANCEL. State (UID -> sequence + content hash) lives
+// in the FOH_CAL_STATE KV namespace so the cron is idempotent and won't
+// spam re-invites.
+
+const FOH_CAL_RECIPIENT = 'getdangerous@myecalendar.com';
+// Configurable via the FOH_CAL_FROM wrangler var so we can switch from the
+// Resend onboarding domain (test mode, only sends to your own email) to
+// noreply@dangerouspretzel.com (after verifying the domain at Resend) without
+// a code change. Defaults to onboarding domain for safety.
+const FOH_CAL_FROM_DEFAULT = 'DPC Production Schedule <onboarding@resend.dev>';
+
+async function sha256Hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Same data collection as handleFohCalendar, but returns a structured list
+// of event records (one entry per VEVENT). Each record carries enough
+// metadata to (a) build an iMIP invite body and (b) compute a content hash
+// for idempotent cron replays.
+async function collectFohCalEventList(env) {
+  const [delivRes, prodRes] = await Promise.all([
+    fetch(`${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}`),
+    fetch(`${SHEET_LOGGER_BASE}${PRODUCTION_LOG_PATH}`),
+  ]);
+  const deliveryLogs   = delivRes.ok ? await delivRes.json() : [];
+  const productionLogs = prodRes.ok  ? await prodRes.json() : [];
+
+  const allDeliveries   = resolveDeliveries(deliveryLogs);
+  const prod            = resolveProductionLogs(productionLogs);
+  const meta            = makeSkuMeta(prod.skuConfig);
+  const inventoryReport = getInventoryReport({
+    productionLogs: prod.productionLogs,
+    productionState: prod.state,
+    allDeliveries,
+    skuAliases: prod.skuAliases,
+    latestInventoryTs: prod.latestInventoryTs,
+    getBatchSize: meta.getBatchSize,
+  });
+
+  let dailyAvg = 0;
+  try { dailyAvg = (await fetchSquareCheeseConsumption(env, 28)).dailyAvg || 0; } catch (_) {}
+
+  const today = todayMountain();
+  const cheese = scheduleCheese({
+    deliveries: allDeliveries,
+    inventoryReport,
+    fohDailyAvg: dailyAvg,
+    today,
+    skuAliases: prod.skuAliases,
+    lookaheadDays: 14,
+  });
+
+  const horizon = (() => {
+    const dt = new Date(today);
+    dt.setUTCDate(dt.getUTCDate() + 30);
+    return dt.toISOString().slice(0, 10);
+  })();
+  const cateringDeliveries = allDeliveries.filter((d) => {
+    if (!d.date) return false;
+    if (d.date < today || d.date > horizon) return false;
+    if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return false;
+    return isCateringDelivery(d);
+  });
+
+  const events = [];
+
+  for (const batch of cheese.batches) {
+    const uid = `cheese-batch-${batch.date}@dangpretz`;
+    const summary = `🧀 Make 1 batch cheese dip${batch.overdue ? ' (overdue!)' : ''}`;
+    const coversList = batch.covers
+      .map((c) => `${c.customer} (${c.qty} for ${c.deliveryDate})`)
+      .join('; ');
+    const fohLine = batch.foh > 0
+      ? ` FOH walk-in covered: ~${Math.round(batch.foh * (CHEESE_MAX_LEAD - 1))} dips.`
+      : '';
+    const description = `Covers: ${coversList || 'FOH walk-in only'}.${fohLine} ~${CHEESE_BATCH_SIZE} dips/batch. Use within ${CHEESE_MAX_LEAD} days.`;
+    events.push({
+      uid,
+      summary,
+      description,
+      allDay: true,
+      dtstart: icsDateAllDay(batch.date),
+      dtend:   icsDateAllDay(addOneDay(batch.date)),
+      location: '',
+      url: 'https://www.dangerouspretzel.com/static/production/',
+    });
+  }
+
+  for (const delivery of cateringDeliveries) {
+    const uid = `catering-${delivery.deliveryId}@dangpretz`;
+    let items = [];
+    try { items = JSON.parse(delivery.lineItems || '[]'); } catch (_) {}
+    const itemsList = items
+      .filter((li) => (Number(li.quantity) || 0) > 0)
+      .map((li) => `  - ${li.sku || '?'} × ${li.quantity || 0}`)
+      .join('\n');
+    const customer = delivery.customer || '?';
+    const isPickup = (delivery.type || 'delivery').toLowerCase() === 'pickup';
+    const summaryShort = items.length > 0
+      ? `${items[0].sku} × ${items[0].quantity}${items.length > 1 ? ` +${items.length - 1} more` : ''}`
+      : '';
+    const summary = `🥨 Catering ${isPickup ? 'pickup' : 'delivery'}: ${customer}${summaryShort ? ` (${summaryShort})` : ''}`;
+    const descParts = [
+      `Customer: ${customer}`,
+      delivery.contactPhone ? `Phone: ${delivery.contactPhone}` : '',
+      delivery.contactEmail ? `Email: ${delivery.contactEmail}` : '',
+      `Type: ${isPickup ? 'Pickup' : 'Delivery'}`,
+      itemsList ? `Items:\n${itemsList}` : '',
+      delivery.notes ? `Notes: ${delivery.notes}` : '',
+    ].filter(Boolean);
+    events.push({
+      uid,
+      summary,
+      description: descParts.join('\n'),
+      allDay: false,
+      // 9 AM Mountain default until we plumb pickup_at through the resolved
+      // delivery row. ≈ 16:00 UTC during MDT (close enough for FOH).
+      dtstart: `${icsDateAllDay(delivery.date)}T160000Z`,
+      dtend:   `${icsDateAllDay(delivery.date)}T170000Z`,
+      location: isPickup ? 'PICKUP — at shop' : (delivery.address || ''),
+      url: 'https://www.dangerouspretzel.com/static/delivery-planner/',
+    });
+  }
+
+  return events;
+}
+
+// Build a complete VCALENDAR body for a single event with the given METHOD
+// and SEQUENCE. ORGANIZER + ATTENDEE are required for iMIP delivery so the
+// receiving calendar can match on attendee email.
+function buildICSInvite(event, method, sequence, fromHeader) {
+  const dtstamp = icsDateUTC(new Date());
+  const status = method === 'CANCEL' ? 'CANCELLED' : 'CONFIRMED';
+  const fromAddr = (fromHeader.match(/<([^>]+)>/) || [null, fromHeader])[1];
+  const dtstartLine = event.allDay
+    ? `DTSTART;VALUE=DATE:${event.dtstart}`
+    : `DTSTART:${event.dtstart}`;
+  const dtendLine = event.allDay
+    ? `DTEND;VALUE=DATE:${event.dtend}`
+    : `DTEND:${event.dtend}`;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Dangerous Pretzel Co//FOH Schedule//EN',
+    'CALSCALE:GREGORIAN',
+    `METHOD:${method}`,
+    'BEGIN:VEVENT',
+    icsFold(`UID:${event.uid}`),
+    `SEQUENCE:${sequence}`,
+    `DTSTAMP:${dtstamp}`,
+    dtstartLine,
+    dtendLine,
+    `STATUS:${status}`,
+    icsFold(`SUMMARY:${icsEscape(event.summary)}`),
+    icsFold(`DESCRIPTION:${icsEscape(event.description)}`),
+    icsFold(`ORGANIZER;CN=DPC Production Schedule:mailto:${fromAddr}`),
+    icsFold(`ATTENDEE;CN=DPC FOH;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${FOH_CAL_RECIPIENT}`),
+  ];
+  if (event.location) lines.push(icsFold(`LOCATION:${icsEscape(event.location)}`));
+  if (event.url) lines.push(icsFold(`URL:${event.url}`));
+  lines.push('END:VEVENT');
+  lines.push('END:VCALENDAR');
+  lines.push('');
+  return lines.join('\r\n');
+}
+
+// Send a single iMIP-format email via Resend. Returns parsed response.
+async function sendCalendarInvite(env, event, method, sequence) {
+  const fromAddr = env.FOH_CAL_FROM || FOH_CAL_FROM_DEFAULT;
+  const ics = buildICSInvite(event, method, sequence, fromAddr);
+  const subject = (method === 'CANCEL' ? 'Cancelled: ' : '') + event.summary;
+  const textBody = [
+    event.summary,
+    '',
+    event.description || '',
+    event.location ? `\nLocation: ${event.location}` : '',
+    event.url ? `\n${event.url}` : '',
+  ].filter(Boolean).join('\n');
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: fromAddr,
+      to: [FOH_CAL_RECIPIENT],
+      subject,
+      text: textBody,
+      // Resend supports custom headers + attachments. Sending the .ics as
+      // a text/calendar attachment + content_type header is the iMIP
+      // pattern most calendar receivers (Gmail, Outlook, Apple Mail,
+      // myecalendar) recognize.
+      headers: {
+        'Content-class': 'urn:content-classes:calendarmessage',
+      },
+      attachments: [
+        {
+          filename: 'invite.ics',
+          content: btoa(unescape(encodeURIComponent(ics))),
+          content_type: `text/calendar; method=${method}; charset=UTF-8`,
+        },
+      ],
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, body };
+}
+
+// Diff against KV, send REQUEST/CANCEL invites as needed, return summary.
+async function syncFohCalendar(env) {
+  if (!env.RESEND_API_KEY) {
+    return { error: 'RESEND_API_KEY not configured' };
+  }
+  if (!env.FOH_CAL_STATE) {
+    return { error: 'FOH_CAL_STATE KV binding not configured' };
+  }
+
+  const events = await collectFohCalEventList(env);
+
+  // Pull all existing UIDs from KV. KV.list() returns keys; we then need
+  // values. Simpler to fetch each as we walk current events + diff.
+  const listRes = await env.FOH_CAL_STATE.list({ prefix: 'uid:' });
+  const priorByUid = {};
+  for (const k of listRes.keys) {
+    const raw = await env.FOH_CAL_STATE.get(k.name);
+    if (!raw) continue;
+    try { priorByUid[k.name.slice(4)] = JSON.parse(raw); } catch (_) {}
+  }
+
+  const sent = [];
+  const seenUids = new Set();
+  // Resend rate limit is 5/sec — keep us comfortably under by spacing
+  // requests 250ms apart. With ~16 events at first run that's ~4 seconds.
+  const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+  // 1) New + changed events
+  for (const event of events) {
+    seenUids.add(event.uid);
+    // Hash everything that affects the user-visible event
+    const hash = await sha256Hex(JSON.stringify({
+      summary: event.summary,
+      description: event.description,
+      dtstart: event.dtstart,
+      dtend: event.dtend,
+      allDay: event.allDay,
+      location: event.location,
+    }));
+    const prior = priorByUid[event.uid];
+    if (prior && prior.contentHash === hash && prior.status !== 'cancelled') {
+      continue; // already in sync, skip
+    }
+    const sequence = prior ? (prior.sequence || 0) + 1 : 0;
+    if (sent.length > 0) await sleep(250); // pace under Resend's 5/sec
+    const result = await sendCalendarInvite(env, event, 'REQUEST', sequence);
+    sent.push({ uid: event.uid, action: prior ? 'update' : 'create', sequence, ok: result.ok, error: result.ok ? undefined : result.body });
+    if (result.ok) {
+      await env.FOH_CAL_STATE.put(`uid:${event.uid}`, JSON.stringify({
+        sequence,
+        contentHash: hash,
+        summary: event.summary,
+        dtstart: event.dtstart,
+        status: 'confirmed',
+      }));
+    }
+  }
+
+  // 2) Cancellations: prior UIDs that aren't in current set
+  for (const [uid, prior] of Object.entries(priorByUid)) {
+    if (seenUids.has(uid)) continue;
+    if (prior.status === 'cancelled') continue;
+    // Build a stub event for the cancel email — recipient just needs UID +
+    // SEQUENCE + DTSTART to match the original invite.
+    const stub = {
+      uid,
+      summary: prior.summary || uid,
+      description: 'This event has been cancelled.',
+      allDay: !/T\d/.test(prior.dtstart || ''),
+      dtstart: prior.dtstart || icsDateAllDay(todayMountain()),
+      dtend:   prior.dtstart || icsDateAllDay(todayMountain()),
+      location: '',
+      url: '',
+    };
+    const sequence = (prior.sequence || 0) + 1;
+    if (sent.length > 0) await sleep(250);
+    const result = await sendCalendarInvite(env, stub, 'CANCEL', sequence);
+    sent.push({ uid, action: 'cancel', sequence, ok: result.ok, error: result.ok ? undefined : result.body });
+    if (result.ok) {
+      await env.FOH_CAL_STATE.put(`uid:${uid}`, JSON.stringify({
+        ...prior,
+        sequence,
+        status: 'cancelled',
+      }));
+    }
+  }
+
+  return {
+    totalEvents: events.length,
+    sentCount: sent.length,
+    skippedCount: events.length - sent.filter((s) => s.action !== 'cancel').length,
+    sent,
+  };
+}
+
+async function handleFohCalSync(request, env) {
+  const authErr = checkAdminToken(request, env);
+  if (authErr) return authErr;
+  const summary = await syncFohCalendar(env);
+  return json(summary);
+}
+
+// ─── END FOH CALENDAR EMAIL-INVITE SYNC ───────────────────────────────────
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -1270,6 +1589,14 @@ export default {
         // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Cleanup square error:', err);
         return json({ error: err.message || 'Cleanup failed' }, 500);
+      }
+    }
+    if (url.pathname === '/admin/foh-cal-sync' && request.method === 'POST') {
+      try {
+        return await handleFohCalSync(request, env);
+      } catch (err) {
+        console.error('FOH cal sync error:', err);
+        return json({ error: err.message || 'FOH cal sync failed' }, 500);
       }
     }
     if (url.pathname === '/webhooks/square' && request.method === 'POST') {
@@ -1487,5 +1814,19 @@ export default {
       console.error('Worker error:', err);
       return json({ error: 'Internal server error' }, 500);
     }
+  },
+
+  // Cron entry point — fires per the [triggers] crons in wrangler.toml.
+  // Same logic as POST /admin/foh-cal-sync, but unauthenticated (Cloudflare
+  // only invokes this for our scheduled trigger). ctx.waitUntil keeps the
+  // worker alive past the scheduled() return until the sync completes.
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(
+      syncFohCalendar(env).then((s) => {
+        console.log('FOH cal sync:', JSON.stringify(s));
+      }).catch((err) => {
+        console.error('FOH cal sync failed:', err);
+      }),
+    );
   },
 };
