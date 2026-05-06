@@ -308,6 +308,10 @@ export function resolveProductionLogs(logs) {
   const skuConfig = {};
   const skuAliases = {};
   const productionLogs = Array.isArray(logs) ? logs : [];
+  // packedCases keyed by deliveryId → { canonicalSku → { caseIndex → {packed, ts} } }
+  // Last-write-wins per (deliveryId, sku, caseIndex). Tap to pack, tap again
+  // to unpack. Display-side counts entries where packed === true.
+  const packedCases = {};
   let latestInventoryTs = null;
 
   // Pass 1: collect skuConfig + skuAliases. We need ALL aliases known
@@ -436,8 +440,32 @@ export function resolveProductionLogs(logs) {
     }
   });
 
+  // Pass 3: case_packed events. These are NOT date-keyed because a tap
+  // packing a case can happen on a different day than the delivery.
+  // Stored top-level keyed by deliveryId. Last-write-wins per case.
+  productionLogs.forEach((row) => {
+    if (row.action !== 'case_packed') return;
+    const deliveryId = row.deliveryId || '';
+    if (!deliveryId) return;
+    const sku = canonicalSku(row.sku);
+    if (!sku) return;
+    const caseIndex = Number(row.caseIndex) || 0;
+    if (caseIndex <= 0) return;
+    if (!packedCases[deliveryId]) packedCases[deliveryId] = {};
+    if (!packedCases[deliveryId][sku]) packedCases[deliveryId][sku] = {};
+    const prev = packedCases[deliveryId][sku][caseIndex];
+    const ts = row.timeStamp || '';
+    // Only overwrite if this row is newer (defensive against out-of-order logs).
+    if (!prev || (prev.ts || '') < ts) {
+      packedCases[deliveryId][sku][caseIndex] = {
+        packed: row.packed === 'true' || row.packed === true,
+        ts,
+      };
+    }
+  });
+
   return {
-    state, skuConfig, skuAliases, latestInventoryTs, productionLogs,
+    state, skuConfig, skuAliases, latestInventoryTs, productionLogs, packedCases,
   };
 }
 

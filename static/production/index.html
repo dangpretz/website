@@ -843,6 +843,25 @@
     .wpack-list .pack-count { font: 700 13px 'Manrope', sans-serif; min-width: 56px; }
     .wpack-list .pack-cust  { color: var(--dark); flex: 1; }
     .wpack-list .pack-date  { font: 400 11px 'Manrope', sans-serif; color: #888; }
+    /* Per-case checkbox slots — tap to toggle pack state. */
+    .wpack-list .pack-slots {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-left: 8px;
+    }
+    .wpack-list .pack-slot {
+      width: 22px; height: 22px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1.5px solid #ccc; border-radius: 4px;
+      font: 700 11px 'Manrope', sans-serif; color: transparent;
+      background: transparent; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      padding: 0;
+    }
+    .wpack-list .pack-slot:hover { border-color: #888; }
+    .wpack-list .pack-slot.packed {
+      background: #4a4; border-color: #4a4; color: #fff;
+    }
+    .wpack-list li.all-packed { opacity: 0.55; }
+    .wpack-list li.all-packed .pack-cust::before { content: '✓ '; color: #4a4; font-weight: 700; }
 
     /* Schedule-diff toast — fired after a stock save to show the user how
        the schedule responded across days. Pure observation; doesn't modify
@@ -1026,7 +1045,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-06-shapeonly';
+  } from '../../scripts/inventory.js?v=2026-05-06-cases-pack';
 
   // Feature flag — shape-only catering + box expansion. Off by default; turn
   // on per-device with ?shapeonly=1 (sticky via localStorage) or
@@ -1169,6 +1188,7 @@
   let productionLogs  = []; // raw production log rows — kept for timestamp-precise effective inventory
   let skuConfig       = {}; // { sku: { batchSize, type } } — from sku_config log entries
   let skuAliases      = {}; // { oldSku: canonicalSku } — from sku_alias log entries
+  let packedCases     = {}; // {deliveryId: {sku: {caseIndex: {packed, ts}}}} — from case_packed log entries
   let latestInventoryTs = null; // ISO timestamp of latest inventory snapshot
   let schedule        = { shape: {}, bfp: {}, overdue: [], foh: [], unconfigured: [] };
   let currentDate     = new Date();
@@ -2407,6 +2427,7 @@
           const caseSize  = Number(it.caseSize)  || defaultCs;
           const caseCount = Number(it.caseCount) || (caseSize > 0 ? Math.ceil(qty / caseSize) : 0);
           packs.push({
+            deliveryId: deliv.deliveryId || '',
             customer: deliv.customer || deliv.location || '?',
             date:     deliv.date,
             caseSize, caseCount, qty,
@@ -2419,13 +2440,42 @@
         const items = packs.map((p) => {
           const dateLbl = p.date ? `${fmtDay(parseDate(p.date))} ${fmtShort(parseDate(p.date))}` : '';
           // SKUs without standard cases (bees bats, plain bombs, cheese dip) display pretzel count instead.
-          const countLbl = (p.caseSize > 0 && p.caseCount > 0)
+          const hasSlots = (p.caseSize > 0 && p.caseCount > 0 && p.deliveryId);
+          const countLbl = hasSlots
             ? `${p.caseCount}×${p.caseSize}`
             : `${p.qty}p`;
-          return `<li>
+
+          // Per-case slot buttons (checkboxes). Tap toggles the case_packed
+          // state for (deliveryId, sku, caseIndex). Only rendered when we
+          // have a discrete case structure to track.
+          let slotsHtml = '';
+          let allPacked = false;
+          if (hasSlots) {
+            const skuPacks = (packedCases[p.deliveryId] || {})[d.sku] || {};
+            let packedCount = 0;
+            const slots = [];
+            for (let i = 1; i <= p.caseCount; i++) {
+              const isPacked = !!skuPacks[i]?.packed;
+              if (isPacked) packedCount++;
+              slots.push(`<button type="button" class="pack-slot${isPacked ? ' packed' : ''}"
+                data-pack-toggle
+                data-delivery-id="${esc(p.deliveryId)}"
+                data-sku="${esc(d.sku)}"
+                data-case-size="${p.caseSize}"
+                data-case-index="${i}"
+                data-currently-packed="${isPacked ? '1' : '0'}"
+                aria-label="Case ${i} of ${p.caseCount}"
+                title="Case ${i} of ${p.caseCount}">${isPacked ? '✓' : ''}</button>`);
+            }
+            slotsHtml = `<span class="pack-slots">${slots.join('')}</span>`;
+            allPacked = packedCount >= p.caseCount;
+          }
+          const liCls = allPacked ? 'all-packed' : '';
+          return `<li class="${liCls}">
             <span class="pack-count">${esc(countLbl)}</span>
             <span class="pack-cust">${esc(p.customer)}</span>
             <span class="pack-date">${esc(dateLbl)}</span>
+            ${slotsHtml}
           </li>`;
         }).join('');
         const totalCases = packs.reduce((s, p) => s + (p.caseCount || 0), 0);
@@ -3111,6 +3161,72 @@
     loggedPretzels[type][dateStr][sku] = Math.max(0, pretzels);
   }
 
+  /**
+   * Toggle a packed-case slot on the BFP pack list.
+   * Optimistic UI: flip the slot visually + update local packedCases state,
+   * then POST a `case_packed` log event. On error, the next loadProduction
+   * will re-sync from the server (or we revert the flip directly).
+   */
+  async function togglePackedCase(btn) {
+    const deliveryId = btn.dataset.deliveryId || '';
+    const sku        = btn.dataset.sku || '';
+    const caseSize   = Number(btn.dataset.caseSize) || 0;
+    const caseIndex  = Number(btn.dataset.caseIndex) || 0;
+    if (!deliveryId || !sku || caseIndex <= 0) return;
+
+    const currentlyPacked = btn.dataset.currentlyPacked === '1';
+    const newPacked = !currentlyPacked;
+
+    // Optimistic UI flip
+    btn.classList.toggle('packed', newPacked);
+    btn.textContent = newPacked ? '✓' : '';
+    btn.dataset.currentlyPacked = newPacked ? '1' : '0';
+
+    // Update local state so re-renders within the same session see the change
+    if (!packedCases[deliveryId]) packedCases[deliveryId] = {};
+    if (!packedCases[deliveryId][sku]) packedCases[deliveryId][sku] = {};
+    packedCases[deliveryId][sku][caseIndex] = {
+      packed: newPacked,
+      ts: new Date().toISOString(),
+    };
+
+    // Refresh the parent <li>'s "all packed" state — adds the green ✓ /
+    // dimming when every case in that delivery's SKU line is packed.
+    const li = btn.closest('li');
+    if (li) {
+      const slots = li.querySelectorAll('.pack-slot');
+      const allPacked = [...slots].every(s => s.classList.contains('packed'));
+      li.classList.toggle('all-packed', allPacked);
+    }
+
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action:     'case_packed',
+        deliveryId,
+        sku,
+        caseSize:   String(caseSize),
+        caseIndex:  String(caseIndex),
+        packed:     String(newPacked),
+        timeStamp:  new Date().toISOString(),
+      });
+    } catch (e) {
+      // Revert on error
+      btn.classList.toggle('packed', currentlyPacked);
+      btn.textContent = currentlyPacked ? '✓' : '';
+      btn.dataset.currentlyPacked = currentlyPacked ? '1' : '0';
+      packedCases[deliveryId][sku][caseIndex] = {
+        packed: currentlyPacked,
+        ts: new Date().toISOString(),
+      };
+      if (li) {
+        const slots = li.querySelectorAll('.pack-slot');
+        const allPacked = [...slots].every(s => s.classList.contains('packed'));
+        li.classList.toggle('all-packed', allPacked);
+      }
+      alert('Failed to log case pack — try again. ' + (e?.message || ''));
+    }
+  }
+
   function bumpStepper(type, dateStr, sku, deltaSign) {
     // deltaSign is +1 or -1 — actual increment is the SKU's stepDelta (batch or tray)
     const stepDelta = getStepDelta(type, sku);
@@ -3481,6 +3597,9 @@
         bumpStepper(type, dateStr, sku, delta);
       });
     });
+    document.querySelectorAll('[data-pack-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => togglePackedCase(btn));
+    });
     // Cheese tab stepper — single SKU, single batch/day, simpler than shape/bfp.
     document.querySelectorAll('[data-cheese-step]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -3706,6 +3825,7 @@
     skuConfig         = resolved.skuConfig;
     skuAliases        = resolved.skuAliases;
     latestInventoryTs = resolved.latestInventoryTs;
+    packedCases       = resolved.packedCases || {};
   }
 
   async function loadSkus() {
