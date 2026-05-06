@@ -3,6 +3,7 @@
    no-empty,
    no-plusplus,
    no-continue,
+   no-restricted-syntax,
    max-len
 */
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -112,6 +113,75 @@ export const BAKE_GROUPS = {
   coating: ['10oz bbk', '6.5oz bbk', '4oz twist bbk'],
 };
 
+// ─── SHAPE-ONLY (CATERING / FOH) RULES ────────────────────────────────────
+// Some deliveries leave the production pipeline at the dough stage:
+//   - Catering boxes are baked + boxed fresh in the FOH store at fulfillment.
+//   - The "FOH Placeholder" customer represents FOH retail walk-in stock.
+// For those, shape team makes the dough; BFP team does NOT bake/freeze them.
+// Detection is automatic: ANY line item starting with "Catering:" OR a
+// customer name matching FOH_PLACEHOLDER_NAME (case-insensitive).
+
+export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
+
+// Default catering box → pretzel expansions, used when a per-box override
+// hasn't been written to skuConfig yet. Manager can override via the
+// production app's "Box mapping" tab — those entries take priority.
+//
+// User-confirmed mappings (2026-05-05):
+//   Catering: Salty Pretzel Box   → 15 × 6.5oz plain
+//   Catering: BBK Pretzel Box - 15 → 15 × 6.5oz bbk
+// Saint, Swell Cream, and dip-box mappings TBD (manager configures).
+export const DEFAULT_BOX_EXPANSIONS = {
+  'Catering: Salty Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
+  'Catering: BBK Pretzel Box - 15': [{ sku: '6.5oz bbk', multiplier: 15 }],
+};
+
+/**
+ * True if a delivery should be classified as shape-only (skip BFP).
+ * MUST be called BEFORE expanding box line items, since detection looks
+ * at the original "Catering: ..." prefixes.
+ */
+export function isShapeOnlyDelivery(d) {
+  if (!d) return false;
+  const customer = (d.customer || d.location || '').trim().toLowerCase();
+  if (customer === FOH_PLACEHOLDER_NAME.toLowerCase()) return true;
+  let items = [];
+  try { items = JSON.parse(d.lineItems || '[]'); } catch (_) {}
+  if (!Array.isArray(items)) return false;
+  return items.some((li) => /^catering:/i.test((li.sku || li.name || '').trim()));
+}
+
+/**
+ * Expand catering-box line items into their constituent pretzel/dip SKUs.
+ * Pure function. Lookups: skuConfig[box].expandsTo first, then DEFAULT_BOX_EXPANSIONS.
+ * Boxes with no mapping pass through unchanged (manager sees them as
+ * "New SKU in orders" and can set up via the box-mapping tab).
+ *
+ * @param {Array} lineItems  [{sku|name, quantity}]
+ * @param {Object} skuConfig
+ * @returns {Array} new line item array (does not mutate input)
+ */
+export function expandBoxLineItems(lineItems, skuConfig = {}) {
+  if (!Array.isArray(lineItems)) return [];
+  const out = [];
+  for (const li of lineItems) {
+    const key = (li.sku || li.name || '').trim();
+    const qty = Number(li.quantity) || 0;
+    if (!key || qty <= 0) { out.push(li); continue; }
+    const cfg = skuConfig[key];
+    const expansion = (cfg?.expandsTo && cfg.expandsTo.length ? cfg.expandsTo : null)
+      || DEFAULT_BOX_EXPANSIONS[key]
+      || null;
+    if (!expansion) { out.push(li); continue; }
+    for (const { sku: targetSku, multiplier } of expansion) {
+      const m = Number(multiplier) || 0;
+      if (!targetSku || m <= 0) continue;
+      out.push({ sku: targetSku, quantity: qty * m });
+    }
+  }
+  return out;
+}
+
 // ─── SKU META HELPER ──────────────────────────────────────────────────────
 
 /**
@@ -141,8 +211,17 @@ export function makeSkuMeta(skuConfig = {}) {
  * its own resolver that adds barcodes for its UI. This shared resolver is
  * sufficient for inventory math (which only needs status, lineItems, date,
  * customer, _confirmedAt).
+ *
+ * @param {Array} logs
+ * @param {Object} [options]
+ * @param {boolean} [options.shapeOnlyEnabled=false]  Gate the new behavior.
+ *   When true: each resolved delivery gets a `_shapeOnly` flag (computed
+ *   BEFORE expansion, so "Catering:" prefix detection works), and box line
+ *   items are expanded per skuConfig + DEFAULT_BOX_EXPANSIONS.
+ * @param {Object} [options.skuConfig={}]  For box expansions.
  */
-export function resolveDeliveries(logs) {
+export function resolveDeliveries(logs, options = {}) {
+  const { shapeOnlyEnabled = false, skuConfig = {} } = options;
   const byId = {};
   if (!Array.isArray(logs)) return [];
   logs.forEach((row, idx) => {
@@ -172,7 +251,21 @@ export function resolveDeliveries(logs) {
     }
     byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
   });
-  return Object.values(byId);
+  const out = Object.values(byId);
+  if (shapeOnlyEnabled) {
+    for (const d of out) {
+      // Detect BEFORE expansion so the "Catering:" prefix check still matches.
+      d._shapeOnly = isShapeOnlyDelivery(d);
+      // Expand box line items in place. Original sheet row stays untouched;
+      // this only mutates the resolved record's lineItems string.
+      try {
+        const items = JSON.parse(d.lineItems || '[]');
+        const expanded = expandBoxLineItems(items, skuConfig);
+        if (expanded !== items) d.lineItems = JSON.stringify(expanded);
+      } catch (_) {}
+    }
+  }
+  return out;
 }
 
 // ─── PRODUCTION LOG RESOLUTION ────────────────────────────────────────────
@@ -198,11 +291,21 @@ export function resolveProductionLogs(logs) {
   productionLogs.forEach((row) => {
     if (row.action === 'sku_config') {
       if (row.sku) {
+        // Optional `expandsTo` JSON column — used for catering box → pretzel
+        // expansion mappings. Parse safely; bad JSON falls back to no expansion.
+        let expandsTo = null;
+        if (row.expandsTo) {
+          try {
+            const parsed = JSON.parse(row.expandsTo);
+            if (Array.isArray(parsed)) expandsTo = parsed;
+          } catch (_) {}
+        }
         skuConfig[row.sku] = {
           batchSize: Number(row.batchSize) || 0,
           traySize: Number(row.traySize) || 0,
           caseSize: Number(row.caseSize) || 0,
           type: row.type || 'standard',
+          ...(expandsTo ? { expandsTo } : {}),
         };
       }
     } else if (row.action === 'sku_alias') {
@@ -526,8 +629,15 @@ const STATUS_RANK = {
 };
 const WORST_STATUS = (a, b) => (STATUS_RANK[a] >= STATUS_RANK[b] ? a : b);
 
-function statusFor(qty, frozenP, doughP) {
+function statusFor(qty, frozenP, doughP, shapeOnly = false) {
   if (qty <= 0) return 'ready';
+  if (shapeOnly) {
+    // FOH bakes from dough at fulfillment time, so dough alone counts as ready.
+    // 'baking' isn't a meaningful state here — there's no BFP step to wait on.
+    if (frozenP + doughP >= qty) return 'ready';
+    if (frozenP + doughP > 0) return 'partial';
+    return 'unstarted';
+  }
   if (frozenP >= qty) return 'ready';
   if (frozenP + doughP >= qty) return 'baking';
   if (frozenP + doughP > 0) return 'partial';
@@ -596,8 +706,10 @@ export function attributeDeliveryCoverage({
       doughLeft[key] = dAvail - doughP;
 
       const needShapeP = Math.max(0, qty - frozenP - doughP);
-      const needBfpP = Math.max(0, qty - frozenP);
-      const lineStatus = statusFor(qty, frozenP, doughP);
+      // Shape-only deliveries skip BFP: the FOH bakes them fresh, so once
+      // dough exists they're satisfied. needBfpP collapses to 0.
+      const needBfpP = delivery._shapeOnly ? 0 : Math.max(0, qty - frozenP);
+      const lineStatus = statusFor(qty, frozenP, doughP, delivery._shapeOnly);
 
       lines[key] = {
         sku: key,
@@ -615,6 +727,7 @@ export function attributeDeliveryCoverage({
       deliveryId: id,
       date: delivery.date || '',
       customer: delivery.customer || delivery.location || '',
+      shapeOnly: !!delivery._shapeOnly,
       lines,
       aggregateStatus: hasProductionSku ? aggregate : null,
     });
