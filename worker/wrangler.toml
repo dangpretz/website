@@ -6,3 +6,15 @@ account_id = "f399e3bcd5ea1501830d0ad1d35d9da3"
 [vars]
 SQUARE_LOCATION_ID = "LEJ3PDZ9V6NYN"
 SQUARE_ENV = "production"
+
+# Tracks which calendar events we've already invited getdangerous@myecalendar.com
+# to. Each VEVENT UID -> { sequence, contentHash, summary, status }. Without
+# this, the cron would re-send invites every run.
+[[kv_namespaces]]
+binding = "FOH_CAL_STATE"
+id = "3f111dbe5ac44c7e9b168f8049754b22"
+
+# Cron — every 30 min. Sends new/changed events as METHOD:REQUEST and
+# disappeared events as METHOD:CANCEL to getdangerous@myecalendar.com.
+[triggers]
+crons = ["*/30 * * * *"]
