@@ -125,8 +125,25 @@
     .line-items-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
     .line-items-head label { margin-bottom: 0; }
     .line-item-row {
-      display: grid; grid-template-columns: 1fr 100px 40px; gap: 12px;
+      display: grid;
+      grid-template-columns: minmax(140px, 1.2fr) 70px 70px 90px 40px;
+      gap: 8px;
       align-items: end; margin-bottom: 12px;
+    }
+    .line-item-row > .case-cell { display: flex; flex-direction: column; gap: 2px; }
+    .line-item-row > .case-cell label {
+      font: 600 10px 'Manrope', sans-serif; color: #888; text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .line-item-row select[data-line-case-size],
+    .line-item-row input[data-line-case-count] {
+      padding: 8px 8px; font: 400 13px 'Manrope', sans-serif;
+      border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; width: 100%;
+    }
+    .line-item-row .case-cell.disabled select,
+    .line-item-row .case-cell.disabled input { opacity: 0.3; pointer-events: none; }
+    .line-item-row .case-hint {
+      grid-column: 1 / -1; font: 400 11px 'Manrope', sans-serif; color: #888;
+      margin-top: -4px;
     }
     .line-item-row .remove-row {
       padding: 10px; min-width: 40px; background: #ddd; color: #555;
@@ -401,7 +418,13 @@
       .overflow-menu button { padding: 12px 16px; min-height: 44px; }
 
       /* ── Line item row: tighter qty column on small screens ── */
-      .line-item-row { grid-template-columns: 1fr 76px 44px; gap: 8px; }
+      .line-item-row {
+        grid-template-columns: 1fr 60px 60px 76px 44px;
+        gap: 6px;
+      }
+      .line-item-row .case-cell label { font-size: 9px; }
+      .line-item-row select[data-line-case-size],
+      .line-item-row input[data-line-case-count] { font-size: 12px; padding: 8px 6px; }
 
       /* ── Week grid ── */
       .week-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -876,7 +899,8 @@
       attributeDeliveryCoverage,
       isShapeOnlyDelivery,
       expandBoxLineItems,
-    } from '../../scripts/inventory.js?v=2026-05-06-shapeonly';
+      caseSizeOptionsFor,
+    } from '../../scripts/inventory.js?v=2026-05-06-cases';
 
     // Feature flag — kept in sync with production app via the same key.
     const SHAPE_ONLY_ENABLED = (() => {
@@ -1174,7 +1198,7 @@
       return input;
     }
 
-    function addLineRow(skuVal, qtyVal) {
+    function addLineRow(skuVal, qtyVal, caseSizeVal, caseCountVal) {
       lineItemsEmpty.hidden = true;
       const row = document.createElement('div');
       row.className = 'line-item-row';
@@ -1193,6 +1217,124 @@
       const isCustom = skuVal && !isKnown;
       if (isKnown) { skuSelect.value = skuVal; skuCustomInput.value = skuVal; }
       else if (isCustom) { skuSelect.value = '__custom__'; skuCustomInput.value = skuVal; skuCustomInput.style.display = ''; }
+      skuWrapper.append(skuSelect, skuCustomInput);
+
+      // Case-count cell
+      const caseCountCell = document.createElement('div');
+      caseCountCell.className = 'case-cell';
+      const caseCountLabel = document.createElement('label');
+      caseCountLabel.textContent = 'Cases';
+      const caseCountInput = document.createElement('input');
+      caseCountInput.type = 'number';
+      caseCountInput.min = '0';
+      caseCountInput.step = '1';
+      caseCountInput.setAttribute('data-line-case-count', '');
+      caseCountInput.placeholder = '—';
+      caseCountInput.value = caseCountVal != null ? String(caseCountVal) : '';
+      caseCountCell.append(caseCountLabel, caseCountInput);
+
+      // Case-size cell
+      const caseSizeCell = document.createElement('div');
+      caseSizeCell.className = 'case-cell';
+      const caseSizeLabel = document.createElement('label');
+      caseSizeLabel.textContent = 'Size';
+      const caseSizeSelect = document.createElement('select');
+      caseSizeSelect.setAttribute('data-line-case-size', '');
+      caseSizeCell.append(caseSizeLabel, caseSizeSelect);
+
+      // Quantity (pretzels)
+      const qtyInput = buildQuantityInput(qtyVal || '');
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn remove-row';
+      removeBtn.setAttribute('aria-label', 'Remove row');
+      removeBtn.textContent = '−';
+      removeBtn.addEventListener('click', () => {
+        row.remove();
+        if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false;
+      });
+
+      row.append(skuWrapper, caseCountCell, caseSizeCell, qtyInput, removeBtn);
+
+      // Hint row, hidden until pretzel/case mismatch shows up
+      const hint = document.createElement('div');
+      hint.className = 'case-hint';
+      hint.hidden = true;
+      row.appendChild(hint);
+
+      // ── Wire case-aware sync logic ──
+      // The currently-selected SKU determines available case sizes.
+      // SKUs not in CASE_SIZE_OPTIONS get the cases UI disabled (pretzel-only).
+
+      const currentSkuName = () => {
+        if (skuSelect.value === '__custom__') return skuCustomInput.value.trim();
+        return skuSelect.value || '';
+      };
+
+      const populateCaseSizes = (preferredSize) => {
+        const options = caseSizeOptionsFor(currentSkuName());
+        caseSizeSelect.innerHTML = '';
+        if (!options.length) {
+          caseCountCell.classList.add('disabled');
+          caseSizeCell.classList.add('disabled');
+          caseCountInput.value = '';
+          // Add a placeholder option so the select has SOME state
+          const opt = document.createElement('option');
+          opt.value = ''; opt.textContent = '—'; caseSizeSelect.append(opt);
+          return;
+        }
+        caseCountCell.classList.remove('disabled');
+        caseSizeCell.classList.remove('disabled');
+        options.forEach((sz) => {
+          const opt = document.createElement('option');
+          opt.value = String(sz); opt.textContent = String(sz);
+          caseSizeSelect.append(opt);
+        });
+        // Pick the preferred (passed-in) size if it's still valid; otherwise default to first.
+        if (preferredSize && options.includes(Number(preferredSize))) {
+          caseSizeSelect.value = String(preferredSize);
+        }
+      };
+
+      const updateHint = () => {
+        const cs = Number(caseSizeSelect.value) || 0;
+        const cc = Number(caseCountInput.value) || 0;
+        const qty = Number(qtyInput.value) || 0;
+        if (!cs || (!cc && !qty)) { hint.hidden = true; return; }
+        const exact = cs && cc && (cs * cc === qty);
+        if (exact || (!cc && !qty)) { hint.hidden = true; return; }
+        if (qty > 0 && cs > 0) {
+          const fractional = qty / cs;
+          hint.hidden = false;
+          hint.textContent = `≈ ${fractional.toFixed(1)} cases at ${cs}/case`;
+        } else {
+          hint.hidden = true;
+        }
+      };
+
+      // Edits sync on blur (avoids stealing keystrokes mid-type).
+      caseCountInput.addEventListener('blur', () => {
+        const cs = Number(caseSizeSelect.value) || 0;
+        const cc = Number(caseCountInput.value) || 0;
+        if (cs > 0 && cc > 0) qtyInput.value = String(cs * cc);
+        updateHint();
+      });
+      caseSizeSelect.addEventListener('change', () => {
+        const cs = Number(caseSizeSelect.value) || 0;
+        const cc = Number(caseCountInput.value) || 0;
+        if (cs > 0 && cc > 0) qtyInput.value = String(cs * cc);
+        updateHint();
+      });
+      qtyInput.addEventListener('blur', () => {
+        const cs = Number(caseSizeSelect.value) || 0;
+        const qty = Number(qtyInput.value) || 0;
+        if (cs > 0 && qty > 0 && qty % cs === 0) {
+          // Clean multiple — sync caseCount too.
+          caseCountInput.value = String(qty / cs);
+        }
+        updateHint();
+      });
 
       skuSelect.addEventListener('change', () => {
         if (skuSelect.value === '__custom__') {
@@ -1203,18 +1345,24 @@
           skuCustomInput.style.display = 'none';
           skuCustomInput.value = skuSelect.value;
         }
+        // Refresh case options for the new SKU. Keep the user-entered cases
+        // count, but recompute pretzel quantity if a default size emerges.
+        populateCaseSizes();
+        const cs = Number(caseSizeSelect.value) || 0;
+        const cc = Number(caseCountInput.value) || 0;
+        if (cs > 0 && cc > 0) qtyInput.value = String(cs * cc);
+        updateHint();
+      });
+      skuCustomInput.addEventListener('blur', () => {
+        populateCaseSizes();
+        updateHint();
       });
 
-      skuWrapper.append(skuSelect, skuCustomInput);
+      // Initial state: populate case-size options for the starting SKU,
+      // honoring any caller-provided caseSize.
+      populateCaseSizes(caseSizeVal);
+      updateHint();
 
-      const qtyInput = buildQuantityInput(qtyVal || '');
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'btn remove-row';
-      removeBtn.setAttribute('aria-label', 'Remove row');
-      removeBtn.textContent = '−';
-      removeBtn.addEventListener('click', () => { row.remove(); if (!lineItemsContainer.querySelector('.line-item-row')) lineItemsEmpty.hidden = false; });
-      row.append(skuWrapper, qtyInput, removeBtn);
       lineItemsContainer.insertBefore(row, lineItemsEmpty);
     }
 
@@ -1294,7 +1442,7 @@
         if (lastOrder && lastOrder.lineItems.length > 0) {
           form.type.value = lastOrder.type;
           clearLineItems();
-          lastOrder.lineItems.forEach((it) => addLineRow(it.sku, it.quantity));
+          lastOrder.lineItems.forEach((it) => addLineRow(it.sku, it.quantity, it.caseSize, it.caseCount));
           document.getElementById('prefill-notice').hidden = false;
         }
       }, 300);
@@ -1490,7 +1638,15 @@
       const hint = pillCoverageHint(row, sku);
       const titleAttr = hint.tooltip ? ` title="${escapeHtml(hint.tooltip)}"` : '';
       const cls = ['item-pill', hint.className].filter(Boolean).join(' ');
-      return `<span class="${cls}"${titleAttr}>${escapeHtml(sku)} ×${escapeHtml(String(qty))}</span>`;
+      // Show case info when the line item carries it. "× N (P)" reads as
+      // "N cases of size S, totalling P pretzels". Falls back to legacy
+      // pretzel-only display when no case data is present.
+      const caseSize = Number(item.caseSize) || 0;
+      const caseCount = Number(item.caseCount) || 0;
+      const label = (caseSize > 0 && caseCount > 0)
+        ? `${escapeHtml(sku)} · ${caseCount}×${caseSize} (${qty}p)`
+        : `${escapeHtml(sku)} ×${escapeHtml(String(qty))}`;
+      return `<span class="${cls}"${titleAttr}>${label}</span>`;
     }
 
     function renderDeliveryCard(row) {
@@ -1794,7 +1950,7 @@
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
       else if (row.sku && (row.volume != null)) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
-      items.forEach((it) => addLineRow(it.sku, it.quantity));
+      items.forEach((it) => addLineRow(it.sku, it.quantity, it.caseSize, it.caseCount));
     }
 
     function startEdit(deliveryId) {
@@ -2156,8 +2312,21 @@
       rows.forEach((row) => {
         const sku = row.querySelector('[data-line-sku]').value.trim();
         const qty = row.querySelector('[data-line-qty]').value.trim();
+        const caseSizeRaw = row.querySelector('[data-line-case-size]')?.value || '';
+        const caseCountRaw = row.querySelector('[data-line-case-count]')?.value || '';
         if (sku && (!qty || Number(qty) <= 0)) { hasZeroQty = true; return; }
-        if (sku && qty && Number(qty) > 0) lineItems.push({ sku, quantity: Number(qty) });
+        if (sku && qty && Number(qty) > 0) {
+          const lineItem = { sku, quantity: Number(qty) };
+          // Persist case info ONLY if both size + count are present.
+          // Empty/disabled case fields → fall back to legacy line-item shape.
+          const caseSize = Number(caseSizeRaw) || 0;
+          const caseCount = Number(caseCountRaw) || 0;
+          if (caseSize > 0 && caseCount > 0) {
+            lineItem.caseSize = caseSize;
+            lineItem.caseCount = caseCount;
+          }
+          lineItems.push(lineItem);
+        }
       });
       if (!customer || !date || !type) { showError('Please fill in customer, date, and type.'); return; }
       if (hasZeroQty) { showError('Enter a quantity > 0 for each SKU.'); return; }

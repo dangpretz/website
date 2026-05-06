@@ -66,7 +66,8 @@ export const BATCH_SIZES = {
   '3oz cheese dip': CHEESE_BATCH_SIZE,
 };
 
-// Pretzels per case — wholesale shipping unit.
+// Pretzels per case — wholesale shipping unit. Default per SKU; managers
+// can pick from CASE_SIZE_OPTIONS per delivery.
 export const CASE_SIZES = {
   '21oz mammoth pretzel': 25,
   '10oz mustache': 48,
@@ -76,12 +77,38 @@ export const CASE_SIZES = {
   '6.5oz plain': 72,
   '6.5oz bbk': 72,
   '6.5oz spicy bee': 72,
-  '4oz twist plain': 52,
-  '4oz twist bbk': 52,
-  '4oz twist spicy bee': 52,
+  '4oz twist plain': 40,
+  '4oz twist bbk': 40,
+  '4oz twist spicy bee': 40,
   'plain bombs': 0,
   'bees bats': 0,
 };
+
+// Per-SKU allowed case sizes. First value = default selection in dropdown.
+// SKUs missing or empty array → no standard cases (pretzel-only entry).
+// 10oz and 6.5oz pretzels ship in two sizes depending on the customer's
+// order; manager picks per delivery line item in the planner form.
+export const CASE_SIZE_OPTIONS = {
+  '21oz mammoth pretzel': [25],
+  '10oz mustache':        [48, 20],
+  '10oz plain':           [48, 20],
+  '10oz bbk':             [48, 20],
+  '10oz spicy bee':       [48, 20],
+  '6.5oz plain':          [72, 36],
+  '6.5oz bbk':            [72, 36],
+  '6.5oz spicy bee':      [72, 36],
+  '4oz twist plain':      [40],
+  '4oz twist bbk':        [40],
+  '4oz twist spicy bee':  [40],
+};
+
+/**
+ * Allowed case sizes for an SKU (after alias resolution if applicable).
+ * Returns [] when the SKU has no standard case (pretzel-only entry).
+ */
+export function caseSizeOptionsFor(sku) {
+  return CASE_SIZE_OPTIONS[sku] || [];
+}
 
 // Pretzels per baking sheet (tray) — BFP team's natural unit.
 export const TRAY_SIZES = {
