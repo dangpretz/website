@@ -626,6 +626,14 @@ async function handleInspectSquare(request, env) {
   const url = new URL(request.url);
   const orderId = url.searchParams.get('order');
   const invoiceId = url.searchParams.get('invoice');
+  const webhooks = url.searchParams.get('webhooks');
+
+  if (webhooks) {
+    const r = await fetch(`${SQUARE_BASE}/webhooks/subscriptions`, {
+      headers: { 'Square-Version': '2025-01-23', Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}` },
+    });
+    return json(await r.json());
+  }
 
   if (orderId) {
     const r = await fetch(`${SQUARE_BASE}/orders/${orderId}`, {
