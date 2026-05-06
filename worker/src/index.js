@@ -1033,7 +1033,7 @@ function isCateringDelivery(d) {
   if ((d.deliveryId || '').startsWith('sq_')) {
     let items = [];
     try { items = JSON.parse(d.lineItems || '[]'); } catch {}
-    if (items.some((li) => /^catering:/i.test(li.name || ''))) return true;
+    if (items.some((li) => /^catering:/i.test(li.name || li.sku || ''))) return true;
   }
   return false;
 }
