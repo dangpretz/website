@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receiving | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design system ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 9999; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
+    .hero h1 { font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif; color: #fff; margin: 0; }
+
+    .section-cream { background: #F5F0E8; padding: clamp(32px, 5vw, 60px) 5%; min-height: calc(100vh - 200px); }
+    .max-800 { max-width: 800px; margin: 0 auto; }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .card-title {
+      font: 700 13px 'Manrope', sans-serif;
+      color: #999;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    /* ── Form fields ── */
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-group label {
+      font: 700 12px 'Manrope', sans-serif;
+      color: #555;
+      letter-spacing: 0.5px;
+    }
+    .field-group input,
+    .field-group select {
+      font: 400 15px 'Manrope', sans-serif;
+      padding: 10px 14px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      color: #1A1A1A;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    .field-group input:focus,
+    .field-group select:focus { border-color: #C41E1E; }
+
+    .session-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .session-grid .span-2 { grid-column: span 2; }
+
+    .date-display {
+      font: 600 15px 'Manrope', sans-serif;
+      color: #1A1A1A;
+      padding: 10px 14px;
+      background: #F5F0E8;
+      border-radius: 6px;
+      border: 2px solid transparent;
+    }
+
+    /* ── Scan input ── */
+    .scan-input-wrap { margin-bottom: 16px; }
+    .scan-input-wrap input {
+      width: 100%;
+      font: 400 clamp(18px, 2.5vw, 22px)/1 'Manrope', sans-serif;
+      padding: 16px 20px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      color: #1A1A1A;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .scan-input-wrap input:focus { border-color: #C41E1E; }
+    .scan-input-wrap input:disabled { background: #f0ece6; color: #aaa; }
+    .scan-hint { font: 400 12px 'Manrope', sans-serif; color: #aaa; margin-top: 6px; }
+
+    /* ── Product card ── */
+    .product-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-left: 4px solid #C41E1E;
+    }
+    .product-label { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .product-name-display { font: 700 18px 'Manrope', sans-serif; color: #1A1A1A; display: block; margin-bottom: 4px; }
+    .product-pack-display { font: 400 13px 'Manrope', sans-serif; color: #888; display: block; margin-bottom: 16px; }
+
+    /* ── Temp area ── */
+    .temp-field { margin-bottom: 16px; }
+    .temp-field label { font: 700 12px 'Manrope', sans-serif; color: #555; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
+    .temp-input-wrap { display: flex; align-items: center; gap: 10px; }
+    .temp-input-wrap input {
+      width: 140px;
+      font: 400 20px 'Manrope', sans-serif;
+      padding: 10px 14px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .temp-input-wrap input:focus { border-color: #C41E1E; }
+    .temp-badge {
+      font: 700 14px 'Manrope', sans-serif;
+      padding: 6px 14px;
+      border-radius: 20px;
+      min-width: 80px;
+      text-align: center;
+    }
+    .temp-badge.pass { background: #e6f4e6; color: #2a7a2a; }
+    .temp-badge.fail { background: #fde8e8; color: #C41E1E; }
+    .temp-threshold { font: 400 12px 'Manrope', sans-serif; color: #aaa; margin-top: 6px; }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background: #C41E1E;
+      color: #fff;
+      font: 700 14px 'Manrope', sans-serif;
+      border: none;
+      border-radius: 6px;
+      padding: 12px 24px;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+    }
+    .btn-primary:hover { background: #a01818; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #F5F0E8;
+      color: #1A1A1A;
+      font: 700 13px 'Manrope', sans-serif;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-secondary:hover { background: #ece5d8; }
+
+    .btn-submit {
+      background: #1A1A1A;
+      color: #fff;
+      font: 700 15px 'Manrope', sans-serif;
+      border: none;
+      border-radius: 8px;
+      padding: 16px 32px;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .btn-submit:hover { background: #333; }
+    .btn-submit:disabled { background: #bbb; cursor: not-allowed; }
+
+    /* ── New product form ── */
+    .new-product-form {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-left: 4px solid #f0a500;
+    }
+    .new-product-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .new-product-title { font: 700 15px 'Manrope', sans-serif; color: #1A1A1A; }
+    .new-product-code { font: 600 12px 'Courier New', monospace; background: #F5F0E8; padding: 3px 8px; border-radius: 4px; color: #555; }
+    .new-product-hint { font: 400 13px 'Manrope', sans-serif; color: #888; margin-bottom: 16px; }
+    .new-product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .checkbox-label { display: flex; align-items: center; gap: 8px; font: 600 13px 'Manrope', sans-serif; color: #555; margin-bottom: 16px; cursor: pointer; }
+    .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #C41E1E; }
+
+    /* ── Product selector ── */
+    .product-selector {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .product-selector label { font: 700 12px 'Manrope', sans-serif; color: #555; letter-spacing: 0.5px; display: block; margin-bottom: 8px; }
+    .product-selector input {
+      width: 100%;
+      font: 400 15px 'Manrope', sans-serif;
+      padding: 10px 14px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      outline: none;
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+    .product-selector input:focus { border-color: #C41E1E; }
+    .product-options { max-height: 280px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; }
+    .product-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.15s;
+      gap: 12px;
+    }
+    .product-option:last-child { border-bottom: none; }
+    .product-option:hover { background: #F5F0E8; }
+    .option-name { font: 600 14px 'Manrope', sans-serif; color: #1A1A1A; }
+    .option-pack { font: 400 12px 'Manrope', sans-serif; color: #888; white-space: nowrap; flex-shrink: 0; }
+    .product-option-empty { padding: 20px; text-align: center; font: 400 14px 'Manrope', sans-serif; color: #bbb; }
+
+    /* ── Session items ── */
+    .session-items-heading {
+      font: 700 13px 'Manrope', sans-serif;
+      color: #999;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .session-item {
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font: 700 14px 'Manrope', sans-serif; color: #1A1A1A; display: block; }
+    .item-pack { font: 400 12px 'Manrope', sans-serif; color: #888; }
+    .item-temp { font: 600 13px 'Manrope', sans-serif; color: #555; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+    .item-temp.muted { color: #bbb; font-weight: 400; }
+    .item-temp-badge { font: 700 11px 'Manrope', sans-serif; padding: 2px 7px; border-radius: 10px; }
+    .item-temp-badge.pass { background: #e6f4e6; color: #2a7a2a; }
+    .item-temp-badge.fail { background: #fde8e8; color: #C41E1E; }
+    .item-remove {
+      background: none;
+      border: none;
+      color: #ccc;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: color 0.15s;
+    }
+    .item-remove:hover { color: #C41E1E; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 12px 24px; border-radius: 6px; font: 700 14px 'Manrope', sans-serif;
+      color: #fff; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      pointer-events: none; opacity: 1; transition: opacity 0.4s ease;
+      white-space: nowrap; background: #1A1A1A;
+    }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    /* ── Scan area locked state hint ── */
+    .locked-hint {
+      text-align: center;
+      padding: 32px;
+      font: 400 14px 'Manrope', sans-serif;
+      color: #bbb;
+    }
+
+    /* ── Warning banner ── */
+    .warn-banner {
+      background: #fff8e6;
+      border: 1px solid #f0c050;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font: 600 13px 'Manrope', sans-serif;
+      color: #a07000;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 540px) {
+      .session-grid { grid-template-columns: 1fr; }
+      .session-grid .span-2 { grid-column: span 1; }
+      .new-product-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>RECEIVING.</h1>
+  </section>
+
+  <div class="section-cream">
+    <div class="max-800">
+
+      <!-- Session Header -->
+      <div class="card" id="session-header">
+        <div class="card-title">Session Details</div>
+        <div class="session-grid">
+          <div class="field-group">
+            <label for="employee-name">Received By</label>
+            <input type="text" id="employee-name" placeholder="Your name" autocomplete="off">
+          </div>
+          <div class="field-group">
+            <label for="supplier-select">Supplier</label>
+            <select id="supplier-select">
+              <option value="">Select supplier…</option>
+              <option value="usfoods">US Foods</option>
+              <option value="sysco">Sysco</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field-group" id="other-supplier-wrap" hidden>
+            <label for="other-supplier">Supplier Name</label>
+            <input type="text" id="other-supplier" placeholder="Enter supplier name" autocomplete="off">
+          </div>
+          <div class="field-group span-2">
+            <label>Date</label>
+            <div class="date-display" id="date-display"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scan Area -->
+      <div class="card" id="scan-card">
+        <div class="card-title">Scan Items</div>
+
+        <div class="scan-input-wrap">
+          <input
+            type="text"
+            id="barcode-input"
+            placeholder="Scan barcode here…"
+            autocomplete="off"
+            spellcheck="false"
+            disabled
+          >
+          <p class="scan-hint" id="scan-hint">Enter your name and select a supplier to begin.</p>
+        </div>
+
+        <!-- Inline warning (non-16-char barcode with US Foods selected) -->
+        <div id="barcode-warn" class="warn-banner" hidden></div>
+
+        <!-- Matched product card -->
+        <div id="product-card" class="product-card" hidden>
+          <div class="product-label">Product Identified</div>
+          <span class="product-name-display" id="product-name-display"></span>
+          <span class="product-pack-display" id="product-pack-display"></span>
+
+          <div id="temp-area" hidden>
+            <div class="temp-field">
+              <label for="temp-input">Temperature (°F)</label>
+              <div class="temp-input-wrap">
+                <input type="number" id="temp-input" placeholder="e.g. 38" step="0.1" min="-20" max="200">
+                <div id="temp-badge" class="temp-badge"></div>
+              </div>
+              <p class="temp-threshold">Must be below 42°F to pass</p>
+            </div>
+          </div>
+
+          <button id="add-item-btn" class="btn-primary" disabled>Add to Session</button>
+        </div>
+
+        <!-- New product form (US Foods unknown barcode) -->
+        <div id="new-product-form" class="new-product-form" hidden>
+          <div class="new-product-header">
+            <span class="new-product-title">Unknown Product</span>
+            <span class="new-product-code" id="new-product-code-display"></span>
+          </div>
+          <p class="new-product-hint">This barcode isn't in the system yet. Fill in the details below to add it and continue.</p>
+          <div class="new-product-grid">
+            <div class="field-group">
+              <label for="new-product-name">Product Name</label>
+              <input type="text" id="new-product-name" placeholder="e.g. Cheese, Cheddar Mild" autocomplete="off">
+            </div>
+            <div class="field-group">
+              <label for="new-product-pack">Pack Size (e.g. 4/5/LB)</label>
+              <input type="text" id="new-product-pack" placeholder="e.g. 4/5/LB" autocomplete="off">
+            </div>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="new-product-temp">
+            Requires temperature check (refrigerated / dairy / fresh)
+          </label>
+          <button id="save-new-product-btn" class="btn-primary">Save & Continue</button>
+        </div>
+
+        <!-- Product selector (Sysco / Other / fallback) -->
+        <div id="product-selector" class="product-selector" hidden>
+          <label for="product-search">Select Product</label>
+          <input type="text" id="product-search" placeholder="Type to search products…" autocomplete="off">
+          <div id="product-options" class="product-options"></div>
+        </div>
+
+      </div>
+
+      <!-- Session Items -->
+      <div id="session-section" hidden>
+        <div class="session-items-heading">Items This Session</div>
+        <div id="session-items"></div>
+        <button id="submit-btn" class="btn-submit" disabled>Submit Receiving Session</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { appendLog } from '../../scripts/sheet-logger.js';
+
+    // ─────────────────────────────────────────────────────────────
+    // PRODUCT CATALOG
+    // To add a product: copy any line below, fill in all fields, save the file.
+    //
+    // Fields:
+    //   id          – unique identifier (use "usf-XXXXXXX" for US Foods items)
+    //   name        – full product name as it should appear in records
+    //   packSize    – case size in COUNT/SIZE/UNIT format (e.g. 4/5/LB)
+    //   requiresTemp – true for all dairy, refrigerated, and fresh produce items
+    //   usFoodsCode – the 7-digit product code found at chars 7–13 of the US Foods
+    //                 barcode (leave as '' for Sysco-only items)
+    // ─────────────────────────────────────────────────────────────
+    const PRODUCTS = [
+      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB',    requiresTemp: true,  usFoodsCode: '0877506' },
+      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB',    requiresTemp: false, usFoodsCode: '0033858' },
+      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB',    requiresTemp: false, usFoodsCode: '1008416' },
+      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL',    requiresTemp: false, usFoodsCode: '4364063' },
+      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB',    requiresTemp: false, usFoodsCode: '7016876' },
+      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL',    requiresTemp: false, usFoodsCode: '7329113' },
+      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '0746479' },
+      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL',    requiresTemp: true,  usFoodsCode: '1324079' },
+      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB',     requiresTemp: true,  usFoodsCode: '1492816' },
+      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB',     requiresTemp: true,  usFoodsCode: '3547205' },
+      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL',    requiresTemp: true,  usFoodsCode: '5328406' },
+      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ',    requiresTemp: false, usFoodsCode: '6773394' },
+      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB',     requiresTemp: true,  usFoodsCode: '7017429' },
+      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '8123322' },
+      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA',   requiresTemp: false, usFoodsCode: '5329420' },
+      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB',    requiresTemp: true,  usFoodsCode: '8340861' },
+      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA',  requiresTemp: false, usFoodsCode: '7807993' },
+      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB',    requiresTemp: false, usFoodsCode: '3022647' },
+      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '6401780' },
+      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB',     requiresTemp: false, usFoodsCode: '3737152' },
+      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB',   requiresTemp: false, usFoodsCode: '7330202' },
+      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '1332642' },
+      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB',     requiresTemp: true,  usFoodsCode: '7326432' },
+      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ',    requiresTemp: true,  usFoodsCode: '3330487' },
+      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB',    requiresTemp: true,  usFoodsCode: '9929174' },
+      // ── Add new products below this line ─────────────────────────
+    ];
+
+    const TEMP_THRESHOLD = 42;
+    const LOG_PATH = '/dangpretz/receiving';
+
+    // ── State ────────────────────────────────────────────────────
+    let sessionId = generateId();
+    let sessionItems = [];
+    let pendingProduct = null;
+    let pendingBarcode = '';
+
+    // ── DOM refs ─────────────────────────────────────────────────
+    const nameInput       = document.getElementById('employee-name');
+    const supplierSelect  = document.getElementById('supplier-select');
+    const otherWrap       = document.getElementById('other-supplier-wrap');
+    const otherInput      = document.getElementById('other-supplier');
+    const barcodeInput    = document.getElementById('barcode-input');
+    const scanHint        = document.getElementById('scan-hint');
+    const barcodeWarn     = document.getElementById('barcode-warn');
+    const productCard     = document.getElementById('product-card');
+    const tempArea        = document.getElementById('temp-area');
+    const tempInput       = document.getElementById('temp-input');
+    const tempBadge       = document.getElementById('temp-badge');
+    const addItemBtn      = document.getElementById('add-item-btn');
+    const newProductForm  = document.getElementById('new-product-form');
+    const productSelector = document.getElementById('product-selector');
+    const productSearch   = document.getElementById('product-search');
+    const productOptions  = document.getElementById('product-options');
+    const sessionSection  = document.getElementById('session-section');
+    const sessionItemsEl  = document.getElementById('session-items');
+    const submitBtn       = document.getElementById('submit-btn');
+
+    // ── Date display ─────────────────────────────────────────────
+    document.getElementById('date-display').textContent =
+      new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    // ── Session header listeners ──────────────────────────────────
+    nameInput.addEventListener('input', checkSessionReady);
+    supplierSelect.addEventListener('change', () => {
+      otherWrap.hidden = supplierSelect.value !== 'other';
+      checkSessionReady();
+    });
+    otherInput.addEventListener('input', checkSessionReady);
+
+    function checkSessionReady() {
+      const name = nameInput.value.trim();
+      const supplier = supplierSelect.value;
+      const otherOk = supplier !== 'other' || otherInput.value.trim();
+      const ready = name && supplier && otherOk;
+      barcodeInput.disabled = !ready;
+      scanHint.textContent = ready
+        ? 'Scan a barcode or type it and press Enter.'
+        : 'Enter your name and select a supplier to begin.';
+      if (ready) barcodeInput.focus();
+    }
+
+    // ── Barcode input ─────────────────────────────────────────────
+    barcodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const raw = barcodeInput.value.trim();
+        barcodeInput.value = '';
+        if (raw) handleBarcode(raw);
+      }
+    });
+
+    function handleBarcode(raw) {
+      pendingBarcode = raw;
+      pendingProduct = null;
+      hideAll();
+
+      const supplier = supplierSelect.value;
+
+      if (supplier === 'usfoods') {
+        if (raw.length !== 16) {
+          barcodeWarn.hidden = false;
+          barcodeWarn.textContent = `US Foods barcodes are 16 characters — this one is ${raw.length}. Select the product manually below.`;
+          showProductSelector();
+          return;
+        }
+        const code = raw.slice(6, 13);
+        const match = PRODUCTS.find((p) => p.usFoodsCode === code);
+        if (match) {
+          showProductCard(match);
+        } else {
+          showNewProductForm(code);
+        }
+      } else {
+        // Sysco or Other: manual select
+        showProductSelector();
+      }
+    }
+
+    // ── Product card ─────────────────────────────────────────────
+    function showProductCard(product) {
+      pendingProduct = product;
+      document.getElementById('product-name-display').textContent = product.name;
+      document.getElementById('product-pack-display').textContent = product.packSize;
+
+      tempArea.hidden = !product.requiresTemp;
+      if (product.requiresTemp) {
+        tempInput.value = '';
+        tempBadge.textContent = '';
+        tempBadge.className = 'temp-badge';
+      }
+
+      productCard.hidden = false;
+      updateAddButton();
+
+      if (product.requiresTemp) {
+        tempInput.focus();
+      } else {
+        addItemBtn.focus();
+      }
+    }
+
+    // ── Temp ─────────────────────────────────────────────────────
+    tempInput.addEventListener('input', () => {
+      const t = parseFloat(tempInput.value);
+      if (isNaN(t) || tempInput.value === '') {
+        tempBadge.textContent = '';
+        tempBadge.className = 'temp-badge';
+      } else if (t < TEMP_THRESHOLD) {
+        tempBadge.textContent = '✓ Pass';
+        tempBadge.className = 'temp-badge pass';
+      } else {
+        tempBadge.textContent = '✗ Fail';
+        tempBadge.className = 'temp-badge fail';
+      }
+      updateAddButton();
+    });
+
+    function updateAddButton() {
+      if (!pendingProduct) { addItemBtn.disabled = true; return; }
+      if (pendingProduct.requiresTemp) {
+        addItemBtn.disabled = isNaN(parseFloat(tempInput.value));
+      } else {
+        addItemBtn.disabled = false;
+      }
+    }
+
+    // ── Add item ─────────────────────────────────────────────────
+    addItemBtn.addEventListener('click', addItem);
+
+    function addItem() {
+      if (!pendingProduct) return;
+      const temp = pendingProduct.requiresTemp ? parseFloat(tempInput.value) : null;
+      sessionItems.push({
+        barcode:      pendingBarcode,
+        productId:    pendingProduct.id,
+        productName:  pendingProduct.name,
+        packSize:     pendingProduct.packSize,
+        requiresTemp: pendingProduct.requiresTemp,
+        temperature:  temp,
+        tempPass:     temp !== null ? temp < TEMP_THRESHOLD : null,
+      });
+      pendingProduct = null;
+      pendingBarcode = '';
+      hideAll();
+      renderSessionItems();
+      barcodeInput.focus();
+    }
+
+    // ── New product form ─────────────────────────────────────────
+    function showNewProductForm(code) {
+      document.getElementById('new-product-code-display').textContent = `Code: ${code}`;
+      document.getElementById('new-product-name').value = '';
+      document.getElementById('new-product-pack').value = '';
+      document.getElementById('new-product-temp').checked = false;
+      newProductForm.hidden = false;
+      document.getElementById('new-product-name').focus();
+    }
+
+    document.getElementById('save-new-product-btn').addEventListener('click', async () => {
+      const name     = document.getElementById('new-product-name').value.trim();
+      const packSize = document.getElementById('new-product-pack').value.trim();
+      const reqTemp  = document.getElementById('new-product-temp').checked;
+      const codeText = document.getElementById('new-product-code-display').textContent.replace('Code: ', '');
+
+      if (!name || !packSize) {
+        showToast('Please fill in product name and pack size', 'error');
+        return;
+      }
+
+      const newProduct = { id: `new-${codeText}`, name, packSize, requiresTemp: reqTemp, usFoodsCode: codeText };
+      PRODUCTS.push(newProduct);
+
+      // Log the new product so it can be added to the code later
+      try {
+        await appendLog(LOG_PATH, {
+          action:       'new_product',
+          usFoodsCode:  codeText,
+          productName:  name,
+          packSize,
+          requiresTemp: String(reqTemp),
+          timeStamp:    new Date().toISOString(),
+          addedBy:      nameInput.value.trim(),
+        });
+      } catch (_) { /* non-critical — proceed regardless */ }
+
+      newProductForm.hidden = true;
+      showToast('Product added — remember to add it to the code!', 'success');
+      showProductCard(newProduct);
+    });
+
+    // ── Product selector ─────────────────────────────────────────
+    function showProductSelector() {
+      productSearch.value = '';
+      renderProductOptions('');
+      productSelector.hidden = false;
+      productSearch.focus();
+    }
+
+    productSearch.addEventListener('input', () => renderProductOptions(productSearch.value));
+
+    function renderProductOptions(query) {
+      const q = query.toLowerCase().trim();
+      const matches = q
+        ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(q))
+        : [...PRODUCTS].sort((a, b) => a.name.localeCompare(b.name));
+
+      if (matches.length === 0) {
+        productOptions.innerHTML = '<div class="product-option-empty">No products found</div>';
+        return;
+      }
+      productOptions.innerHTML = matches.map((p) => `
+        <div class="product-option" data-id="${escapeHtml(p.id)}">
+          <span class="option-name">${escapeHtml(p.name)}</span>
+          <span class="option-pack">${escapeHtml(p.packSize)}</span>
+        </div>`).join('');
+
+      productOptions.querySelectorAll('.product-option').forEach((el) => {
+        el.addEventListener('click', () => {
+          const product = PRODUCTS.find((p) => p.id === el.dataset.id);
+          if (!product) return;
+          productSelector.hidden = true;
+          barcodeWarn.hidden = true;
+          showProductCard(product);
+        });
+      });
+    }
+
+    // ── Session items ─────────────────────────────────────────────
+    function renderSessionItems() {
+      if (sessionItems.length === 0) {
+        sessionSection.hidden = true;
+        submitBtn.disabled = true;
+        return;
+      }
+      sessionSection.hidden = false;
+      submitBtn.disabled = false;
+
+      sessionItemsEl.innerHTML = sessionItems.map((item, i) => {
+        const tempHtml = item.requiresTemp
+          ? `<span class="item-temp">${item.temperature}°F <span class="item-temp-badge ${item.tempPass ? 'pass' : 'fail'}">${item.tempPass ? '✓ Pass' : '✗ Fail'}</span></span>`
+          : '<span class="item-temp muted">No temp req.</span>';
+        return `
+          <div class="session-item">
+            <div class="item-info">
+              <span class="item-name">${escapeHtml(item.productName)}</span>
+              <span class="item-pack">${escapeHtml(item.packSize)}</span>
+            </div>
+            ${tempHtml}
+            <button class="item-remove" data-index="${i}" title="Remove item">&times;</button>
+          </div>`;
+      }).join('');
+
+      sessionItemsEl.querySelectorAll('.item-remove').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          sessionItems.splice(parseInt(btn.dataset.index, 10), 1);
+          renderSessionItems();
+        });
+      });
+    }
+
+    // ── Submit ────────────────────────────────────────────────────
+    submitBtn.addEventListener('click', submitSession);
+
+    async function submitSession() {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+
+      const receivedBy   = nameInput.value.trim();
+      const supplierVal  = supplierSelect.value;
+      const supplierName = supplierVal === 'other' ? otherInput.value.trim() : supplierVal;
+      const date         = new Date().toISOString().slice(0, 10);
+
+      try {
+        for (const item of sessionItems) {
+          await appendLog(LOG_PATH, {
+            action:       'receive',
+            sessionId,
+            receivedBy,
+            date,
+            timeStamp:    new Date().toISOString(),
+            supplier:     supplierName,
+            barcode:      item.barcode,
+            productId:    item.productId,
+            productName:  item.productName,
+            packSize:     item.packSize,
+            requiresTemp: String(item.requiresTemp),
+            temperature:  item.temperature !== null ? String(item.temperature) : '',
+            tempPass:     item.tempPass !== null ? String(item.tempPass) : '',
+          });
+        }
+        const count = sessionItems.length;
+        showToast(`✓ ${count} item${count !== 1 ? 's' : ''} logged successfully`, 'success');
+        sessionItems = [];
+        sessionId = generateId();
+        pendingProduct = null;
+        pendingBarcode = '';
+        hideAll();
+        renderSessionItems();
+        barcodeInput.focus();
+      } catch (err) {
+        showToast('Submit failed: ' + (err.message || 'unknown error'), 'error');
+        submitBtn.disabled = false;
+      } finally {
+        submitBtn.textContent = 'Submit Receiving Session';
+      }
+    }
+
+    // ── Utilities ─────────────────────────────────────────────────
+    function hideAll() {
+      productCard.hidden     = true;
+      newProductForm.hidden  = true;
+      productSelector.hidden = true;
+      barcodeWarn.hidden     = true;
+    }
+
+    function generateId() {
+      return typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `rec-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 3500);
+    }
+  </script>
+</body>
+</html>
