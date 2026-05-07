@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Delivery History | Dangerous Pretzel Co.</title>
+  <title>Receiving History | Dangerous Pretzel Co.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
@@ -13,7 +13,6 @@
     body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
     a { color: inherit; text-decoration: none; }
 
-    /* ── Nav ── */
     .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 9999; border-bottom: 1px solid #333; }
     .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
     .nav-logo { height: 46px; }
@@ -21,11 +20,9 @@
     .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
     .nav-links a:hover { color: #C41E1E; }
 
-    /* ── Hero ── */
     .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
     .hero h1 { font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif; color: #fff; margin: 0; }
 
-    /* ── Layout ── */
     .section-cream { background: #F5F0E8; padding: clamp(24px, 4vw, 48px) 5%; min-height: calc(100vh - 200px); }
     .max-1000 { max-width: 1000px; margin: 0 auto; }
 
@@ -66,10 +63,6 @@
     .field-group input:focus,
     .field-group select:focus { border-color: #C41E1E; }
 
-    .date-range { display: flex; align-items: center; gap: 8px; }
-    .date-range input { flex: 1; }
-    .date-range span { font: 400 12px 'Manrope', sans-serif; color: #aaa; flex-shrink: 0; }
-
     .btn-clear {
       background: #F5F0E8;
       color: #888;
@@ -84,123 +77,100 @@
     }
     .btn-clear:hover { background: #ece5d8; color: #1A1A1A; }
 
-    .results-meta {
-      font: 400 13px 'Manrope', sans-serif;
-      color: #888;
-      margin-bottom: 16px;
-    }
+    .results-meta { font: 400 13px 'Manrope', sans-serif; color: #888; margin-bottom: 16px; }
     .results-meta strong { color: #1A1A1A; font-weight: 700; }
 
-    /* ── Status message ── */
     .status-msg { font: 400 14px 'Manrope', sans-serif; color: #aaa; padding: 40px 0; text-align: center; }
     .status-msg.error { color: #C41E1E; font-weight: 700; }
 
-    /* ── Delivery cards ── */
-    .delivery-card {
+    /* ── Session cards ── */
+    .session-card {
       background: #fff;
       border-radius: 10px;
-      padding: 0;
       margin-bottom: 12px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.06);
       overflow: hidden;
-      border-left: 4px solid #ddd;
     }
-    .delivery-card.status-scheduled  { border-left-color: #C41E1E; }
-    .delivery-card.status-delivered  { border-left-color: #2a7a2a; }
-    .delivery-card.status-picked_up  { border-left-color: #2a7a2a; }
-    .delivery-card.status-cancelled  { border-left-color: #bbb; opacity: 0.65; }
 
-    /* Card header — always visible, click to expand */
-    .card-summary {
+    .session-summary {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       padding: 16px 20px;
       cursor: pointer;
       user-select: none;
     }
-    .card-summary:hover { background: #fafafa; }
-    .summary-customer { font: 700 15px 'Manrope', sans-serif; color: #1A1A1A; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .summary-date { font: 400 13px 'Manrope', sans-serif; color: #888; white-space: nowrap; }
-    .summary-badges { display: flex; gap: 6px; flex-shrink: 0; }
+    .session-summary:hover { background: #fafafa; }
 
+    .session-info { flex: 1; min-width: 0; }
+    .session-date { font: 700 15px 'Manrope', sans-serif; color: #1A1A1A; }
+    .session-meta { font: 400 12px 'Manrope', sans-serif; color: #888; margin-top: 2px; }
+
+    .session-badges { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
     .badge {
       font: 700 11px 'Manrope', sans-serif;
-      padding: 3px 9px;
+      padding: 3px 10px;
       border-radius: 20px;
       white-space: nowrap;
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
-    .badge-type { background: #F5F0E8; color: #555; }
-    .badge-status-scheduled { background: #fde8e8; color: #C41E1E; }
-    .badge-status-delivered  { background: #e6f4e6; color: #2a7a2a; }
-    .badge-status-picked_up  { background: #e6f4e6; color: #2a7a2a; }
-    .badge-status-cancelled  { background: #eee;    color: #999; }
+    .badge-supplier { background: #F5F0E8; color: #555; }
+    .badge-fail     { background: #fde8e8; color: #C41E1E; }
 
-    .expand-icon {
-      color: #ccc;
-      font-size: 18px;
-      line-height: 1;
-      transition: transform 0.25s;
-      flex-shrink: 0;
+    .item-count { font: 700 13px 'Manrope', sans-serif; color: #aaa; white-space: nowrap; }
+    .expand-icon { color: #ccc; font-size: 18px; line-height: 1; transition: transform 0.25s; flex-shrink: 0; }
+    .session-card.open .expand-icon { transform: rotate(180deg); }
+
+    /* ── Session body ── */
+    .session-body { border-top: 1px solid #f0f0f0; display: none; }
+    .session-card.open .session-body { display: block; }
+
+    .received-by-row {
+      padding: 10px 20px;
+      font: 400 13px 'Manrope', sans-serif;
+      color: #888;
+      border-bottom: 1px solid #f5f5f5;
+      background: #fafafa;
     }
-    .delivery-card.open .expand-icon { transform: rotate(180deg); }
+    .received-by-row strong { color: #555; }
 
-    /* Card body — expanded details */
-    .card-body {
-      border-top: 1px solid #f0f0f0;
-      padding: 16px 20px;
-      display: none;
+    /* ── Item rows ── */
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      border-bottom: 1px solid #f5f5f5;
     }
-    .delivery-card.open .card-body { display: block; }
+    .item-row:last-child { border-bottom: none; }
+    .item-row.temp-fail { background: #fffaf9; }
 
-    .detail-section { margin-bottom: 16px; }
-    .detail-section:last-child { margin-bottom: 0; }
-    .detail-label {
+    .item-name-wrap { flex: 1; min-width: 0; }
+    .item-name { font: 600 14px 'Manrope', sans-serif; color: #1A1A1A; }
+    .item-pack { font: 400 12px 'Manrope', sans-serif; color: #aaa; margin-top: 1px; }
+
+    .item-temp { font: 600 13px 'Manrope', sans-serif; white-space: nowrap; }
+    .item-temp.no-temp { color: #ccc; font-weight: 400; font-style: italic; }
+
+    .temp-badge {
+      display: inline-block;
       font: 700 11px 'Manrope', sans-serif;
-      color: #bbb;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 5px;
     }
+    .temp-badge.pass { background: #e6f4e6; color: #2a7a2a; }
+    .temp-badge.fail { background: #fde8e8; color: #C41E1E; }
 
-    /* Line items */
-    .line-items { display: flex; flex-direction: column; gap: 4px; }
-    .line-item { font: 400 14px 'Manrope', sans-serif; color: #1A1A1A; display: flex; gap: 8px; }
-    .line-item .qty { color: #aaa; }
-    .line-item.empty { color: #ccc; font-style: italic; }
-
-    /* Barcodes */
-    .barcode-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .barcode-chip {
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      background: #F5F0E8;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 3px 8px;
-      color: #555;
-    }
-    .empty-value { font: 400 13px 'Manrope', sans-serif; color: #ccc; font-style: italic; }
-
-    /* Confirmation */
-    .confirm-row { font: 400 13px 'Manrope', sans-serif; color: #555; margin-bottom: 4px; }
-    .confirm-row strong { color: #1A1A1A; }
-
-    /* No results */
-    .no-results {
-      text-align: center;
-      padding: 60px 20px;
-      font: 400 15px 'Manrope', sans-serif;
-      color: #aaa;
-    }
+    /* ── No results ── */
+    .no-results { text-align: center; padding: 60px 20px; font: 400 15px 'Manrope', sans-serif; color: #aaa; }
     .no-results strong { color: #1A1A1A; display: block; font-size: 18px; margin-bottom: 8px; }
 
     @media (max-width: 640px) {
       .filter-grid { grid-template-columns: 1fr; }
-      .filter-row { grid-template-columns: 1fr; }
-      .summary-badges { display: none; }
+      .filter-row  { grid-template-columns: 1fr; }
+      .session-badges { display: none; }
     }
   </style>
 </head>
@@ -219,32 +189,34 @@
   </nav>
 
   <section class="hero">
-    <h1>DELIVERY HISTORY.</h1>
+    <h1>RECEIVING HISTORY.</h1>
   </section>
 
   <div class="section-cream">
     <div class="max-1000">
 
-      <!-- Filter bar -->
       <div class="filter-card">
         <div class="filter-grid">
           <div class="field-group">
-            <label for="filter-customer">Customer</label>
-            <input type="text" id="filter-customer" placeholder="Search by name…" autocomplete="off">
+            <label for="filter-product">Product</label>
+            <input type="text" id="filter-product" placeholder="Search by product name…" autocomplete="off">
           </div>
           <div class="field-group">
-            <label for="filter-status">Status</label>
-            <select id="filter-status">
-              <option value="">All statuses</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="delivered">Delivered</option>
-              <option value="picked_up">Picked Up</option>
-              <option value="cancelled">Cancelled</option>
+            <label for="filter-supplier">Supplier</label>
+            <select id="filter-supplier">
+              <option value="">All suppliers</option>
+              <option value="usfoods">US Foods</option>
+              <option value="sysco">Sysco</option>
             </select>
           </div>
           <div class="field-group">
-            <label for="filter-sku">Item / SKU</label>
-            <input type="text" id="filter-sku" placeholder="Search by product…" autocomplete="off">
+            <label for="filter-temp">Temperature</label>
+            <select id="filter-temp">
+              <option value="">All results</option>
+              <option value="pass">Pass only</option>
+              <option value="fail">Fail only</option>
+              <option value="checked">Temp checked</option>
+            </select>
           </div>
         </div>
         <div class="filter-row">
@@ -260,13 +232,8 @@
         </div>
       </div>
 
-      <!-- Results count -->
       <div id="results-meta" class="results-meta" hidden></div>
-
-      <!-- Status / loading -->
-      <div id="status-msg" class="status-msg">Loading deliveries…</div>
-
-      <!-- Results -->
+      <div id="status-msg" class="status-msg">Loading receiving records…</div>
       <div id="results"></div>
 
     </div>
@@ -275,94 +242,31 @@
   <script type="module">
     import { fetchLog } from '../../scripts/sheet-logger.js';
 
-    const LOG_PATH = '/dangpretz/delivery-planner';
+    const LOG_PATH = '/dangpretz/receiving';
 
-    // ── Delivery resolver (handles barcodes — copied from delivery planner) ──
-    function resolveDeliveriesFromLogs(logs) {
-      const byId = {};
-      if (!Array.isArray(logs)) return [];
-      logs.forEach((row, idx) => {
-        const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
-        if (row.action === 'delete') { delete byId[id]; return; }
-        if (row.action === 'barcodes') {
-          if (byId[id]) {
-            try { byId[id].barcodes = JSON.parse(row.barcodes || '[]'); } catch (_) { byId[id].barcodes = []; }
-          }
-          return;
-        }
-        if (row.action === 'confirm') {
-          if (byId[id]) {
-            byId[id].confirmation = {
-              confirmedBy:      row.confirmedBy || '',
-              confirmNote:      row.confirmNote || '',
-              confirmTimestamp: row.confirmTimestamp || row.timeStamp || '',
-            };
-            const t = (byId[id].type || 'delivery').toLowerCase();
-            byId[id].status = t === 'pickup' ? 'picked_up' : 'delivered';
-          }
-          return;
-        }
-        if (row.action === 'status') {
-          if (byId[id]) {
-            let s = row.status || 'scheduled';
-            if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
-            byId[id].status = s;
-          }
-          return;
-        }
-        if (row.action === 'update') {
-          const prevBarcodes     = byId[id] ? byId[id].barcodes     : undefined;
-          const prevConfirmation = byId[id] ? byId[id].confirmation : undefined;
-          byId[id] = { ...row, deliveryId: id };
-          if (prevBarcodes)     byId[id].barcodes     = prevBarcodes;
-          if (prevConfirmation) byId[id].confirmation = prevConfirmation;
-          let s = row.status || 'scheduled';
-          if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
-          byId[id].status = s;
-          return;
-        }
-        const prevBarcodes     = byId[id] ? byId[id].barcodes     : undefined;
-        const prevConfirmation = byId[id] ? byId[id].confirmation : undefined;
-        byId[id] = { ...row, deliveryId: id };
-        if (prevBarcodes)     byId[id].barcodes     = prevBarcodes;
-        if (prevConfirmation) byId[id].confirmation = prevConfirmation;
-        let s = byId[id].status || 'scheduled';
-        if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
-        byId[id].status = s;
-      });
-      // Sort newest first
-      return Object.values(byId).sort((a, b) => {
-        const d = (b.date || '').localeCompare(a.date || '');
-        return d !== 0 ? d : (b.timeStamp || '').localeCompare(a.timeStamp || '');
-      });
-    }
+    let allSessions = [];   // array of { sessionId, date, supplier, receivedBy, items[] }
+    let allItems    = [];   // flat list for filtering
 
-    // ── State ────────────────────────────────────────────────────
-    let allDeliveries = [];
-
-    // ── DOM refs ─────────────────────────────────────────────────
-    const filterCustomer  = document.getElementById('filter-customer');
-    const filterStatus    = document.getElementById('filter-status');
-    const filterSku       = document.getElementById('filter-sku');
-    const filterDateFrom  = document.getElementById('filter-date-from');
-    const filterDateTo    = document.getElementById('filter-date-to');
-    const clearBtn        = document.getElementById('clear-btn');
-    const statusMsg       = document.getElementById('status-msg');
-    const resultsMeta     = document.getElementById('results-meta');
-    const resultsEl       = document.getElementById('results');
+    const filterProduct  = document.getElementById('filter-product');
+    const filterSupplier = document.getElementById('filter-supplier');
+    const filterTemp     = document.getElementById('filter-temp');
+    const filterDateFrom = document.getElementById('filter-date-from');
+    const filterDateTo   = document.getElementById('filter-date-to');
+    const clearBtn       = document.getElementById('clear-btn');
+    const statusMsg      = document.getElementById('status-msg');
+    const resultsMeta    = document.getElementById('results-meta');
+    const resultsEl      = document.getElementById('results');
 
     // ── Wire filters ─────────────────────────────────────────────
-    [filterCustomer, filterSku].forEach((el) => {
-      let t;
-      el.addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 250); });
-    });
-    [filterStatus, filterDateFrom, filterDateTo].forEach((el) => {
+    let debounce;
+    filterProduct.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(applyFilters, 250); });
+    [filterSupplier, filterTemp, filterDateFrom, filterDateTo].forEach((el) => {
       el.addEventListener('change', applyFilters);
     });
     clearBtn.addEventListener('click', () => {
-      filterCustomer.value = '';
-      filterStatus.value   = '';
-      filterSku.value      = '';
+      filterProduct.value  = '';
+      filterSupplier.value = '';
+      filterTemp.value     = '';
       filterDateFrom.value = '';
       filterDateTo.value   = '';
       applyFilters();
@@ -372,131 +276,147 @@
     async function init() {
       try {
         const logs = await fetchLog(LOG_PATH);
-        allDeliveries = resolveDeliveriesFromLogs(logs);
+        buildSessions(Array.isArray(logs) ? logs : []);
         statusMsg.hidden = true;
         applyFilters();
       } catch (err) {
         statusMsg.className = 'status-msg error';
-        statusMsg.textContent = 'Failed to load deliveries: ' + (err.message || 'unknown error');
+        statusMsg.textContent = 'Failed to load records: ' + (err.message || 'unknown error');
       }
+    }
+
+    // Group log rows into sessions by sessionId, newest first
+    function buildSessions(logs) {
+      const sessionMap = {};
+      logs
+        .filter((r) => r.action === 'receive')
+        .forEach((r) => {
+          const sid = r.sessionId || `legacy-${r.timeStamp}`;
+          if (!sessionMap[sid]) {
+            sessionMap[sid] = {
+              sessionId:  sid,
+              date:       r.date || '',
+              supplier:   r.supplier || '',
+              receivedBy: r.receivedBy || '',
+              items:      [],
+            };
+          }
+          sessionMap[sid].items.push({
+            productName:  r.productName || '—',
+            packSize:     r.packSize    || '',
+            requiresTemp: r.requiresTemp === 'true',
+            temperature:  r.temperature !== '' ? parseFloat(r.temperature) : null,
+            tempPass:     r.tempPass === 'true' ? true : r.tempPass === 'false' ? false : null,
+            barcode:      r.barcode || '',
+          });
+          allItems.push({ ...r, sessionId: sid });
+        });
+
+      allSessions = Object.values(sessionMap).sort((a, b) => b.date.localeCompare(a.date) || b.sessionId.localeCompare(a.sessionId));
     }
 
     // ── Filter ───────────────────────────────────────────────────
     function applyFilters() {
-      const customer  = filterCustomer.value.trim().toLowerCase();
-      const status    = filterStatus.value;
-      const sku       = filterSku.value.trim().toLowerCase();
-      const dateFrom  = filterDateFrom.value;
-      const dateTo    = filterDateTo.value;
+      const product  = filterProduct.value.trim().toLowerCase();
+      const supplier = filterSupplier.value.toLowerCase();
+      const temp     = filterTemp.value;
+      const dateFrom = filterDateFrom.value;
+      const dateTo   = filterDateTo.value;
 
-      const filtered = allDeliveries.filter((d) => {
-        if (customer) {
-          const name = (d.customer || d.location || '').toLowerCase();
-          if (!name.includes(customer)) return false;
-        }
-        if (status && d.status !== status) return false;
-        if (dateFrom && (d.date || '') < dateFrom) return false;
-        if (dateTo   && (d.date || '') > dateTo)   return false;
-        if (sku) {
-          let items = [];
-          try { items = JSON.parse(d.lineItems || '[]'); } catch (_) {}
-          const match = items.some((it) => (it.sku || '').toLowerCase().includes(sku));
-          if (!match) return false;
-        }
-        return true;
-      });
+      // Filter at the item level, then rebuild sessions from matching items
+      const filteredSessions = allSessions
+        .filter((s) => {
+          if (supplier && s.supplier.toLowerCase() !== supplier) return false;
+          if (dateFrom && s.date < dateFrom) return false;
+          if (dateTo   && s.date > dateTo)   return false;
+          return true;
+        })
+        .map((s) => {
+          const filteredItems = s.items.filter((item) => {
+            if (product && !item.productName.toLowerCase().includes(product)) return false;
+            if (temp === 'pass')    return item.tempPass === true;
+            if (temp === 'fail')    return item.tempPass === false;
+            if (temp === 'checked') return item.requiresTemp;
+            return true;
+          });
+          return { ...s, items: filteredItems };
+        })
+        .filter((s) => s.items.length > 0);
 
-      const total = allDeliveries.length;
-      const shown = filtered.length;
+      const totalItems   = allSessions.reduce((n, s) => n + s.items.length, 0);
+      const shownItems   = filteredSessions.reduce((n, s) => n + s.items.length, 0);
       resultsMeta.hidden = false;
-      resultsMeta.innerHTML = `Showing <strong>${shown}</strong> of <strong>${total}</strong> deliveries`;
+      resultsMeta.innerHTML = `Showing <strong>${shownItems}</strong> of <strong>${totalItems}</strong> received items across <strong>${filteredSessions.length}</strong> session${filteredSessions.length !== 1 ? 's' : ''}`;
 
-      renderResults(filtered);
+      renderResults(filteredSessions);
     }
 
     // ── Render ───────────────────────────────────────────────────
-    function renderResults(deliveries) {
-      if (deliveries.length === 0) {
-        resultsEl.innerHTML = `
-          <div class="no-results">
-            <strong>No deliveries found</strong>
-            Try adjusting your filters.
-          </div>`;
+    function renderResults(sessions) {
+      if (sessions.length === 0) {
+        resultsEl.innerHTML = `<div class="no-results"><strong>No records found</strong>Try adjusting your filters.</div>`;
         return;
       }
-      resultsEl.innerHTML = deliveries.map((d) => renderCard(d)).join('');
 
-      // Wire expand/collapse
-      resultsEl.querySelectorAll('.card-summary').forEach((summary) => {
-        summary.addEventListener('click', () => {
-          summary.closest('.delivery-card').classList.toggle('open');
-        });
+      resultsEl.innerHTML = sessions.map((s) => renderSession(s)).join('');
+
+      resultsEl.querySelectorAll('.session-summary').forEach((el) => {
+        el.addEventListener('click', () => el.closest('.session-card').classList.toggle('open'));
       });
     }
 
-    function renderCard(d) {
-      const customer  = escapeHtml(d.customer || d.location || '—');
-      const date      = escapeHtml(d.date || '—');
-      const type      = (d.type || 'delivery').toLowerCase();
-      const typeLabel = type === 'pickup' ? 'Pickup' : 'Delivery';
-      const status    = d.status || 'scheduled';
-      const statusLabels = { scheduled: 'Scheduled', delivered: 'Delivered', picked_up: 'Picked Up', cancelled: 'Cancelled' };
-      const statusLabel  = escapeHtml(statusLabels[status] || status);
+    function renderSession(s) {
+      const dateLabel    = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+      const supplierLabel = supplierName(s.supplier);
+      const hasFail      = s.items.some((i) => i.tempPass === false);
+      const itemCount    = s.items.length;
 
-      // Line items
-      let items = [];
-      try { items = JSON.parse(d.lineItems || '[]'); } catch (_) {}
-      const itemsHtml = items.length
-        ? items.map((it) => `<div class="line-item"><span class="sku">${escapeHtml(it.sku || '—')}</span><span class="qty">× ${escapeHtml(String(it.quantity ?? '?'))}</span></div>`).join('')
-        : '<div class="line-item empty">No line items</div>';
-
-      // Barcodes
-      const barcodes = Array.isArray(d.barcodes) ? d.barcodes : [];
-      const barcodesHtml = barcodes.length
-        ? barcodes.map((b) => `<code class="barcode-chip">${escapeHtml(b)}</code>`).join('')
-        : '<span class="empty-value">None recorded</span>';
-
-      // Confirmation
-      let confirmHtml = '<span class="empty-value">Not yet confirmed</span>';
-      if (d.confirmation && d.confirmation.confirmedBy) {
-        const ts = d.confirmation.confirmTimestamp
-          ? new Date(d.confirmation.confirmTimestamp).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
-          : '—';
-        confirmHtml = `
-          <div class="confirm-row"><strong>Confirmed by:</strong> ${escapeHtml(d.confirmation.confirmedBy)}</div>
-          <div class="confirm-row"><strong>At:</strong> ${escapeHtml(ts)}</div>
-          ${d.confirmation.confirmNote ? `<div class="confirm-row"><strong>Note:</strong> ${escapeHtml(d.confirmation.confirmNote)}</div>` : ''}`;
-      }
+      const itemsHtml = s.items.map((item) => {
+        const tempHtml = item.requiresTemp && item.temperature !== null
+          ? `<span class="item-temp">${item.temperature}°F<span class="temp-badge ${item.tempPass ? 'pass' : 'fail'}">${item.tempPass ? '✓ Pass' : '✗ Fail'}</span></span>`
+          : `<span class="item-temp no-temp">No temp req.</span>`;
+        return `
+          <div class="item-row${item.tempPass === false ? ' temp-fail' : ''}">
+            <div class="item-name-wrap">
+              <div class="item-name">${escapeHtml(item.productName)}</div>
+              ${item.packSize ? `<div class="item-pack">${escapeHtml(item.packSize)}</div>` : ''}
+            </div>
+            ${tempHtml}
+          </div>`;
+      }).join('');
 
       return `
-        <div class="delivery-card status-${escapeHtml(status)}">
-          <div class="card-summary">
-            <span class="summary-customer">${customer}</span>
-            <span class="summary-date">${date}</span>
-            <div class="summary-badges">
-              <span class="badge badge-type">${escapeHtml(typeLabel)}</span>
-              <span class="badge badge-status-${escapeHtml(status)}">${statusLabel}</span>
+        <div class="session-card">
+          <div class="session-summary">
+            <div class="session-info">
+              <div class="session-date">${escapeHtml(dateLabel)}</div>
+              <div class="session-meta">Received by ${escapeHtml(s.receivedBy || '—')}</div>
             </div>
+            <div class="session-badges">
+              <span class="badge badge-supplier">${escapeHtml(supplierLabel)}</span>
+              ${hasFail ? '<span class="badge badge-fail">Temp Fail</span>' : ''}
+            </div>
+            <span class="item-count">${itemCount} item${itemCount !== 1 ? 's' : ''}</span>
             <span class="expand-icon">&#8964;</span>
           </div>
-          <div class="card-body">
-            <div class="detail-section">
-              <div class="detail-label">Order Items</div>
-              <div class="line-items">${itemsHtml}</div>
+          <div class="session-body">
+            <div class="received-by-row">
+              <strong>Supplier:</strong> ${escapeHtml(supplierLabel)} &nbsp;·&nbsp;
+              <strong>Received by:</strong> ${escapeHtml(s.receivedBy || '—')} &nbsp;·&nbsp;
+              <strong>Date:</strong> ${escapeHtml(s.date || '—')}
             </div>
-            <div class="detail-section">
-              <div class="detail-label">Barcodes</div>
-              <div class="barcode-chips">${barcodesHtml}</div>
-            </div>
-            <div class="detail-section">
-              <div class="detail-label">Confirmation</div>
-              ${confirmHtml}
-            </div>
+            ${itemsHtml}
           </div>
         </div>`;
     }
 
-    // ── Utilities ─────────────────────────────────────────────────
+    function supplierName(val) {
+      if (!val) return '—';
+      if (val === 'usfoods') return 'US Foods';
+      if (val === 'sysco')   return 'Sysco';
+      return val;
+    }
+
     function escapeHtml(s) {
       return String(s)
         .replace(/&/g, '&amp;')
