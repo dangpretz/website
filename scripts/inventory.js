@@ -884,10 +884,18 @@ export function scheduleCheese({
     });
   });
 
-  // Starting inventory = effective cf for cheese (cheese_done credits live
-  // here too — same convention as dough). Frozen is unused for cheese
-  // (it's refrigerated, not frozen).
-  const startInventory = (inventoryReport?.effective?.coldFerment?.[CHEESE_SKU_KEY]) || 0;
+  // Starting inventory = effective cf + fr for cheese.
+  //   - cheese_done log entries credit `cf` (the dough convention we
+  //     reused for batches-on-hand).
+  //   - The Stock tab's manual count writes to BOTH `cf` and `fr` from a
+  //     single user-entered "on hand" number; for items without a real
+  //     dough/baking lifecycle (cheese, bulk dip, etc.) the value lands
+  //     in `fr`. Sum both so a manual stock count reflects in the
+  //     scheduler — otherwise scheduleCheese sees 0 and force-overdues
+  //     every upcoming batch even when the fridge is full.
+  const cfStart = inventoryReport?.effective?.coldFerment?.[CHEESE_SKU_KEY] || 0;
+  const frStart = inventoryReport?.effective?.frozen?.[CHEESE_SKU_KEY] || 0;
+  const startInventory = cfStart + frStart;
 
   // Walk forward. Track running stock. When stock would go negative on day i,
   // schedule a batch on the latest valid day inside the [i-MAX_LEAD, i-MIN_LEAD]
