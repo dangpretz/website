@@ -549,7 +549,7 @@
       PRODUCTS.push(newProduct);
       try { await appendLog(LOG_PATH, { action: 'new_product', usFoodsCode: code, productName: name, packSize, requiresTemp: String(reqTemp), timeStamp: new Date().toISOString(), addedBy: nameInput.value.trim() }); } catch (_) {}
       newProductForm.hidden = true;
-      showToast('Product added — remember to add it to the code!', 'success');
+      showToast('Product saved and available for future sessions', 'success');
       showProductCard(newProduct);
     });
 
@@ -660,6 +660,20 @@
     }
 
     function buildSessions(logs) {
+      // Re-load any products added via the unknown-product form in past sessions
+      logs.filter((r) => r.action === 'new_product').forEach((r) => {
+        const exists = PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode);
+        if (!exists && r.usFoodsCode && r.productName) {
+          PRODUCTS.push({
+            id:           `new-${r.usFoodsCode}`,
+            name:         r.productName,
+            packSize:     r.packSize    || '',
+            requiresTemp: r.requiresTemp === 'true',
+            usFoodsCode:  r.usFoodsCode,
+          });
+        }
+      });
+
       const map = {};
       logs.filter((r) => r.action === 'receive').forEach((r) => {
         const sid = r.sessionId || `legacy-${r.timeStamp}`;
