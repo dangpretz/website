@@ -1045,19 +1045,21 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-06-cases-pack';
+  } from '../../scripts/inventory.js?v=2026-05-07-pack-list-shape-only';
 
-  // Feature flag — shape-only catering + box expansion. Off by default; turn
-  // on per-device with ?shapeonly=1 (sticky via localStorage) or
-  // localStorage.setItem('shapeOnly2026','on') in dev tools. Set
-  // localStorage.shapeOnly2026 = 'off' to disable.
+  // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
+  // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
+  // count dough as ready (FOH bakes them fresh at fulfillment).
+  // Override per-device with ?shapeonly=0 (sticky via localStorage) if
+  // an issue surfaces. ?shapeonly=1 force-enables (clears any prior
+  // 'off' override).
   const SHAPE_ONLY_ENABLED = (() => {
     try {
       const url = new URLSearchParams(window.location.search).get('shapeonly');
-      if (url === '1' || url === 'on') localStorage.setItem('shapeOnly2026', 'on');
+      if (url === '1' || url === 'on') localStorage.removeItem('shapeOnly2026');
       else if (url === '0' || url === 'off') localStorage.setItem('shapeOnly2026', 'off');
-      return localStorage.getItem('shapeOnly2026') === 'on';
-    } catch (_) { return false; }
+      return localStorage.getItem('shapeOnly2026') !== 'off';
+    } catch (_) { return true; }
   })();
 
   // FOH cheese consumption — fetched from the worker on load. Updated on
@@ -2408,14 +2410,34 @@
     // contributes to. Reads case info from each line item's optional
     // caseSize/caseCount; falls back to ceil(quantity / defaultCaseSize)
     // for legacy line items.
+    //
+    // Pack window = bake-allocation dates ∪ TODAY. Today's deliveries
+    // always belong on the pack list — even if BFP isn't baking for them
+    // (e.g. today's order is fully covered by frozen stock). Otherwise the
+    // BFP team can't see "what's shipping right now" without flipping
+    // views.
     let packListHtml = '';
-    if (isBFP && Array.isArray(d.deliveryDates) && d.deliveryDates.length > 0) {
+    const todayShipStr = (function () {
+      try {
+        return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+      } catch (_) {
+        return new Date().toISOString().slice(0, 10);
+      }
+    })();
+    const hasBakeDates = Array.isArray(d.deliveryDates) && d.deliveryDates.length > 0;
+    if (isBFP && hasBakeDates) {
       const dateSet = new Set(d.deliveryDates);
+      dateSet.add(todayShipStr);
       const defaultCs = getCaseSize(d.sku) || 0;
       const packs = [];
       allDeliveries.forEach((deliv) => {
         if (!dateSet.has(deliv.date)) return;
         if (['delivered','picked_up','cancelled'].includes(deliv.status)) return;
+        // Shape-only deliveries (catering boxes, FOH Placeholder) leave the
+        // pipeline at the dough stage — FOH bakes + boxes them fresh at
+        // fulfillment. BFP doesn't pack these, so they don't belong on
+        // the BFP pack list.
+        if (deliv._shapeOnly) return;
         let items = [];
         try { items = JSON.parse(deliv.lineItems || '[]'); } catch (_) {}
         items.forEach((it) => {
@@ -3994,19 +4016,101 @@
     document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val')
     || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null);
 
+  // Track when the current worker session started so we don't toast diffs
+  // accumulated before they sat down (first refresh after page load is a
+  // sync, not an "update").
+  let _workerDiffArmed = false;
+
   async function softRefresh() {
     if (_isInputBusy()) return;
+    // Snapshot prev schedule for the worker-view diff toast. Manager view
+    // already sees diffs on saveStock; soft-refreshes there are silent.
+    const prevSched = (_isWorkerView && _workerDiffArmed) ? schedule : null;
     try {
       await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       // Skip render if user just started typing during the network call
       if (!_isInputBusy()) render();
+      // Surface team-relevant schedule shifts so the dough/BFP team can see
+      // what changed instead of "wait, my number went from 3 to 4 mid-shift".
+      if (prevSched) {
+        try {
+          const diff = filterDiffForRole(diffSchedules(prevSched, schedule), userRole);
+          if (diff.perDay.length > 0 || diff.newOverdue.length > 0) {
+            showWorkerRefreshDiffToast(diff);
+          }
+        } catch (toastErr) { console.warn('worker refresh diff skipped:', toastErr); }
+      }
+      _workerDiffArmed = _isWorkerView; // arm AFTER first successful refresh
     } catch (_) { /* network blip — next interval will retry */ }
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') softRefresh();
   });
   setInterval(softRefresh, 60_000);
+
+  /**
+   * Filter a schedule diff to entries that matter to a single team.
+   * Shape worker sees only deltaShape; BFP worker sees only deltaBfp;
+   * manager would see everything (but doesn't get this toast — saveStock
+   * already covers them).
+   */
+  function filterDiffForRole(diff, role) {
+    const teamKey = role === 'shape' ? 'deltaShape' : 'deltaBfp';
+    return {
+      perDay: (diff.perDay || []).filter(d => Math.abs(d[teamKey] || 0) >= 0.01),
+      newOverdue: (diff.newOverdue || []).filter(o => o.team === role),
+    };
+  }
+
+  /**
+   * Soft "schedule changed" toast for the worker view's auto-refresh.
+   * Different framing from showScheduleDiffToast (which is tied to manager
+   * stock saves). Single-team perspective — only the worker's own batches.
+   */
+  function showWorkerRefreshDiffToast({ perDay, newOverdue }) {
+    document.querySelectorAll('.schedule-diff-toast').forEach(n => n.remove());
+    const toast = document.createElement('div');
+    toast.className = 'schedule-diff-toast worker-refresh';
+    if (newOverdue.length > 0) toast.classList.add('has-overdue');
+
+    const titleText = appLang === 'es'
+      ? '✏️ Cronograma actualizado'
+      : '✏️ Schedule updated';
+
+    const teamKey = userRole === 'shape' ? 'deltaShape' : 'deltaBfp';
+    let rowsHtml = '';
+    if (newOverdue.length > 0) {
+      const list = newOverdue.map(o => `<strong>${esc(o.sku)}</strong>`).join(', ');
+      const label = appLang === 'es' ? `🚨 Nuevo atrasado: ${list}` : `🚨 New overdue: ${list}`;
+      rowsHtml += `<div class="schedule-diff-toast-row"><span class="day"></span><span class="sub">${label}</span></div>`;
+    }
+    perDay.forEach((entry) => {
+      const delta = entry[teamKey] || 0;
+      if (Math.abs(delta) < 0.01) return;
+      const dayLabel = fmtFull(parseDate(entry.date));
+      const rounded = Math.round(delta);
+      const sign = rounded > 0 ? `+${rounded}` : `${rounded}`;
+      const cls  = rounded > 0 ? 'add' : 'sub';
+      const word = (Math.abs(rounded) === 1)
+        ? (appLang === 'es' ? 'tanda' : 'batch')
+        : (appLang === 'es' ? 'tandas' : 'batches');
+      rowsHtml += `<div class="schedule-diff-toast-row">
+        <span class="day">${esc(dayLabel)}</span>
+        <span class="${cls}">${sign} ${word}</span>
+      </div>`;
+    });
+    const dismiss = appLang === 'es' ? 'Toca para cerrar' : 'Tap to dismiss';
+    toast.innerHTML = `
+      <div class="schedule-diff-toast-title">${titleText}</div>
+      ${rowsHtml}
+      <div class="schedule-diff-toast-dismiss">${dismiss}</div>`;
+
+    document.body.appendChild(toast);
+    const remove = () => toast.remove();
+    toast.addEventListener('click', remove);
+    setTimeout(remove, 8000);
+  }
 
   // Extra sheet
   document.getElementById('extra-save').addEventListener('click', saveExtra);
