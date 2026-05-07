@@ -1816,17 +1816,13 @@ export default {
     }
   },
 
-  // Cron entry point — fires per the [triggers] crons in wrangler.toml.
-  // Same logic as POST /admin/foh-cal-sync, but unauthenticated (Cloudflare
-  // only invokes this for our scheduled trigger). ctx.waitUntil keeps the
-  // worker alive past the scheduled() return until the sync completes.
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(
-      syncFohCalendar(env).then((s) => {
-        console.log('FOH cal sync:', JSON.stringify(s));
-      }).catch((err) => {
-        console.error('FOH cal sync failed:', err);
-      }),
-    );
+  // Cron entry point — DISABLED 2026-05-06. myecalendar requires a paid
+  // Magic Import subscription to consume external iCal URLs, so the email-
+  // invite path was abandoned. Pivoting to a self-hosted /foh-schedule page.
+  // Stub left in place (returns immediately, sends nothing) as a safety net
+  // in case Cloudflare's cron triggers are slow to fully unregister after
+  // the wrangler.toml `crons = []` change.
+  async scheduled(_event, _env, _ctx) {
+    console.log('FOH cal cron fired but is disabled — no-op');
   },
 };

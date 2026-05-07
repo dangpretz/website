@@ -21,5 +21,8 @@ id = "3f111dbe5ac44c7e9b168f8049754b22"
 
 # Cron — every 30 min. Sends new/changed events as METHOD:REQUEST and
 # disappeared events as METHOD:CANCEL to getdangerous@myecalendar.com.
+# DISABLED 2026-05-06: Resend's MIME structure (attachment-only) isn't being
+# recognized by myecalendar. Investigating proper iMIP via raw-MIME provider
+# (Mailgun) OR pivot to Google Calendar share. Re-enable once delivery works.
 [triggers]
-crons = ["*/30 * * * *"]
+crons = []
