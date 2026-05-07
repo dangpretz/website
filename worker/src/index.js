@@ -1538,6 +1538,78 @@ async function handleFohCalSync(request, env) {
   return json(summary);
 }
 
+// myecalendar's "Magic Import" parses plain-text email bodies (no .ics).
+// Per https://www.ecalendar.com/magicimport — recipient = virtual mailbox,
+// subject = category name, body = natural-language event list. Sender must
+// match the registered account email (drew@dangerouspretzel.com here).
+//
+// This handler sends ONE test email so we can confirm the format works
+// before committing to a full sync refactor.
+async function handleFohCalTest(request, env) {
+  const authErr = checkAdminToken(request, env);
+  if (authErr) return authErr;
+  const url = new URL(request.url);
+  const fromOverride = url.searchParams.get('from'); // optional override
+  const fromAddr = fromOverride || 'Drew Feller <drew@dangerouspretzel.com>';
+  const subject = 'DPC Production';
+  // Natural-language event lines — Magic Import uses an AI parser, so plain
+  // English with explicit dates/times is the safest bet. One short test
+  // event today + one tomorrow + one with a specific time so we can see how
+  // each kind of event surfaces.
+  const today = todayMountain();
+  const tomorrow = addOneDay(today);
+  const niceDate = (yyyymmdd) => {
+    const [y, m, d] = yyyymmdd.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+      timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    });
+  };
+  const eventsText = [
+    `${niceDate(today)} 9:00 AM: Make 1 batch of cheese dip (1 hour)`,
+    `${niceDate(tomorrow)} 9:00 AM: Make 1 batch of cheese dip (1 hour)`,
+    `${niceDate(tomorrow)} 2:00 PM: Catering pickup for Test Customer (30 minutes)`,
+  ].join('\n');
+
+  const body = `DPC Production schedule test — see attached events.txt.\n\n${eventsText}`;
+
+  const variant = url.searchParams.get('variant') || 'attached';
+  // 'attached' = body + .txt attachment (Magic Import docs explicitly list
+  //              TXT as an attachment format)
+  // 'body'     = body text only (already tested, didn't work)
+  const payload = {
+    from: fromAddr,
+    to: [FOH_CAL_RECIPIENT],
+    subject,
+    text: body,
+  };
+  if (variant === 'attached') {
+    payload.attachments = [{
+      filename: 'events.txt',
+      content: btoa(unescape(encodeURIComponent(eventsText))),
+      content_type: 'text/plain; charset=UTF-8',
+    }];
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const respBody = await res.json().catch(() => ({}));
+  return json({
+    ok: res.ok,
+    status: res.status,
+    sentFrom: fromAddr,
+    sentTo: FOH_CAL_RECIPIENT,
+    subject,
+    bodyPreview: body,
+    resendResponse: respBody,
+  });
+}
+
 // ─── END FOH CALENDAR EMAIL-INVITE SYNC ───────────────────────────────────
 
 export default {
@@ -1597,6 +1669,14 @@ export default {
       } catch (err) {
         console.error('FOH cal sync error:', err);
         return json({ error: err.message || 'FOH cal sync failed' }, 500);
+      }
+    }
+    if (url.pathname === '/admin/foh-cal-test' && request.method === 'POST') {
+      try {
+        return await handleFohCalTest(request, env);
+      } catch (err) {
+        console.error('FOH cal test error:', err);
+        return json({ error: err.message || 'FOH cal test failed' }, 500);
       }
     }
     if (url.pathname === '/webhooks/square' && request.method === 'POST') {
