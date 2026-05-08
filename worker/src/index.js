@@ -1184,6 +1184,29 @@ function buildCheeseEvent({ batch, dtstamp }) {
   return lines.join('\r\n');
 }
 
+// Generic dip-batch event builder — used for the 4 retail dips. Cheese keeps
+// its existing buildCheeseEvent (different UID prefix, different description
+// emphasis on covers + shelf life) for backward compatibility with calendars
+// that already imported those events.
+function buildDipBatchEvent({ dipSku, cfg, batch, dtstamp }) {
+  const uid = `${cfg.key}-batch-${batch.date}@dangpretz`;
+  const sizeStr = batch.size === 'double' ? ' double' : '';
+  const summary = `${cfg.emoji} Make 1${sizeStr} ${cfg.label} batch (${batch.units})${batch.overdue ? ' (overdue!)' : ''}`;
+  const lines = [
+    'BEGIN:VEVENT',
+    icsFold(`UID:${uid}`),
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${icsDateAllDay(batch.date)}`,
+    `DTEND;VALUE=DATE:${icsDateAllDay(addOneDay(batch.date))}`,
+    icsFold(`SUMMARY:${icsEscape(summary)}`),
+  ];
+  const desc = `${batch.units} ${cfg.label} dips per batch. Use within ${cfg.shelfLifeDays} days. FOH walk-in average ~${Math.round(batch.foh * 10) / 10} dips/day.`;
+  lines.push(icsFold(`DESCRIPTION:${icsEscape(desc)}`));
+  lines.push(icsFold('URL:https://drewfeller.com/static/production/'));
+  lines.push('END:VEVENT');
+  return lines.join('\r\n');
+}
+
 function addOneDay(yyyymmdd) {
   const [y, m, d] = yyyymmdd.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -1261,16 +1284,21 @@ async function handleFohCalendar(request, env) {
     getBatchSize: meta.getBatchSize,
   });
 
-  // Square FOH walk-in rate. Fail-soft: if Square errors, use 0.
-  let dailyAvg = 0;
+  // Per-dip Square consumption (single Square scan returns all 5 dips).
+  // Fail-soft: if Square errors, retail dips fall through to 0/day demand
+  // (no upcoming batches scheduled until next refresh).
+  let dipAvgs = {};
   try {
-    const c = await fetchSquareCheeseConsumption(env, 28);
-    dailyAvg = c.dailyAvg || 0;
+    const dipData = await fetchSquareDipConsumption(env, 28);
+    Object.entries(dipData.dips || {}).forEach(([sku, info]) => {
+      dipAvgs[sku] = Number(info.dailyAvg) || 0;
+    });
   } catch (_) { /* best-effort */ }
+  const dailyAvg = dipAvgs[CHEESE_KEY] || 0; // legacy alias for cheese-only callers
 
   const today = todayMountain();
 
-  // Cheese batches.
+  // Cheese batches (kept on existing buildCheeseEvent for UID continuity).
   const cheese = scheduleCheese({
     deliveries: allDeliveries,
     inventoryReport,
@@ -1278,6 +1306,24 @@ async function handleFohCalendar(request, env) {
     today,
     skuAliases: prod.skuAliases,
     lookaheadDays: 14,
+  });
+
+  // 4 retail dips — same scheduleDip per dip, emitted via buildDipBatchEvent.
+  const retailDipBatches = [];
+  Object.entries(DIP_CONFIG).forEach(([dipSku, cfg]) => {
+    if (dipSku === CHEESE_KEY) return; // cheese already scheduled above
+    const sched = scheduleDip({
+      dipSku,
+      deliveries: allDeliveries,
+      inventoryReport,
+      fohDailyAvg: dipAvgs[dipSku] || 0,
+      today,
+      skuAliases: prod.skuAliases,
+      lookaheadDays: 14,
+    });
+    sched.batches.forEach((batch) => {
+      retailDipBatches.push({ dipSku, cfg, batch });
+    });
   });
 
   // Upcoming catering deliveries (next 30 days, scheduled status).
@@ -1297,6 +1343,7 @@ async function handleFohCalendar(request, env) {
   const dtstamp = icsDateUTC(new Date());
   const events = [
     ...cheese.batches.map((batch) => buildCheeseEvent({ batch, dtstamp })),
+    ...retailDipBatches.map(({ dipSku, cfg, batch }) => buildDipBatchEvent({ dipSku, cfg, batch, dtstamp })),
     ...cateringDeliveries.map((delivery) => buildCateringEvent({ delivery, dtstamp })),
   ];
 
