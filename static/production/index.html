@@ -987,6 +987,7 @@
       <div id="cfg-mode-bar" style="display:flex;background:var(--gray-1);border-radius:10px;padding:3px;gap:3px;margin-bottom:16px">
         <button class="cfg-mode-btn active" data-cfg-mode="config" id="cfg-newtab" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:var(--white);font:700 13px 'Manrope',sans-serif;color:var(--dark);box-shadow:0 1px 4px rgba(0,0,0,0.10);cursor:pointer">New SKU</button>
         <button class="cfg-mode-btn" data-cfg-mode="alias" id="cfg-aliastab" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:none;font:700 13px 'Manrope',sans-serif;color:var(--gray-4);cursor:pointer">Map to existing</button>
+        <button class="cfg-mode-btn" data-cfg-mode="box" id="cfg-boxtab" style="flex:1;padding:10px 6px;border:none;border-radius:8px;background:none;font:700 13px 'Manrope',sans-serif;color:var(--gray-4);cursor:pointer">Box mapping</button>
       </div>
 
       <div id="cfg-config-panel">
@@ -1025,6 +1026,17 @@
           Map to canonical SKU
         </label>
         <select id="cfg-alias-target" class="extra-sku-select" style="margin-bottom:8px"></select>
+      </div>
+
+      <div id="cfg-box-panel" style="display:none">
+        <p id="cfg-box-help" style="font:400 13px 'Manrope',sans-serif;color:var(--gray-4);margin-bottom:12px">
+          A catering box that contains multiple of one or more pretzel/dip SKUs. Each line below adds units of a real SKU when an order includes 1× this box.
+        </p>
+        <div id="cfg-box-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+        <button class="btn-secondary" id="cfg-box-add-row" type="button" style="width:100%;padding:10px;background:none;border:1.5px dashed var(--gray-2);border-radius:10px;color:var(--gray-4);font:700 13px 'Manrope',sans-serif;cursor:pointer;margin-bottom:12px">+ Add a SKU to this box</button>
+        <p style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3);margin:0">
+          Example: <em>Catering: Honey Mustard Dip Box</em> → 12 × <em>honey mustard dip</em>.
+        </p>
       </div>
     </div>
     <div class="sheet-footer">
@@ -3843,6 +3855,39 @@
     });
     document.getElementById('cfg-config-panel').style.display = mode === 'config' ? '' : 'none';
     document.getElementById('cfg-alias-panel').style.display  = mode === 'alias'  ? '' : 'none';
+    document.getElementById('cfg-box-panel').style.display    = mode === 'box'    ? '' : 'none';
+  }
+
+  // Render one box-mapping row: SKU dropdown + multiplier input + remove btn.
+  // Existing rows seeded from skuConfig[cfgSku].expandsTo when re-opening
+  // the sheet for a previously-mapped box.
+  function renderCfgBoxRow(initialSku, initialMul) {
+    const row = document.createElement('div');
+    row.className = 'cfg-box-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 36px;gap:6px;align-items:center';
+    const skuSelect = document.createElement('select');
+    skuSelect.className = 'cfg-box-sku extra-sku-select';
+    skuSelect.style.margin = '0';
+    skuSelect.innerHTML = '<option value="">Pick SKU…</option>'
+      + allSkus.filter(s => s !== cfgSku).map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    if (initialSku) skuSelect.value = initialSku;
+    const mulInput = document.createElement('input');
+    mulInput.type = 'number';
+    mulInput.min = '1';
+    mulInput.placeholder = 'qty';
+    mulInput.className = 'cfg-box-mul';
+    mulInput.style.cssText = 'padding:10px;border:1.5px solid var(--gray-2);border-radius:8px;width:100%;box-sizing:border-box';
+    if (initialMul) mulInput.value = String(initialMul);
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = '×';
+    removeBtn.style.cssText = 'background:none;border:1px solid var(--gray-2);border-radius:8px;padding:8px;font-size:18px;color:var(--gray-4);cursor:pointer';
+    removeBtn.addEventListener('click', () => row.remove());
+    row.appendChild(skuSelect);
+    row.appendChild(mulInput);
+    row.appendChild(removeBtn);
+    document.getElementById('cfg-box-rows').appendChild(row);
+    return row;
   }
 
   function openCfgSheet(sku) {
@@ -3861,7 +3906,22 @@
       .filter(s => s !== sku) // can't alias to self
       .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
 
-    setCfgMode('config'); // default to config tab
+    // Seed box-mapping rows from existing skuConfig.expandsTo. If empty,
+    // start with one blank row so the manager has something to fill in.
+    const boxRowsContainer = document.getElementById('cfg-box-rows');
+    boxRowsContainer.innerHTML = '';
+    const existing = skuConfig[sku]?.expandsTo || [];
+    if (existing.length > 0) {
+      existing.forEach((e) => renderCfgBoxRow(e.sku, e.multiplier));
+    } else {
+      renderCfgBoxRow('', '');
+    }
+
+    // Default to box mode if the SKU name starts with "Catering:" — likely a
+    // box, and that's almost certainly what the manager opened the sheet for.
+    // Otherwise default to the existing config tab.
+    const looksLikeBox = /^catering:/i.test(sku);
+    setCfgMode(looksLikeBox ? 'box' : 'config');
     document.getElementById('cfg-overlay').classList.add('open');
   }
 
@@ -3874,6 +3934,26 @@
         if (!target) { alert('Pick a target SKU first'); throw new Error('No target'); }
         await appendLog(PRODUCTION_LOG, {
           action: 'sku_alias', from: cfgSku, to: target,
+          timeStamp: new Date().toISOString(),
+        });
+      } else if (cfgMode === 'box') {
+        // Read all rows in the box-mapping panel; each row contributes one
+        // entry to expandsTo if both fields are filled. Empty rows ignored.
+        const rows = [...document.querySelectorAll('#cfg-box-rows .cfg-box-row')];
+        const expandsTo = rows.map((r) => {
+          const sku = r.querySelector('.cfg-box-sku').value.trim();
+          const multiplier = parseInt(r.querySelector('.cfg-box-mul').value, 10) || 0;
+          return sku && multiplier > 0 ? { sku, multiplier } : null;
+        }).filter(Boolean);
+        if (expandsTo.length === 0) {
+          alert('Add at least one SKU + quantity (or use "Map to existing" if you just want to alias).');
+          throw new Error('No expansions');
+        }
+        await appendLog(PRODUCTION_LOG, {
+          action: 'sku_config', sku: cfgSku,
+          batchSize: '0', traySize: '0', caseSize: '0',
+          type: 'box',
+          expandsTo: JSON.stringify(expandsTo),
           timeStamp: new Date().toISOString(),
         });
       } else {
@@ -3892,10 +3972,14 @@
       }
       document.getElementById('cfg-overlay').classList.remove('open');
       await loadProduction();
+      // Box-mapping changes affect the resolved delivery line items, so we
+      // must re-resolve before rebuilding the schedule. Pretzel/SKU config
+      // changes only affect downstream — schedule rebuild covers them.
+      resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
     } catch (e) {
-      if (!['No target', 'No size'].includes(e.message)) alert('Error saving: ' + e.message);
+      if (!['No target', 'No size', 'No expansions'].includes(e.message)) alert('Error saving: ' + e.message);
     } finally {
       saveBtn.disabled = false; saveBtn.textContent = 'Save';
     }
@@ -4249,6 +4333,7 @@
   document.getElementById('cfg-save').addEventListener('click', saveCfg);
   document.getElementById('cfg-cancel').addEventListener('click', () =>
     document.getElementById('cfg-overlay').classList.remove('open'));
+  document.getElementById('cfg-box-add-row').addEventListener('click', () => renderCfgBoxRow('', ''));
   document.getElementById('cfg-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('cfg-overlay'))
       document.getElementById('cfg-overlay').classList.remove('open');
