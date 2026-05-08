@@ -729,17 +729,41 @@ export function getInventoryReport(args) {
       let items = [];
       try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
       const cust = delivery.customer || delivery.location || '?';
+      // Shape-only deliveries (catering boxes, FOH Placeholder) leave the
+      // pipeline at the dough stage — FOH bakes them fresh from coldFerment
+      // at fulfillment, so deduct from `cf` instead of `fr`. Frozen never
+      // had these pretzels, so the fr deduction would be a no-op anyway,
+      // but we skip it to keep flow accounting clean.
+      const isShapeOnly = !!delivery._shapeOnly;
       items.forEach(({ sku, quantity }) => {
         let key = sku?.trim();
         if (!key) return;
         if (skuAliases[key]) key = skuAliases[key];
         const qty = Number(quantity) || 0;
         if (qty <= 0) return;
-        if (fr[key] != null) fr[key] = Math.max(0, fr[key] - qty);
+        if (isShapeOnly) {
+          // Deduct from cf FIFO (matches BFP-done's consumption pattern).
+          if (cf[key] != null) cf[key] = Math.max(0, cf[key] - qty);
+          if (doughQueue[key]) {
+            let toConsume = qty;
+            while (toConsume > 0 && doughQueue[key].length > 0) {
+              const oldest = doughQueue[key][0];
+              const take = Math.min(oldest.pretzels, toConsume);
+              oldest.pretzels -= take;
+              toConsume -= take;
+              if (oldest.pretzels <= 0) doughQueue[key].shift();
+            }
+          }
+        } else if (fr[key] != null) {
+          fr[key] = Math.max(0, fr[key] - qty);
+        }
         // onHand bucket: lifecycle-less SKUs (cheese, dips) live here.
-        // Until the first post-Phase-3a snapshot lands, oh[cheese] is
-        // undefined and fr deduction handles it. Once oh is populated,
-        // fr[cheese] = 0 so the fr line is a harmless no-op.
+        // Independent of shape-only — a delivery with cheese in line items
+        // consumes onHand whether it's a shape-only catering box or a
+        // regular catering invoice. Pre-Phase-3a snapshots had cheese in
+        // fr; the fr branch above handles the legacy case for non-shape-only
+        // (and shape-only catering boxes don't usually contain cheese SKUs
+        // directly anyway).
         if (oh[key] != null) oh[key] = Math.max(0, oh[key] - qty);
         if (!flowDelivered[key]) flowDelivered[key] = [];
         flowDelivered[key].push({ customer: cust, qty, confirmedAt: delivery._confirmedAt || '' });
@@ -750,20 +774,26 @@ export function getInventoryReport(args) {
   Object.keys(fr).forEach((k) => { fr[k] = Math.max(0, Math.round(fr[k])); });
   Object.keys(oh).forEach((k) => { oh[k] = Math.max(0, Math.round(oh[k])); });
 
-  // Aging dough alerts
+  // Aging dough alerts. Per-SKU thresholds: dips configured in DIP_CONFIG
+  // use their `shelfLifeDays` (warn one day before, fail at). Pretzels and
+  // anything else fall back to the global DOUGH_AGE_WARN_DAYS / FAIL_DAYS.
   const now = Date.now();
   const agingDough = [];
   Object.entries(doughQueue).forEach(([sku, queue]) => {
+    const dipCfg = DIP_CONFIG[sku];
+    const failAt = dipCfg ? dipCfg.shelfLifeDays : DOUGH_AGE_FAIL_DAYS;
+    const warnAt = dipCfg ? Math.max(1, dipCfg.shelfLifeDays - 1) : DOUGH_AGE_WARN_DAYS;
     queue.forEach((entry) => {
       if (entry.pretzels <= 0) return;
       const ageMs = now - new Date(entry.ts).getTime();
       const ageDays = ageMs / 86400000;
-      if (ageDays >= DOUGH_AGE_WARN_DAYS) {
+      if (ageDays >= warnAt) {
         agingDough.push({
           sku,
           ageDays: Math.floor(ageDays),
           pretzels: Math.round(entry.pretzels),
-          critical: ageDays >= DOUGH_AGE_FAIL_DAYS,
+          critical: ageDays >= failAt,
+          shelfLifeDays: failAt,
         });
       }
     });
