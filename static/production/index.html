@@ -1040,12 +1040,13 @@
     BATCH_SIZES, CASE_SIZES, TRAY_SIZES, FOH_SKUS, BAKE_GROUPS,
     DOUGH_AGE_WARN_DAYS, DOUGH_AGE_FAIL_DAYS,
     CHEESE_BATCH_SIZE, CHEESE_KEY, CHEESE_MAX_LEAD,
+    DIP_CONFIG,
     makeSkuMeta,
     resolveDeliveries, resolveProductionLogs,
     getInventoryReport, attributeDeliveryCoverage,
-    scheduleCheese,
+    scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-07-pack-list-shape-only';
+  } from '../../scripts/inventory.js?v=2026-05-08-dips';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1062,9 +1063,13 @@
     } catch (_) { return true; }
   })();
 
-  // FOH cheese consumption — fetched from the worker on load. Updated on
-  // every loadProduction() since the rate is stable across hours.
-  const CHEESE_CONSUMPTION_URL = 'https://dpc-catering-checkout.drew-f39.workers.dev/cheese-consumption?days=28';
+  // FOH dip consumption — single Square scan returns dailyAvg for cheese
+  // + 4 retail dips. Fetched on load; rate is stable across hours.
+  const DIP_CONSUMPTION_URL = 'https://dpc-catering-checkout.drew-f39.workers.dev/dip-consumption?days=28';
+  // Per-dip dailyAvg keyed by canonical SKU (DIP_CONFIG keys). Cheese kept
+  // as cheeseFohDailyAvg too for legacy callers; will be removed once all
+  // call sites migrate.
+  let dipDailyAvgs = {};
   let cheeseFohDailyAvg = 0;
 
   // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -2925,40 +2930,48 @@
     </div></div>`;
   }
 
-  // ─── CHEESE TAB ───────────────────────────────────────────────────────────
-  // Manager-facing view of the FOH cheese-dip schedule. Mirrors the iCalendar
-  // feed (same scheduleCheese() output), so what the manager sees here is
-  // exactly what the FOH tablet will see in their calendar.
-  function renderCheeseTab(dateStr) {
-    const report = getInventoryReportLocal();
-    const cheeseSchedule = scheduleCheese({
+  // ─── DIPS TAB ─────────────────────────────────────────────────────────────
+  // Manager-facing view of the FOH dip schedule (cheese + retail dips).
+  // Mirrors the iCalendar feed (same scheduleDip() output per dip), so the
+  // tablet calendar and this view never disagree.
+  //
+  // Per-dip card: today's recommended batch (if any) + stepper + upcoming list.
+  // Stepper logs `cheese_done` rows with {sku, batches, size}; size determines
+  // single vs double crediting in getInventoryReport.
+  function renderDipCard(dipSku, dateStr, report) {
+    const cfg = DIP_CONFIG[dipSku];
+    if (!cfg) return '';
+    const dailyAvg = dipDailyAvgs[dipSku] || (dipSku === CHEESE_KEY ? cheeseFohDailyAvg : 0);
+    const sched = scheduleDip({
+      dipSku,
       deliveries: allDeliveries,
       inventoryReport: report,
-      fohDailyAvg: cheeseFohDailyAvg,
+      fohDailyAvg: dailyAvg,
       today: dateStr,
       skuAliases,
       lookaheadDays: 14,
     });
 
-    // Today's batch (if any) and made count.
-    const todayBatch = cheeseSchedule.batches.find(b => b.date === dateStr);
+    const todayBatch = sched.batches.find(b => b.date === dateStr);
     const dayState = productionState[dateStr] || {};
-    const cheeseDoneList = dayState.cheeseDone || [];
-    const todayMade = cheeseDoneList
-      .filter(c => c.sku === CHEESE_KEY)
-      .reduce((s, c) => s + (Number(c.batches) || 0), 0);
+    const doneList = dayState.cheeseDone || []; // log key stays cheese_done across all dips
+    // todayMadeUnits tallies dips produced today for this SKU (each log entry
+    // contributes batches × singleBatchSize OR doubleBatchSize per its size).
+    const todayMadeUnits = doneList
+      .filter(c => c.sku === dipSku)
+      .reduce((s, c) => {
+        const sz = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
+        return s + (Number(c.batches) || 0) * sz;
+      }, 0);
 
-    // Mirror scheduleCheese's startInventory: sum cf + fr + oh. Old snapshots
-    // have cheese in fr (pre-Phase-3a); new ones in oh. Both flow through.
-    const effectiveCheese = (report.effective.coldFerment[CHEESE_KEY] || 0)
-      + (report.effective.frozen[CHEESE_KEY] || 0)
-      + (report.effective.onHand?.[CHEESE_KEY] || 0);
-    const fohRate = cheeseFohDailyAvg;
+    const onHand = (report.effective.coldFerment[dipSku] || 0)
+      + (report.effective.frozen[dipSku] || 0)
+      + (report.effective.onHand?.[dipSku] || 0);
 
-    // Today's card
     let todayHtml = '';
     if (todayBatch) {
-      const isDone = todayMade >= 1 - 0.01;
+      const targetUnits = todayBatch.units;
+      const isDone = todayMadeUnits >= targetUnits - 0.01;
       const coversList = todayBatch.covers.length > 0
         ? todayBatch.covers.map(c => `${esc(c.customer)} (${c.qty}p ${appLang === 'es' ? 'para' : 'for'} ${esc(c.deliveryDate)})`).join(', ')
         : (appLang === 'es' ? 'sólo FOH (mostrador)' : 'FOH walk-in only');
@@ -2968,64 +2981,82 @@
       const statusPill = isDone
         ? `<span class="wcard-pill done">✅ ${appLang === 'es' ? 'Hecho' : 'Done'}</span>`
         : (todayBatch.overdue ? overdueTag : `<span class="wcard-pill pending">⏳ ${appLang === 'es' ? 'Pendiente' : 'Pending'}</span>`);
+      const sizeLabel = todayBatch.size === 'double' ? 'double' : 'single';
+      const sizeChip = (cfg.singleBatchSize !== cfg.doubleBatchSize)
+        ? `<span class="wcard-pill" style="background:#f0e8d0;color:#5a4a1a">${sizeLabel} (${todayBatch.units})</span>` : '';
+      // Stepper buttons: cheese has a single +1/-1; retail dips offer single
+      // and double buttons since they're distinct batch sizes.
+      const showDouble = cfg.singleBatchSize !== cfg.doubleBatchSize;
       todayHtml = `
         <div class="wcard ${isDone ? 'status-done' : (todayBatch.overdue ? 'status-overdue' : 'status-pending')}" style="--wcard-stripe:#E5C16A">
           <div class="wcard-head">
             <div>
-              <div class="wcard-name">🧀 ${appLang === 'es' ? 'Hacer 1 tanda de queso' : 'Make 1 batch cheese dip'}</div>
+              <div class="wcard-name">${cfg.emoji} ${appLang === 'es' ? 'Hacer 1 tanda de' : 'Make 1 batch'} ${esc(cfg.label)}</div>
               <div style="font:500 12px 'Manrope',sans-serif;color:var(--gray-3);margin-top:2px">
                 ${esc(coversList)}
               </div>
             </div>
-            ${statusPill}
+            <div style="display:flex;gap:6px;align-items:center">${sizeChip}${statusPill}</div>
           </div>
           <div class="wcard-metrics" style="margin-top:8px">
             <div class="wmetric">
-              <div class="wmetric-label">${appLang === 'es' ? 'TANDAS' : 'BATCHES'}</div>
-              <div class="wmetric-value"><strong>${isDone ? 1 : 0}</strong><span class="of"> / 1</span></div>
+              <div class="wmetric-label">${appLang === 'es' ? 'DIPS HECHOS' : 'DIPS MADE'}</div>
+              <div class="wmetric-value"><strong>${Math.round(todayMadeUnits)}</strong><span class="of"> / ${targetUnits}</span></div>
             </div>
             <div class="wmetric">
-              <div class="wmetric-label">${appLang === 'es' ? 'DIPS' : 'DIPS'}</div>
-              <div class="wmetric-value"><strong>${isDone ? CHEESE_BATCH_SIZE : 0}</strong><span class="of"> / ${CHEESE_BATCH_SIZE}</span></div>
+              <div class="wmetric-label">${appLang === 'es' ? 'INVENTARIO' : 'ON HAND'}</div>
+              <div class="wmetric-value"><strong>${Math.round(onHand)}</strong></div>
             </div>
           </div>
-          <div class="wstepper">
-            <button class="wstep-btn" data-cheese-step data-delta="-1" ${todayMade <= 0 ? 'disabled' : ''}>−</button>
-            <div class="wstep-center">${todayMade.toFixed ? Number(todayMade).toFixed(0) : todayMade} / 1 ${appLang === 'es' ? 'tanda' : 'batch'}</div>
-            <button class="wstep-btn" data-cheese-step data-delta="1" ${isDone ? 'disabled' : ''}>+</button>
+          <div class="wstepper" style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="single" data-delta="-1" ${todayMadeUnits <= 0 ? 'disabled' : ''}>−</button>
+            <button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="single" data-delta="1">+ ${appLang === 'es' ? 'sencilla' : 'single'} (${cfg.singleBatchSize})</button>
+            ${showDouble ? `<button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="double" data-delta="1">+ ${appLang === 'es' ? 'doble' : 'double'} (${cfg.doubleBatchSize})</button>` : ''}
           </div>
         </div>`;
     } else {
-      todayHtml = `<div class="no-prod" style="padding:32px 20px">
-        🧀 ${appLang === 'es' ? 'Sin tanda de queso programada hoy' : 'No cheese batch scheduled today'}
+      todayHtml = `<div class="no-prod" style="padding:24px 20px">
+        ${cfg.emoji} ${appLang === 'es' ? 'Sin tanda hoy' : 'No batch needed today'} — ${esc(cfg.label)}
         <br><span style="font-size:13px;color:var(--gray-3)">
           ${appLang === 'es' ? 'Inventario: ' : 'On hand: '}
-          ${Math.round(effectiveCheese)} ${appLang === 'es' ? 'dips · consumo FOH ~' : 'dips · FOH walk-in ~'}${fohRate}/${appLang === 'es' ? 'día' : 'day'}
+          ${Math.round(onHand)} ${appLang === 'es' ? 'dips · consumo FOH ~' : 'dips · FOH walk-in ~'}${dailyAvg}/${appLang === 'es' ? 'día' : 'day'}
         </span>
       </div>`;
     }
 
-    // Upcoming batches list
-    const upcoming = cheeseSchedule.batches.filter(b => b.date > dateStr).slice(0, 14);
+    const upcoming = sched.batches.filter(b => b.date > dateStr).slice(0, 8);
     const upcomingHtml = upcoming.length === 0 ? '' : `
-      <div style="margin-top:24px">
-        <div class="status-section-label" style="color:var(--gray-3)">
-          ${appLang === 'es' ? 'PRÓXIMAS TANDAS' : 'UPCOMING BATCHES'}
+      <div style="margin-top:12px">
+        <div class="status-section-label" style="color:var(--gray-3);font-size:11px">
+          ${appLang === 'es' ? 'PRÓXIMAS' : 'UPCOMING'}
         </div>
         ${upcoming.map(b => {
           const dateLabel = `${fmtDay(parseDate(b.date))} ${fmtShort(parseDate(b.date))}`;
-          const coversList = b.covers.length > 0
-            ? b.covers.map(c => `${esc(c.customer)} (${c.qty}p)`).join(', ')
-            : (appLang === 'es' ? 'sólo FOH' : 'FOH walk-in');
           const overdue = b.overdue ? ' 🚨' : '';
-          return `<div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #eee;font:500 13px 'Manrope',sans-serif">
-            <span><strong>${esc(dateLabel)}</strong>${overdue}</span>
-            <span style="color:var(--gray-3);font-size:12px;text-align:right;max-width:60%">${esc(coversList)}</span>
+          const sizeStr = b.size === 'double' ? ` · double (${b.units})` : ` · ${b.units}`;
+          return `<div style="display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #eee;font:500 12px 'Manrope',sans-serif">
+            <span><strong>${esc(dateLabel)}</strong>${overdue}${sizeStr}</span>
           </div>`;
         }).join('')}
       </div>`;
 
-    // Subscription URL hint
+    return `<div style="margin-bottom:18px">
+      <div style="margin-bottom:6px">
+        <div style="font:700 14px 'Paytone One',sans-serif;color:var(--dark)">${cfg.emoji} ${esc(cfg.label.charAt(0).toUpperCase() + cfg.label.slice(1))}</div>
+        <div style="font:400 11px 'Manrope',sans-serif;color:var(--gray-3)">
+          ${appLang === 'es' ? 'Inventario' : 'On hand'} ${Math.round(onHand)} · FOH ~${dailyAvg}/${appLang === 'es' ? 'día' : 'day'}
+        </div>
+      </div>
+      ${todayHtml}
+      ${upcomingHtml}
+    </div>`;
+  }
+
+  function renderCheeseTab(dateStr) {
+    // Tab key is still 'cheese' (legacy) but rendered content is now all dips.
+    const report = getInventoryReportLocal();
+    const dipsHtml = Object.keys(DIP_CONFIG).map(sku => renderDipCard(sku, dateStr, report)).join('');
+
     const calUrl = 'https://dpc-catering-checkout.drew-f39.workers.dev/foh-cal.ics';
     const calHint = `
       <div style="margin-top:24px;padding:12px;background:#f8f8f8;border-radius:8px;font:400 11px 'Manrope',sans-serif;color:var(--gray-3)">
@@ -3034,22 +3065,24 @@
       </div>`;
 
     return `<div class="team-card"><div class="team-body">
-      <div style="margin-bottom:8px">
-        <div style="font:800 18px 'Paytone One',sans-serif;color:var(--dark)">🧀 ${appLang === 'es' ? 'Queso' : 'Cheese Dip'}</div>
+      <div style="margin-bottom:16px">
+        <div style="font:800 18px 'Paytone One',sans-serif;color:var(--dark)">${appLang === 'es' ? '🧀 Salsas' : '🧀 Dips'}</div>
         <div style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3)">
-          ${appLang === 'es' ? 'Inventario' : 'On hand'} ${Math.round(effectiveCheese)} ${appLang === 'es' ? 'dips · FOH ~' : 'dips · FOH walk-in ~'}${fohRate}/${appLang === 'es' ? 'día' : 'day'}
+          ${appLang === 'es' ? 'Programación FOH para queso y salsas de menudeo' : 'FOH schedule for cheese + retail dips'}
         </div>
       </div>
-      ${todayHtml}
-      ${upcomingHtml}
+      ${dipsHtml}
       ${calHint}
     </div></div>`;
   }
 
-  // Cheese stepper — increments cheese_done log entries.
-  async function logCheeseDelta(delta) {
+  // Dip stepper — generic across cheese + retail dips. Logs cheese_done
+  // (action name kept for backward-compat) with {sku, batches, size}.
+  // size === 'double' credits doubleBatchSize via getInventoryReport's
+  // updated cheese_done handler.
+  async function logDipDelta(sku, size, delta) {
     const dateStr = toDateStr(currentDate);
-    const completions = JSON.stringify([{ sku: CHEESE_KEY, batches: delta }]);
+    const completions = JSON.stringify([{ sku, batches: delta, size: size || 'single' }]);
     await appendLog(PRODUCTION_LOG, {
       action: 'cheese_done',
       date: dateStr,
@@ -3059,6 +3092,10 @@
     await loadProduction();
     schedule = buildOptimalSchedule();
     render();
+  }
+  // Backward-compat for any remaining cheese-only call sites.
+  async function logCheeseDelta(delta) {
+    return logDipDelta(CHEESE_KEY, 'single', delta);
   }
 
   async function saveStock() {
@@ -3661,7 +3698,16 @@
     document.querySelectorAll('[data-pack-toggle]').forEach(btn => {
       btn.addEventListener('click', () => togglePackedCase(btn));
     });
-    // Cheese tab stepper — single SKU, single batch/day, simpler than shape/bfp.
+    // Dips tab stepper — per-dip, single OR double batches, simpler than shape/bfp.
+    document.querySelectorAll('[data-dip-step]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sku = btn.dataset.sku;
+        const size = btn.dataset.size || 'single';
+        const delta = parseInt(btn.dataset.delta, 10);
+        logDipDelta(sku, size, delta).catch(err => alert('Error logging dip: ' + err.message));
+      });
+    });
+    // Backward-compat: handle any remaining data-cheese-step buttons.
     document.querySelectorAll('[data-cheese-step]').forEach(btn => {
       btn.addEventListener('click', () => {
         const delta = parseInt(btn.dataset.delta, 10);
@@ -3896,20 +3942,29 @@
     } catch { allSkus = Object.keys(BATCH_SIZES); } // fallback to hardcoded list
   }
 
-  // Pull FOH cheese walk-in rate from the worker (last 28 days of Square
-  // orders → daily average). Best-effort: if the fetch fails the cheese
-  // scheduler falls back to delivery-only demand.
-  async function loadCheeseConsumption() {
+  // Pull per-dip FOH walk-in rates from the worker (last 28 days of Square
+  // orders → daily average per dip). Best-effort: if the fetch fails the
+  // schedulers fall back to delivery-only demand for cheese (0 demand for
+  // retail dips, so they show no upcoming batches until the next refresh).
+  async function loadDipConsumption() {
     try {
-      const r = await fetch(CHEESE_CONSUMPTION_URL);
+      const r = await fetch(DIP_CONSUMPTION_URL);
       if (!r.ok) return;
       const data = await r.json();
-      cheeseFohDailyAvg = Number(data.dailyAvg) || 0;
+      const next = {};
+      Object.entries(data.dips || {}).forEach(([sku, info]) => {
+        next[sku] = Number(info.dailyAvg) || 0;
+      });
+      dipDailyAvgs = next;
+      cheeseFohDailyAvg = next['3oz cheese dip'] || 0;
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('cheese-consumption fetch failed:', e);
+      console.warn('dip-consumption fetch failed:', e);
     }
   }
+  // Backward-compat alias — keep so all four Promise.all sites keep working.
+  // Phase 3d migrates the call sites; remove this in Phase 4 cleanup.
+  const loadCheeseConsumption = loadDipConsumption;
 
   // ─── NAV WIRING ───────────────────────────────────────────────────────────
 

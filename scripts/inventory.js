@@ -681,17 +681,24 @@ export function getInventoryReport(args) {
         }
       });
     } else if (row.action === 'cheese_done') {
-      // FOH cheese batch: 1 batch = CHEESE_BATCH_SIZE dips; lives in cf
-      // (refrigerated) until consumed by deliveries or FOH walk-in.
-      // No separate "bake" stage — single-step product. Same dough-age
-      // queue mechanics so the 5-day shelf-life alert fires.
+      // FOH dip batch (cheese or any retail dip in DIP_CONFIG). 1 batch =
+      // singleBatchSize dips by default; if c.size === 'double', credits
+      // doubleBatchSize. Lives in cf (refrigerated) until consumed by
+      // deliveries or FOH walk-in. No separate "bake" stage — single-step
+      // product. Same dough-age queue mechanics so the shelf-life alert fires.
       let comps = []; try { comps = JSON.parse(row.completions || '[]'); } catch {}
       comps.forEach((c) => {
         let key = (c.sku || '').trim();
         if (!key) return;
         if (skuAliases[key]) key = skuAliases[key];
-        const bs = getBatchSize(key);
-        if (!bs) return;
+        const cfg = DIP_CONFIG[key];
+        let bs;
+        if (cfg) {
+          bs = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
+        } else {
+          bs = getBatchSize(key);
+          if (!bs) return;
+        }
         const batches = Number(c.batches) || 0;
         const p = batches * bs;
         cf[key] = (cf[key] || 0) + p;
