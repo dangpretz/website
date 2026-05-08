@@ -16,9 +16,11 @@ import {
   getInventoryReport,
   makeSkuMeta,
   scheduleCheese,
+  scheduleDip,
   CHEESE_BATCH_SIZE,
   CHEESE_KEY,
   CHEESE_MAX_LEAD,
+  DIP_CONFIG,
 } from '../../scripts/inventory.js';
 
 const SQUARE_BASE = 'https://connect.squareup.com/v2';
@@ -1005,6 +1007,109 @@ async function handleCheeseConsumption(request, env) {
   });
 }
 
+/**
+ * Single Square scan that counts ALL configured dips (cheese + 4 retail dips)
+ * in one pagination loop. Cheaper than 5 separate /cheese-consumption-style
+ * fetches. Per-dip match patterns come from DIP_CONFIG.squareNames +
+ * .squareModifiers — keep those in sync as the Square catalog evolves.
+ *
+ * Returns { daysSampled, dips: { [dipSku]: { unitsSold, dailyAvg, namesSeen, modifiersSeen } } }.
+ */
+async function fetchSquareDipConsumption(env, daysSampled = 28) {
+  const locationId = env.SQUARE_LOCATION_ID || 'LEJ3PDZ9V6NYN';
+  const startAt = new Date(Date.now() - daysSampled * 86400e3).toISOString();
+  const orders = [];
+  let cursor;
+  let pageCount = 0;
+  do {
+    const res = await fetch(`${SQUARE_BASE}/orders/search`, {
+      method: 'POST',
+      headers: {
+        'Square-Version': '2025-01-23',
+        Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        location_ids: [locationId],
+        query: {
+          filter: {
+            date_time_filter: { created_at: { start_at: startAt } },
+            state_filter: { states: ['OPEN', 'COMPLETED'] }, // skip CANCELED — wasn't consumed
+          },
+          sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' },
+        },
+        limit: 500,
+        cursor,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(`Square search failed: ${JSON.stringify(data).slice(0, 300)}`);
+    orders.push(...(data.orders || []));
+    cursor = data.cursor;
+    pageCount += 1;
+    if (pageCount > 20) break;
+  } while (cursor);
+
+  // Build per-dip accumulators from DIP_CONFIG
+  const dips = {};
+  Object.keys(DIP_CONFIG).forEach((sku) => {
+    dips[sku] = {
+      units: 0,
+      namesSeen: new Set(),
+      modifiersSeen: new Set(),
+    };
+  });
+
+  orders.forEach((o) => {
+    (o.line_items || []).forEach((li) => {
+      const name = (li.name || '').trim();
+      const qty = parseInt(li.quantity, 10) || 0;
+      // Direct line-item match per dip
+      Object.entries(DIP_CONFIG).forEach(([sku, cfg]) => {
+        if (cfg.squareNames.some((re) => re.test(name)) && qty > 0) {
+          dips[sku].namesSeen.add(name);
+          dips[sku].units += qty;
+        }
+      });
+      // Modifier match — each modifier instance = parent qty units of that dip
+      (li.modifiers || []).forEach((mod) => {
+        const mname = (mod.name || '').trim();
+        Object.entries(DIP_CONFIG).forEach(([sku, cfg]) => {
+          if (cfg.squareModifiers.some((re) => re.test(mname))) {
+            dips[sku].modifiersSeen.add(mname);
+            dips[sku].units += qty;
+          }
+        });
+      });
+    });
+  });
+
+  const out = { daysSampled, ordersScanned: orders.length, dips: {} };
+  Object.entries(dips).forEach(([sku, agg]) => {
+    out.dips[sku] = {
+      unitsSold: agg.units,
+      dailyAvg: daysSampled > 0 ? Math.round((agg.units / daysSampled) * 10) / 10 : 0,
+      namesSeen: [...agg.namesSeen],
+      modifiersSeen: [...agg.modifiersSeen],
+    };
+  });
+  return out;
+}
+
+async function handleDipConsumption(request, env) {
+  const url = new URL(request.url);
+  const days = Math.max(1, Math.min(90, parseInt(url.searchParams.get('days'), 10) || 28));
+  const result = await fetchSquareDipConsumption(env, days);
+  return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      ...CORS_HEADERS,
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
+}
+
 // ─── iCalendar feed for FOH ──────────────────────────────────────────────
 
 // Today as 'YYYY-MM-DD' in Mountain TZ (matches the production app).
@@ -1073,6 +1178,29 @@ function buildCheeseEvent({ batch, dtstamp }) {
     .join('; ');
   const fohLine = batch.foh > 0 ? ` FOH walk-in covered: ~${Math.round(batch.foh * (CHEESE_MAX_LEAD - 1))} dips.` : '';
   const desc = `Covers: ${coversList || 'FOH walk-in only'}.${fohLine} ~${CHEESE_BATCH_SIZE} dips/batch. Use within ${CHEESE_MAX_LEAD} days.`;
+  lines.push(icsFold(`DESCRIPTION:${icsEscape(desc)}`));
+  lines.push(icsFold('URL:https://drewfeller.com/static/production/'));
+  lines.push('END:VEVENT');
+  return lines.join('\r\n');
+}
+
+// Generic dip-batch event builder — used for the 4 retail dips. Cheese keeps
+// its existing buildCheeseEvent (different UID prefix, different description
+// emphasis on covers + shelf life) for backward compatibility with calendars
+// that already imported those events.
+function buildDipBatchEvent({ dipSku, cfg, batch, dtstamp }) {
+  const uid = `${cfg.key}-batch-${batch.date}@dangpretz`;
+  const sizeStr = batch.size === 'double' ? ' double' : '';
+  const summary = `${cfg.emoji} Make 1${sizeStr} ${cfg.label} batch (${batch.units})${batch.overdue ? ' (overdue!)' : ''}`;
+  const lines = [
+    'BEGIN:VEVENT',
+    icsFold(`UID:${uid}`),
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${icsDateAllDay(batch.date)}`,
+    `DTEND;VALUE=DATE:${icsDateAllDay(addOneDay(batch.date))}`,
+    icsFold(`SUMMARY:${icsEscape(summary)}`),
+  ];
+  const desc = `${batch.units} ${cfg.label} dips per batch. Use within ${cfg.shelfLifeDays} days. FOH walk-in average ~${Math.round(batch.foh * 10) / 10} dips/day.`;
   lines.push(icsFold(`DESCRIPTION:${icsEscape(desc)}`));
   lines.push(icsFold('URL:https://drewfeller.com/static/production/'));
   lines.push('END:VEVENT');
@@ -1156,16 +1284,21 @@ async function handleFohCalendar(request, env) {
     getBatchSize: meta.getBatchSize,
   });
 
-  // Square FOH walk-in rate. Fail-soft: if Square errors, use 0.
-  let dailyAvg = 0;
+  // Per-dip Square consumption (single Square scan returns all 5 dips).
+  // Fail-soft: if Square errors, retail dips fall through to 0/day demand
+  // (no upcoming batches scheduled until next refresh).
+  let dipAvgs = {};
   try {
-    const c = await fetchSquareCheeseConsumption(env, 28);
-    dailyAvg = c.dailyAvg || 0;
+    const dipData = await fetchSquareDipConsumption(env, 28);
+    Object.entries(dipData.dips || {}).forEach(([sku, info]) => {
+      dipAvgs[sku] = Number(info.dailyAvg) || 0;
+    });
   } catch (_) { /* best-effort */ }
+  const dailyAvg = dipAvgs[CHEESE_KEY] || 0; // legacy alias for cheese-only callers
 
   const today = todayMountain();
 
-  // Cheese batches.
+  // Cheese batches (kept on existing buildCheeseEvent for UID continuity).
   const cheese = scheduleCheese({
     deliveries: allDeliveries,
     inventoryReport,
@@ -1173,6 +1306,24 @@ async function handleFohCalendar(request, env) {
     today,
     skuAliases: prod.skuAliases,
     lookaheadDays: 14,
+  });
+
+  // 4 retail dips — same scheduleDip per dip, emitted via buildDipBatchEvent.
+  const retailDipBatches = [];
+  Object.entries(DIP_CONFIG).forEach(([dipSku, cfg]) => {
+    if (dipSku === CHEESE_KEY) return; // cheese already scheduled above
+    const sched = scheduleDip({
+      dipSku,
+      deliveries: allDeliveries,
+      inventoryReport,
+      fohDailyAvg: dipAvgs[dipSku] || 0,
+      today,
+      skuAliases: prod.skuAliases,
+      lookaheadDays: 14,
+    });
+    sched.batches.forEach((batch) => {
+      retailDipBatches.push({ dipSku, cfg, batch });
+    });
   });
 
   // Upcoming catering deliveries (next 30 days, scheduled status).
@@ -1192,6 +1343,7 @@ async function handleFohCalendar(request, env) {
   const dtstamp = icsDateUTC(new Date());
   const events = [
     ...cheese.batches.map((batch) => buildCheeseEvent({ batch, dtstamp })),
+    ...retailDipBatches.map(({ dipSku, cfg, batch }) => buildDipBatchEvent({ dipSku, cfg, batch, dtstamp })),
     ...cateringDeliveries.map((delivery) => buildCateringEvent({ delivery, dtstamp })),
   ];
 
@@ -1698,6 +1850,14 @@ export default {
         // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Cheese consumption error:', err);
         return json({ error: err.message || 'Cheese consumption failed' }, 500);
+      }
+    }
+    if (url.pathname === '/dip-consumption' && request.method === 'GET') {
+      try { return await handleDipConsumption(request, env); }
+      catch (err) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('Dip consumption error:', err);
+        return json({ error: err.message || 'Dip consumption failed' }, 500);
       }
     }
     if (url.pathname === '/foh-cal.ics' && request.method === 'GET') {
