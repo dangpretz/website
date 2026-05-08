@@ -1052,13 +1052,13 @@
     BATCH_SIZES, CASE_SIZES, TRAY_SIZES, FOH_SKUS, BAKE_GROUPS,
     DOUGH_AGE_WARN_DAYS, DOUGH_AGE_FAIL_DAYS,
     CHEESE_BATCH_SIZE, CHEESE_KEY, CHEESE_MAX_LEAD,
-    DIP_CONFIG,
+    DIP_CONFIG, DEFAULT_BOX_EXPANSIONS,
     makeSkuMeta,
     resolveDeliveries, resolveProductionLogs,
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-08-dips';
+  } from '../../scripts/inventory.js?v=2026-05-08-followups';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1315,7 +1315,7 @@
       reduced_for:    ({n}) => ` · ${n} SKU${n > 1 ? 's' : ''} reduced for deliveries since count`,
       sku_col:        'SKU',
       dough_col:      '🧊 Dough',
-      frozen_col:     '❄️ Frozen',
+      frozen_col:     '❄️ Frozen / 📦 On hand',
       since_today:    'today',
       since_yest:     'since yesterday',
       since_date:     ({d}) => `since ${d}`,
@@ -1463,7 +1463,7 @@
       reduced_for:    ({n}) => ` · ${n} producto${n > 1 ? 's' : ''} reducido${n > 1 ? 's' : ''} por entregas`,
       sku_col:        'Producto',
       dough_col:      '🧊 Masa',
-      frozen_col:     '❄️ Congelado',
+      frozen_col:     '❄️ Congelado / 📦 Inventario',
       since_today:    'hoy',
       since_yest:     'desde ayer',
       since_date:     ({d}) => `desde ${d}`,
@@ -2924,6 +2924,41 @@
       </div>`;
     }).join('');
 
+    // Box mappings list — surfaces all catering box → SKU expansions so
+    // the manager can see what's wired up at a glance and jump back into
+    // edit mode for any of them. Includes both manager-saved configs
+    // (skuConfig.type === 'box') and the hardcoded fallbacks
+    // (DEFAULT_BOX_EXPANSIONS, marked "default" since no override exists).
+    const customBoxes = Object.entries(skuConfig)
+      .filter(([, cfg]) => cfg.type === 'box' && Array.isArray(cfg.expandsTo) && cfg.expandsTo.length > 0)
+      .map(([box, cfg]) => ({ box, expansions: cfg.expandsTo, isDefault: false }));
+    const customBoxNames = new Set(customBoxes.map((b) => b.box));
+    const defaultBoxes = Object.entries(DEFAULT_BOX_EXPANSIONS || {})
+      .filter(([box]) => !customBoxNames.has(box))
+      .map(([box, expansions]) => ({ box, expansions, isDefault: true }));
+    const boxEntries = [...customBoxes, ...defaultBoxes].sort((a, b) => a.box.localeCompare(b.box));
+    const boxMappingsHtml = boxEntries.length === 0 ? '' : `
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee">
+        <div style="font:700 13px 'Manrope',sans-serif;color:var(--gray-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">
+          ${appLang === 'es' ? '📦 Cajas configuradas' : '📦 Box mappings'} (${boxEntries.length})
+        </div>
+        ${boxEntries.map(({ box, expansions, isDefault }) => {
+          const expansionsStr = expansions
+            .map(e => `${e.multiplier} × ${esc(e.sku)}`)
+            .join(', ');
+          const defaultTag = isDefault
+            ? `<span style="font-size:10px;background:#eee;color:var(--gray-3);padding:2px 6px;border-radius:8px;margin-left:6px">default</span>`
+            : '';
+          return `<div class="box-mapping-row" data-box-edit="${esc(box)}" style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f3f3f3;font:500 13px 'Manrope',sans-serif;cursor:pointer;align-items:center" title="Click to edit">
+            <span style="flex:1;min-width:0">
+              <strong style="color:var(--dark)">${esc(box)}</strong>${defaultTag}
+              <div style="color:var(--gray-3);font-size:12px;margin-top:2px">→ ${expansionsStr}</div>
+            </span>
+            <span style="color:var(--gray-3);font-size:12px;margin-left:8px">${appLang === 'es' ? 'Editar' : 'Edit'} →</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+
     return `<div class="team-card"><div class="team-body">
       <div class="stock-tab-header">
         <div>
@@ -2939,6 +2974,7 @@
       </div>
       ${rows}
       <button class="btn-primary" id="stock-save" style="margin-top:20px">${t('save_stock')}</button>
+      ${boxMappingsHtml}
     </div></div>`;
   }
 
@@ -3754,6 +3790,10 @@
     });
     const stockSaveBtn = document.getElementById('stock-save');
     if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
+    // Stock tab → Box mappings list — click a row to re-open its config sheet.
+    document.querySelectorAll('[data-box-edit]').forEach(row => {
+      row.addEventListener('click', () => openCfgSheet(row.dataset.boxEdit));
+    });
     document.querySelectorAll('[data-goto]').forEach(row => {
       row.addEventListener('click', () => {
         currentDate = parseDate(row.dataset.goto);

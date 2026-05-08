@@ -1184,6 +1184,27 @@ function buildCheeseEvent({ batch, dtstamp }) {
   return lines.join('\r\n');
 }
 
+// Tombstone VEVENT for a UID that's no longer in the live schedule. Some
+// calendar clients (myecalendar in particular) keep events in the calendar
+// after they drop out of the subscribed feed. Emitting an explicit
+// STATUS:CANCELLED VEVENT with the same UID for a few days post-occurrence
+// gives those clients a clear signal to remove. Idempotent — clients that
+// already removed the event treat the cancel as a no-op.
+function buildBatchCancelEvent({ uid, date, dtstamp, summary }) {
+  const lines = [
+    'BEGIN:VEVENT',
+    icsFold(`UID:${uid}`),
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${icsDateAllDay(date)}`,
+    `DTEND;VALUE=DATE:${icsDateAllDay(addOneDay(date))}`,
+    'STATUS:CANCELLED',
+    'SEQUENCE:1',
+    icsFold(`SUMMARY:${icsEscape(summary || '(cancelled)')}`),
+    'END:VEVENT',
+  ];
+  return lines.join('\r\n');
+}
+
 // Generic dip-batch event builder — used for the 4 retail dips. Cheese keeps
 // its existing buildCheeseEvent (different UID prefix, different description
 // emphasis on covers + shelf life) for backward compatibility with calendars
@@ -1341,10 +1362,37 @@ async function handleFohCalendar(request, env) {
 
   // Build .ics body
   const dtstamp = icsDateUTC(new Date());
+
+  // Tombstones for past 3 days × every dip type. Calendar clients that
+  // imported a batch on (today-1) and now don't see it in the live feed
+  // will receive STATUS:CANCELLED for that UID and remove. Idempotent —
+  // clients with no matching event treat as no-op. Cheap (15 small events).
+  const tombstoneEvents = [];
+  for (let i = 1; i <= 3; i++) {
+    const date = (() => {
+      const dt = new Date(today);
+      dt.setUTCDate(dt.getUTCDate() - i);
+      return dt.toISOString().slice(0, 10);
+    })();
+    Object.entries(DIP_CONFIG).forEach(([dipSku, cfg]) => {
+      // Cheese uses its own UID prefix; retail dips use cfg.key
+      const uid = dipSku === CHEESE_KEY
+        ? `cheese-batch-${date}@dangpretz`
+        : `${cfg.key}-batch-${date}@dangpretz`;
+      tombstoneEvents.push(buildBatchCancelEvent({
+        uid,
+        date,
+        dtstamp,
+        summary: `(cancelled) ${cfg.label} batch`,
+      }));
+    });
+  }
+
   const events = [
     ...cheese.batches.map((batch) => buildCheeseEvent({ batch, dtstamp })),
     ...retailDipBatches.map(({ dipSku, cfg, batch }) => buildDipBatchEvent({ dipSku, cfg, batch, dtstamp })),
     ...cateringDeliveries.map((delivery) => buildCateringEvent({ delivery, dtstamp })),
+    ...tombstoneEvents,
   ];
 
   const ics = [
