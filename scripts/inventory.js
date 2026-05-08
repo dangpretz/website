@@ -40,14 +40,91 @@
 export const DOUGH_AGE_WARN_DAYS = 5; // yellow aging-dough banner threshold
 export const DOUGH_AGE_FAIL_DAYS = 6; // red banner — discard or use today
 
-// Cheese-dip production rules. Lead-time semantics: a batch must be ready
-// at least 2 days before the delivery it covers, but can be made up to 5
-// days ahead. After 5 days, cheese goes stale (mirrors the dough age queue
-// for shape work).
-export const CHEESE_MIN_LEAD = 2; // make ≥ N days before delivery
-export const CHEESE_MAX_LEAD = 5; // no more than N days before delivery
-export const CHEESE_BATCH_SIZE = 150; // dips per batch
-export const CHEESE_DAILY_CAP = 1; // max batches/day for FOH cheese maker
+// FOH dip production rules — one entry per SKU made by the FOH cheese maker.
+// Lead-time: a batch must be ready ≥ minLead days before consumption, but
+// can be made up to maxLead days ahead. Past maxLead the batch goes stale.
+//   - cheese is one batch size only (150 dips); single/double map to same value
+//   - retail dips have a single (35) or double (70) batch size — the scheduler
+//     picks single by default, upgrades to double if the same-day deficit
+//     exceeds singleBatchSize
+//   - all dips share the same FOH cheese maker (dailyCap=1 across the lane;
+//     enforcement in scheduleDip is per-SKU for now — Phase 4 cross-dip cap
+//     deferred)
+export const DIP_CONFIG = {
+  '3oz cheese dip': {
+    key: 'cheese',
+    emoji: '🧀',
+    label: 'cheese dip',
+    minLead: 2,
+    maxLead: 5,
+    singleBatchSize: 150,
+    doubleBatchSize: 150, // cheese has only one size
+    dailyCap: 1,
+    shelfLifeDays: 5,
+    // Square match patterns — used by the worker's /dip-consumption endpoint.
+    squareNames: [/^dangerous\s*dip(\s*-\s*catering)?$/i],
+    squareModifiers: [/^dangerous\s*dip$/i],
+  },
+  'hot ranch dip': {
+    key: 'hot-ranch',
+    emoji: '🌶',
+    label: 'hot ranch',
+    minLead: 1,
+    maxLead: 7,
+    singleBatchSize: 35,
+    doubleBatchSize: 70,
+    dailyCap: 1,
+    shelfLifeDays: 7,
+    squareNames: [/^hot\s*ranch(\s*-\s*catering)?$/i],
+    squareModifiers: [/^hot\s*ranch$/i],
+  },
+  'sweet cream dip': {
+    key: 'sweet-cream',
+    emoji: '🥛',
+    label: 'sweet cream',
+    minLead: 1,
+    maxLead: 7,
+    singleBatchSize: 35,
+    doubleBatchSize: 70,
+    dailyCap: 1,
+    shelfLifeDays: 7,
+    squareNames: [/^sweet\s*cream(\s*-\s*catering)?$/i],
+    squareModifiers: [/^sweet\s*cream$/i],
+  },
+  'house mustard dip': {
+    key: 'house-mustard',
+    emoji: '💛',
+    label: 'house mustard',
+    minLead: 1,
+    maxLead: 7,
+    singleBatchSize: 35,
+    doubleBatchSize: 70,
+    dailyCap: 1,
+    shelfLifeDays: 7,
+    squareNames: [/^house\s*mustard(\s*-\s*catering)?$/i],
+    squareModifiers: [/^house\s*mustard$/i],
+  },
+  'honey mustard dip': {
+    key: 'honey-mustard',
+    emoji: '🍯',
+    label: 'honey mustard',
+    minLead: 1,
+    maxLead: 7,
+    singleBatchSize: 35,
+    doubleBatchSize: 70,
+    dailyCap: 1,
+    shelfLifeDays: 7,
+    squareNames: [/^honey\s*mustard(\s*-\s*catering)?$/i],
+    squareModifiers: [/^honey\s*mustard$/i],
+  },
+};
+
+// Backward-compat shims — callers that imported the old constants still work.
+// Phase 3b+ should read DIP_CONFIG['3oz cheese dip'] directly.
+export const CHEESE_MIN_LEAD = DIP_CONFIG['3oz cheese dip'].minLead;
+export const CHEESE_MAX_LEAD = DIP_CONFIG['3oz cheese dip'].maxLead;
+export const CHEESE_BATCH_SIZE = DIP_CONFIG['3oz cheese dip'].singleBatchSize;
+export const CHEESE_DAILY_CAP = DIP_CONFIG['3oz cheese dip'].dailyCap;
 
 // Pretzels per batch (per-SKU; skuConfig override takes priority).
 // 3oz cheese dip is in here at batchSize 150 — it's tracked production now,
@@ -825,109 +902,108 @@ function addDaysISO(s, n) {
 }
 
 /**
- * Schedule cheese-dip batches for the FOH cheese maker.
+ * Schedule batches for any FOH dip (cheese, hot ranch, sweet cream, etc).
  *
- * Phantom-delivery model: combines per-day delivery demand (from active
- * deliveries with `3oz cheese dip` line items) with a constant FOH walk-in
- * rate (`fohDailyAvg`, fed in from the Square consumption endpoint), then
- * walks forward day-by-day. When inventory would dip negative, schedules
- * one batch on the LATEST valid day inside the [delivery − CHEESE_MAX_LEAD,
- * delivery − CHEESE_MIN_LEAD] window. Honors the 1-batch/day capacity cap.
+ * Phantom-delivery model: combines per-day delivery demand (line items
+ * matching this dip's SKU) with a constant FOH walk-in rate, walks
+ * forward day-by-day, and when inventory would dip negative, schedules
+ * one batch on the LATEST valid day inside the [day − maxLead, day − minLead]
+ * window. Honors the dailyCap cap. Single batch by default; upgrades to
+ * double when same-day deficit exceeds singleBatchSize.
  *
  * Used by:
- *   - production app (Cheese tab) — manager sees per-day "make a batch" cards.
+ *   - production app (Dips tab) — manager sees per-day "make a batch" cards.
  *   - worker (/foh-cal.ics) — emits an iCalendar VEVENT per scheduled batch.
  * Both call this exact function so the calendar and the manager view never
  * disagree.
  *
  * @param {Object} args
+ * @param {string} args.dipSku              Key into DIP_CONFIG (e.g. '3oz cheese dip').
  * @param {Array}  args.deliveries          Resolved deliveries (active + confirmed).
  * @param {Object} args.inventoryReport     From getInventoryReport.
- * @param {number} args.fohDailyAvg         Average FOH walk-in cheese dips/day (Square).
+ * @param {number} args.fohDailyAvg         Average FOH walk-in units/day for this dip (Square).
  * @param {string} args.today               'YYYY-MM-DD' (Mountain TZ).
  * @param {Object} args.skuAliases          From resolveProductionLogs.
  * @param {number} [args.lookaheadDays=14]  How far forward to plan.
  * @returns {{
- *   batches: Array<{date: string, dayIndex: number, covers: Array<{customer, qty, deliveryDate}>, foh: number, overdue: boolean}>,
- *   demandByDate: Array<{date: string, delivery: number, foh: number, total: number}>,
+ *   dipSku: string,
+ *   batches: Array<{date, dayIndex, covers, foh, overdue, fillsDay, size: 'single'|'double', units: number}>,
+ *   demandByDate: Array<{date, delivery, foh, total, covers}>,
  *   startInventory: number,
  *   fohDailyAvg: number,
  * }}
  */
-export function scheduleCheese({
-  deliveries, inventoryReport, fohDailyAvg, today, skuAliases, lookaheadDays = 14,
+export function scheduleDip({
+  dipSku, deliveries, inventoryReport, fohDailyAvg, today, skuAliases, lookaheadDays = 14,
 }) {
+  const cfg = DIP_CONFIG[dipSku];
+  if (!cfg) throw new Error(`scheduleDip: unknown dipSku "${dipSku}"`);
   const dailyAvg = Math.max(0, Number(fohDailyAvg) || 0);
   // Look further than the user-visible horizon so the algorithm "sees" deliveries
   // whose window straddles the edge (e.g. a delivery on day 16 has a window
   // ending on day 14, which we still need to plan for).
-  const dayCount = lookaheadDays + CHEESE_MAX_LEAD + 1;
+  const dayCount = lookaheadDays + cfg.maxLead + 1;
 
-  // Per-day demand. delivery from line items; foh constant (manager-tunable
-  // via Square consumption endpoint). We accumulate "covers" for each day
-  // so the calendar event can list which customers a batch is for.
   const demand = Array.from({ length: dayCount }, (_, i) => ({
     date: addDaysISO(today, i),
     delivery: 0,
     foh: dailyAvg,
     total: dailyAvg,
-    covers: [], // [{ customer, qty, deliveryDate }]
+    covers: [],
   }));
 
   (deliveries || []).forEach((d) => {
     if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return;
-    if (!d.date || d.date < today) return; // past unconfirmed ghosts don't count
+    if (!d.date || d.date < today) return;
     let lineItems = [];
     try { lineItems = JSON.parse(d.lineItems || '[]'); } catch {}
-    let cheeseQty = 0;
+    let qtyForDip = 0;
     lineItems.forEach(({ sku, quantity }) => {
       let key = (sku || '').trim();
       if (skuAliases && skuAliases[key]) key = skuAliases[key];
-      if (key !== CHEESE_SKU_KEY) return;
-      cheeseQty += Number(quantity) || 0;
+      if (key !== dipSku) return;
+      qtyForDip += Number(quantity) || 0;
     });
-    if (cheeseQty <= 0) return;
-    // Find the day index for this delivery (today=0).
+    if (qtyForDip <= 0) return;
     const dayIdx = (() => {
       const ms = parseISODate(d.date) - parseISODate(today);
       return Math.round(ms / 86400000);
     })();
     if (dayIdx < 0 || dayIdx >= dayCount) return;
-    demand[dayIdx].delivery += cheeseQty;
-    demand[dayIdx].total += cheeseQty;
+    demand[dayIdx].delivery += qtyForDip;
+    demand[dayIdx].total += qtyForDip;
     demand[dayIdx].covers.push({
       customer: d.customer || d.location || '?',
-      qty: cheeseQty,
+      qty: qtyForDip,
       deliveryDate: d.date,
     });
   });
 
-  // Starting inventory = sum across all three buckets for cheese.
-  //   - cheese_done log entries credit `cf`.
-  //   - Stock tab snapshots: pre-Phase-3a wrote to `fr` (the bug we
-  //     patched in #8); Phase 3a+ writes to `oh` (the on-hand bucket
-  //     for SKUs without a dough/bake lifecycle). Sum all three so old
-  //     and new snapshots both flow through correctly during transition.
-  const cfStart = inventoryReport?.effective?.coldFerment?.[CHEESE_SKU_KEY] || 0;
-  const frStart = inventoryReport?.effective?.frozen?.[CHEESE_SKU_KEY] || 0;
-  const ohStart = inventoryReport?.effective?.onHand?.[CHEESE_SKU_KEY] || 0;
+  // Starting inventory = sum across all three buckets. Pre-Phase-3a snapshots
+  // wrote to `fr`; Phase-3a+ writes to `oh`; cheese_done credits `cf`.
+  const cfStart = inventoryReport?.effective?.coldFerment?.[dipSku] || 0;
+  const frStart = inventoryReport?.effective?.frozen?.[dipSku] || 0;
+  const ohStart = inventoryReport?.effective?.onHand?.[dipSku] || 0;
   const startInventory = cfStart + frStart + ohStart;
 
-  // Walk forward. Track running stock. When stock would go negative on day i,
-  // schedule a batch on the latest valid day inside the [i-MAX_LEAD, i-MIN_LEAD]
-  // window. If no valid day exists (all in the past, or all already booked),
-  // mark it as overdue and force-place on today.
   const batches = [];
   const hasBatchOn = (dayIdx) => batches.some((b) => b.dayIndex === dayIdx);
+  // Pick batch size at placement time. If the immediate deficit (-inv at the
+  // time we decide to place) exceeds a single, upgrade to double.
+  const pickSize = (deficit) => {
+    if (cfg.doubleBatchSize === cfg.singleBatchSize) return { size: 'single', units: cfg.singleBatchSize };
+    if (deficit > cfg.singleBatchSize) return { size: 'double', units: cfg.doubleBatchSize };
+    return { size: 'single', units: cfg.singleBatchSize };
+  };
 
   let inv = startInventory;
   for (let i = 0; i < dayCount; i++) {
     inv -= demand[i].total;
     while (inv < 0) {
-      // Need 1 more batch placed on a day < i and within the window.
       let placed = false;
-      const earliest = Math.max(0, i - CHEESE_MAX_LEAD);
-      const latest = i - CHEESE_MIN_LEAD;
+      const earliest = Math.max(0, i - cfg.maxLead);
+      const latest = i - cfg.minLead;
+      const { size, units } = pickSize(-inv);
       for (let j = latest; j >= earliest; j--) {
         if (j < 0) break;
         if (hasBatchOn(j)) continue;
@@ -938,14 +1014,14 @@ export function scheduleCheese({
           foh: demand[i].foh,
           overdue: false,
           fillsDay: i,
+          size,
+          units,
         });
-        inv += CHEESE_BATCH_SIZE;
+        inv += units;
         placed = true;
         break;
       }
       if (!placed) {
-        // Window's all past or full. Force-place on today (or earliest open day)
-        // and flag overdue so the manager knows it's late.
         for (let j = 0; j < i; j++) {
           if (!hasBatchOn(j)) {
             batches.push({
@@ -955,26 +1031,32 @@ export function scheduleCheese({
               foh: demand[i].foh,
               overdue: true,
               fillsDay: i,
+              size,
+              units,
             });
-            inv += CHEESE_BATCH_SIZE;
+            inv += units;
             placed = true;
             break;
           }
         }
-        if (!placed) {
-          // Even today is full or i=0. Bail to avoid infinite loop.
-          break;
-        }
+        if (!placed) break; // bail to avoid infinite loop
       }
     }
   }
 
   return {
+    dipSku,
     batches: batches.sort((a, b) => a.dayIndex - b.dayIndex),
     demandByDate: demand.slice(0, lookaheadDays + 1),
     startInventory,
     fohDailyAvg: dailyAvg,
   };
+}
+
+// Backward-compat shim — existing callers still work, get the same output
+// with size:'single' on every batch (cheese has only one size).
+export function scheduleCheese(args) {
+  return scheduleDip({ dipSku: CHEESE_SKU_KEY, ...args });
 }
 
 export const CHEESE_KEY = CHEESE_SKU_KEY; // exported for callers that need the canonical SKU name
