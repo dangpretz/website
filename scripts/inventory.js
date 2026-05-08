@@ -367,15 +367,19 @@ export function resolveProductionLogs(logs) {
     if (action === 'inventory') {
       try {
         const snaps = JSON.parse(row.snapshots || '[]');
-        const cf = {}; const
-          fr = {};
+        const cf = {};
+        const fr = {};
+        const oh = {}; // on-hand bucket — for SKUs with no dough/bake lifecycle (cheese, dips)
         snaps.forEach((sn) => {
           const k = canonicalSku(sn.sku);
           if (!k) return;
           cf[k] = Number(sn.coldFerment) || 0;
           fr[k] = Number(sn.frozen) || 0;
+          oh[k] = Number(sn.onHand) || 0;
         });
-        s.coldFerment = cf; s.frozen = fr;
+        s.coldFerment = cf;
+        s.frozen = fr;
+        s.onHand = oh;
       } catch {}
       if (row.timeStamp && (!latestInventoryTs || row.timeStamp > latestInventoryTs)) {
         latestInventoryTs = row.timeStamp;
@@ -476,14 +480,16 @@ export function resolveProductionLogs(logs) {
  * callers should use getInventoryReport().
  */
 export function getLatestInventory(productionState) {
-  const cf = {}; const
-    fr = {};
+  const cf = {};
+  const fr = {};
+  const oh = {};
   Object.keys(productionState).sort().forEach((ds) => {
     const s = productionState[ds];
     Object.entries(s.coldFerment || {}).forEach(([sku, n]) => { cf[sku] = Number(n) || 0; });
     Object.entries(s.frozen || {}).forEach(([sku, n]) => { fr[sku] = Number(n) || 0; });
+    Object.entries(s.onHand || {}).forEach(([sku, n]) => { oh[sku] = Number(n) || 0; });
   });
-  return { coldFerment: cf, frozen: fr };
+  return { coldFerment: cf, frozen: fr, onHand: oh };
 }
 
 /**
@@ -512,10 +518,16 @@ export function getInventoryReport(args) {
   const inv = getLatestInventory(productionState);
   const cf = { ...inv.coldFerment };
   const fr = { ...inv.frozen };
-  const snapshotRaw = { coldFerment: { ...inv.coldFerment }, frozen: { ...inv.frozen } };
+  const oh = { ...(inv.onHand || {}) };
+  const snapshotRaw = {
+    coldFerment: { ...inv.coldFerment },
+    frozen: { ...inv.frozen },
+    onHand: { ...(inv.onHand || {}) },
+  };
   const latestInvDate = Object.keys(productionState)
     .filter((ds) => Object.keys(productionState[ds].coldFerment || {}).length > 0
-                  || Object.keys(productionState[ds].frozen || {}).length > 0)
+                  || Object.keys(productionState[ds].frozen || {}).length > 0
+                  || Object.keys(productionState[ds].onHand || {}).length > 0)
     .sort().pop() || null;
 
   // Seed dough queue with snapshot cf — conservative ts = snapshot timestamp.
@@ -640,6 +652,11 @@ export function getInventoryReport(args) {
         const qty = Number(quantity) || 0;
         if (qty <= 0) return;
         if (fr[key] != null) fr[key] = Math.max(0, fr[key] - qty);
+        // onHand bucket: lifecycle-less SKUs (cheese, dips) live here.
+        // Until the first post-Phase-3a snapshot lands, oh[cheese] is
+        // undefined and fr deduction handles it. Once oh is populated,
+        // fr[cheese] = 0 so the fr line is a harmless no-op.
+        if (oh[key] != null) oh[key] = Math.max(0, oh[key] - qty);
         if (!flowDelivered[key]) flowDelivered[key] = [];
         flowDelivered[key].push({ customer: cust, qty, confirmedAt: delivery._confirmedAt || '' });
       });
@@ -647,6 +664,7 @@ export function getInventoryReport(args) {
 
   Object.keys(cf).forEach((k) => { cf[k] = Math.max(0, Math.round(cf[k])); });
   Object.keys(fr).forEach((k) => { fr[k] = Math.max(0, Math.round(fr[k])); });
+  Object.keys(oh).forEach((k) => { oh[k] = Math.max(0, Math.round(oh[k])); });
 
   // Aging dough alerts
   const now = Date.now();
@@ -669,7 +687,7 @@ export function getInventoryReport(args) {
   agingDough.sort((a, b) => b.ageDays - a.ageDays);
 
   return {
-    effective: { coldFerment: cf, frozen: fr },
+    effective: { coldFerment: cf, frozen: fr, onHand: oh },
     doughQueue,
     flowsSinceSnapshot: { shape: flowShape, bfp: flowBfp, delivered: flowDelivered },
     alerts: { agingDough },
@@ -884,18 +902,16 @@ export function scheduleCheese({
     });
   });
 
-  // Starting inventory = effective cf + fr for cheese.
-  //   - cheese_done log entries credit `cf` (the dough convention we
-  //     reused for batches-on-hand).
-  //   - The Stock tab's manual count writes to BOTH `cf` and `fr` from a
-  //     single user-entered "on hand" number; for items without a real
-  //     dough/baking lifecycle (cheese, bulk dip, etc.) the value lands
-  //     in `fr`. Sum both so a manual stock count reflects in the
-  //     scheduler — otherwise scheduleCheese sees 0 and force-overdues
-  //     every upcoming batch even when the fridge is full.
+  // Starting inventory = sum across all three buckets for cheese.
+  //   - cheese_done log entries credit `cf`.
+  //   - Stock tab snapshots: pre-Phase-3a wrote to `fr` (the bug we
+  //     patched in #8); Phase 3a+ writes to `oh` (the on-hand bucket
+  //     for SKUs without a dough/bake lifecycle). Sum all three so old
+  //     and new snapshots both flow through correctly during transition.
   const cfStart = inventoryReport?.effective?.coldFerment?.[CHEESE_SKU_KEY] || 0;
   const frStart = inventoryReport?.effective?.frozen?.[CHEESE_SKU_KEY] || 0;
-  const startInventory = cfStart + frStart;
+  const ohStart = inventoryReport?.effective?.onHand?.[CHEESE_SKU_KEY] || 0;
+  const startInventory = cfStart + frStart + ohStart;
 
   // Walk forward. Track running stock. When stock would go negative on day i,
   // schedule a batch on the latest valid day inside the [i-MAX_LEAD, i-MIN_LEAD]

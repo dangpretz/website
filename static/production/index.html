@@ -1139,6 +1139,13 @@
   const getCaseSize     = sku => (skuConfig[sku]?.caseSize > 0 ? skuConfig[sku].caseSize : 0) || CASE_SIZES[sku] || 0;
   const isFOH           = sku => skuConfig[sku] ? skuConfig[sku].type === 'foh' : FOH_SKUS.has(sku.toLowerCase()) || FOH_SKUS.has(sku);
   const isCoating       = sku => skuConfig[sku] ? skuConfig[sku].type === 'coating' : BAKE_GROUPS.coating.includes(sku);
+  // Lifecycle-less SKUs: tracked production but no dough → bake → freeze
+  // pipeline. Snapshot stock counts go into a third `onHand` bucket instead
+  // of the `frozen` bucket. Phase 3a hardcodes; Phase 3b moves to DIP_CONFIG.
+  const LIFECYCLELESS_SKUS = new Set([
+    '3oz cheese dip',
+    'bulk dangerous dip (25 srv)',
+  ]);
   // Per-SKU stripe color (worker view) — regex priority. Returns CSS color string.
   const getStripeColor = (sku) => {
     const s = (sku || '').toLowerCase();
@@ -2743,9 +2750,13 @@
     allSkus.forEach(sku => {
       if (isFOH(sku)) return; // FOH SKUs aren't part of production forecast
       // Use effective inventory — same numbers as worker card and scheduler.
+      // Sum all three buckets: cf (dough), fr (frozen), oh (on-hand for
+      // lifecycle-less SKUs). For pretzels only cf+fr have values; for
+      // cheese / bulk dip / future retail dips, oh holds the count.
       const doughEff  = report.effective.coldFerment[sku] || 0;
       const frozenEff = report.effective.frozen[sku] || 0;
-      const stock     = doughEff + frozenEff;
+      const onHandEff = report.effective.onHand?.[sku] || 0;
+      const stock     = doughEff + frozenEff + onHandEff;
       const demand    = demandBySku[sku] || 0;
       const net       = stock - demand;
       const cs        = getCaseSize(sku);
@@ -2790,7 +2801,14 @@
 
     const rows = allSkus.map(sku => {
       const isFohSku   = isFOH(sku);
+      // Lifecycle-less SKUs: cheese, bulk dip, and the 4 retail dips coming
+      // in Phase 3b. They have no dough → bake → freeze pipeline; manager
+      // just enters an "on hand" count. Stock tab renders a single onHand
+      // input instead of dough + frozen. (Hardcoded for Phase 3a; Phase 3b
+      // moves this to DIP_CONFIG in inventory.js.)
+      const isLifecycleless = LIFECYCLELESS_SKUS.has(sku);
       const frozenRaw  = inv.frozen[sku] || 0; // raw snapshot value, used only in "(was N)" label
+      const onHandRaw  = inv.onHand?.[sku] || 0;
       const dedAmt     = deducted[sku] || 0;
       const dedDetails = deductDetails[sku] || [];
       // Pre-fill inputs with effective values — same source of truth as worker
@@ -2798,6 +2816,12 @@
       // on physical count rather than retyping from scratch.
       const doughDisplay  = report.effective.coldFerment[sku] || 0;
       const frozenDisplay = report.effective.frozen[sku] || 0;
+      // For lifecycle-less SKUs, the legacy snapshot may have the count in
+      // `frozen` (pre-Phase-3a). Sum both so the input pre-fills with the
+      // total — manager re-saves and it lands in onHand cleanly.
+      const onHandDisplay = isLifecycleless
+        ? (report.effective.onHand?.[sku] || 0) + frozenDisplay
+        : (report.effective.onHand?.[sku] || 0);
       const fc         = forecasts[sku];
       const ageDays    = oldestDoughAge[sku];
 
@@ -2867,12 +2891,19 @@
         }
       }
 
+      // Right-side input is either the frozen count (pretzels) or the
+      // on-hand count (cheese / bulk dip / future retail dips). Both render
+      // in the same column slot — saveStock() reads data-stock-section to
+      // route the value to the correct snapshot field.
+      const rightInput = isLifecycleless
+        ? `<input class="stock-input" type="number" min="0" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" placeholder="0" title="On hand">`
+        : `<input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" placeholder="0">`;
       return `<div class="stock-row">
         <div><span class="stock-sku">${esc(sku)}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
-        ${isFohSku
+        ${(isFohSku || isLifecycleless)
           ? `<span class="stock-na">—</span>`
           : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" placeholder="0">`}
-        <input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" placeholder="0">
+        ${rightInput}
       </div>`;
     }).join('');
 
@@ -2917,7 +2948,11 @@
       .filter(c => c.sku === CHEESE_KEY)
       .reduce((s, c) => s + (Number(c.batches) || 0), 0);
 
-    const effectiveCheese = report.effective.coldFerment[CHEESE_KEY] || 0;
+    // Mirror scheduleCheese's startInventory: sum cf + fr + oh. Old snapshots
+    // have cheese in fr (pre-Phase-3a); new ones in oh. Both flow through.
+    const effectiveCheese = (report.effective.coldFerment[CHEESE_KEY] || 0)
+      + (report.effective.frozen[CHEESE_KEY] || 0)
+      + (report.effective.onHand?.[CHEESE_KEY] || 0);
     const fohRate = cheeseFohDailyAvg;
 
     // Today's card
@@ -3033,9 +3068,13 @@
       const section = inp.dataset.stockSection;
       const n   = parseInt(inp.value, 10) || 0;
       if (!sku) return;
-      if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0 };
+      if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0, onHand: 0 };
       if (section === 'shape')  snaps[sku].coldFerment = n;
       if (section === 'frozen') snaps[sku].frozen      = n;
+      // onhand bucket — for lifecycle-less SKUs (cheese, bulk dip, future
+      // retail dips). Distinct from `frozen` (which is reserved for actually
+      // frozen pretzels) so the cheese row doesn't pollute pretzel forecasts.
+      if (section === 'onhand') snaps[sku].onHand      = n;
     });
     // Save ALL SKUs the user touched, including zeros — clearing an SKU to 0
     // must propagate so getLatestInventory can overwrite older non-zero values.
