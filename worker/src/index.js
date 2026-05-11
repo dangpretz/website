@@ -1184,6 +1184,24 @@ function buildCheeseEvent({ batch, dtstamp }) {
   return lines.join('\r\n');
 }
 
+// Read the UID set we emitted last time from KV. Used to diff against the
+// current live set so future-date batches that no longer apply get an
+// explicit STATUS:CANCELLED tombstone (the "I added inventory, why is the
+// batch still on the calendar" symptom). Returns an empty Set if KV isn't
+// bound or the key doesn't exist (first run / TTL expired).
+async function kvGetUidSet(env) {
+  if (!env.FOH_CAL_STATE) return new Set();
+  try {
+    const raw = await env.FOH_CAL_STATE.get('last-live-uids');
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (err) {
+    console.warn('FOH cal KV get failed:', err.message);
+    return new Set();
+  }
+}
+
 // Tombstone VEVENT for a UID that's no longer in the live schedule. Some
 // calendar clients (myecalendar in particular) keep events in the calendar
 // after they drop out of the subscribed feed. Emitting an explicit
@@ -1363,11 +1381,56 @@ async function handleFohCalendar(request, env) {
   // Build .ics body
   const dtstamp = icsDateUTC(new Date());
 
-  // Tombstones for past 3 days × every dip type. Calendar clients that
-  // imported a batch on (today-1) and now don't see it in the live feed
-  // will receive STATUS:CANCELLED for that UID and remove. Idempotent —
-  // clients with no matching event treat as no-op. Cheap (15 small events).
-  const tombstoneEvents = [];
+  // Collect the live event set as (uid, date, summary) records so we can
+  // both emit them AND diff against previously-emitted UIDs in KV.
+  const liveRecords = [];
+  cheese.batches.forEach((batch) => {
+    liveRecords.push({
+      uid: `cheese-batch-${batch.date}@dangpretz`,
+      date: batch.date,
+      summary: `🧀 cheese dip batch`,
+      ics: buildCheeseEvent({ batch, dtstamp }),
+    });
+  });
+  retailDipBatches.forEach(({ dipSku, cfg, batch }) => {
+    liveRecords.push({
+      uid: `${cfg.key}-batch-${batch.date}@dangpretz`,
+      date: batch.date,
+      summary: `${cfg.label} batch`,
+      ics: buildDipBatchEvent({ dipSku, cfg, batch, dtstamp }),
+    });
+  });
+  cateringDeliveries.forEach((delivery) => {
+    liveRecords.push({
+      uid: `catering-${delivery.deliveryId}@dangpretz`,
+      date: delivery.date,
+      summary: `catering for ${delivery.customer || '?'}`,
+      ics: buildCateringEvent({ delivery, dtstamp }),
+    });
+  });
+  const currentUids = new Set(liveRecords.map((r) => r.uid));
+
+  // Diff against the last-emitted set in KV. Any UID that WAS in the feed
+  // last time but ISN'T now gets a STATUS:CANCELLED tombstone — fixes the
+  // "I added inventory so the future batch is no longer needed, but the
+  // calendar still shows it" symptom for myecalendar.
+  const previousUids = await kvGetUidSet(env);
+  const disappearedUids = [...previousUids].filter((uid) => !currentUids.has(uid));
+
+  // Tombstones for disappeared UIDs. Each gets a generic cancel event with
+  // the same UID — calendars match on UID and remove.
+  const tombstoneEvents = disappearedUids.map((uid) => buildBatchCancelEvent({
+    uid,
+    // DTSTART is required for STATUS:CANCELLED in some parsers — use today
+    // as a placeholder; the receiving calendar matches on UID anyway.
+    date: today,
+    dtstamp,
+    summary: '(cancelled)',
+  }));
+
+  // Belt-and-suspenders: also keep emitting past-3-day tombstones for every
+  // dip-type slot. Catches calendars whose UID-match was off, or KV first-
+  // request cases where previousUids is empty. Cheap (15 small events).
   for (let i = 1; i <= 3; i++) {
     const date = (() => {
       const dt = new Date(today);
@@ -1375,10 +1438,12 @@ async function handleFohCalendar(request, env) {
       return dt.toISOString().slice(0, 10);
     })();
     Object.entries(DIP_CONFIG).forEach(([dipSku, cfg]) => {
-      // Cheese uses its own UID prefix; retail dips use cfg.key
       const uid = dipSku === CHEESE_KEY
         ? `cheese-batch-${date}@dangpretz`
         : `${cfg.key}-batch-${date}@dangpretz`;
+      // Don't double up if this UID is also in the disappeared set
+      if (currentUids.has(uid)) return;
+      if (disappearedUids.includes(uid)) return;
       tombstoneEvents.push(buildBatchCancelEvent({
         uid,
         date,
@@ -1388,10 +1453,17 @@ async function handleFohCalendar(request, env) {
     });
   }
 
+  // Persist the current live-UID set for next time's diff. Don't block the
+  // response on the KV write — Cloudflare KV is eventually consistent and
+  // a missed write just delays the future-tombstone signal by one cycle.
+  if (env.FOH_CAL_STATE) {
+    env.FOH_CAL_STATE
+      .put('last-live-uids', JSON.stringify([...currentUids]), { expirationTtl: 60 * 60 * 24 * 30 })
+      .catch((err) => console.warn('FOH cal KV put failed:', err.message));
+  }
+
   const events = [
-    ...cheese.batches.map((batch) => buildCheeseEvent({ batch, dtstamp })),
-    ...retailDipBatches.map(({ dipSku, cfg, batch }) => buildDipBatchEvent({ dipSku, cfg, batch, dtstamp })),
-    ...cateringDeliveries.map((delivery) => buildCateringEvent({ delivery, dtstamp })),
+    ...liveRecords.map((r) => r.ics),
     ...tombstoneEvents,
   ];
 

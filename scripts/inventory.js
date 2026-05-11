@@ -206,13 +206,12 @@ export const TRAY_SIZES = {
 
 // SKUs that aren't produced in-house (front-of-house pre-made / sourced).
 // Note: `3oz cheese dip` USED to be here but is now tracked production
-// (FOH makes it on-site in batches of 150). Bulk pre-mixed dip + individual
-// catering-portion dips (dangerous, sweet cream) are FOH — they're
-// portioned fresh during fulfillment, no production scheduling.
+// (FOH makes it on-site in batches of 150). Only the bulk pre-mixed dip
+// is still FOH-external. Individual dip portions (cheese / sweet cream /
+// hot ranch / mustards) live in DIP_CONFIG and are production-scheduled
+// so FOH gets lead-time visibility for catering events.
 export const FOH_SKUS = new Set([
   'bulk dangerous dip (25 srv)',
-  '3oz dangerous dip',
-  '3oz sweet cream dip',
 ]);
 
 // SKUs that need a coating step at BFP (cheese on top during bake).
@@ -235,17 +234,17 @@ export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
 // production app's "Box mapping" tab — those entries take priority.
 //
 // User-confirmed mappings:
-//   Catering: Salty Pretzel Box      → 15 × 6.5oz plain         (2026-05-05)
-//   Catering: BBK Pretzel Box - 15   → 15 × 6.5oz bbk           (2026-05-05)
-//   Catering: Saint Pretzel Box      → 15 × 6.5oz plain         (2026-05-07; FOH tops w/ cinn sugar)
-//   Catering: Dangerous Dip Box      → 15 × 3oz dangerous dip   (2026-05-07; FOH portions fresh)
-//   Catering: Swell Cream Box - 15   → 15 × 3oz sweet cream dip (2026-05-07; FOH portions fresh)
+//   Catering: Salty Pretzel Box      → 15 × 6.5oz plain     (2026-05-05)
+//   Catering: BBK Pretzel Box - 15   → 15 × 6.5oz bbk       (2026-05-05)
+//   Catering: Saint Pretzel Box      → 15 × 6.5oz plain     (2026-05-07; FOH tops w/ cinn sugar)
+//   Catering: Dangerous Dip Box      → 15 × 3oz cheese dip  (2026-05-07; "dangerous dip" is the external name for the internal cheese-dip SKU)
+//   Catering: Swell Cream Box - 15   → 15 × sweet cream dip (2026-05-07; production-tracked via DIP_CONFIG so FOH gets lead-time visibility)
 export const DEFAULT_BOX_EXPANSIONS = {
   'Catering: Salty Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
   'Catering: BBK Pretzel Box - 15': [{ sku: '6.5oz bbk', multiplier: 15 }],
   'Catering: Saint Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
-  'Catering: Dangerous Dip Box': [{ sku: '3oz dangerous dip', multiplier: 15 }],
-  'Catering: Swell Cream Box - 15': [{ sku: '3oz sweet cream dip', multiplier: 15 }],
+  'Catering: Dangerous Dip Box': [{ sku: '3oz cheese dip', multiplier: 15 }],
+  'Catering: Swell Cream Box - 15': [{ sku: 'sweet cream dip', multiplier: 15 }],
 };
 
 /**
