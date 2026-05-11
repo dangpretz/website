@@ -553,6 +553,11 @@
     /* When body has role-shape or role-bfp, hide manager chrome */
     body.role-worker .topnav { display: none; }
     body.role-worker .tab-bar { display: none !important; }
+    /* FOH role is a worker that DOES need tab navigation (Dips ↔ Stock).
+       Override the tab-bar hide above, then hide just Shape + BFP. */
+    body.role-foh .tab-bar { display: flex !important; }
+    body.role-foh .tab-btn[data-tab="shape"],
+    body.role-foh .tab-btn[data-tab="bfp"] { display: none !important; }
 
     /* Worker header — two rows: identity on top, date nav below */
     .worker-header {
@@ -1058,7 +1063,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-08-followups';
+  } from '../../scripts/inventory.js?v=2026-05-07-saint-box-mapping';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1559,14 +1564,20 @@
     return (Math.round(n * 10) / 10).toFixed(1);
   };
 
-  // Role from ?role=shape | ?role=bfp | (default = manager). Used to scope the
-  // UI so the dough team and BFP team can't see/edit each other's schedule.
+  // Role from ?role=shape | ?role=bfp | ?role=foh | (default = manager).
+  // Used to scope the UI so each team only sees their own surface:
+  //   shape → only Shape tab
+  //   bfp   → only BFP tab
+  //   foh   → only Dips (Cheese tab) + Stock tabs — FOH manages dip
+  //           production and on-hand counts; doesn't touch shape/BFP.
   const _roleParam = new URLSearchParams(window.location.search).get('role');
   const userRole   = _roleParam === 'shape' ? 'shape'
                   : _roleParam === 'bfp'   ? 'bfp'
+                  : _roleParam === 'foh'   ? 'foh'
                   : 'manager';
   if (userRole === 'shape')      document.title = appLang === 'es' ? 'Formar · Producción' : 'Shape · Production';
   else if (userRole === 'bfp')   document.title = appLang === 'es' ? 'HCE · Producción'    : 'BFP · Production';
+  else if (userRole === 'foh')   document.title = appLang === 'es' ? 'FOH · Salsas'        : 'FOH · Dips';
   else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
 
   // Set body class for role-aware CSS hiding (handled in stylesheet).
@@ -1582,7 +1593,9 @@
     else document.addEventListener('DOMContentLoaded', setBody);
   }
 
-  let dayTab = userRole === 'bfp' ? 'bfp' : 'shape'; // 'shape' | 'bfp' | 'stock' (manager only)
+  let dayTab = userRole === 'bfp' ? 'bfp'
+             : userRole === 'foh' ? 'cheese' // Dips tab (renamed) is FOH's home
+             : 'shape'; // 'shape' | 'bfp' | 'stock' | 'cheese' (cheese/stock visible per role rules)
 
   // Inline logging state
   // loggedPretzels[type][dateStr][sku] = current pretzel count (local, mid-edit)
@@ -2640,9 +2653,10 @@
 
   function renderDayView() {
     const dateStr    = toDateStr(currentDate);
-    // Stock + Cheese tabs are manager-only; force back to the role's home tab
-    // if a team role somehow lands there.
-    if ((dayTab === 'stock' || dayTab === 'cheese') && userRole !== 'manager') {
+    // Stock + Cheese (Dips) tabs are visible to manager + FOH; shape/BFP get
+    // forced back to their team's home tab if they somehow land there.
+    const isAllowedStockCheese = userRole === 'manager' || userRole === 'foh';
+    if ((dayTab === 'stock' || dayTab === 'cheese') && !isAllowedStockCheese) {
       dayTab = userRole === 'bfp' ? 'bfp' : 'shape';
     }
     if (dayTab === 'stock')  return renderStockTab();
@@ -3056,20 +3070,46 @@
               <div class="wmetric-value"><strong>${Math.round(onHand)}</strong></div>
             </div>
           </div>
-          <div class="wstepper" style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="single" data-delta="-1" ${todayMadeUnits <= 0 ? 'disabled' : ''}>−</button>
-            <button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="single" data-delta="1">+ ${appLang === 'es' ? 'sencilla' : 'single'} (${cfg.singleBatchSize})</button>
-            ${showDouble ? `<button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="double" data-delta="1">+ ${appLang === 'es' ? 'doble' : 'double'} (${cfg.doubleBatchSize})</button>` : ''}
+          <div class="wstepper" style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">
+            <button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="single" data-delta="-1" ${todayMadeUnits <= 0 ? 'disabled' : ''} style="min-width:44px;white-space:nowrap;font-size:14px">−</button>
+            <button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="single" data-delta="1" style="flex:1;white-space:nowrap;font-size:13px;padding:8px 10px">+ ${appLang === 'es' ? 'sencilla' : 'single'} (${cfg.singleBatchSize})</button>
+            ${showDouble ? `<button class="wstep-btn" data-dip-step data-sku="${esc(dipSku)}" data-size="double" data-delta="1" style="flex:1;white-space:nowrap;font-size:13px;padding:8px 10px">+ ${appLang === 'es' ? 'doble' : 'double'} (${cfg.doubleBatchSize})</button>` : ''}
           </div>
         </div>`;
     } else {
-      todayHtml = `<div class="no-prod" style="padding:24px 20px">
-        ${cfg.emoji} ${appLang === 'es' ? 'Sin tanda hoy' : 'No batch needed today'} — ${esc(cfg.label)}
-        <br><span style="font-size:13px;color:var(--gray-3)">
-          ${appLang === 'es' ? 'Inventario: ' : 'On hand: '}
-          ${Math.round(onHand)} ${appLang === 'es' ? 'dips · consumo FOH ~' : 'dips · FOH walk-in ~'}${dailyAvg}/${appLang === 'es' ? 'día' : 'day'}
-        </span>
-      </div>`;
+      // No-batch-needed card uses the same wcard chrome as the batch-needed
+      // case so all 5 dip cards align visually. Green stripe + "✅ Stocked"
+      // pill make it obvious at a glance which dips are good to go.
+      const runwayDays = dailyAvg > 0 ? Math.round(onHand / dailyAvg) : null;
+      const runwayLabel = runwayDays != null
+        ? `${runwayDays} ${appLang === 'es' ? 'días' : 'days'}`
+        : '—';
+      todayHtml = `
+        <div class="wcard status-done" style="--wcard-stripe:#b9d4a8">
+          <div class="wcard-head">
+            <div>
+              <div class="wcard-name">${cfg.emoji} ${esc(cfg.label.charAt(0).toUpperCase() + cfg.label.slice(1))}</div>
+              <div style="font:500 12px 'Manrope',sans-serif;color:var(--gray-3);margin-top:2px">
+                ${appLang === 'es' ? 'Sin tanda hoy — bien abastecido' : 'No batch needed today — well stocked'}
+              </div>
+            </div>
+            <span class="wcard-pill done">✅ ${appLang === 'es' ? 'Abastecido' : 'Stocked'}</span>
+          </div>
+          <div class="wcard-metrics" style="margin-top:8px">
+            <div class="wmetric">
+              <div class="wmetric-label">${appLang === 'es' ? 'INVENTARIO' : 'ON HAND'}</div>
+              <div class="wmetric-value"><strong>${Math.round(onHand)}</strong></div>
+            </div>
+            <div class="wmetric">
+              <div class="wmetric-label">${appLang === 'es' ? 'FOH / DÍA' : 'FOH / DAY'}</div>
+              <div class="wmetric-value"><strong>${dailyAvg}</strong></div>
+            </div>
+            <div class="wmetric">
+              <div class="wmetric-label">${appLang === 'es' ? 'ALCANZA' : 'RUNWAY'}</div>
+              <div class="wmetric-value"><strong>${runwayLabel}</strong></div>
+            </div>
+          </div>
+        </div>`;
     }
 
     const upcoming = sched.batches.filter(b => b.date > dateStr).slice(0, 8);
@@ -3088,13 +3128,10 @@
         }).join('')}
       </div>`;
 
+    // No per-dip section heading above the card — the card itself shows
+    // the dip name + emoji + status pill + on-hand metric. Adding a
+    // duplicate heading line outside the card was redundant noise.
     return `<div style="margin-bottom:18px">
-      <div style="margin-bottom:6px">
-        <div style="font:700 14px 'Paytone One',sans-serif;color:var(--dark)">${cfg.emoji} ${esc(cfg.label.charAt(0).toUpperCase() + cfg.label.slice(1))}</div>
-        <div style="font:400 11px 'Manrope',sans-serif;color:var(--gray-3)">
-          ${appLang === 'es' ? 'Inventario' : 'On hand'} ${Math.round(onHand)} · FOH ~${dailyAvg}/${appLang === 'es' ? 'día' : 'day'}
-        </div>
-      </div>
       ${todayHtml}
       ${upcomingHtml}
     </div>`;
@@ -3703,9 +3740,12 @@
       : '';
     document.getElementById('alert-area').innerHTML = alertHtml;
 
-    // Tab bar — manager only (team roles see only their own card)
+    // Tab bar — manager + FOH (shape/BFP see only their own card; FOH still
+    // needs to switch between Dips and Stock).
     const tabBar = document.getElementById('tab-bar');
-    tabBar.style.display = (viewMode === 'week' || userRole !== 'manager') ? 'none' : 'flex';
+    const tabBarVisible = viewMode !== 'week'
+      && (userRole === 'manager' || userRole === 'foh');
+    tabBar.style.display = tabBarVisible ? 'flex' : 'none';
     document.querySelectorAll('.tab-btn').forEach(btn =>
       btn.classList.toggle('active', btn.dataset.tab === dayTab));
 

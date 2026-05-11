@@ -231,13 +231,15 @@ export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
 // hasn't been written to skuConfig yet. Manager can override via the
 // production app's "Box mapping" tab — those entries take priority.
 //
-// User-confirmed mappings (2026-05-05):
-//   Catering: Salty Pretzel Box   → 15 × 6.5oz plain
-//   Catering: BBK Pretzel Box - 15 → 15 × 6.5oz bbk
-// Saint, Swell Cream, and dip-box mappings TBD (manager configures).
+// User-confirmed mappings:
+//   Catering: Salty Pretzel Box      → 15 × 6.5oz plain  (2026-05-05)
+//   Catering: BBK Pretzel Box - 15   → 15 × 6.5oz bbk    (2026-05-05)
+//   Catering: Saint Pretzel Box      → 15 × 6.5oz plain  (2026-05-07; topped w/ cinn sugar by FOH)
+// Swell Cream and dip-box mappings TBD (manager configures).
 export const DEFAULT_BOX_EXPANSIONS = {
   'Catering: Salty Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
   'Catering: BBK Pretzel Box - 15': [{ sku: '6.5oz bbk', multiplier: 15 }],
+  'Catering: Saint Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
 };
 
 /**
