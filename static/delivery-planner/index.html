@@ -954,7 +954,7 @@
       isShapeOnlyDelivery,
       expandBoxLineItems,
       caseSizeOptionsFor,
-    } from '../../scripts/inventory.js?v=2026-05-07-saint-box-mapping';
+    } from '../../scripts/inventory.js?v=2026-05-07-audit-fixes-round2';
 
     // Shape-only catering + box expansion. ENABLED BY DEFAULT — kept in
     // sync with production app via the same localStorage key.
@@ -1389,10 +1389,16 @@
         }
       };
 
-      // Cases × Size → Pretzels: live update as the user types/picks.
-      // Pretzels → Cases: only on blur (avoids stomping on a partially-typed
-      // pretzel value mid-edit).
+      // Cases × Size → Pretzels: live update as the user types/picks —
+      // but ONLY if the user hasn't manually edited pretzels. Once they
+      // type into pretzels, treat that value as the source of truth and
+      // stop overwriting it. (Hint still shows "≈ cs cases" so the user
+      // sees the implied count without us stomping their number.) The
+      // dirty flag resets when SKU changes (different product, fresh row)
+      // or when pretzels is cleared back to empty.
+      let pretzelsDirty = false;
       const syncQtyFromCases = () => {
+        if (pretzelsDirty) { updateHint(); return; }
         const cs = Number(caseSizeSelect.value) || 0;
         const cc = Number(caseCountInput.value) || 0;
         if (cs > 0 && cc > 0) qtyInput.value = String(cs * cc);
@@ -1400,6 +1406,12 @@
       };
       caseCountInput.addEventListener('input', syncQtyFromCases);
       caseSizeSelect.addEventListener('change', syncQtyFromCases);
+      qtyInput.addEventListener('input', () => {
+        // Any keystroke in pretzels = user wants this value preserved.
+        // Empty pretzels = back to derived mode.
+        pretzelsDirty = qtyInput.value.trim() !== '';
+        updateHint();
+      });
       qtyInput.addEventListener('blur', () => {
         const cs = Number(caseSizeSelect.value) || 0;
         const qty = Number(qtyInput.value) || 0;
@@ -1409,6 +1421,9 @@
         }
         updateHint();
       });
+      // Expose so SKU-change handler can clear the lock when picking a
+      // different product (the row is essentially "new" at that point).
+      row._clearPretzelsDirty = () => { pretzelsDirty = false; };
 
       skuSelect.addEventListener('change', () => {
         if (skuSelect.value === '__custom__') {
@@ -1421,6 +1436,9 @@
         }
         // Refresh case options for the new SKU. Keep the user-entered cases
         // count, but recompute pretzel quantity if a default size emerges.
+        // Switching SKUs resets the "user-edited pretzels" lock — the qty
+        // for the new SKU starts fresh.
+        if (row._clearPretzelsDirty) row._clearPretzelsDirty();
         populateCaseSizes();
         const cs = Number(caseSizeSelect.value) || 0;
         const cc = Number(caseCountInput.value) || 0;
