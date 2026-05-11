@@ -1063,7 +1063,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-07-audit-fixes-round2';
+  } from '../../scripts/inventory.js?v=2026-05-11-foh-stock';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1167,6 +1167,14 @@
   const LIFECYCLELESS_SKUS = new Set([
     '3oz cheese dip',
     'bulk dangerous dip (25 srv)',
+    // Retail + catering-portion dips (DIP_CONFIG entries) — produced in
+    // batches but no dough/bake lifecycle, so stock is a single on-hand
+    // count. Catering boxes (Dangerous Dip Box, Swell Cream Box) expand
+    // to these same SKUs so we don't need separate "portion" SKUs.
+    'hot ranch dip',
+    'sweet cream dip',
+    'house mustard dip',
+    'honey mustard dip',
   ]);
   // Per-SKU stripe color (worker view) — regex priority. Returns CSS color string.
   const getStripeColor = (sku) => {
@@ -2839,7 +2847,12 @@
       if (ageDays >= DOUGH_AGE_WARN_DAYS) oldestDoughAge[sku] = ageDays;
     });
 
-    const rows = allSkus.map(sku => {
+    // FOH role: Stock tab is filtered to dip rows only. They manage dip
+    // on-hand counts, not pretzel inventory. Manager sees everything.
+    const stockSkus = userRole === 'foh'
+      ? allSkus.filter(sku => LIFECYCLELESS_SKUS.has(sku) || isFOH(sku))
+      : allSkus;
+    const rows = stockSkus.map(sku => {
       const isFohSku   = isFOH(sku);
       // Lifecycle-less SKUs: cheese, bulk dip, and the 4 retail dips coming
       // in Phase 3b. They have no dough → bake → freeze pipeline; manager
@@ -2982,14 +2995,20 @@
         }).join('')}
       </div>`;
 
+    // FOH role: simpler chrome. No forecast summary (pretzel-focused), no
+    // dough-aging banners. Stock-tab title swapped to dip-specific label.
+    const isFohRole = userRole === 'foh';
+    const tabTitle = isFohRole
+      ? (appLang === 'es' ? 'Salsas en inventario' : 'Dips on hand')
+      : t('stock_title');
     return `<div class="team-card"><div class="team-body">
       <div class="stock-tab-header">
         <div>
-          <div class="stock-tab-title">${t('stock_title')}</div>
+          <div class="stock-tab-title">${esc(tabTitle)}</div>
           <div class="stock-tab-note">${esc(lastSavedStr)}${esc(deductNote)}</div>
         </div>
       </div>
-      ${summaryHtml}
+      ${isFohRole ? '' : summaryHtml}
       <div class="stock-col-head">
         <span>${t('sku_col')}</span>
         <span style="text-align:center">${t('dough_col')}</span>
@@ -2997,7 +3016,7 @@
       </div>
       ${rows}
       <button class="btn-primary" id="stock-save" style="margin-top:20px">${t('save_stock')}</button>
-      ${boxMappingsHtml}
+      ${isFohRole ? '' : boxMappingsHtml}
     </div></div>`;
   }
 
