@@ -1063,7 +1063,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-07-saint-box-mapping';
+  } from '../../scripts/inventory.js?v=2026-05-07-audit-fixes-round2';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -2465,7 +2465,6 @@
     if (isBFP && hasBakeDates) {
       const dateSet = new Set(d.deliveryDates);
       dateSet.add(todayShipStr);
-      const defaultCs = getCaseSize(d.sku) || 0;
       const packs = [];
       allDeliveries.forEach((deliv) => {
         if (!dateSet.has(deliv.date)) return;
@@ -2483,13 +2482,23 @@
           if (key !== d.sku) return;
           const qty = Number(it.quantity) || 0;
           if (qty <= 0) return;
-          const caseSize  = Number(it.caseSize)  || defaultCs;
-          const caseCount = Number(it.caseCount) || (caseSize > 0 ? Math.ceil(qty / caseSize) : 0);
+          // Use the line item's explicit case info ONLY. Falling back to
+          // ceil(qty / defaultCaseSize) produces misleading slots like
+          // "1×72" for a 15-pretzel order — reads as "one case of 72" when
+          // really it's 15 in a 72-capacity case. Without explicit case
+          // data, drop to "{qty}p" display (no slots, just the pretzel
+          // count). Manager can edit the delivery in the planner to attach
+          // case info if BFP needs to pack against it.
+          const explicitCs = Number(it.caseSize)  || 0;
+          const explicitCc = Number(it.caseCount) || 0;
+          const hasExplicitCases = explicitCs > 0 && explicitCc > 0;
           packs.push({
             deliveryId: deliv.deliveryId || '',
             customer: deliv.customer || deliv.location || '?',
             date:     deliv.date,
-            caseSize, caseCount, qty,
+            caseSize: hasExplicitCases ? explicitCs : 0,
+            caseCount: hasExplicitCases ? explicitCc : 0,
+            qty,
           });
         });
       });
@@ -3714,6 +3723,7 @@
     // Aging-dough banner — manager only. Reads from getInventoryReportLocal() so the
     // numbers match the stock tab's per-row aging indicator exactly.
     let agingDoughHtml = '';
+    let overbakeHtml = '';
     if (userRole === 'manager') {
       const inventoryReport = getInventoryReportLocal();
       const aging = inventoryReport.alerts.agingDough;
@@ -3732,11 +3742,33 @@
           : (appLang === 'es' ? 'Masa envejeciendo — usar pronto:'    : 'Aging dough — use soon:');
         agingDoughHtml = `<div class="alert-banner" style="background:${bg};color:${fg}"><strong>${icon} ${label}</strong> ${items}</div>`;
       }
+      // BFP overbake banner — fires when BFP attributed more pretzels
+      // than the cold-ferment snapshot said existed. Indicates the
+      // inventory snapshot is stale or under-counted. The schedule will
+      // silently shrink shape demand if uncorrected (phantom frozen
+      // covers shape).
+      const overbakes = inventoryReport.alerts.bfpOverbake || [];
+      if (overbakes.length > 0) {
+        // Group by SKU + sum phantom pretzels. One delivery per session
+        // could log many small overbakes; user wants the summary.
+        const bySku = {};
+        overbakes.forEach(o => {
+          if (!bySku[o.sku]) bySku[o.sku] = 0;
+          bySku[o.sku] += Number(o.phantomPretzels) || 0;
+        });
+        const items = Object.entries(bySku)
+          .map(([sku, phantom]) => `<strong>${esc(sku)}</strong> · ~${Math.round(phantom)}p`)
+          .join(' · ');
+        const label = appLang === 'es'
+          ? '⚠️ BFP horneó más de lo registrado — actualiza el inventario:'
+          : '⚠️ BFP attributed more dough than the snapshot tracked — update the inventory:';
+        overbakeHtml = `<div class="alert-banner" style="background:#fff3cd;color:#856404"><strong>${label}</strong> ${items}</div>`;
+      }
     }
 
     // Worker views see no banners (calmer UX). Per-card 🚨 tag still surfaces overdue work.
     const alertHtml = userRole === 'manager'
-      ? (overdueHtml + agingDoughHtml + unconfigHtml + dupHtml + unconfirmedHtml)
+      ? (overdueHtml + agingDoughHtml + overbakeHtml + unconfigHtml + dupHtml + unconfirmedHtml)
       : '';
     document.getElementById('alert-area').innerHTML = alertHtml;
 

@@ -206,10 +206,13 @@ export const TRAY_SIZES = {
 
 // SKUs that aren't produced in-house (front-of-house pre-made / sourced).
 // Note: `3oz cheese dip` USED to be here but is now tracked production
-// (FOH makes it on-site in batches of 150). Only the bulk pre-mixed dip
-// is still external.
+// (FOH makes it on-site in batches of 150). Bulk pre-mixed dip + individual
+// catering-portion dips (dangerous, sweet cream) are FOH — they're
+// portioned fresh during fulfillment, no production scheduling.
 export const FOH_SKUS = new Set([
   'bulk dangerous dip (25 srv)',
+  '3oz dangerous dip',
+  '3oz sweet cream dip',
 ]);
 
 // SKUs that need a coating step at BFP (cheese on top during bake).
@@ -232,14 +235,17 @@ export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
 // production app's "Box mapping" tab — those entries take priority.
 //
 // User-confirmed mappings:
-//   Catering: Salty Pretzel Box      → 15 × 6.5oz plain  (2026-05-05)
-//   Catering: BBK Pretzel Box - 15   → 15 × 6.5oz bbk    (2026-05-05)
-//   Catering: Saint Pretzel Box      → 15 × 6.5oz plain  (2026-05-07; topped w/ cinn sugar by FOH)
-// Swell Cream and dip-box mappings TBD (manager configures).
+//   Catering: Salty Pretzel Box      → 15 × 6.5oz plain         (2026-05-05)
+//   Catering: BBK Pretzel Box - 15   → 15 × 6.5oz bbk           (2026-05-05)
+//   Catering: Saint Pretzel Box      → 15 × 6.5oz plain         (2026-05-07; FOH tops w/ cinn sugar)
+//   Catering: Dangerous Dip Box      → 15 × 3oz dangerous dip   (2026-05-07; FOH portions fresh)
+//   Catering: Swell Cream Box - 15   → 15 × 3oz sweet cream dip (2026-05-07; FOH portions fresh)
 export const DEFAULT_BOX_EXPANSIONS = {
   'Catering: Salty Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
   'Catering: BBK Pretzel Box - 15': [{ sku: '6.5oz bbk', multiplier: 15 }],
   'Catering: Saint Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
+  'Catering: Dangerous Dip Box': [{ sku: '3oz dangerous dip', multiplier: 15 }],
+  'Catering: Swell Cream Box - 15': [{ sku: '3oz sweet cream dip', multiplier: 15 }],
 };
 
 /**
@@ -285,7 +291,28 @@ export function expandBoxLineItems(lineItems, skuConfig = {}) {
       out.push({ sku: targetSku, quantity: qty * m });
     }
   }
-  return out;
+  // Dedupe pass: merge same-SKU line items by summing quantity. Avoids two
+  // pills/coverage-lines for the same product when Square sends both a
+  // catering box AND its constituent pretzels (the box's expansion
+  // collides with the standalone line item). Case info preserved from the
+  // FIRST occurrence of each SKU; later occurrences contribute only qty.
+  const byKey = new Map();
+  const merged = [];
+  for (const li of out) {
+    const k = (li.sku || li.name || '').trim();
+    const q = Number(li.quantity) || 0;
+    if (!k || q <= 0) { merged.push(li); continue; }
+    if (!byKey.has(k)) {
+      const idx = merged.length;
+      const copy = { ...li, quantity: q };
+      merged.push(copy);
+      byKey.set(k, idx);
+    } else {
+      const idx = byKey.get(k);
+      merged[idx].quantity = (Number(merged[idx].quantity) || 0) + q;
+    }
+  }
+  return merged;
 }
 
 // ─── SKU META HELPER ──────────────────────────────────────────────────────
@@ -619,6 +646,10 @@ export function getInventoryReport(args) {
   const flowShape = {};
   const flowBfp = {};
   const flowDelivered = {};
+  // Audit trail of BFP completions that attributed more pretzels than the
+  // cold-ferment inventory said existed. Surfaces snapshot inaccuracies
+  // before they silently warp the shape team's schedule.
+  const bfpOverbakeEvents = [];
 
   // Walk events in TIMESTAMP order (defensive against out-of-order log writes)
   const sortedLogs = [...(productionLogs || [])].sort(
@@ -665,6 +696,22 @@ export function getInventoryReport(args) {
         if (!bs) return;
         const batches = Number(c.batches) || 0;
         const p = batches * bs;
+        // Detect overbake: BFP attributed more pretzels than cold-ferment
+        // had available. The clamp at max(0, …) means the deficit gets
+        // silently swallowed, but the FULL bake still lands in frozen.
+        // That phantom frozen reduces shape demand on future deliveries
+        // (frozen also covers shape) — schedule mysteriously shrinks for
+        // the dough team. Surface it so the manager can fix the snapshot.
+        if (p > 0 && (cf[key] || 0) < p) {
+          bfpOverbakeEvents.push({
+            sku: key,
+            batches,
+            attributedPretzels: p,
+            availableBeforeBake: Math.max(0, cf[key] || 0),
+            phantomPretzels: p - Math.max(0, cf[key] || 0),
+            ts: ts || '',
+          });
+        }
         cf[key] = Math.max(0, (cf[key] || 0) - p);
         fr[key] = (fr[key] || 0) + p;
         flowBfp[key] = (flowBfp[key] || 0) + batches;
@@ -732,10 +779,11 @@ export function getInventoryReport(args) {
       try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
       const cust = delivery.customer || delivery.location || '?';
       // Shape-only deliveries (catering boxes, FOH Placeholder) leave the
-      // pipeline at the dough stage — FOH bakes them fresh from coldFerment
-      // at fulfillment, so deduct from `cf` instead of `fr`. Frozen never
-      // had these pretzels, so the fr deduction would be a no-op anyway,
-      // but we skip it to keep flow accounting clean.
+      // pipeline at the dough stage — FOH bakes them fresh from
+      // coldFerment at fulfillment. Lifecycle-less SKUs (cheese, dips)
+      // live in onHand regardless. Each delivered line item cascades
+      // through buckets in priority order, deducting exactly `qty` units
+      // total across the three buckets.
       const isShapeOnly = !!delivery._shapeOnly;
       items.forEach(({ sku, quantity }) => {
         let key = sku?.trim();
@@ -743,30 +791,51 @@ export function getInventoryReport(args) {
         if (skuAliases[key]) key = skuAliases[key];
         const qty = Number(quantity) || 0;
         if (qty <= 0) return;
-        if (isShapeOnly) {
-          // Deduct from cf FIFO (matches BFP-done's consumption pattern).
-          if (cf[key] != null) cf[key] = Math.max(0, cf[key] - qty);
+
+        // Cascade: onHand → (cf for shape-only) → frozen. Each step takes
+        // only what it has, spills the remainder. Fixes the prior
+        // double-deduction bug where shape-only deliveries with cheese
+        // (cf populated by cheese_done + oh populated by stock snapshot)
+        // had both buckets deduct the full qty.
+        let remaining = qty;
+
+        // 1) onHand — canonical for cheese, retail dips, bulk dip, etc.
+        if (oh[key] != null && oh[key] > 0 && remaining > 0) {
+          const take = Math.min(oh[key], remaining);
+          oh[key] = Math.max(0, oh[key] - take);
+          remaining -= take;
+        }
+
+        // 2) cf — only for shape-only pretzel deliveries (catering boxes,
+        //    FOH Placeholder). FIFO consume the dough queue alongside so
+        //    age tracking stays accurate.
+        if (remaining > 0 && isShapeOnly && cf[key] != null && cf[key] > 0) {
+          const take = Math.min(cf[key], remaining);
+          cf[key] = Math.max(0, cf[key] - take);
           if (doughQueue[key]) {
-            let toConsume = qty;
+            let toConsume = take;
             while (toConsume > 0 && doughQueue[key].length > 0) {
               const oldest = doughQueue[key][0];
-              const take = Math.min(oldest.pretzels, toConsume);
-              oldest.pretzels -= take;
-              toConsume -= take;
+              const t = Math.min(oldest.pretzels, toConsume);
+              oldest.pretzels -= t;
+              toConsume -= t;
               if (oldest.pretzels <= 0) doughQueue[key].shift();
             }
           }
-        } else if (fr[key] != null) {
-          fr[key] = Math.max(0, fr[key] - qty);
+          remaining -= take;
         }
-        // onHand bucket: lifecycle-less SKUs (cheese, dips) live here.
-        // Independent of shape-only — a delivery with cheese in line items
-        // consumes onHand whether it's a shape-only catering box or a
-        // regular catering invoice. Pre-Phase-3a snapshots had cheese in
-        // fr; the fr branch above handles the legacy case for non-shape-only
-        // (and shape-only catering boxes don't usually contain cheese SKUs
-        // directly anyway).
-        if (oh[key] != null) oh[key] = Math.max(0, oh[key] - qty);
+
+        // 3) frozen — standard pretzel ship-out path. Also covers legacy
+        //    pre-Phase-3a cheese snapshots stored in fr, and FOH-only
+        //    catering-portion SKUs (3oz dangerous dip, 3oz sweet cream
+        //    dip) where the manager enters stock via the right-column
+        //    input that writes to fr for non-lifecycle-less rows.
+        if (remaining > 0 && fr[key] != null && fr[key] > 0) {
+          const take = Math.min(fr[key], remaining);
+          fr[key] = Math.max(0, fr[key] - take);
+          remaining -= take;
+        }
+
         if (!flowDelivered[key]) flowDelivered[key] = [];
         flowDelivered[key].push({ customer: cust, qty, confirmedAt: delivery._confirmedAt || '' });
       });
@@ -806,7 +875,7 @@ export function getInventoryReport(args) {
     effective: { coldFerment: cf, frozen: fr, onHand: oh },
     doughQueue,
     flowsSinceSnapshot: { shape: flowShape, bfp: flowBfp, delivered: flowDelivered },
-    alerts: { agingDough },
+    alerts: { agingDough, bfpOverbake: bfpOverbakeEvents },
     snapshot: { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
   };
 }
@@ -976,7 +1045,21 @@ export function scheduleDip({
   dipSku, deliveries, inventoryReport, fohDailyAvg, today, skuAliases, lookaheadDays = 14,
 }) {
   const cfg = DIP_CONFIG[dipSku];
-  if (!cfg) throw new Error(`scheduleDip: unknown dipSku "${dipSku}"`);
+  // FOH-only dips (e.g. portion-served dangerous/sweet cream dips) aren't
+  // production-scheduled — return an empty result instead of throwing so
+  // accidental callers (typo, future feature, manual invocation) don't kill
+  // production-app rendering. Configured dips still flow through normally.
+  if (!cfg) {
+    // eslint-disable-next-line no-console
+    console.warn(`scheduleDip: dipSku "${dipSku}" not in DIP_CONFIG — returning empty schedule (FOH or unconfigured?)`);
+    return {
+      dipSku,
+      batches: [],
+      demandByDate: [],
+      startInventory: 0,
+      fohDailyAvg: Math.max(0, Number(fohDailyAvg) || 0),
+    };
+  }
   const dailyAvg = Math.max(0, Number(fohDailyAvg) || 0);
   // Look further than the user-visible horizon so the algorithm "sees" deliveries
   // whose window straddles the edge (e.g. a delivery on day 16 has a window
