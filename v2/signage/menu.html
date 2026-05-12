@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="600">
+<title>Dangerous Pretzel Co. — Digital Menu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════
+     Dangerous Pretzel Co. — In-Store Signage (V2)
+     Canvas: 1080×1920 portrait, rendered in 1920×1080
+     landscape browser then rotated -90° (TV is dumb-rotated)
+     ═══════════════════════════════════════════════ */
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #1A1A1A;
+    font-family: 'Manrope', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #fff;
+  }
+
+  /* Rotate landscape browser → portrait canvas */
+  body {
+    width: 100vh;
+    height: 100vw;
+    transform-origin: 0 0;
+    transform: rotate(-90deg) translateX(-100vh);
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .screen {
+    width: 100%;
+    height: 100%;
+    padding: 50px 60px 40px;
+    display: flex;
+    flex-direction: column;
+    background: #1A1A1A;
+  }
+
+  /* ─── Header ─── */
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 22px;
+    border-bottom: 4px solid #C41E1E;
+    margin-bottom: 30px;
+  }
+  .head img {
+    height: 90px;
+    display: block;
+  }
+  .head-title {
+    font: 900 italic 96px/1 Georgia, serif;
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+
+  /* ─── Section labels ─── */
+  .label {
+    font: 700 22px 'Manrope', sans-serif;
+    color: #C41E1E;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  /* ─── Combo Banner (Screen 1) ─── */
+  .combos {
+    background: #C41E1E;
+    border-radius: 16px;
+    padding: 28px 36px;
+    margin-bottom: 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 4px 20px rgba(196, 30, 30, 0.25);
+  }
+  .combos-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+  }
+  .combos-title {
+    font: 900 italic 56px/1 Georgia, serif;
+    color: #fff;
+  }
+  .combos-sub {
+    font: 700 18px 'Manrope', sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .combo-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .combo-row + .combo-row {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  .combo-left { flex: 1; }
+  .combo-name {
+    font: 700 38px 'Paytone One', sans-serif;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .combo-desc {
+    font: 400 22px/1.3 'Manrope', sans-serif;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .combo-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .combo-price {
+    font: 700 64px/1 'Paytone One', sans-serif;
+    color: #fff;
+  }
+  .combo-save {
+    font: 700 14px 'Manrope', sans-serif;
+    color: #1A1A1A;
+    background: #F5F0E8;
+    padding: 5px 12px;
+    border-radius: 999px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* ─── Pretzel Cards (cream, with photo) ─── */
+  .pretzel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .p-card {
+    background: #F5F0E8;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .p-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+  }
+  .p-card-body {
+    padding: 16px 22px 20px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  .p-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .p-card h3 {
+    font: 700 38px 'Paytone One', sans-serif;
+    color: #1A1A1A;
+  }
+  .p-card .price {
+    font: 700 36px 'Manrope', sans-serif;
+    color: #C41E1E;
+    white-space: nowrap;
+  }
+  .p-card p {
+    font: 400 18px/1.4 'Manrope', sans-serif;
+    color: #555;
+  }
+
+  /* ─── NEW Flavor Hero (Bootlegger, no photo yet) ─── */
+  .new-flavor-hero {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    background: #F5F0E8;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .new-flavor-placeholder {
+    background:
+      radial-gradient(ellipse at 30% 70%, rgba(255,255,255,0.08) 0%, transparent 60%),
+      linear-gradient(135deg, #C41E1E 0%, #7a0f0f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+  }
+  .new-flavor-placeholder span {
+    font: 900 italic 42px/1 Georgia, serif;
+    color: #fff;
+    letter-spacing: 8px;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+  }
+  .new-flavor-body {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+  .new-flavor-badge {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    background: #C41E1E;
+    color: #fff;
+    font: 700 14px 'Manrope', sans-serif;
+    letter-spacing: 2.5px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    text-transform: uppercase;
+  }
+  .new-flavor-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+    padding-right: 90px;
+  }
+  .new-flavor-body h3 {
+    font: 700 44px 'Paytone One', sans-serif;
+    color: #1A1A1A;
+  }
+  .new-flavor-body .price {
+    font: 700 42px 'Manrope', sans-serif;
+    color: #C41E1E;
+  }
+  .new-flavor-body p {
+    font: 400 20px/1.4 'Manrope', sans-serif;
+    color: #555;
+  }
+
+  /* ─── Single full-width pretzel card (Sweet) ─── */
+  .p-card-full {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    background: #F5F0E8;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .p-card-full img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .p-card-full-body {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .p-card-full-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .p-card-full h3 {
+    font: 700 44px 'Paytone One', sans-serif;
+    color: #1A1A1A;
+  }
+  .p-card-full .price {
+    font: 700 42px 'Manrope', sans-serif;
+    color: #C41E1E;
+  }
+  .p-card-full p {
+    font: 400 20px/1.4 'Manrope', sans-serif;
+    color: #555;
+  }
+
+  /* ─── Dark hero card (For The Kids on Screen 2) ─── */
+  .dark-hero {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    background: #2a2a2a;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+  .dark-hero img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .dark-hero-body {
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .dark-hero-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .dark-hero h3 {
+    font: 700 42px 'Paytone One', sans-serif;
+    color: #fff;
+  }
+  .dark-hero .price {
+    font: 700 40px 'Manrope', sans-serif;
+    color: #C41E1E;
+  }
+  .dark-hero p {
+    font: 400 20px/1.4 'Manrope', sans-serif;
+    color: #aaa;
+  }
+
+  /* ─── Hero card variant with SAVE badge (Half Dozen, Party Bombs) ─── */
+  .hero-with-badge .p-card-full-body { position: relative; }
+  .hero-badge {
+    position: absolute;
+    top: 24px;
+    right: 28px;
+    background: #C41E1E;
+    color: #fff;
+    font: 700 17px 'Manrope', sans-serif;
+    letter-spacing: 2.5px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    text-transform: uppercase;
+  }
+  /* Screen 2's Party Pretzel Bombs gets more visual real estate */
+  .screen[data-screen="2"] .p-card-full {
+    grid-template-columns: 440px 1fr;
+    min-height: 420px;
+  }
+  .screen[data-screen="2"] .p-card-full-body {
+    padding: 36px 44px;
+  }
+  .screen[data-screen="2"] .p-card-full h3 { font-size: 56px; line-height: 1.05; }
+  .screen[data-screen="2"] .p-card-full .price { font-size: 60px; }
+  .screen[data-screen="2"] .p-card-full p { font-size: 26px; line-height: 1.4; }
+
+  /* ─── Bomb Cards (dark, with photo) ─── */
+  .bomb-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .b-card {
+    background: #2a2a2a;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .b-card img {
+    width: 100%;
+    height: 440px;
+    object-fit: cover;
+    display: block;
+  }
+  .b-card-body {
+    padding: 22px 26px 28px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .b-card h3 {
+    font: 700 36px 'Paytone One', sans-serif;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .b-card .price {
+    font: 700 30px 'Manrope', sans-serif;
+    color: #C41E1E;
+    margin-bottom: 10px;
+  }
+  .b-card p {
+    font: 400 19px/1.4 'Manrope', sans-serif;
+    color: #aaa;
+  }
+
+  /* ─── Group Cards ─── */
+  .group-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 36px;
+  }
+  .g-card {
+    background: #F5F0E8;
+    border-radius: 16px;
+    padding: 44px 52px;
+    position: relative;
+  }
+  .g-card .badge {
+    position: absolute;
+    top: 26px;
+    right: 26px;
+    background: #C41E1E;
+    color: #fff;
+    font: 700 17px 'Manrope', sans-serif;
+    letter-spacing: 2.5px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    text-transform: uppercase;
+  }
+  .g-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 22px 0 10px;
+  }
+  .g-card h3 {
+    font: 700 40px 'Paytone One', sans-serif;
+    color: #1A1A1A;
+  }
+  .g-card .price {
+    font: 700 44px 'Manrope', sans-serif;
+    color: #C41E1E;
+  }
+  .g-card p {
+    font: 400 24px/1.45 'Manrope', sans-serif;
+    color: #555;
+  }
+
+  /* ─── Featured "pair it up" (Screen 2) ─── */
+  .pair-callout {
+    background: #F5F0E8;
+    border-radius: 16px;
+    padding: 44px 52px;
+    margin-bottom: 0;
+  }
+  .pair-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 26px;
+    padding-bottom: 22px;
+    border-bottom: 2px solid rgba(196, 30, 30, 0.25);
+  }
+  .pair-title {
+    font: 900 italic 54px/1 Georgia, serif;
+    color: #1A1A1A;
+  }
+  .pair-price {
+    font: 700 44px 'Manrope', sans-serif;
+    color: #C41E1E;
+  }
+  .pair-price small {
+    font: 700 20px 'Manrope', sans-serif;
+    color: #1A1A1A;
+    letter-spacing: 2.5px;
+    margin-left: 8px;
+    text-transform: uppercase;
+  }
+  .dips-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 32px;
+    font: 700 28px 'Paytone One', sans-serif;
+    color: #1A1A1A;
+  }
+  .dips-list span {
+    display: inline-flex;
+    align-items: center;
+  }
+  .dips-list span + span::before {
+    content: '·';
+    color: #C41E1E;
+    margin-right: 28px;
+    font-weight: 900;
+  }
+
+  /* ─── Catering callout ─── */
+  .catering-callout {
+    background: #2a2a2a;
+    border-radius: 16px;
+    padding: 50px 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .catering-left h3 {
+    font: 900 italic 58px/1.1 Georgia, serif;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .catering-left p {
+    font: 400 26px 'Manrope', sans-serif;
+    color: #aaa;
+  }
+  .catering-url {
+    font: 700 38px/1.2 'Manrope', sans-serif;
+    color: #C41E1E;
+    text-align: right;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  /* ─── Hero banner (Screen 3) ─── */
+  .hero-banner {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 28px;
+    height: 220px;
+    flex-shrink: 0;
+  }
+  .hero-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .hero-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(26,26,26,0.7) 0%, rgba(26,26,26,0.2) 60%, rgba(26,26,26,0.0) 100%);
+  }
+  .hero-banner-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 48px;
+    z-index: 2;
+  }
+  .hero-banner-text .label {
+    color: #fff;
+    margin-bottom: 6px;
+    opacity: 0.85;
+  }
+  .hero-banner-text h2 {
+    font: 900 italic 56px/1.05 Georgia, serif;
+    color: #fff;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ─── Dips Section (Screen 3) — compact list layout ─── */
+  .dips-section { margin-bottom: 32px; }
+  .dips-sub {
+    font: 400 26px 'Manrope', sans-serif;
+    color: #999;
+    margin-bottom: 24px;
+  }
+  .dips-sub strong { color: #C41E1E; font-weight: 700; }
+  .dips-list-cards {
+    background: #F5F0E8;
+    border-radius: 14px;
+    padding: 8px 36px;
+  }
+  .dip-row {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(26, 26, 26, 0.08);
+  }
+  .dip-row:last-child { border-bottom: none; }
+  .dip-row .dip-name {
+    font: 700 32px 'Paytone One', sans-serif;
+    color: #1A1A1A;
+    flex-shrink: 0;
+    min-width: 280px;
+  }
+  .dip-row .dip-desc {
+    font: 400 22px/1.3 'Manrope', sans-serif;
+    color: #555;
+    flex: 1;
+  }
+
+  /* ─── Drinks (Screen 3) ─── */
+  .drinks-section { margin-bottom: 28px; }
+  .drinks-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .d-card {
+    background: #2a2a2a;
+    border-radius: 16px;
+    padding: 42px 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+  }
+  .d-card-text { flex: 1; }
+  .d-card h3 {
+    font: 700 44px 'Paytone One', sans-serif;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .d-card p {
+    font: 400 24px/1.4 'Manrope', sans-serif;
+    color: #aaa;
+  }
+  .d-card .price {
+    font: 700 54px 'Manrope', sans-serif;
+    color: #C41E1E;
+    white-space: nowrap;
+  }
+
+  /* ─── Featured callout (Screen 3) ─── */
+  .feat-callout {
+    background: #C41E1E;
+    border-radius: 16px;
+    padding: 30px 44px;
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    margin-top: auto;
+  }
+  .feat-emoji {
+    flex-shrink: 0;
+    width: 72px;
+    height: 72px;
+    background: #fff;
+    color: #C41E1E;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: 900 italic 44px/1 Georgia, serif;
+  }
+  .feat-body { flex: 1; }
+  .feat-label {
+    font: 700 17px 'Manrope', sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .feat-callout h3 {
+    font: 900 italic 36px/1.1 Georgia, serif;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .feat-callout p {
+    font: 400 20px/1.4 'Manrope', sans-serif;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  /* ─── Hidden back-door icon ─── */
+  .relaunch {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 24px;
+    height: 24px;
+    opacity: 0.04;
+    z-index: 9999;
+    color: #fff;
+    text-decoration: none;
+    font-size: 18px;
+    line-height: 24px;
+    text-align: center;
+  }
+
+  /* ─── Screen switcher (?screen=N hides the others) ─── */
+  .screen[data-screen="2"], .screen[data-screen="3"] { display: none; }
+  body.s1 .screen[data-screen="1"] { display: flex; }
+  body.s1 .screen[data-screen="2"], body.s1 .screen[data-screen="3"] { display: none; }
+  body.s2 .screen[data-screen="1"] { display: none; }
+  body.s2 .screen[data-screen="2"] { display: flex; }
+  body.s2 .screen[data-screen="3"] { display: none; }
+  body.s3 .screen[data-screen="1"], body.s3 .screen[data-screen="2"] { display: none; }
+  body.s3 .screen[data-screen="3"] { display: flex; }
+</style>
+</head>
+<body>
+
+  <!-- ═══════════ SCREEN 1: PRETZELS ═══════════ -->
+  <section class="screen" data-screen="1">
+    <div class="head">
+      <img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
+      <span class="head-title">Pretzels</span>
+    </div>
+
+    <!-- Deals -->
+    <div class="combos">
+      <div class="combos-head">
+        <span class="combos-title">Deals</span>
+        <span class="combos-sub">Pick Your Size</span>
+      </div>
+      <div class="combo-row">
+        <div class="combo-left">
+          <div class="combo-name">Date Night</div>
+          <div class="combo-desc">1 Salty + 1 Saint + choice of 2 dips</div>
+        </div>
+        <div class="combo-right">
+          <span class="combo-price">$14</span>
+          <span class="combo-save">Save $2</span>
+        </div>
+      </div>
+      <div class="combo-row">
+        <div class="combo-left">
+          <div class="combo-name">The 4-Pack</div>
+          <div class="combo-desc">Any 4 pretzels + any 4 dips</div>
+        </div>
+        <div class="combo-right">
+          <span class="combo-price">$28</span>
+          <span class="combo-save">Save $6</span>
+        </div>
+      </div>
+      <div class="combo-row">
+        <div class="combo-left">
+          <div class="combo-name">Half Dozen</div>
+          <div class="combo-desc">Any 6 pretzels &mdash; built for sharing</div>
+        </div>
+        <div class="combo-right">
+          <span class="combo-price">$29</span>
+          <span class="combo-save">Save 25%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Savory -->
+    <p class="label">Savory</p>
+    <div class="pretzel-grid">
+      <div class="p-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/salty.jpg" alt="Salty">
+        <div class="p-card-body">
+          <div class="p-card-head">
+            <h3>Salty</h3>
+            <span class="price">$6</span>
+          </div>
+          <p>Pure, unadulterated soft pretzel. Invented by monks, perfected for punks.</p>
+        </div>
+      </div>
+      <div class="p-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/bbk.jpg" alt="BBK">
+        <div class="p-card-body">
+          <div class="p-card-head">
+            <h3>BBK</h3>
+            <span class="price">$7</span>
+          </div>
+          <p>Brush Before Kissing. Parmesan, garlic and fresh herbs.</p>
+        </div>
+      </div>
+      <div class="p-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/spicy-bee.jpg" alt="Spicy Bee">
+        <div class="p-card-body">
+          <div class="p-card-head">
+            <h3>Spicy Bee</h3>
+            <span class="price">$7</span>
+          </div>
+          <p>Chili-cheddar dough. Hot honey glaze. Candied jalape&ntilde;os.</p>
+        </div>
+      </div>
+      <div class="p-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/devils-delight.jpg" alt="Devil's Delight">
+        <div class="p-card-body">
+          <div class="p-card-head">
+            <h3>Devil's Delight</h3>
+            <span class="price">$7</span>
+          </div>
+          <p>Gooey pepperjack cheese and pepperoni.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootlegger (NEW flavor, no photo yet) -->
+    <div class="new-flavor-hero">
+      <div class="new-flavor-placeholder"><span>DPC</span></div>
+      <div class="new-flavor-body">
+        <span class="new-flavor-badge">New</span>
+        <div class="new-flavor-head">
+          <h3>Bootlegger</h3>
+          <span class="price">$7</span>
+        </div>
+        <p>Bourbon, maple, bacon &mdash; once hidden in the trunk of a fast car, always about to run out.</p>
+      </div>
+    </div>
+
+    <!-- Sweet -->
+    <p class="label">Sweet</p>
+    <div class="p-card-full">
+      <img src="https://www.dangerouspretzel.com/images/menu-photos/saint.jpg" alt="Saint">
+      <div class="p-card-full-body">
+        <div class="p-card-full-head">
+          <h3>Saint</h3>
+          <span class="price">$6</span>
+        </div>
+        <p>Sweet cinnamon sugar that's never done anything wrong.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ SCREEN 2: BOMBS & GROUPS ═══════════ -->
+  <section class="screen" data-screen="2">
+    <div class="head">
+      <img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
+      <span class="head-title">Bombs</span>
+    </div>
+
+    <p class="label">A Riskier Take on Pretzel Bites</p>
+    <div class="bomb-grid">
+      <div class="b-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/salty-bombs.jpg" alt="Salty Bombs">
+        <div class="b-card-body">
+          <h3>Salty Bombs</h3>
+          <p class="price">$6</p>
+          <p>Keep your hands off &mdash; these salty bombs are for one.</p>
+        </div>
+      </div>
+      <div class="b-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/saint-bombs.jpg" alt="Saint Bombs">
+        <div class="b-card-body">
+          <h3>Saint Bombs</h3>
+          <p class="price">$6</p>
+          <p>Enough cinnamon sugar to get your adrenaline going.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dark-hero">
+      <img src="https://www.dangerouspretzel.com/images/menu-photos/for-the-kids.jpg" alt="For The Kids">
+      <div class="dark-hero-body">
+        <div class="dark-hero-head">
+          <h3>For The Kids</h3>
+          <span class="price">$7</span>
+        </div>
+        <p>Sugary glaze topped with fruity pebbles crumbs.</p>
+      </div>
+    </div>
+
+    <p class="label">Party Option &middot; 25% Off</p>
+    <div class="p-card-full hero-with-badge">
+      <img src="https://www.dangerouspretzel.com/images/menu-photos/party-pretzel-bombs.jpg" alt="Party Pretzel Bombs">
+      <div class="p-card-full-body">
+        <span class="hero-badge">Save 25%</span>
+        <div class="p-card-full-head">
+          <h3>Party Pretzel Bombs</h3>
+          <span class="price">$16</span>
+        </div>
+        <p>Serves 3. Pick Salty, Saint, or For The Kids.</p>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div class="catering-callout">
+      <div class="catering-left">
+        <h3>Bigger event?</h3>
+        <p>Weddings, corporate, festivals. We&rsquo;ve got you.</p>
+      </div>
+      <div class="catering-url">dangerouspretzel.com<br>/catering</div>
+    </div>
+  </section>
+
+  <!-- ═══════════ SCREEN 3: SIDES ═══════════ -->
+  <section class="screen" data-screen="3">
+    <div class="head">
+      <img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
+      <span class="head-title">Sides</span>
+    </div>
+
+    <div class="hero-banner">
+      <img src="https://www.dangerouspretzel.com/images/backgrounds/dipped-bbk-with-cheese.jpg" alt="Pretzel dipped in cheese">
+      <div class="hero-banner-text">
+        <p class="label">The Supporting Cast</p>
+        <h2>Dunk it. Pair it.</h2>
+      </div>
+    </div>
+
+    <div class="dips-section">
+      <p class="label">Dips</p>
+      <p class="dips-sub">House-made &middot; 3oz each &middot; <strong>$2</strong></p>
+      <div class="dips-list-cards">
+        <div class="dip-row">
+          <span class="dip-name">Dangerous Dip</span>
+          <span class="dip-desc">Creamy house cheese dip with the right amount of spice.</span>
+        </div>
+        <div class="dip-row">
+          <span class="dip-name">House Mustard</span>
+          <span class="dip-desc">Yellow mustard-ish.</span>
+        </div>
+        <div class="dip-row">
+          <span class="dip-name">Honey Mustard</span>
+          <span class="dip-desc">Stone ground classic. Sweet and tangy.</span>
+        </div>
+        <div class="dip-row">
+          <span class="dip-name">Hot Ranch</span>
+          <span class="dip-desc">Our take on buffalo ranch.</span>
+        </div>
+        <div class="dip-row">
+          <span class="dip-name">Sweet Cream</span>
+          <span class="dip-desc">Sweet + cream + cheese.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="drinks-section">
+      <p class="label">Suds &amp; Sodas</p>
+      <div class="drinks-grid">
+        <div class="d-card">
+          <div class="d-card-text">
+            <h3>Draft Beer</h3>
+            <p>Rotating local taps &mdash; Kiitos, Templin Family, Uinta, Bohemian, Second Summit and more.</p>
+          </div>
+          <span class="price">$7&ndash;$9</span>
+        </div>
+        <div class="d-card">
+          <div class="d-card-text">
+            <h3>Cans &amp; Bottles</h3>
+            <p>Local craft beer, cider, ros&eacute; bubbles, hard root beer.</p>
+          </div>
+          <span class="price">$8&ndash;$10</span>
+        </div>
+        <div class="d-card">
+          <div class="d-card-text">
+            <h3>Non-Alcoholic</h3>
+            <p>Sodas, Brigham&rsquo;s Brew root beer, NA beer, kombucha.</p>
+          </div>
+          <span class="price">$2&ndash;$6</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="feat-callout">
+      <div class="feat-emoji">!</div>
+      <div class="feat-body">
+        <p class="feat-label">House Move</p>
+        <h3>Spicy Bee + Hot Ranch</h3>
+        <p>The combo our regulars order on repeat. Sweet heat meets cool buffalo.</p>
+      </div>
+    </div>
+  </section>
+
+  <a class="relaunch" href="./index.html" aria-label="Re-launch screen picker">&#x2630;</a>
+
+  <script>
+    // Screen switcher: ?screen=1 / 2 / 3
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const n = parseInt(params.get('screen'), 10);
+      const cls = (n === 1 || n === 2 || n === 3) ? 's' + n : 's1';
+      document.body.classList.add(cls);
+    })();
+  </script>
+</body>
+</html>

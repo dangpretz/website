@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dangerous Pretzel Co. — Pretzel Program</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════
+     Dangerous Pretzel Co. — Pretzel Program One-Pager
+     Mirrors website v2 design system + sell-sheet pattern
+     Target: 8.5 × 11" letter, single page
+     ═══════════════════════════════════════════════ */
+
+  @page { size: letter; margin: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 8.5in; height: 11in;
+    font-family: 'Manrope', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  body { background: #1A1A1A; color: #fff; overflow: hidden; }
+
+  .sheet {
+    width: 8.5in; height: 11in;
+    padding: 0.4in 0.5in 0.35in;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 12px; border-bottom: 2px solid #C41E1E; margin-bottom: 14px;
+  }
+  .header img { height: 38px; display: block; }
+  .header-tagline {
+    font: 900 italic 16px/1 Georgia, serif; color: #F5F0E8;
+    letter-spacing: 1px;
+  }
+
+  /* ─── Hook ─── */
+  .hook {
+    background: #2a2a2a; border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 14px;
+  }
+  .hook-headline {
+    font: 900 italic 22px/1.1 Georgia, serif; color: #fff; margin-bottom: 4px;
+  }
+  .hook-sub {
+    font: 400 10.5px/1.4 'Manrope', sans-serif; color: #bbb; margin-bottom: 12px;
+  }
+  .hook-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px;
+  }
+  .hook-item { display: flex; align-items: flex-start; gap: 8px; }
+  .hook-icon {
+    flex-shrink: 0; width: 18px; height: 18px;
+    background: #C41E1E; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .hook-icon svg { width: 10px; height: 10px; fill: #fff; }
+  .hook-item h3 { font: 700 11.5px/1.2 'Manrope', sans-serif; color: #F5F0E8; margin-bottom: 1px; }
+  .hook-item p { font: 400 10px/1.3 'Manrope', sans-serif; color: #aaa; }
+
+  /* ─── Labels ─── */
+  .label {
+    font: 700 10px 'Manrope', sans-serif; color: #C41E1E;
+    letter-spacing: 2.5px; text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  /* ─── Pricing Section ─── */
+  .pricing { margin-bottom: 12px; }
+  .pricing-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .price-card {
+    background: #F5F0E8; border-radius: 8px;
+    padding: 14px 16px 12px;
+  }
+  .price-card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #d9d2c4;
+  }
+  .price-card h3 {
+    font: 700 16px 'Paytone One', sans-serif; color: #1A1A1A;
+  }
+  .price-card .case-size {
+    font: 700 10px 'Manrope', sans-serif; color: #C41E1E;
+    letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .price-rows { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+  .price-row {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .price-row .flavor-name {
+    font: 700 11px 'Manrope', sans-serif; color: #1A1A1A;
+  }
+  .price-row .flavor-price {
+    font: 700 13px 'Manrope', sans-serif; color: #C41E1E;
+  }
+  .price-card .retail-note {
+    font: 400 9.5px 'Manrope', sans-serif; color: #666;
+    padding-top: 6px; border-top: 1px dashed #d9d2c4;
+  }
+  .price-card .retail-note strong { color: #1A1A1A; font-weight: 700; }
+  .flavor-strip {
+    margin-top: 10px;
+    font: 400 9.5px 'Manrope', sans-serif; color: #888;
+    text-align: center;
+  }
+  .flavor-strip strong { color: #F5F0E8; font-weight: 700; }
+
+  /* ─── Flavor Photos Row ─── */
+  .flavors { margin-bottom: 12px; }
+  .flavors-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  }
+  .flavor-card {
+    border-radius: 8px; overflow: hidden; background: #2a2a2a;
+  }
+  .flavor-card img {
+    width: 100%; height: 85px; object-fit: cover; display: block;
+  }
+  .flavor-info { padding: 8px 11px 10px; }
+  .flavor-card h3 {
+    font: 700 13px 'Paytone One', sans-serif; color: #fff; margin-bottom: 1px;
+  }
+  .flavor-card p {
+    font: 400 9.5px/1.35 'Manrope', sans-serif; color: #aaa;
+  }
+
+  /* ─── Bottom Grid ─── */
+  .bottom-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;
+  }
+  .bottom-card {
+    background: #2a2a2a; border-radius: 8px; padding: 14px 16px;
+  }
+  .bottom-card h3 {
+    font: 900 italic 16px/1.1 Georgia, serif; color: #fff; margin-bottom: 8px;
+  }
+  .bottom-card p {
+    font: 400 10px/1.5 'Manrope', sans-serif; color: #aaa; margin-bottom: 6px;
+  }
+  .bottom-card ul { list-style: none; padding: 0; }
+  .bottom-card li {
+    font: 400 10px/1.5 'Manrope', sans-serif; color: #ccc;
+    padding-left: 14px; position: relative; margin-bottom: 3px;
+  }
+  .bottom-card li::before {
+    content: ''; position: absolute; left: 0; top: 5px;
+    width: 6px; height: 6px; background: #C41E1E; border-radius: 50%;
+  }
+  .venue-names {
+    font: 400 10px/1.6 'Manrope', sans-serif; color: #888;
+    margin-top: 4px;
+  }
+  .venue-names span { color: #F5F0E8; font-weight: 700; }
+  .press-names {
+    font: 400 9.5px 'Manrope', sans-serif; color: #666;
+    margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444;
+  }
+  .press-names span { color: #C41E1E; font-weight: 700; }
+
+  /* ─── Do the Math ─── */
+  .do-math { margin-bottom: 12px; }
+  .math-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 8px;
+  }
+  .math-card {
+    background: #F5F0E8; border-radius: 8px;
+    padding: 10px 14px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .math-card.scenario { background: #C41E1E; }
+  .math-card .math-label {
+    font: 700 9px 'Manrope', sans-serif; color: #C41E1E;
+    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px;
+  }
+  .math-card.scenario .math-label { color: #fff; opacity: 0.9; }
+  .math-card .math-calc {
+    font: 400 11px 'Manrope', sans-serif; color: #555; margin-bottom: 4px;
+  }
+  .math-card.scenario .math-calc { color: rgba(255,255,255,0.9); }
+  .math-card .math-result {
+    font: 700 18px 'Paytone One', sans-serif; color: #1A1A1A; line-height: 1;
+  }
+  .math-card .math-result span {
+    font: 400 10px 'Manrope', sans-serif; color: #888;
+    letter-spacing: 0.5px; text-transform: lowercase; margin-left: 2px;
+  }
+  .math-card.scenario .math-result { color: #fff; }
+  .math-card.scenario .math-result span { color: rgba(255,255,255,0.85); }
+  .trial-note {
+    background: #2a2a2a; border-radius: 8px;
+    padding: 10px 16px;
+    font: 400 italic 10.5px/1.45 'Manrope', sans-serif; color: #ccc;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .trial-note::before {
+    content: '"';
+    font: 900 italic 32px/0.7 Georgia, serif; color: #C41E1E;
+    flex-shrink: 0;
+  }
+  .trial-note strong {
+    font-weight: 700; font-style: normal; color: #F5F0E8;
+  }
+
+  /* ─── CTA Footer ─── */
+  .cta-footer {
+    background: #C41E1E; border-radius: 8px;
+    padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: auto;
+  }
+  .cta-left h3 {
+    font: 900 italic 18px/1.1 Georgia, serif; color: #fff; margin-bottom: 2px;
+  }
+  .cta-left p { font: 400 11px 'Manrope', sans-serif; color: rgba(255,255,255,0.85); }
+  .cta-right { text-align: right; }
+  .cta-right .contact-name { font: 700 12px 'Manrope', sans-serif; color: #fff; }
+  .cta-right .contact-detail { font: 400 11px 'Manrope', sans-serif; color: rgba(255,255,255,0.85); }
+  .cta-right .contact-url { font: 700 11px 'Manrope', sans-serif; color: #fff; letter-spacing: 0.5px; }
+
+  @media print {
+    html, body { width: 8.5in; height: 11in; }
+    .sheet { page-break-after: avoid; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- Header -->
+  <div class="header">
+    <img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
+    <span class="header-tagline">PRETZEL PROGRAM</span>
+  </div>
+
+  <!-- Hook -->
+  <div class="hook">
+    <h2 class="hook-headline">Your venue. $1K–$10K/month. Zero kitchen.</h2>
+    <p class="hook-sub">We place a free branded warmer at your venue — it plugs into any outlet, keeps pretzels hot all day, and takes up about as much space as a toaster oven. Your staff serves them. Your guests love them. You keep the margin on every pretzel.</p>
+    <div class="hook-grid">
+      <div class="hook-item">
+        <div class="hook-icon"><svg viewBox="0 0 16 16"><path d="M13.5 4.5l-7 7L3 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <h3>Free Branded Warmer</h3>
+          <p>Plug-in countertop display. No installation, no purchase, no risk.</p>
+        </div>
+      </div>
+      <div class="hook-item">
+        <div class="hook-icon"><svg viewBox="0 0 16 16"><path d="M13.5 4.5l-7 7L3 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <h3>Zero Kitchen Required</h3>
+          <p>No chef, no fryer, no prep. Served from frozen in minutes.</p>
+        </div>
+      </div>
+      <div class="hook-item">
+        <div class="hook-icon"><svg viewBox="0 0 16 16"><path d="M13.5 4.5l-7 7L3 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <h3>Your Staff, Your Guests</h3>
+          <p>Existing team handles it. Sell direct at $7–$12 per pretzel.</p>
+        </div>
+      </div>
+      <div class="hook-item">
+        <div class="hook-icon"><svg viewBox="0 0 16 16"><path d="M13.5 4.5l-7 7L3 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <h3>You Keep the Margin</h3>
+          <p>Wholesale in, retail out. Every pretzel you sell is your revenue.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pricing -->
+  <div class="pricing">
+    <p class="label">WHOLESALE PRICING &middot; PER PRETZEL</p>
+    <div class="pricing-grid">
+      <div class="price-card">
+        <div class="price-card-head">
+          <h3>10oz Premium</h3>
+          <span class="case-size">48ct Case</span>
+        </div>
+        <div class="price-rows">
+          <div class="price-row">
+            <span class="flavor-name">Plain</span>
+            <span class="flavor-price">$3.75</span>
+          </div>
+          <div class="price-row">
+            <span class="flavor-name">BBK &middot; Spicy Bee</span>
+            <span class="flavor-price">$4.25</span>
+          </div>
+        </div>
+        <p class="retail-note">Suggested retail: <strong>$10–$12</strong> per pretzel</p>
+      </div>
+      <div class="price-card">
+        <div class="price-card-head">
+          <h3>7oz Stadium</h3>
+          <span class="case-size">72ct Case</span>
+        </div>
+        <div class="price-rows">
+          <div class="price-row">
+            <span class="flavor-name">Plain</span>
+            <span class="flavor-price">$3.00</span>
+          </div>
+          <div class="price-row">
+            <span class="flavor-name">BBK &middot; Spicy Bee</span>
+            <span class="flavor-price">$3.50</span>
+          </div>
+        </div>
+        <p class="retail-note">Suggested retail: <strong>$7–$8</strong> per pretzel</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flavor Photos -->
+  <div class="flavors">
+    <div class="flavors-grid">
+      <div class="flavor-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/spicy-bee.jpg" alt="Spicy Bee">
+        <div class="flavor-info">
+          <h3>Spicy Bee</h3>
+          <p>Chili-cheddar dough finished with hot honey. Our #1 seller and easy upsell.</p>
+        </div>
+      </div>
+      <div class="flavor-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/bbk.jpg" alt="BBK">
+        <div class="flavor-info">
+          <h3>BBK</h3>
+          <p>Parmesan, garlic, fresh herbs. Pairs with beer. Savory crowds reorder it.</p>
+        </div>
+      </div>
+      <div class="flavor-card">
+        <img src="https://www.dangerouspretzel.com/images/menu-photos/salty.jpg" alt="Plain">
+        <div class="flavor-info">
+          <h3>Plain</h3>
+          <p>Traditional German soft pretzel. Serve as classic Salt or dust with Cinnamon Sugar.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: What's Included + Where It's Working -->
+  <div class="bottom-grid">
+    <div class="bottom-card">
+      <h3>What's Included</h3>
+      <ul>
+        <li>Free branded pretzel warmer on loan</li>
+        <li>Branded parchment, bags &amp; serving materials</li>
+        <li>Phone training for your staff</li>
+        <li>Marketing &amp; menu materials</li>
+        <li>Monday–Friday delivery on your schedule</li>
+      </ul>
+    </div>
+    <div class="bottom-card">
+      <h3>Where It's Working</h3>
+      <p class="venue-names"><span>Delta Center</span> &middot; <span>Powder Mountain</span> &middot; <span>SLC Bees Stadium</span> &middot; <span>Alta (Goldminer's Daughter)</span> &middot; <span>The Union Event Center</span> &middot; <span>TF Brewery</span> &middot; <span>Hopkins Brewery</span> &middot; <span>ROHA Brewing</span> &middot; <span>Pioneer Theater</span></p>
+      <p class="press-names">Featured in <span>Salt Lake Magazine</span>, <span>Salt Lake Tribune</span>, <span>Axios</span> &middot; <span>City Weekly Best of Utah 2025</span></p>
+    </div>
+  </div>
+
+  <!-- Do the Math -->
+  <div class="do-math">
+    <p class="label">DO THE MATH</p>
+    <div class="math-grid">
+      <div class="math-card">
+        <p class="math-label">10oz Spicy Bee</p>
+        <p class="math-calc">$4.25 in &rarr; $10.00 out</p>
+        <p class="math-result">$5.75<span>/ pretzel</span></p>
+      </div>
+      <div class="math-card">
+        <p class="math-label">7oz Plain</p>
+        <p class="math-calc">$3.00 in &rarr; $7.00 out</p>
+        <p class="math-result">$4.00<span>/ pretzel</span></p>
+      </div>
+      <div class="math-card scenario">
+        <p class="math-label">Typical Venue</p>
+        <p class="math-calc">30 pretzels/day &times; ~$5 margin</p>
+        <p class="math-result">$4,500+<span>/ month</span></p>
+      </div>
+    </div>
+    <p class="trial-note"><span><strong>Try it for one event.</strong> If your crowd doesn't go crazy, we come pick up the station. We've genuinely never had to. &nbsp;&mdash; Drew, Founder</span></p>
+  </div>
+
+  <!-- CTA Footer -->
+  <div class="cta-footer">
+    <div class="cta-left">
+      <h3>Ready to Run the Program?</h3>
+      <p>Spots are limited. We won't place two programs competing for the same guests.</p>
+    </div>
+    <div class="cta-right">
+      <p class="contact-name">Drew Sparks, Owner</p>
+      <p class="contact-detail">drew@dangerouspretzel.com &middot; 801.916.9122</p>
+      <p class="contact-url">dangerouspretzel.com</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPC Signage — Pick a Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #1A1A1A;
+    color: #fff;
+    font-family: 'Manrope', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 8px;
+  }
+  .head img { height: 54px; }
+  h1 {
+    font: 900 italic 48px/1.1 Georgia, serif;
+    color: #fff;
+  }
+  .lead {
+    font: 400 17px/1.5 'Manrope', sans-serif;
+    color: #aaa;
+    margin-bottom: 40px;
+    max-width: 580px;
+    text-align: center;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+    max-width: 980px;
+    width: 100%;
+  }
+  .card {
+    background: #2a2a2a;
+    border-radius: 14px;
+    padding: 36px 28px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    aspect-ratio: 9 / 16;
+    justify-content: space-between;
+    border: 2px solid transparent;
+  }
+  .card:hover { background: #333; border-color: #C41E1E; transform: translateY(-2px); }
+  .card .num {
+    font: 900 italic 96px/1 Georgia, serif;
+    color: #C41E1E;
+  }
+  .card .title {
+    font: 700 30px 'Paytone One', sans-serif;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .card .desc {
+    font: 400 15px/1.4 'Manrope', sans-serif;
+    color: #aaa;
+  }
+  .footnote {
+    margin-top: 40px;
+    font: 400 13px/1.5 'Manrope', sans-serif;
+    color: #666;
+    max-width: 640px;
+    text-align: center;
+  }
+  .footnote code {
+    background: #2a2a2a;
+    color: #F5F0E8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+  }
+  @media (max-width: 768px) {
+    .cards { grid-template-columns: 1fr; }
+    .card { aspect-ratio: auto; padding: 28px 22px; }
+    .card .num { font-size: 72px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
+    <h1>Signage</h1>
+  </div>
+  <p class="lead">Pick a screen for this TV. The browser will load that menu screen and stay on it. Menu auto-refreshes every 10 minutes.</p>
+
+  <div class="cards">
+    <a class="card" href="./menu.html?screen=1">
+      <span class="num">1</span>
+      <div>
+        <div class="title">Pretzels</div>
+        <p class="desc">Combos + Savory + Sweet</p>
+      </div>
+    </a>
+    <a class="card" href="./menu.html?screen=2">
+      <span class="num">2</span>
+      <div>
+        <div class="title">Bombs</div>
+        <p class="desc">Bombs + Group Orders</p>
+      </div>
+    </a>
+    <a class="card" href="./menu.html?screen=3">
+      <span class="num">3</span>
+      <div>
+        <div class="title">Sides</div>
+        <p class="desc">Dips + Suds &amp; Sodas</p>
+      </div>
+    </a>
+  </div>
+
+  <p class="footnote">
+    Direct URLs:
+    <code>menu.html?screen=1</code> &middot;
+    <code>menu.html?screen=2</code> &middot;
+    <code>menu.html?screen=3</code>
+  </p>
+</div>
+</body>
+</html>
