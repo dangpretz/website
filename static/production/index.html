@@ -1061,7 +1061,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-12-foh-dough-transfer';
+  } from '../../scripts/inventory.js?v=2026-05-12-foh-dough-audit-1';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -3322,25 +3322,36 @@
   // bundles every non-zero input. Inputs reset on successful save.
   function renderFohDoughSection(report) {
     const cf = report?.effective?.coldFerment || {};
+    const fr = report?.effective?.frozen || {};
     const rows = FOH_DOUGH_SKUS.map((sku) => {
       const ts = getTraySize(sku) || 0;
-      const pretzels = Math.max(0, cf[sku] || 0);
+      // "Sheets ready" aggregates cf + fr — FOH pulls from whichever the
+      // walk-in has. Cf-only would understate available stock once cf
+      // drains below an order's needs but fr still has trays.
+      const pretzels = Math.max(0, cf[sku] || 0) + Math.max(0, fr[sku] || 0);
       const sheetsReady = ts > 0 ? Math.floor(pretzels / ts) : 0;
       const label = sku; // intentionally raw — FOH knows their SKU names
       const readyTxt = ts > 0
         ? `${sheetsReady} ${appLang === 'es' ? (sheetsReady === 1 ? 'hoja lista' : 'hojas listas') : (sheetsReady === 1 ? 'sheet ready' : 'sheets ready')}`
-        : (appLang === 'es' ? 'sin tamaño de bandeja' : 'no tray size');
+        : (appLang === 'es' ? '⚠️ sin tamaño de bandeja — avisa al gerente' : '⚠️ tray size unset — tell manager');
+      // Defense-in-depth: if a new SKU lands in FOH_DOUGH_SKUS without a
+      // TRAY_SIZES entry, disable its input rather than silently swallowing
+      // FOH's pull (foh_transfer handler bails on `if (!ts2) return;`).
+      const disabled = ts > 0 ? '' : 'disabled';
+      const inputStyle = ts > 0
+        ? 'width:64px;padding:8px;border:2px solid var(--gray-1);border-radius:8px;font:700 16px \'Manrope\',sans-serif;text-align:center;color:var(--dark)'
+        : 'width:64px;padding:8px;border:2px dashed var(--gray-2);border-radius:8px;font:700 16px \'Manrope\',sans-serif;text-align:center;color:var(--gray-3);background:var(--gray-1);cursor:not-allowed';
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 12px;border-bottom:1px solid var(--gray-1)">
           <div style="flex:1;min-width:0">
             <div style="font:700 15px 'Manrope',sans-serif;color:var(--dark);text-transform:capitalize">${label}</div>
-            <div style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3)">${readyTxt}</div>
+            <div style="font:400 12px 'Manrope',sans-serif;color:${ts > 0 ? 'var(--gray-3)' : '#A32D2D'}">${readyTxt}</div>
           </div>
           <label style="display:flex;align-items:center;gap:8px;font:600 12px 'Manrope',sans-serif;color:var(--gray-3)">
             <span>${appLang === 'es' ? 'Sacadas' : 'Pulled'}</span>
             <input type="number" inputmode="numeric" min="0" step="1" value="0"
-                   data-foh-transfer-sheets data-sku="${sku}"
-                   style="width:64px;padding:8px;border:2px solid var(--gray-1);border-radius:8px;font:700 16px 'Manrope',sans-serif;text-align:center;color:var(--dark)">
+                   data-foh-transfer-sheets data-sku="${sku}" ${disabled}
+                   style="${inputStyle}">
           </label>
         </div>`;
     }).join('');
@@ -3387,6 +3398,13 @@
       await loadProduction();
       schedule = buildOptimalSchedule();
       render();
+      // Success feedback — inputs reset on render(), so without this toast
+      // FOH has no signal that the save actually went through (was: only
+      // an alert() on failure, silence on success).
+      try {
+        const totalSheets = transfers.reduce((acc, t) => acc + (Number(t.sheets) || 0), 0);
+        showFohTransferToast(totalSheets);
+      } catch (toastErr) { console.warn('foh toast skipped:', toastErr); }
     } catch (err) {
       // appendLog now throws on non-2xx — surface to the user instead of
       // silently failing (the whole point of the recent sheet-logger
@@ -3568,6 +3586,29 @@
     toast.addEventListener('click', remove);
     const ttl = (perDay.length === 0 && newOverdue.length === 0) ? 2500 : 6000;
     setTimeout(remove, ttl);
+  }
+
+  // FOH dough-pull confirmation. Reuses the schedule-diff-toast CSS so no
+  // new styling surface needed. ~3s TTL — long enough to read, short
+  // enough to not pile up if FOH saves twice.
+  function showFohTransferToast(sheetsTotal) {
+    document.querySelectorAll('.schedule-diff-toast').forEach(n => n.remove());
+    const toast = document.createElement('div');
+    toast.className = 'schedule-diff-toast unchanged';
+    const sheetWord = appLang === 'es'
+      ? (sheetsTotal === 1 ? 'hoja transferida' : 'hojas transferidas')
+      : (sheetsTotal === 1 ? 'sheet transferred' : 'sheets transferred');
+    const title = appLang === 'es'
+      ? `✓ Guardado · ${sheetsTotal} ${sheetWord}`
+      : `✓ Saved · ${sheetsTotal} ${sheetWord}`;
+    const dismiss = appLang === 'es' ? 'Toca para cerrar' : 'Tap to dismiss';
+    toast.innerHTML = `
+      <div class="schedule-diff-toast-title">${title}</div>
+      <div class="schedule-diff-toast-dismiss">${dismiss}</div>`;
+    document.body.appendChild(toast);
+    const remove = () => toast.remove();
+    toast.addEventListener('click', remove);
+    setTimeout(remove, 3000);
   }
 
   // ─── INLINE LOGGER (TAP +/- ON SKU ROW) ───────────────────────────────────
@@ -4644,9 +4685,12 @@
   // Auto-refresh — visibility regain + soft 60s interval. Both gated by
   // active input focus + pending save (so we don't clobber typing).
   // .inline-onhand-edit is the dynamic input from the Dips-tab ON HAND
-  // editor; without it softRefresh would erase the input mid-type.
+  // editor; without it softRefresh would erase the input mid-type. Same
+  // story for [data-foh-transfer-sheets] on the FOH home page — without
+  // it, FOH could be partway through typing "5" when the 60s interval
+  // fires and rebuilds the dough section back to 0.
   const _isInputBusy = () =>
-    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit')
+    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit, [data-foh-transfer-sheets]')
     || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null);
 
   // Track when the current worker session started so we don't toast diffs

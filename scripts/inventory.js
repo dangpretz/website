@@ -205,7 +205,10 @@ export const TRAY_SIZES = {
   '4oz twist bbk': 12,
   '4oz twist spicy bee': 12,
   'bees bats': 6,
-  'plain bombs': 0,
+  // 54 bombs per sheet pan (confirmed by FOH May 2026). Sold as 6/order
+  // regular or 18/order party, but both pull from the same 54-per-sheet
+  // dough inventory.
+  'plain bombs': 54,
 };
 
 // SKUs that aren't produced in-house (front-of-house pre-made / sourced).
@@ -674,6 +677,10 @@ export function getInventoryReport(args) {
   // cold-ferment inventory said existed. Surfaces snapshot inaccuracies
   // before they silently warp the shape team's schedule.
   const bfpOverbakeEvents = [];
+  // Audit trail of FOH speed-rack pulls that exceeded cold-ferment + frozen
+  // combined. Like overbake: clamps at 0 but records the deficit so the
+  // manager can reconcile (typo on input vs. truly missing inventory).
+  const fohOverPullEvents = [];
 
   // Walk events in TIMESTAMP order (defensive against out-of-order log writes)
   const sortedLogs = [...(productionLogs || [])].sort(
@@ -799,11 +806,13 @@ export function getInventoryReport(args) {
     } else if (row.action === 'foh_transfer') {
       // FOH stocked the in-store speed rack from the wholesale walk-in.
       // Sheets are measured in BFP-tray units (one sheet = one tray of
-      // pretzels). Deduct from cold-ferment FIFO (oldest first — same
-      // physics as bfp_done) but DO NOT credit frozen: the dough is leaving
-      // the wholesale accounting universe entirely. The raw log row
-      // preserves the requested sheet count even if it exceeded available
-      // cf (cap at 0 here), so the audit trail still shows what FOH took.
+      // pretzels). The dough leaves the wholesale accounting universe
+      // entirely (no frozen credit). Deduction order: cold-ferment FIFO
+      // first (matches FOH's mental model — they grab thawed dough off
+      // the rack), then frozen for any remainder. If the pull exceeds
+      // cf+fr combined, record the deficit in fohOverPullEvents so the
+      // manager can reconcile (typo vs. real inventory drift). The raw
+      // log row always preserves the requested sheet count.
       let xfers = []; try { xfers = JSON.parse(row.transfers || '[]'); } catch {}
       xfers.forEach((x) => {
         let key = (x.sku || '').trim();
@@ -813,11 +822,30 @@ export function getInventoryReport(args) {
         if (!ts2) return;
         const sheets = Number(x.sheets) || 0;
         if (!sheets) return;
-        const p = sheets * ts2;
-        cf[key] = Math.max(0, (cf[key] || 0) - p);
+        const needed = sheets * ts2;
+        const cfAvail = Math.max(0, cf[key] || 0);
+        const frAvail = Math.max(0, fr[key] || 0);
+        const fromCf = Math.min(cfAvail, needed);
+        const fromFr = Math.min(frAvail, needed - fromCf);
+        const deficit = needed - fromCf - fromFr;
+        cf[key] = cfAvail - fromCf;
+        fr[key] = frAvail - fromFr;
         flowFoh[key] = (flowFoh[key] || 0) + sheets;
+        if (deficit > 0) {
+          fohOverPullEvents.push({
+            sku: key,
+            sheets,
+            requestedPretzels: needed,
+            availableCf: cfAvail,
+            availableFr: frAvail,
+            deficitPretzels: deficit,
+            ts: ts || '',
+          });
+        }
+        // FIFO-consume the dough-age queue for the cf portion only. Frozen
+        // pretzels don't carry an age queue (shelf life resets at freeze).
         if (!doughQueue[key]) doughQueue[key] = [];
-        let toConsume = p;
+        let toConsume = fromCf;
         while (toConsume > 0 && doughQueue[key].length > 0) {
           const oldest = doughQueue[key][0];
           const take = Math.min(oldest.pretzels, toConsume);
@@ -965,7 +993,7 @@ export function getInventoryReport(args) {
     flowsSinceSnapshot: {
       shape: flowShape, bfp: flowBfp, foh: flowFoh, delivered: flowDelivered,
     },
-    alerts: { agingDough, bfpOverbake: bfpOverbakeEvents },
+    alerts: { agingDough, bfpOverbake: bfpOverbakeEvents, fohOverPull: fohOverPullEvents },
     snapshot: { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
   };
 }
