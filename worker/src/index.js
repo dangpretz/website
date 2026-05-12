@@ -1084,26 +1084,48 @@ async function fetchSquareDipConsumption(env, daysSampled = 28) {
     };
   });
 
+  // Pre-build flat matcher lists keyed by SKU so the inner loop is one
+  // pass through DIP_CONFIG entries (5 today) rather than nested
+  // some()-over-regex inside the per-line-item loop. At realistic
+  // future scale (~50K Square orders × 5 line items × 10 dips), the
+  // original O(orders × items × dips × regex) gets noticeable; this
+  // collapses the inner dimension to a single check per dip-regex pair.
+  const dipMatchers = Object.entries(DIP_CONFIG).map(([sku, cfg]) => ({
+    sku,
+    nameRes: cfg.squareNames,
+    modRes: cfg.squareModifiers,
+  }));
+
   orders.forEach((o) => {
     (o.line_items || []).forEach((li) => {
       const name = (li.name || '').trim();
       const qty = parseInt(li.quantity, 10) || 0;
-      // Direct line-item match per dip
-      Object.entries(DIP_CONFIG).forEach(([sku, cfg]) => {
-        if (cfg.squareNames.some((re) => re.test(name)) && qty > 0) {
+      if (qty <= 0) return;
+      // Direct line-item match per dip — early-exit each test once a name
+      // matches, since a single line item is one product (no double-count).
+      for (const { sku, nameRes } of dipMatchers) {
+        let matched = false;
+        for (const re of nameRes) {
+          if (re.test(name)) { matched = true; break; }
+        }
+        if (matched) {
           dips[sku].namesSeen.add(name);
           dips[sku].units += qty;
         }
-      });
+      }
       // Modifier match — each modifier instance = parent qty units of that dip
       (li.modifiers || []).forEach((mod) => {
         const mname = (mod.name || '').trim();
-        Object.entries(DIP_CONFIG).forEach(([sku, cfg]) => {
-          if (cfg.squareModifiers.some((re) => re.test(mname))) {
+        for (const { sku, modRes } of dipMatchers) {
+          let matched = false;
+          for (const re of modRes) {
+            if (re.test(mname)) { matched = true; break; }
+          }
+          if (matched) {
             dips[sku].modifiersSeen.add(mname);
             dips[sku].units += qty;
           }
-        });
+        }
       });
     });
   });
