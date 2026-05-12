@@ -21,6 +21,10 @@
 // ║   shape_done +N      → cf += N×bs (also pushed to dough age queue)       ║
 // ║   bfp_done   +N      → cf -= N×bs (cap 0, FIFO from oldest)              ║
 // ║                      → fr += N×bs                                        ║
+// ║   foh_transfer +N    → cf -= N×ts (cap 0, FIFO oldest first; NO fr)      ║
+// ║                        (FOH moving sheets from wholesale walk-in to the  ║
+// ║                        in-store speed rack — leaves the wholesale       ║
+// ║                        accounting world entirely.)                       ║
 // ║   confirmed delivery → fr -= delivery qty (cap 0)                        ║
 // ║                                                                          ║
 // ║ COVERAGE ATTRIBUTION                                                     ║
@@ -629,12 +633,16 @@ export function getLatestInventory(productionState) {
  * @param {Object} args.skuAliases
  * @param {string|null} args.latestInventoryTs
  * @param {(sku: string) => number} args.getBatchSize
+ * @param {(sku: string) => number} [args.getTraySize]   Required for foh_transfer
+ *        events (sheets → pretzels). If omitted, defaults to TRAY_SIZES lookup.
  */
 export function getInventoryReport(args) {
   const {
     productionLogs, productionState, allDeliveries,
     skuAliases, latestInventoryTs, getBatchSize,
+    getTraySize: getTraySizeArg,
   } = args;
+  const getTraySize = getTraySizeArg || ((sku) => TRAY_SIZES[sku] || 0);
 
   const inv = getLatestInventory(productionState);
   const cf = { ...inv.coldFerment };
@@ -660,6 +668,7 @@ export function getInventoryReport(args) {
 
   const flowShape = {};
   const flowBfp = {};
+  const flowFoh = {}; // sheets transferred to in-store speed rack
   const flowDelivered = {};
   // Audit trail of BFP completions that attributed more pretzels than the
   // cold-ferment inventory said existed. Surfaces snapshot inaccuracies
@@ -785,6 +794,36 @@ export function getInventoryReport(args) {
             toRemove -= take;
             if (last.pretzels <= 0) doughQueue[key].pop();
           }
+        }
+      });
+    } else if (row.action === 'foh_transfer') {
+      // FOH stocked the in-store speed rack from the wholesale walk-in.
+      // Sheets are measured in BFP-tray units (one sheet = one tray of
+      // pretzels). Deduct from cold-ferment FIFO (oldest first — same
+      // physics as bfp_done) but DO NOT credit frozen: the dough is leaving
+      // the wholesale accounting universe entirely. The raw log row
+      // preserves the requested sheet count even if it exceeded available
+      // cf (cap at 0 here), so the audit trail still shows what FOH took.
+      let xfers = []; try { xfers = JSON.parse(row.transfers || '[]'); } catch {}
+      xfers.forEach((x) => {
+        let key = (x.sku || '').trim();
+        if (!key) return;
+        if (skuAliases[key]) key = skuAliases[key];
+        const ts2 = getTraySize(key);
+        if (!ts2) return;
+        const sheets = Number(x.sheets) || 0;
+        if (!sheets) return;
+        const p = sheets * ts2;
+        cf[key] = Math.max(0, (cf[key] || 0) - p);
+        flowFoh[key] = (flowFoh[key] || 0) + sheets;
+        if (!doughQueue[key]) doughQueue[key] = [];
+        let toConsume = p;
+        while (toConsume > 0 && doughQueue[key].length > 0) {
+          const oldest = doughQueue[key][0];
+          const take = Math.min(oldest.pretzels, toConsume);
+          oldest.pretzels -= take;
+          toConsume -= take;
+          if (oldest.pretzels <= 0) doughQueue[key].shift();
         }
       });
     }
@@ -923,7 +962,9 @@ export function getInventoryReport(args) {
   return {
     effective: { coldFerment: cf, frozen: fr, onHand: oh },
     doughQueue,
-    flowsSinceSnapshot: { shape: flowShape, bfp: flowBfp, delivered: flowDelivered },
+    flowsSinceSnapshot: {
+      shape: flowShape, bfp: flowBfp, foh: flowFoh, delivered: flowDelivered,
+    },
     alerts: { agingDough, bfpOverbake: bfpOverbakeEvents },
     snapshot: { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
   };

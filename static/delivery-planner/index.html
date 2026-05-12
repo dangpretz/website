@@ -955,7 +955,7 @@
       isShapeOnlyDelivery,
       expandBoxLineItems,
       caseSizeOptionsFor,
-    } from '../../scripts/inventory.js?v=2026-05-11-audit-pass-2';
+    } from '../../scripts/inventory.js?v=2026-05-12-foh-dough-transfer';
 
     // Shape-only catering + box expansion. ENABLED BY DEFAULT — kept in
     // sync with production app via the same localStorage key.
@@ -1990,6 +1990,7 @@
             skuAliases: prodResolved.skuAliases,
             latestInventoryTs: prodResolved.latestInventoryTs,
             getBatchSize: meta.getBatchSize,
+            getTraySize: meta.getTraySize,
           });
           // Today-and-forward only — past unconfirmed ghost orders shouldn't
           // eat current inventory FIFO. Mirrors stock-tab filter.

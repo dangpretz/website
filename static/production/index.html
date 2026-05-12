@@ -553,11 +553,9 @@
     /* When body has role-shape or role-bfp, hide manager chrome */
     body.role-worker .topnav { display: none; }
     body.role-worker .tab-bar { display: none !important; }
-    /* FOH role is a worker that DOES need tab navigation (Dips ↔ Stock).
-       Override the tab-bar hide above, then hide just Shape + BFP. */
-    body.role-foh .tab-bar { display: flex !important; }
-    body.role-foh .tab-btn[data-tab="shape"],
-    body.role-foh .tab-btn[data-tab="bfp"] { display: none !important; }
+    /* FOH role gets a single combined "Today" screen — Dips + Dough on one
+       page. No tab navigation, by design (user explicitly asked for the
+       simplest possible UX). The tab strip stays hidden via .role-worker. */
 
     /* Worker header — two rows: identity on top, date nav below */
     .worker-header {
@@ -1063,7 +1061,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-11-audit-pass-2';
+  } from '../../scripts/inventory.js?v=2026-05-12-foh-dough-transfer';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1176,6 +1174,18 @@
     'house mustard dip',
     'honey mustard dip',
   ]);
+  // FOH bakes/sells these SKUs in-store. When FOH pulls trays from the
+  // wholesale walk-in to stock their speed rack, the Dough section logs a
+  // foh_transfer for each. Subset matches "all 6.5oz + bombs" — bats
+  // included because they're bomb-shape and likely pulled together. Tune
+  // here if FOH ever bakes a 10oz line in-store.
+  const FOH_DOUGH_SKUS = [
+    '6.5oz plain',
+    '6.5oz bbk',
+    '6.5oz spicy bee',
+    'plain bombs',
+    'bees bats',
+  ];
   // Per-SKU stripe color (worker view) — regex priority. Returns CSS color string.
   const getStripeColor = (sku) => {
     const s = (sku || '').toLowerCase();
@@ -1604,8 +1614,8 @@
   }
 
   let dayTab = userRole === 'bfp' ? 'bfp'
-             : userRole === 'foh' ? 'cheese' // Dips tab (renamed) is FOH's home
-             : 'shape'; // 'shape' | 'bfp' | 'stock' | 'cheese' (cheese/stock visible per role rules)
+             : userRole === 'foh' ? 'foh-home' // single-screen view: Dips + Dough on one page
+             : 'shape'; // 'shape' | 'bfp' | 'stock' | 'cheese' | 'foh-home' (visibility per role rules)
 
   // Inline logging state
   // loggedPretzels[type][dateStr][sku] = current pretzel count (local, mid-edit)
@@ -1689,6 +1699,7 @@
       skuAliases,
       latestInventoryTs,
       getBatchSize,
+      getTraySize,
     });
   }
 
@@ -2672,6 +2683,9 @@
 
   function renderDayView() {
     const dateStr    = toDateStr(currentDate);
+    // FOH role has its own single-page surface (Dips + Dough on one screen)
+    // — pin it regardless of which tab the dayTab string says.
+    if (userRole === 'foh') return renderFohHome(dateStr);
     // Stock + Cheese (Dips) tabs are visible to manager + FOH; shape/BFP get
     // forced back to their team's home tab if they somehow land there.
     const isAllowedStockCheese = userRole === 'manager' || userRole === 'foh';
@@ -3259,6 +3273,129 @@
       ${dipsHtml}
       ${calHint}
     </div></div>`;
+  }
+
+  // ─── RENDER FOH HOME (single combined screen: Dips + Dough) ──────────────
+  //
+  // FOH's only screen. Two stacked sections inside one team-card:
+  //   1. Dips      — existing renderDipCard steppers (cheese + retail dips)
+  //   2. Dough     — pretzel-sheet pulls to the in-store speed rack
+  //                  (writes foh_transfer log rows; FIFO-consumes wholesale
+  //                  coldFerment, no frozen credit)
+  // The aim is a zero-cognitive-load view: open the app, see today's tasks,
+  // tap. No tab navigation. Manager view still has full Stock/Shape/BFP tabs.
+
+  function renderFohHome(dateStr) {
+    const report  = getInventoryReportLocal();
+    const dipsHtml = Object.keys(DIP_CONFIG)
+      .map((sku) => renderDipCard(sku, dateStr, report)).join('');
+    const doughHtml = renderFohDoughSection(report);
+
+    const calUrl = 'https://dpc-catering-checkout.drew-f39.workers.dev/foh-cal.ics';
+    const calHint = `
+      <div style="margin-top:24px;padding:12px;background:#f8f8f8;border-radius:8px;font:400 11px 'Manrope',sans-serif;color:var(--gray-3)">
+        📅 ${appLang === 'es' ? 'Calendario FOH' : 'FOH calendar'}: <code style="font-size:11px;background:#fff;padding:2px 4px;border-radius:3px">${calUrl}</code>
+        <br>${appLang === 'es' ? 'Suscríbete en myecalendar — actualiza cada hora.' : 'Subscribe in myecalendar — refreshes hourly.'}
+      </div>`;
+
+    return `<div class="team-card"><div class="team-body">
+      <div style="margin-bottom:16px">
+        <div style="font:800 18px 'Paytone One',sans-serif;color:var(--dark)">${appLang === 'es' ? '🧀 Salsas' : '🧀 Dips'}</div>
+        <div style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3)">
+          ${appLang === 'es' ? 'Programación FOH para queso y salsas de menudeo' : 'FOH schedule for cheese + retail dips'}
+        </div>
+      </div>
+      ${dipsHtml}
+      <div style="margin:28px 0 14px 0;padding-top:18px;border-top:2px solid var(--gray-1)">
+        <div style="font:800 18px 'Paytone One',sans-serif;color:var(--dark)">${appLang === 'es' ? '🥨 Masa → estante rápido' : '🥨 Dough → speed rack'}</div>
+        <div style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3)">
+          ${appLang === 'es' ? 'Registra las hojas que sacaste del refrigerador para hornear en tienda.' : 'Log the sheets you pulled from the walk-in to bake in-store.'}
+        </div>
+      </div>
+      ${doughHtml}
+      ${calHint}
+    </div></div>`;
+  }
+
+  // Dough section — per-SKU row showing "N sheets ready" + an input for
+  // sheets pulled. Bottom Save button writes one foh_transfer log row that
+  // bundles every non-zero input. Inputs reset on successful save.
+  function renderFohDoughSection(report) {
+    const cf = report?.effective?.coldFerment || {};
+    const rows = FOH_DOUGH_SKUS.map((sku) => {
+      const ts = getTraySize(sku) || 0;
+      const pretzels = Math.max(0, cf[sku] || 0);
+      const sheetsReady = ts > 0 ? Math.floor(pretzels / ts) : 0;
+      const label = sku; // intentionally raw — FOH knows their SKU names
+      const readyTxt = ts > 0
+        ? `${sheetsReady} ${appLang === 'es' ? (sheetsReady === 1 ? 'hoja lista' : 'hojas listas') : (sheetsReady === 1 ? 'sheet ready' : 'sheets ready')}`
+        : (appLang === 'es' ? 'sin tamaño de bandeja' : 'no tray size');
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 12px;border-bottom:1px solid var(--gray-1)">
+          <div style="flex:1;min-width:0">
+            <div style="font:700 15px 'Manrope',sans-serif;color:var(--dark);text-transform:capitalize">${label}</div>
+            <div style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3)">${readyTxt}</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font:600 12px 'Manrope',sans-serif;color:var(--gray-3)">
+            <span>${appLang === 'es' ? 'Sacadas' : 'Pulled'}</span>
+            <input type="number" inputmode="numeric" min="0" step="1" value="0"
+                   data-foh-transfer-sheets data-sku="${sku}"
+                   style="width:64px;padding:8px;border:2px solid var(--gray-1);border-radius:8px;font:700 16px 'Manrope',sans-serif;text-align:center;color:var(--dark)">
+          </label>
+        </div>`;
+    }).join('');
+
+    return `
+      <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-1);overflow:hidden">
+        ${rows}
+        <div style="padding:14px 12px;display:flex;flex-direction:column;align-items:stretch;gap:8px">
+          <button id="foh-transfer-save"
+                  style="background:var(--dark);color:#fff;border:none;border-radius:10px;padding:14px;font:800 14px 'Manrope',sans-serif;cursor:pointer">
+            ${appLang === 'es' ? 'Guardar transferencia' : 'Save transfer'}
+          </button>
+          <div style="font:400 11px 'Manrope',sans-serif;color:var(--gray-3);text-align:center">
+            ${appLang === 'es' ? 'Toca guardar una o dos veces al día después de surtir el estante.' : 'Tap save once or twice a day after you stock the rack.'}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Collects every non-zero data-foh-transfer-sheets input on the page,
+  // writes one bundled foh_transfer log row, then reloads. Empty saves are
+  // a no-op (button stays available but nothing fires). Negatives blocked
+  // client-side via min="0"; getInventoryReport also clamps cf at 0.
+  async function saveFohTransfer() {
+    const btn = document.getElementById('foh-transfer-save');
+    if (btn) btn.disabled = true;
+    const transfers = [];
+    document.querySelectorAll('[data-foh-transfer-sheets]').forEach((inp) => {
+      const sku = (inp.dataset.sku || '').trim();
+      const sheets = parseInt(inp.value, 10) || 0;
+      if (sku && sheets > 0) transfers.push({ sku, sheets });
+    });
+    if (!transfers.length) {
+      if (btn) btn.disabled = false;
+      return;
+    }
+    try {
+      await appendLog(PRODUCTION_LOG, {
+        action: 'foh_transfer',
+        date: toDateStr(new Date()),
+        transfers: JSON.stringify(transfers),
+        timeStamp: new Date().toISOString(),
+      });
+      await loadProduction();
+      schedule = buildOptimalSchedule();
+      render();
+    } catch (err) {
+      // appendLog now throws on non-2xx — surface to the user instead of
+      // silently failing (the whole point of the recent sheet-logger
+      // hardening). Re-enable the button so they can retry.
+      // eslint-disable-next-line no-alert, no-console
+      console.error('foh_transfer save failed', err);
+      alert((appLang === 'es' ? 'No se pudo guardar' : 'Save failed') + `: ${err.message || err}`);
+      if (btn) btn.disabled = false;
+    }
   }
 
   // Dip stepper — generic across cheese + retail dips. Logs cheese_done
@@ -4049,6 +4186,9 @@
     });
     const stockSaveBtn = document.getElementById('stock-save');
     if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
+    // FOH dough-transfer save button (only present on FOH home view).
+    const fohTransferBtn = document.getElementById('foh-transfer-save');
+    if (fohTransferBtn) fohTransferBtn.addEventListener('click', saveFohTransfer);
     // ↺ zero button: pre-fill the SKU's on-hand input to 0 without saving.
     // Manager / FOH still has to click Save Stock Count to commit, so a
     // misclick is easily fixed by editing the field back to the right value.
