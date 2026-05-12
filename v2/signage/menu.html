@@ -610,23 +610,35 @@
     padding: 8px 36px;
   }
   .dip-row {
-    display: flex;
-    align-items: baseline;
+    display: grid;
+    grid-template-columns: 240px 1fr 240px;
+    align-items: center;
     gap: 24px;
-    padding: 16px 0;
+    padding: 13px 0;
     border-bottom: 1px solid rgba(26, 26, 26, 0.08);
   }
   .dip-row:last-child { border-bottom: none; }
   .dip-row .dip-name {
-    font: 700 32px 'Paytone One', sans-serif;
+    font: 700 30px 'Paytone One', sans-serif;
     color: #1A1A1A;
-    flex-shrink: 0;
-    min-width: 280px;
   }
   .dip-row .dip-desc {
-    font: 400 22px/1.3 'Manrope', sans-serif;
+    font: 400 20px/1.3 'Manrope', sans-serif;
     color: #555;
-    flex: 1;
+  }
+  .dip-row .dip-pairs {
+    font: 700 16px/1.3 'Manrope', sans-serif;
+    color: #C41E1E;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-align: right;
+  }
+  .dip-row .dip-pairs span {
+    display: block;
+    font: 400 11px 'Manrope', sans-serif;
+    color: #999;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
   }
 
   /* ─── Drinks (Screen 3) ─── */
@@ -996,22 +1008,27 @@
         <div class="dip-row">
           <span class="dip-name">Dangerous Dip</span>
           <span class="dip-desc">Creamy house cheese dip with the right amount of spice.</span>
+          <span class="dip-pairs"><span>Pairs With</span>Salty &middot; Bootlegger</span>
         </div>
         <div class="dip-row">
           <span class="dip-name">House Mustard</span>
           <span class="dip-desc">Yellow mustard-ish.</span>
+          <span class="dip-pairs"><span>Pairs With</span>Salty &middot; BBK</span>
         </div>
         <div class="dip-row">
           <span class="dip-name">Honey Mustard</span>
           <span class="dip-desc">Stone ground classic. Sweet and tangy.</span>
+          <span class="dip-pairs"><span>Pairs With</span>Saint &middot; For The Kids</span>
         </div>
         <div class="dip-row">
           <span class="dip-name">Hot Ranch</span>
           <span class="dip-desc">Our take on buffalo ranch.</span>
+          <span class="dip-pairs"><span>Pairs With</span>Spicy Bee &middot; Devil's Delight</span>
         </div>
         <div class="dip-row">
           <span class="dip-name">Sweet Cream</span>
           <span class="dip-desc">Sweet + cream + cheese.</span>
+          <span class="dip-pairs"><span>Pairs With</span>Saint &middot; Saint Bombs</span>
         </div>
       </div>
     </div>
