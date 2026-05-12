@@ -878,6 +878,22 @@ export function getInventoryReport(args) {
   Object.keys(fr).forEach((k) => { fr[k] = Math.max(0, Math.round(fr[k])); });
   Object.keys(oh).forEach((k) => { oh[k] = Math.max(0, Math.round(oh[k])); });
 
+  // Prune dough queue: drop entries past their shelf-life + 3-day grace
+  // window. They've either been consumed (zeroed) or are stale enough that
+  // they shouldn't drive aging alerts or live-stock displays. Keeps the
+  // in-memory queue bounded as log history grows over months.
+  const pruneNow = Date.now();
+  Object.keys(doughQueue).forEach((sku) => {
+    const dipCfg = DIP_CONFIG[sku];
+    const failAt = dipCfg ? dipCfg.shelfLifeDays : DOUGH_AGE_FAIL_DAYS;
+    const dropMs = (failAt + 3) * 86400000; // shelf-life + 3 days grace
+    doughQueue[sku] = doughQueue[sku].filter((e) => {
+      if (e.pretzels <= 0) return false;
+      const ageMs = pruneNow - new Date(e.ts).getTime();
+      return ageMs < dropMs;
+    });
+  });
+
   // Aging dough alerts. Per-SKU thresholds: dips configured in DIP_CONFIG
   // use their `shelfLifeDays` (warn one day before, fail at). Pretzels and
   // anything else fall back to the global DOUGH_AGE_WARN_DAYS / FAIL_DAYS.
@@ -1142,7 +1158,11 @@ export function scheduleDip({
   const startInventory = cfStart + frStart + ohStart;
 
   const batches = [];
-  const hasBatchOn = (dayIdx) => batches.some((b) => b.dayIndex === dayIdx);
+  // Set of dayIdx for O(1) lookup. Updated alongside batches.push() — keep
+  // in sync. Previous .some() across batches grew linearly per call;
+  // at 100+ dips × 30 days × inner loop, the scan got expensive.
+  const batchedDays = new Set();
+  const hasBatchOn = (dayIdx) => batchedDays.has(dayIdx);
   // Pick batch size at placement time. If the immediate deficit (-inv at the
   // time we decide to place) exceeds a single, upgrade to double.
   const pickSize = (deficit) => {
@@ -1172,6 +1192,7 @@ export function scheduleDip({
           size,
           units,
         });
+        batchedDays.add(j);
         inv += units;
         placed = true;
         break;
@@ -1189,6 +1210,7 @@ export function scheduleDip({
               size,
               units,
             });
+            batchedDays.add(j);
             inv += units;
             placed = true;
             break;
