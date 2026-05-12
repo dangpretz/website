@@ -115,7 +115,7 @@
   }
   .combo-left { flex: 1; }
   .combo-name {
-    font: 700 38px 'Paytone One', sans-serif;
+    font: 700 48px/1.05 'Paytone One', sans-serif;
     color: #fff;
     margin-bottom: 4px;
   }
@@ -130,7 +130,7 @@
     gap: 6px;
   }
   .combo-price {
-    font: 700 64px/1 'Paytone One', sans-serif;
+    font: 700 52px/1 'Paytone One', sans-serif;
     color: #fff;
   }
   .combo-save {
@@ -202,18 +202,36 @@
   }
   .new-flavor-placeholder {
     background:
-      radial-gradient(ellipse at 30% 70%, rgba(255,255,255,0.08) 0%, transparent 60%),
-      linear-gradient(135deg, #C41E1E 0%, #7a0f0f 100%);
+      radial-gradient(ellipse at 30% 70%, rgba(255,255,255,0.12) 0%, transparent 60%),
+      linear-gradient(135deg, #C41E1E 0%, #5a0a0a 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 100%;
+    position: relative;
+    overflow: hidden;
   }
-  .new-flavor-placeholder span {
-    font: 900 italic 42px/1 Georgia, serif;
-    color: #fff;
-    letter-spacing: 8px;
-    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+  .new-flavor-placeholder::before {
+    content: 'B';
+    font: 900 italic 240px/1 Georgia, serif;
+    color: rgba(255, 255, 255, 0.18);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -52%);
+    text-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    letter-spacing: -0.05em;
+  }
+  .new-flavor-placeholder::after {
+    content: 'BOOTLEGGER';
+    font: 700 14px 'Manrope', sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 6px;
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
   }
   .new-flavor-body {
     padding: 24px 28px;
@@ -298,11 +316,12 @@
   /* ─── Dark hero card (For The Kids on Screen 2) ─── */
   .dark-hero {
     display: grid;
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 1fr 1fr;
     background: #2a2a2a;
     border-radius: 14px;
     overflow: hidden;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
+    min-height: 200px;
   }
   .dark-hero img {
     width: 100%;
@@ -506,19 +525,19 @@
   .catering-callout {
     background: #2a2a2a;
     border-radius: 16px;
-    padding: 50px 56px;
+    padding: 26px 36px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
   }
   .catering-left h3 {
-    font: 900 italic 58px/1.1 Georgia, serif;
+    font: 900 italic 44px/1.1 Georgia, serif;
     color: #fff;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
   .catering-left p {
-    font: 400 26px 'Manrope', sans-serif;
+    font: 400 20px 'Manrope', sans-serif;
     color: #aaa;
   }
   .catering-url {
@@ -571,7 +590,7 @@
   }
 
   /* ─── Dips Section (Screen 3) — compact list layout ─── */
-  .dips-section { margin-bottom: 32px; }
+  .dips-section { margin-bottom: 24px; }
   .dips-label {
     font: 700 32px 'Manrope', sans-serif;
     color: #C41E1E;
@@ -611,7 +630,7 @@
   }
 
   /* ─── Drinks (Screen 3) ─── */
-  .drinks-section { margin-bottom: 28px; }
+  .drinks-section { margin-bottom: 18px; }
   .drinks-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -646,7 +665,7 @@
   .feat-callout {
     background: #C41E1E;
     border-radius: 16px;
-    padding: 30px 44px;
+    padding: 20px 36px;
     display: flex;
     align-items: center;
     gap: 26px;
@@ -680,6 +699,53 @@
   .feat-callout p {
     font: 400 20px/1.4 'Manrope', sans-serif;
     color: rgba(255, 255, 255, 0.92);
+  }
+
+  /* ─── QR Block (action card) ─── */
+  .qr-block {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 14px 18px;
+    border-radius: 12px;
+  }
+  .qr-block img {
+    width: 110px;
+    height: 110px;
+    background: #fff;
+    padding: 7px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .qr-block .qr-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .qr-block .qr-label {
+    font: 700 17px 'Manrope', sans-serif;
+    color: #fff;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+  }
+  .qr-block .qr-sub {
+    font: 400 16px/1.35 'Manrope', sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  /* ─── Op-info strip (bottom of each screen) ─── */
+  .op-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 4px 0;
+    margin-top: 12px;
+    border-top: 1px solid #2a2a2a;
+    font: 400 14px 'Manrope', sans-serif;
+    color: #666;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
   }
 
   /* ─── Hidden back-door icon ─── */
@@ -803,7 +869,7 @@
 
     <!-- Bootlegger (NEW flavor, no photo yet) -->
     <div class="new-flavor-hero">
-      <div class="new-flavor-placeholder"><span>DPC</span></div>
+      <div class="new-flavor-placeholder" aria-label="Bootlegger"></div>
       <div class="new-flavor-body">
         <span class="new-flavor-badge">New</span>
         <div class="new-flavor-head">
@@ -825,6 +891,12 @@
         </div>
         <p>Sweet cinnamon sugar that's never done anything wrong.</p>
       </div>
+    </div>
+
+    <div class="op-strip">
+      <span>Open 11&ndash;8 Daily &middot; Fri&ndash;Sat til 9</span>
+      <span>@dangerouspretzelco</span>
+      <span>Order at the counter</span>
     </div>
   </section>
 
@@ -886,7 +958,19 @@
         <h3>Bigger event?</h3>
         <p>Weddings, corporate, festivals. We&rsquo;ve got you.</p>
       </div>
-      <div class="catering-url">dangerouspretzel.com<br>/catering</div>
+      <div class="qr-block">
+        <img src="./qr/catering.svg" alt="">
+        <div class="qr-text">
+          <span class="qr-label">Book Catering</span>
+          <span class="qr-sub">Scan to inquire</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="op-strip">
+      <span>Open 11&ndash;8 Daily &middot; Fri&ndash;Sat til 9</span>
+      <span>@dangerouspretzelco</span>
+      <span>Order at the counter</span>
     </div>
   </section>
 
@@ -960,12 +1044,24 @@
     </div>
 
     <div class="feat-callout">
-      <div class="feat-emoji">!</div>
       <div class="feat-body">
         <p class="feat-label">House Move</p>
         <h3>Spicy Bee + Hot Ranch</h3>
         <p>The combo our regulars order on repeat. Sweet heat meets cool buffalo.</p>
       </div>
+      <div class="qr-block">
+        <img src="./qr/order.svg" alt="">
+        <div class="qr-text">
+          <span class="qr-label">Order Online</span>
+          <span class="qr-sub">Skip the line</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="op-strip">
+      <span>Open 11&ndash;8 Daily &middot; Fri&ndash;Sat til 9</span>
+      <span>@dangerouspretzelco</span>
+      <span>Order at the counter</span>
     </div>
   </section>
 
