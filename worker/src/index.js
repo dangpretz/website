@@ -826,6 +826,30 @@ async function handleSquareWebhook(request, env) {
   let payload;
   try { payload = JSON.parse(body); } catch (_) { return json({ error: 'bad json' }, 400); }
 
+  // Idempotency: Square retries webhooks for up to 24h on non-2xx responses
+  // AND occasionally double-fires for transient reasons. Dedupe by event_id
+  // in KV so the same event doesn't sync (and overwrite manager edits) twice.
+  // 7-day TTL covers the full retry window with margin.
+  const eventId = payload.event_id || payload.id;
+  if (eventId && env.FOH_CAL_STATE) {
+    const stateKey = `sq-webhook:${eventId}`;
+    try {
+      const seen = await env.FOH_CAL_STATE.get(stateKey);
+      if (seen) {
+        return json({ ok: true, skipped: 'duplicate event', event_id: eventId, first_seen: seen });
+      }
+      // Fire-and-forget write so the response isn't blocked. Worst case (race
+      // where two retries arrive simultaneously) both process, but that's no
+      // worse than current behavior — KV is eventually consistent.
+      env.FOH_CAL_STATE
+        .put(stateKey, new Date().toISOString(), { expirationTtl: 60 * 60 * 24 * 7 })
+        .catch((err) => console.warn('webhook dedupe KV put failed:', err.message));
+    } catch (err) {
+      // KV read fail — fall through to sync (eventual consistency safety net)
+      console.warn('webhook dedupe KV get failed:', err.message);
+    }
+  }
+
   // Resolve order ID from event payload (varies by event type)
   const orderId =
     payload.data?.object?.order?.id              // order.* events

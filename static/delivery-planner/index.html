@@ -954,7 +954,7 @@
       isShapeOnlyDelivery,
       expandBoxLineItems,
       caseSizeOptionsFor,
-    } from '../../scripts/inventory.js?v=2026-05-07-dip-catering-route';
+    } from '../../scripts/inventory.js?v=2026-05-11-audit-pass-2';
 
     // Shape-only catering + box expansion. ENABLED BY DEFAULT — kept in
     // sync with production app via the same localStorage key.
@@ -1168,15 +1168,19 @@
 
     /** Resolve deliveries from logs. Normalizes old ready states to scheduled. */
     function resolveDeliveriesFromLogs(logs) {
-      const byId = {};
       if (!Array.isArray(logs)) return [];
+      const byId = {};
+      // Collect barcode updates separately so they apply AFTER all
+      // create/update/delete rows. Otherwise a barcodes row logged BEFORE
+      // the corresponding create row (e.g. scanner fires before manager
+      // saves the delivery) would be silently dropped because byId[id]
+      // doesn't exist yet at that point in the walk.
+      const latestBarcodes = {};
       logs.forEach((row, idx) => {
         const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
         if (row.action === 'delete') { delete byId[id]; return; }
         if (row.action === 'barcodes') {
-          if (byId[id]) {
-            try { byId[id].barcodes = JSON.parse(row.barcodes || '[]'); } catch (_) { byId[id].barcodes = []; }
-          }
+          try { latestBarcodes[id] = JSON.parse(row.barcodes || '[]'); } catch (_) { latestBarcodes[id] = []; }
           return;
         }
         if (row.action === 'confirm') {
@@ -1218,6 +1222,11 @@
         let s = byId[id].status || 'scheduled';
         if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
         byId[id].status = s;
+      });
+      // Apply collected barcodes last — covers the out-of-order case where
+      // a 'barcodes' row was logged before the corresponding 'create'.
+      Object.entries(latestBarcodes).forEach(([id, codes]) => {
+        if (byId[id]) byId[id].barcodes = codes;
       });
       return Object.values(byId).sort((a, b) => {
         const d = (a.date || '').localeCompare(b.date || '');
@@ -1408,8 +1417,10 @@
       caseSizeSelect.addEventListener('change', syncQtyFromCases);
       qtyInput.addEventListener('input', () => {
         // Any keystroke in pretzels = user wants this value preserved.
-        // Empty pretzels = back to derived mode.
+        // Empty pretzels = back to derived mode, and immediately re-sync
+        // from current case×size so the user sees the implied count.
         pretzelsDirty = qtyInput.value.trim() !== '';
+        if (!pretzelsDirty) syncQtyFromCases();
         updateHint();
       });
       qtyInput.addEventListener('blur', () => {
