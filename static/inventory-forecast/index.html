@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory Forecast | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 400; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    /* ── Hero ── */
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px,4vw,50px) 5% clamp(16px,3vw,28px); }
+    .hero h1 { font: 900 italic clamp(32px,5vw,52px)/1.05 Georgia, serif; color: #fff; }
+
+    /* ── Sections ── */
+    .section-cream { background: #F5F0E8; padding: clamp(32px,5vw,60px) 5%; }
+    .section-dark  { background: #1A1A1A; padding: clamp(32px,5vw,60px) 5%; }
+    .section-dark h2 { font: 900 italic clamp(24px,3vw,36px)/1.05 Georgia, serif; color: #fff; margin-bottom: 24px; }
+    .max-800  { max-width: 800px;  margin: 0 auto; }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Cards ── */
+    .card { background: #fff; border-radius: 10px; padding: 22px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .card-title { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
+    .card-dark { background: #2e2e2e; box-shadow: none; }
+    .card-dark .card-title { color: #666; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #1A1A1A; color: #fff; font: 600 14px 'Manrope', sans-serif; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 1; transition: opacity .4s; pointer-events: none; }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    /* ── Buttons ── */
+    .btn-primary { padding: 10px 20px; font: 700 13px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background .2s; }
+    .btn-primary:hover:not(:disabled) { background: #a01818; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-ghost { padding: 7px 16px; font: 700 12px 'Manrope', sans-serif; background: transparent; border: 2px solid #ccc; color: #666; border-radius: 6px; cursor: pointer; transition: all .2s; white-space: nowrap; }
+    .btn-ghost:hover:not(:disabled) { border-color: #C41E1E; color: #C41E1E; }
+    .btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-ghost.active { border-color: #C41E1E; color: #C41E1E; background: #fde8e8; }
+
+    /* ════════════════════════════════════
+       FORECAST TABLE
+    ════════════════════════════════════ */
+    .forecast-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .forecast-window { font: 600 14px 'Manrope', sans-serif; color: #555; }
+    .forecast-actions { display: flex; gap: 8px; }
+
+    .forecast-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .forecast-table { width: 100%; border-collapse: collapse; background: #fff; cursor: pointer; }
+    .forecast-table th { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 2px solid #f0ece6; white-space: nowrap; }
+    .forecast-table td { font: 400 14px 'Manrope', sans-serif; color: #1A1A1A; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+    .forecast-table tr:last-child td { border-bottom: none; }
+    .forecast-table tbody tr:hover td { background: #faf8f5; }
+    .forecast-table tbody tr.row-short { background: #fff5f5; }
+    .forecast-table tbody tr.row-short:hover td { background: #ffeaea; }
+    .forecast-table tbody tr.row-low { background: #fffbf0; }
+    .forecast-table tbody tr.row-low:hover td { background: #fff6e0; }
+
+    .val-short    { color: #C41E1E; font-weight: 700; }
+    .val-low      { color: #b07000; font-weight: 700; }
+    .val-ok       { color: #2a7a2a; font-weight: 700; }
+    .val-neutral  { color: #1A1A1A; }
+
+    .status-badge { display: inline-block; font: 700 10px 'Manrope', sans-serif; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+    .status-badge.short  { background: #fde8e8; color: #C41E1E; }
+    .status-badge.low    { background: #fff3cc; color: #8a6000; }
+    .status-badge.ok     { background: #e6f4e6; color: #2a7a2a; }
+    .status-badge.none   { background: #f0f0f0; color: #aaa; }
+
+    .table-status { text-align: center; padding: 40px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
+    .table-status.error { color: #C41E1E; font-weight: 700; }
+    .no-recipe-note { margin-top: 12px; font: 400 12px 'Manrope', sans-serif; color: #999; font-style: italic; }
+
+    /* ════════════════════════════════════
+       SLIDE-OUT PANEL
+    ════════════════════════════════════ */
+    .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 500; opacity: 0; pointer-events: none; transition: opacity .25s; }
+    .panel-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .detail-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); background: #fff; z-index: 600; transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); overflow-y: auto; display: flex; flex-direction: column; }
+    .detail-panel.open { transform: translateX(0); }
+
+    .panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; border-bottom: 2px solid #f0ece6; position: sticky; top: 0; background: #fff; z-index: 1; }
+    .panel-title { font: 700 16px 'Manrope', sans-serif; color: #1A1A1A; line-height: 1.3; }
+    .panel-subtitle { font: 400 12px 'Manrope', sans-serif; color: #888; margin-top: 3px; }
+    .panel-close { background: none; border: none; font-size: 22px; line-height: 1; color: #bbb; cursor: pointer; padding: 0; flex-shrink: 0; margin-top: 2px; }
+    .panel-close:hover { color: #555; }
+
+    .panel-stock-row { display: flex; gap: 16px; padding: 14px 20px; background: #F5F0E8; border-bottom: 1px solid #e8e3da; flex-wrap: wrap; }
+    .panel-stat { display: flex; flex-direction: column; gap: 2px; }
+    .panel-stat-label { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: .8px; text-transform: uppercase; }
+    .panel-stat-value { font: 700 18px 'Manrope', sans-serif; color: #1A1A1A; }
+    .panel-stat-value.val-short { color: #C41E1E; }
+    .panel-stat-value.val-ok    { color: #2a7a2a; }
+
+    .panel-timeline { flex: 1; padding: 16px 20px; }
+    .panel-section-label { font: 700 10px 'Manrope', sans-serif; color: #bbb; letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 8px; }
+    .panel-section-label:first-child { margin-top: 0; }
+
+    .timeline-event { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: start; padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; border-left: 3px solid transparent; }
+    .timeline-event.ev-receive { border-left-color: #2a7a2a; background: #f4faf4; }
+    .timeline-event.ev-use     { border-left-color: #C41E1E; background: #fff5f5; }
+    .timeline-event.ev-adjust  { border-left-color: #aaa;    background: #f8f8f8; }
+    .timeline-event.ev-expected{ border-left-color: #e8a000; background: #fffbf0; font-style: italic; }
+    .te-date { font: 600 11px 'Manrope', sans-serif; color: #888; padding-top: 1px; white-space: nowrap; }
+    .te-desc { font: 400 13px 'Manrope', sans-serif; color: #1A1A1A; }
+    .te-qty  { font: 700 13px 'Manrope', sans-serif; white-space: nowrap; text-align: right; }
+    .te-qty.positive { color: #2a7a2a; }
+    .te-qty.negative { color: #C41E1E; }
+    .te-qty.expected { color: #b07000; }
+    .timeline-empty { font: 400 13px 'Manrope', sans-serif; color: #bbb; font-style: italic; padding: 8px 10px; }
+    .today-divider { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+    .today-divider::before, .today-divider::after { content: ''; flex: 1; height: 1px; background: #e0d8cc; }
+    .today-label { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+
+    /* ════════════════════════════════════
+       RECIPE EDITOR
+    ════════════════════════════════════ */
+    .recipe-editor-section { padding: clamp(32px,5vw,60px) 5%; background: #1A1A1A; }
+    .recipe-editor-section h2 { font: 900 italic clamp(24px,3vw,36px)/1.05 Georgia, serif; color: #fff; margin-bottom: 8px; }
+    .recipe-editor-section .recipe-intro { font: 400 14px/1.6 'Manrope', sans-serif; color: #777; margin-bottom: 28px; }
+
+    .sku-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+
+    .sku-card { background: #2e2e2e; border-radius: 10px; overflow: hidden; }
+    .sku-card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; transition: border-color .2s; }
+    .sku-card.expanded .sku-card-header { border-bottom-color: #3a3a3a; }
+    .sku-card-name { font: 700 14px 'Manrope', sans-serif; color: #fff; }
+    .sku-card-meta { font: 400 11px 'Manrope', sans-serif; color: #666; margin-top: 2px; }
+    .sku-card-chevron { color: #555; font-size: 18px; transition: transform .25s; flex-shrink: 0; }
+    .sku-card.expanded .sku-card-chevron { transform: rotate(180deg); }
+    .sku-card-body { display: none; padding: 16px 18px; }
+    .sku-card.expanded .sku-card-body { display: block; }
+
+    /* Scale inputs */
+    .scale-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .scale-field { display: flex; flex-direction: column; gap: 4px; }
+    .scale-label { font: 700 10px 'Manrope', sans-serif; color: #777; letter-spacing: .7px; text-transform: uppercase; }
+    .scale-input { font: 400 14px 'Manrope', sans-serif; padding: 8px 10px; border: 2px solid #444; border-radius: 5px; background: #3a3a3a; color: #fff; outline: none; transition: border-color .2s; -moz-appearance: textfield; }
+    .scale-input:focus { border-color: #C41E1E; }
+    .scale-input::-webkit-outer-spin-button,
+    .scale-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .scale-input[readonly] { background: #252525; color: #666; border-color: #333; cursor: default; }
+
+    /* Ingredient table */
+    .recipe-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .recipe-ing-table th { font: 700 10px 'Manrope', sans-serif; color: #666; letter-spacing: .7px; text-transform: uppercase; padding: 6px 8px; text-align: left; border-bottom: 1px solid #3a3a3a; white-space: nowrap; }
+    .recipe-ing-table td { padding: 5px 8px; border-bottom: 1px solid #252525; vertical-align: middle; }
+    .recipe-ing-table tr:last-child td { border-bottom: none; }
+    .ing-name { font: 400 12px 'Manrope', sans-serif; color: #ccc; }
+    .recipe-qty-input { width: 72px; font: 400 13px 'Manrope', sans-serif; padding: 5px 7px; border: 1.5px solid #444; border-radius: 4px; background: #3a3a3a; color: #fff; outline: none; text-align: right; transition: border-color .2s; -moz-appearance: textfield; }
+    .recipe-qty-input:focus { border-color: #C41E1E; }
+    .recipe-qty-input::-webkit-outer-spin-button,
+    .recipe-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .recipe-qty-derived { font: 400 12px 'Manrope', sans-serif; color: #555; text-align: right; min-width: 54px; display: inline-block; }
+    .ing-unit { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; }
+    .sku-save-row { display: flex; align-items: center; gap: 10px; }
+    .sku-save-btn { padding: 9px 20px; font: 700 13px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background .2s; }
+    .sku-save-btn:hover:not(:disabled) { background: #a01818; }
+    .sku-save-btn:disabled { background: #555; cursor: not-allowed; }
+    .sku-save-status { font: 400 12px 'Manrope', sans-serif; color: #666; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      .forecast-table th:nth-child(4),
+      .forecast-table td:nth-child(4),
+      .forecast-table th:nth-child(6),
+      .forecast-table td:nth-child(6) { display: none; }
+      .sku-grid { grid-template-columns: 1fr; }
+      .scale-row { grid-template-columns: 1fr 1fr; }
+      .scale-row .auto-col { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+        <a href="../barcode-lookup/index.html">Barcode Lookup</a>
+        <a href="../receiving-history/index.html">Receiving History</a>
+        <a href="../inventory/index.html">Inventory</a>
+        <a href="../inventory-forecast/index.html">Forecast</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>INVENTORY FORECAST.</h1>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       FORECAST TABLE
+  ══════════════════════════════════════ -->
+  <div class="section-cream">
+    <div class="max-1100">
+
+      <div class="forecast-controls">
+        <div class="forecast-window" id="forecast-window">Next 7 days</div>
+        <div class="forecast-actions">
+          <button class="btn-ghost" id="edit-recipes-btn">✎ Edit Recipes</button>
+          <button class="btn-ghost" id="refresh-btn">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div id="table-status" class="table-status">Loading forecast…</div>
+
+      <div id="forecast-table-wrap" class="forecast-table-wrap" hidden>
+        <table class="forecast-table" id="forecast-table">
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>Unit</th>
+              <th>In Stock</th>
+              <th>Expected Use (7d)</th>
+              <th>Projected</th>
+              <th>PAR</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="forecast-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="no-recipe-note" class="no-recipe-note" hidden>
+        Some ingredients show "—" because no recipe has been defined for their SKUs yet. Click "Edit Recipes" to set up recipes.
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       RECIPE EDITOR (toggled)
+  ══════════════════════════════════════ -->
+  <div class="recipe-editor-section" id="recipe-editor-section" hidden>
+    <div class="max-1100">
+      <h2>RECIPES.</h2>
+      <p class="recipe-intro">
+        For each pretzel SKU, enter how many pretzels fit on one tray and how many trays are in one batch.
+        Then enter how many units of each ingredient go into one batch.
+        Per-tray and per-pretzel quantities are calculated automatically.
+      </p>
+      <div class="sku-grid" id="sku-grid"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SLIDE-OUT PANEL + OVERLAY
+  ══════════════════════════════════════ -->
+  <div class="panel-overlay" id="panel-overlay"></div>
+  <div class="detail-panel" id="detail-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title" id="panel-title">—</div>
+        <div class="panel-subtitle" id="panel-subtitle">—</div>
+      </div>
+      <button class="panel-close" id="panel-close">×</button>
+    </div>
+    <div class="panel-stock-row" id="panel-stock-row"></div>
+    <div class="panel-timeline" id="panel-timeline"></div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+
+    const DELIVERY_PATH  = '/dangpretz/delivery-planner';
+    const RECEIVING_PATH = '/dangpretz/receiving';
+    const INVENTORY_PATH = '/dangpretz/inventory';
+    const RECIPES_PATH   = '/dangpretz/recipes';
+
+    // ── SKUs (from delivery planner) ────────────────────────────────────────
+    const SKUS = [
+      '21oz mammoth pretzel', '10oz mustache', '10oz plain',
+      '10oz bbk', '10oz spicy bee', '6.5oz plain', '6.5oz bbk',
+      '6.5oz spicy bee', '4oz twist plain', '4oz twist bbk',
+      '4oz twist spicy bee', '3oz cheese dip',
+      'bulk dangerous dip (25 srv)', 'plain bombs', 'bees bats',
+    ];
+
+    // ── Product catalog ──────────────────────────────────────────────────────
+    const PRODUCTS = [
+      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB'   },
+      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB'   },
+      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB'   },
+      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL'   },
+      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB'   },
+      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL'   },
+      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB'    },
+      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL'   },
+      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB'    },
+      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB'    },
+      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL'   },
+      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ'   },
+      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB'    },
+      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB'    },
+      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA'  },
+      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB'   },
+      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA' },
+      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB'   },
+      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB'    },
+      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB'    },
+      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB'  },
+      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB'    },
+      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB'    },
+      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ'   },
+      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB'   },
+    ];
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function generateId() {
+      return (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `fc-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
+    }
+    function showToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 3500);
+    }
+    function formatDate(d) {
+      if (!d) return '—';
+      try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+      catch (_) { return d; }
+    }
+    function fmt2(n) { return isNaN(n) ? '—' : (Math.round(n * 100) / 100).toString(); }
+    function parsePackSize(ps) {
+      const parts = (ps || '').split('/');
+      if (parts.length < 3) return { innerUnitsPerCase: 1, innerUnitLabel: ps || 'unit' };
+      const c = parseFloat(parts[0]);
+      return { innerUnitsPerCase: isNaN(c) ? 1 : c, innerUnitLabel: `${parts[1]} ${parts[2]}` };
+    }
+    function todayStr() { return new Date().toISOString().slice(0, 10); }
+    function addDays(dateStr, n) {
+      const d = new Date(dateStr + 'T12:00:00');
+      d.setDate(d.getDate() + n);
+      return d.toISOString().slice(0, 10);
+    }
+
+    // ── Dynamic products (new_product entries from receiving log) ────────────
+    function buildDynamicProducts(receivingLogs) {
+      receivingLogs.filter((r) => r.action === 'new_product').forEach((r) => {
+        if (!r.usFoodsCode || !r.productName) return;
+        if (PRODUCTS.some((p) => p.id === `new-${r.usFoodsCode}`)) return;
+        PRODUCTS.push({ id: `new-${r.usFoodsCode}`, name: r.productName, packSize: r.packSize || '' });
+      });
+    }
+
+    // ── Compute inventory (same as inventory page) ───────────────────────────
+    function computeInventory(receivingLogs, inventoryLogs) {
+      const map = new Map();
+      for (const p of PRODUCTS) {
+        map.set(p.id, { productId: p.id, productName: p.name, packSize: p.packSize, stock: 0, par: null, lastReceived: null, lastUsed: null });
+      }
+      for (const r of receivingLogs) {
+        if (r.action !== 'receive') continue;
+        const id = r.productId;
+        if (!map.has(id)) {
+          map.set(id, { productId: id, productName: r.productName || id, packSize: r.packSize || '', stock: 0, par: null, lastReceived: null, lastUsed: null });
+        }
+        const row = map.get(id);
+        row.stock += parsePackSize(r.packSize).innerUnitsPerCase;
+        if (r.date && (!row.lastReceived || r.date > row.lastReceived)) row.lastReceived = r.date;
+      }
+      for (const r of inventoryLogs) {
+        const id = r.productId;
+        if (!map.has(id)) continue;
+        const row = map.get(id);
+        if (r.action === 'use')    { row.stock -= Number(r.quantity) || 0; if (r.date && (!row.lastUsed || r.date > row.lastUsed)) row.lastUsed = r.date; }
+        if (r.action === 'adjust') { row.stock += Number(r.quantity) || 0; }
+        if (r.action === 'par')    { const v = Number(r.par); if (!isNaN(v)) row.par = v; }
+      }
+      return map;
+    }
+
+    // ── Resolve deliveries (from delivery planner) ───────────────────────────
+    function resolveDeliveries(logs) {
+      const byId = {};
+      if (!Array.isArray(logs)) return [];
+      logs.forEach((row, idx) => {
+        const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
+        if (row.action === 'delete') { delete byId[id]; return; }
+        if (row.action === 'barcodes') { if (byId[id]) { try { byId[id].barcodes = JSON.parse(row.barcodes || '[]'); } catch (_) {} } return; }
+        if (row.action === 'confirm') {
+          if (byId[id]) {
+            byId[id].confirmation = { confirmedBy: row.confirmedBy || '', confirmTimestamp: row.confirmTimestamp || row.timeStamp || '' };
+            byId[id].status = (byId[id].type || 'delivery').toLowerCase() === 'pickup' ? 'picked_up' : 'delivered';
+          }
+          return;
+        }
+        if (row.action === 'status') { if (byId[id]) { let s = row.status || 'scheduled'; if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled'; byId[id].status = s; } return; }
+        if (row.action === 'update') {
+          const prev = byId[id];
+          byId[id] = { ...row, deliveryId: id };
+          if (prev?.barcodes) byId[id].barcodes = prev.barcodes;
+          if (prev?.confirmation) byId[id].confirmation = prev.confirmation;
+          let s = row.status || 'scheduled'; if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled'; byId[id].status = s;
+          return;
+        }
+        // create or legacy
+        const prev = byId[id];
+        byId[id] = { ...row, deliveryId: id };
+        if (prev?.barcodes) byId[id].barcodes = prev.barcodes;
+        let s = byId[id].status || 'scheduled'; if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled'; byId[id].status = s;
+      });
+      return Object.values(byId).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.timeStamp || '').localeCompare(b.timeStamp || ''));
+    }
+
+    // ── Build recipe maps ────────────────────────────────────────────────────
+    function buildRecipeMaps(recipeLogs) {
+      const scaleMap  = {};  // sku → { pretzelsPerTray, traysPerBatch }
+      const recipeMap = {};  // sku → { productId → quantityPerBatch }
+      for (const r of recipeLogs) {
+        if (r.action === 'sku_scale') {
+          const ppt = Number(r.pretzelsPerTray);
+          const tpb = Number(r.traysPerBatch);
+          if (!isNaN(ppt) && !isNaN(tpb) && ppt > 0 && tpb > 0) {
+            scaleMap[r.sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
+          }
+        }
+        if (r.action === 'recipe') {
+          if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
+          const v = Number(r.quantityPerBatch);
+          if (!isNaN(v)) recipeMap[r.sku][r.productId] = v;
+        }
+      }
+      return { scaleMap, recipeMap };
+    }
+
+    // ── Compute forecast ─────────────────────────────────────────────────────
+    function computeForecast(deliveries, recipeMap, scaleMap, inventoryMap) {
+      const today = todayStr();
+      const end   = addDays(today, 6);
+
+      // Seed from inventoryMap
+      const forecastMap = new Map();
+      for (const [id, inv] of inventoryMap) {
+        forecastMap.set(id, {
+          productId: id,
+          productName: inv.productName,
+          packSize: inv.packSize,
+          stock: inv.stock,
+          par: inv.par,
+          expectedUsage: 0,
+          projectedRemaining: inv.stock,
+          dailyExpected: {},  // date → qty
+          hasRecipe: false,
+        });
+      }
+
+      // Accumulate expected usage from deliveries
+      for (const d of deliveries) {
+        if (!d.date || d.date < today || d.date > end) continue;
+        if (d.status === 'cancelled') continue;
+
+        let lineItems = [];
+        try { lineItems = JSON.parse(d.lineItems || '[]'); } catch (_) {}
+        // Legacy single-sku fallback
+        if (!lineItems.length && d.sku) lineItems = [{ sku: d.sku, quantity: Number(d.volume) || 0 }];
+
+        for (const li of lineItems) {
+          const sku = li.sku;
+          const qty = Number(li.quantity) || 0;
+          if (!qty) continue;
+
+          const scale = scaleMap[sku];
+          if (!scale) continue;
+          const pretzelsPerBatch = scale.pretzelsPerTray * scale.traysPerBatch;
+          if (!pretzelsPerBatch) continue;
+          const batchesNeeded = qty / pretzelsPerBatch;
+
+          const recipe = recipeMap[sku];
+          if (!recipe) continue;
+
+          for (const [productId, qtyPerBatch] of Object.entries(recipe)) {
+            if (!forecastMap.has(productId)) continue;
+            const row = forecastMap.get(productId);
+            const usage = batchesNeeded * qtyPerBatch;
+            row.expectedUsage += usage;
+            row.projectedRemaining = row.stock - row.expectedUsage;
+            row.hasRecipe = true;
+            row.dailyExpected[d.date] = (row.dailyExpected[d.date] || 0) + usage;
+          }
+        }
+      }
+
+      return forecastMap;
+    }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let forecastMap   = new Map();
+    let inventoryMap  = new Map();
+    let scaleMap      = {};
+    let recipeMap     = {};
+    let allReceivingLogs = [];
+    let allInventoryLogs = [];
+
+    // ── Load all data ─────────────────────────────────────────────────────────
+    async function loadAll() {
+      const statusEl = document.getElementById('table-status');
+      const wrapEl   = document.getElementById('forecast-table-wrap');
+      statusEl.className = 'table-status';
+      statusEl.textContent = 'Loading forecast…';
+      statusEl.hidden = false;
+      wrapEl.hidden = true;
+
+      try {
+        const [dRaw, rRaw, iRaw, rcRaw] = await Promise.all([
+          fetchLog(DELIVERY_PATH),
+          fetchLog(RECEIVING_PATH),
+          fetchLog(INVENTORY_PATH),
+          fetchLog(RECIPES_PATH),
+        ]);
+        const dLogs  = Array.isArray(dRaw)  ? dRaw  : [];
+        const rLogs  = Array.isArray(rRaw)  ? rRaw  : [];
+        const iLogs  = Array.isArray(iRaw)  ? iRaw  : [];
+        const rcLogs = Array.isArray(rcRaw) ? rcRaw : [];
+
+        allReceivingLogs = rLogs;
+        allInventoryLogs = iLogs;
+
+        buildDynamicProducts(rLogs);
+        ({ scaleMap, recipeMap } = buildRecipeMaps(rcLogs));
+        inventoryMap = computeInventory(rLogs, iLogs);
+
+        const deliveries = resolveDeliveries(dLogs);
+        forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap);
+
+        updateWindowLabel();
+        renderForecastTable();
+        if (document.getElementById('recipe-editor-section').offsetParent !== null) {
+          renderRecipeEditor();
+        }
+      } catch (err) {
+        statusEl.className = 'table-status error';
+        statusEl.textContent = 'Failed to load: ' + (err.message || 'unknown error');
+      }
+    }
+
+    function updateWindowLabel() {
+      const today = todayStr();
+      const end   = addDays(today, 6);
+      const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      document.getElementById('forecast-window').textContent = `Next 7 days: ${fmt(today)} – ${fmt(end)}`;
+    }
+
+    // ── Render forecast table ─────────────────────────────────────────────────
+    function renderForecastTable() {
+      const tbody  = document.getElementById('forecast-tbody');
+      const wrapEl = document.getElementById('forecast-table-wrap');
+      const statusEl = document.getElementById('table-status');
+      const noteEl   = document.getElementById('no-recipe-note');
+
+      let rows = Array.from(forecastMap.values());
+
+      // Sort: SHORT → LOW → OK → none
+      rows.sort((a, b) => {
+        const rank = (r) => {
+          if (!r.hasRecipe) return 3;
+          if (r.projectedRemaining < 0) return 0;
+          if (r.par !== null && r.projectedRemaining < r.par) return 1;
+          return 2;
+        };
+        const d = rank(a) - rank(b);
+        return d !== 0 ? d : a.productName.localeCompare(b.productName);
+      });
+
+      let anyNoRecipe = false;
+
+      tbody.innerHTML = rows.map((row) => {
+        const { productId, productName, packSize, stock, par, expectedUsage, projectedRemaining, hasRecipe } = row;
+        const { innerUnitLabel } = parsePackSize(packSize);
+
+        let statusClass, statusLabel, rowClass, projClass;
+        if (!hasRecipe) {
+          statusClass = 'none'; statusLabel = '—'; rowClass = ''; projClass = 'val-neutral';
+          anyNoRecipe = true;
+        } else if (projectedRemaining < 0) {
+          statusClass = 'short'; statusLabel = 'SHORT'; rowClass = 'row-short'; projClass = 'val-short';
+        } else if (par !== null && projectedRemaining < par) {
+          statusClass = 'low'; statusLabel = 'LOW'; rowClass = 'row-low'; projClass = 'val-low';
+        } else {
+          statusClass = 'ok'; statusLabel = 'OK'; rowClass = ''; projClass = 'val-ok';
+        }
+
+        const stockClass = hasRecipe ? (stock <= 0 ? 'val-short' : 'val-neutral') : 'val-neutral';
+        const expDisplay  = hasRecipe ? fmt2(expectedUsage) : '—';
+        const projDisplay = hasRecipe ? fmt2(projectedRemaining) : '—';
+        const parDisplay  = par !== null ? String(par) : '—';
+
+        return `<tr class="${rowClass}" data-product-id="${escapeHtml(productId)}">
+          <td>${escapeHtml(productName)}</td>
+          <td>${escapeHtml(innerUnitLabel)}</td>
+          <td class="${stockClass}">${stock}</td>
+          <td>${expDisplay}</td>
+          <td class="${projClass}">${projDisplay}</td>
+          <td>${parDisplay}</td>
+          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+        </tr>`;
+      }).join('');
+
+      // Wire row clicks for panel
+      tbody.querySelectorAll('tr[data-product-id]').forEach((tr) => {
+        tr.addEventListener('click', () => openPanel(tr.dataset.productId));
+      });
+
+      statusEl.hidden = true;
+      wrapEl.hidden = false;
+      noteEl.hidden = !anyNoRecipe;
+    }
+
+    // ── Slide-out panel ───────────────────────────────────────────────────────
+    function openPanel(productId) {
+      const row = forecastMap.get(productId);
+      if (!row) return;
+
+      const { innerUnitLabel } = parsePackSize(row.packSize);
+
+      // Header
+      document.getElementById('panel-title').textContent = row.productName;
+      document.getElementById('panel-subtitle').textContent = `Unit: ${innerUnitLabel}  ·  Pack: ${row.packSize}`;
+
+      // Stock stats
+      const stockRow = document.getElementById('panel-stock-row');
+      const projClass = row.hasRecipe && row.projectedRemaining < 0 ? 'val-short' : row.hasRecipe ? 'val-ok' : '';
+      stockRow.innerHTML = `
+        <div class="panel-stat">
+          <span class="panel-stat-label">In Stock</span>
+          <span class="panel-stat-value">${row.stock} <small style="font-size:12px;font-weight:400;color:#888;">${escapeHtml(innerUnitLabel)}</small></span>
+        </div>
+        ${row.hasRecipe ? `
+        <div class="panel-stat">
+          <span class="panel-stat-label">Expected Use (7d)</span>
+          <span class="panel-stat-value">${fmt2(row.expectedUsage)}</span>
+        </div>
+        <div class="panel-stat">
+          <span class="panel-stat-label">Projected</span>
+          <span class="panel-stat-value ${projClass}">${fmt2(row.projectedRemaining)}</span>
+        </div>` : ''}
+        ${row.par !== null ? `
+        <div class="panel-stat">
+          <span class="panel-stat-label">PAR</span>
+          <span class="panel-stat-value">${row.par}</span>
+        </div>` : ''}`;
+
+      // Build timeline
+      const timeline = document.getElementById('panel-timeline');
+      const events = [];
+
+      // Past receives
+      for (const r of allReceivingLogs) {
+        if (r.action === 'receive' && r.productId === productId) {
+          events.push({ date: r.date || '', type: 'receive', qty: parsePackSize(r.packSize).innerUnitsPerCase, desc: r.supplier || r.receivedBy || 'received', ts: r.timeStamp || r.date || '' });
+        }
+      }
+      // Past usage + adjustments
+      for (const r of allInventoryLogs) {
+        if (r.productId !== productId) continue;
+        if (r.action === 'use') {
+          events.push({ date: r.date || '', type: 'use', qty: -(Number(r.quantity) || 0), desc: r.usedBy ? `Used by ${r.usedBy}` : 'Usage logged', ts: r.timeStamp || r.date || '' });
+        }
+        if (r.action === 'adjust') {
+          const q = Number(r.quantity) || 0;
+          events.push({ date: r.date || '', type: 'adjust', qty: q, desc: r.note || r.adjustedBy || 'Adjustment', ts: r.timeStamp || r.date || '' });
+        }
+      }
+      // Sort past events chronologically
+      events.sort((a, b) => (a.ts || a.date).localeCompare(b.ts || b.date));
+
+      // Future expected usage
+      const futureEvents = [];
+      const today = todayStr();
+      for (const [date, qty] of Object.entries(row.dailyExpected || {})) {
+        if (date >= today) futureEvents.push({ date, type: 'expected', qty: -qty });
+      }
+      futureEvents.sort((a, b) => a.date.localeCompare(b.date));
+
+      // Render
+      let html = '';
+
+      if (events.length === 0 && futureEvents.length === 0) {
+        html = '<div class="timeline-empty">No activity recorded for this ingredient.</div>';
+      } else {
+        if (events.length > 0) {
+          html += `<div class="panel-section-label">History</div>`;
+          html += events.map((e) => {
+            const qtyStr = e.qty >= 0 ? `+${fmt2(e.qty)}` : fmt2(e.qty);
+            const qtyClass = e.qty >= 0 ? 'positive' : 'negative';
+            return `<div class="timeline-event ev-${e.type}">
+              <span class="te-date">${formatDate(e.date)}</span>
+              <span class="te-desc">${escapeHtml(e.desc)}</span>
+              <span class="te-qty ${qtyClass}">${qtyStr}</span>
+            </div>`;
+          }).join('');
+        } else {
+          html += '<div class="timeline-empty">No history recorded.</div>';
+        }
+
+        html += `<div class="today-divider"><span class="today-label">Today · ${fmt2(row.stock)} ${escapeHtml(innerUnitLabel)} on hand</span></div>`;
+
+        if (futureEvents.length > 0) {
+          html += `<div class="panel-section-label">Expected (next 7 days)</div>`;
+          let running = row.stock;
+          html += futureEvents.map((e) => {
+            running += e.qty;
+            const qtyStr = fmt2(e.qty);
+            const runClass = running < 0 ? 'val-short' : 'val-ok';
+            return `<div class="timeline-event ev-expected">
+              <span class="te-date">${formatDate(e.date)}</span>
+              <span class="te-desc">Expected usage</span>
+              <span class="te-qty expected">${qtyStr} <span class="${runClass}" style="font-size:11px;font-weight:400;">(→${fmt2(running)})</span></span>
+            </div>`;
+          }).join('');
+        } else {
+          html += '<div class="timeline-empty" style="font-style:italic;color:#bbb;margin-top:8px;">No scheduled usage in the next 7 days.</div>';
+        }
+      }
+
+      timeline.innerHTML = html;
+
+      // Open panel
+      document.getElementById('detail-panel').classList.add('open');
+      document.getElementById('panel-overlay').classList.add('open');
+    }
+
+    function closePanel() {
+      document.getElementById('detail-panel').classList.remove('open');
+      document.getElementById('panel-overlay').classList.remove('open');
+    }
+
+    document.getElementById('panel-close').addEventListener('click', closePanel);
+    document.getElementById('panel-overlay').addEventListener('click', closePanel);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+
+    // ── Recipe editor ─────────────────────────────────────────────────────────
+    document.getElementById('edit-recipes-btn').addEventListener('click', () => {
+      const sec = document.getElementById('recipe-editor-section');
+      const btn = document.getElementById('edit-recipes-btn');
+      const isOpen = !sec.hidden;
+      sec.hidden = isOpen;
+      btn.classList.toggle('active', !isOpen);
+      if (!isOpen) renderRecipeEditor();
+    });
+
+    function renderRecipeEditor() {
+      const grid = document.getElementById('sku-grid');
+      grid.innerHTML = SKUS.map((sku) => buildSkuCard(sku)).join('');
+      grid.querySelectorAll('.sku-card-header').forEach((hdr) => {
+        hdr.addEventListener('click', () => hdr.closest('.sku-card').classList.toggle('expanded'));
+      });
+      grid.querySelectorAll('.sku-card').forEach(wireSkuCard);
+    }
+
+    function buildSkuCard(sku) {
+      const scale = scaleMap[sku] || {};
+      const ppt = scale.pretzelsPerTray || '';
+      const tpb = scale.traysPerBatch   || '';
+      const ppb = (ppt && tpb) ? String(ppt * tpb) : '—';
+
+      const recipe = recipeMap[sku] || {};
+      const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
+
+      const ingRows = PRODUCTS.map((p) => {
+        const { innerUnitLabel } = parsePackSize(p.packSize);
+        const perBatch = recipe[p.id] != null ? recipe[p.id] : '';
+        const perTray  = (perBatch !== '' && tpb) ? fmt2(perBatch / tpb) : '';
+        const perPret  = (perBatch !== '' && ppt && tpb) ? fmt2(perBatch / (ppt * tpb)) : '';
+        return `<tr>
+          <td><span class="ing-name">${escapeHtml(p.name)}</span></td>
+          <td><input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${perBatch}" placeholder="—" min="0" step="0.001"></td>
+          <td><span class="recipe-qty-derived per-tray">${perTray || '—'}</span></td>
+          <td><span class="recipe-qty-derived per-pretzel">${perPret || '—'}</span></td>
+          <td><span class="ing-unit">${escapeHtml(innerUnitLabel)}</span></td>
+        </tr>`;
+      }).join('');
+
+      return `<div class="sku-card${hasAny ? ' expanded' : ''}" data-sku="${escapeHtml(sku)}">
+        <div class="sku-card-header">
+          <div>
+            <div class="sku-card-name">${escapeHtml(sku)}</div>
+            <div class="sku-card-meta">${hasAny ? `${ppt || '?'} pretzels/tray · ${tpb || '?'} trays/batch` : 'No recipe defined'}</div>
+          </div>
+          <span class="sku-card-chevron">⌄</span>
+        </div>
+        <div class="sku-card-body">
+          <div class="scale-row">
+            <div class="scale-field">
+              <label class="scale-label">Pretzels / Tray</label>
+              <input type="number" class="scale-input ppt-input" value="${ppt}" placeholder="0" min="1" step="1">
+            </div>
+            <div class="scale-field">
+              <label class="scale-label">Trays / Batch</label>
+              <input type="number" class="scale-input tpb-input" value="${tpb}" placeholder="0" min="1" step="1">
+            </div>
+            <div class="scale-field auto-col">
+              <label class="scale-label">Pretzels / Batch</label>
+              <input type="number" class="scale-input ppb-display" value="${ppb === '—' ? '' : ppb}" placeholder="—" readonly tabindex="-1">
+            </div>
+          </div>
+          <table class="recipe-ing-table">
+            <thead><tr>
+              <th>Ingredient</th>
+              <th>Per Batch</th>
+              <th>Per Tray</th>
+              <th>Per Pretzel</th>
+              <th>Unit</th>
+            </tr></thead>
+            <tbody>${ingRows}</tbody>
+          </table>
+          <div class="sku-save-row">
+            <button class="sku-save-btn">Save Recipe</button>
+            <span class="sku-save-status"></span>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function wireSkuCard(card) {
+      const sku = card.dataset.sku;
+      const pptInput = card.querySelector('.ppt-input');
+      const tpbInput = card.querySelector('.tpb-input');
+      const ppbDisplay = card.querySelector('.ppb-display');
+
+      function updateDerived() {
+        const ppt = parseFloat(pptInput.value) || 0;
+        const tpb = parseFloat(tpbInput.value) || 0;
+        const ppb = ppt && tpb ? ppt * tpb : 0;
+        if (ppbDisplay) ppbDisplay.value = ppb ? String(ppb) : '';
+
+        // Update per-tray and per-pretzel derived columns live
+        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
+          const val = parseFloat(inp.value);
+          const row = inp.closest('tr');
+          const perTrayEl    = row.querySelector('.per-tray');
+          const perPretzelEl = row.querySelector('.per-pretzel');
+          if (!isNaN(val)) {
+            if (perTrayEl)    perTrayEl.textContent    = tpb ? fmt2(val / tpb) : '—';
+            if (perPretzelEl) perPretzelEl.textContent = ppb ? fmt2(val / ppb)  : '—';
+          } else {
+            if (perTrayEl)    perTrayEl.textContent    = '—';
+            if (perPretzelEl) perPretzelEl.textContent = '—';
+          }
+        });
+      }
+
+      pptInput.addEventListener('input', updateDerived);
+      tpbInput.addEventListener('input', updateDerived);
+      card.querySelectorAll('.recipe-qty-input').forEach((inp) => inp.addEventListener('input', updateDerived));
+
+      // Save button
+      card.querySelector('.sku-save-btn').addEventListener('click', async () => {
+        const saveBtn    = card.querySelector('.sku-save-btn');
+        const statusSpan = card.querySelector('.sku-save-status');
+        const ppt = parseFloat(pptInput.value);
+        const tpb = parseFloat(tpbInput.value);
+
+        if ((!isNaN(ppt) && ppt > 0) !== (!isNaN(tpb) && tpb > 0)) {
+          showToast('Enter both pretzels/tray and trays/batch', 'error'); return;
+        }
+
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; statusSpan.textContent = '';
+        const now = new Date().toISOString();
+        const writes = [];
+
+        // Write scale if set
+        if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) {
+          writes.push(appendLog(RECIPES_PATH, {
+            action: 'sku_scale', sku, pretzelsPerTray: String(ppt), traysPerBatch: String(tpb), timeStamp: now, updatedBy: '',
+          }));
+        }
+
+        // Write each ingredient that has a value
+        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
+          const productId = inp.dataset.productId;
+          const val = parseFloat(inp.value);
+          if (!isNaN(val) && val >= 0) {
+            writes.push(appendLog(RECIPES_PATH, {
+              action: 'recipe', sku, productId, quantityPerBatch: String(val), timeStamp: now, updatedBy: '',
+            }));
+          }
+        });
+
+        if (!writes.length) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; return; }
+
+        try {
+          await Promise.all(writes);
+          // Update in-memory maps
+          if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) scaleMap[sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
+          if (!recipeMap[sku]) recipeMap[sku] = {};
+          card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
+            const val = parseFloat(inp.value);
+            if (!isNaN(val) && val >= 0) recipeMap[sku][inp.dataset.productId] = val;
+          });
+          // Update card meta
+          const metaEl = card.querySelector('.sku-card-meta');
+          if (metaEl && scaleMap[sku]) metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
+          // Re-run forecast with updated recipe data
+          const deliveries = resolveDeliveries([]); // need raw logs — just reload
+          await loadAll();
+          showToast('✓ Recipe saved', 'success');
+          statusSpan.textContent = 'Saved ✓';
+        } catch (err) {
+          showToast('Save failed: ' + (err.message || 'error'), 'error');
+          statusSpan.textContent = 'Error saving';
+          saveBtn.disabled = false;
+        } finally {
+          saveBtn.textContent = 'Save Recipe';
+          if (saveBtn.disabled) saveBtn.disabled = false;
+        }
+      });
+    }
+
+    // ── Controls ──────────────────────────────────────────────────────────────
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+      const btn = document.getElementById('refresh-btn');
+      btn.disabled = true;
+      loadAll().finally(() => { btn.disabled = false; });
+    });
+
+    // ── Boot ──────────────────────────────────────────────────────────────────
+    loadAll();
+  </script>
+</body>
+</html>
