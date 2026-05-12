@@ -361,6 +361,12 @@
   .screen[data-screen="2"] .p-card-full h3 { font-size: 56px; line-height: 1.05; }
   .screen[data-screen="2"] .p-card-full .price { font-size: 60px; }
   .screen[data-screen="2"] .p-card-full p { font-size: 26px; line-height: 1.4; }
+  .screen[data-screen="2"] .p-card-full .price-anchor {
+    font: 400 32px 'Manrope', sans-serif;
+    color: #888;
+    text-decoration: line-through;
+    margin-right: 10px;
+  }
 
   /* ─── Bomb Cards (dark, with photo) ─── */
   .bomb-grid {
@@ -566,8 +572,15 @@
 
   /* ─── Dips Section (Screen 3) — compact list layout ─── */
   .dips-section { margin-bottom: 32px; }
+  .dips-label {
+    font: 700 32px 'Manrope', sans-serif;
+    color: #C41E1E;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
   .dips-sub {
-    font: 400 26px 'Manrope', sans-serif;
+    font: 400 22px 'Manrope', sans-serif;
     color: #999;
     margin-bottom: 24px;
   }
@@ -738,7 +751,7 @@
         </div>
         <div class="combo-right">
           <span class="combo-price">$29</span>
-          <span class="combo-save">Save 25%</span>
+          <span class="combo-save">Save $10</span>
         </div>
       </div>
     </div>
@@ -763,7 +776,7 @@
             <h3>BBK</h3>
             <span class="price">$7</span>
           </div>
-          <p>Brush Before Kissing. Parmesan, garlic and fresh herbs.</p>
+          <p>Parmesan and garlic, no apologies. Brush before kissing.</p>
         </div>
       </div>
       <div class="p-card">
@@ -773,7 +786,7 @@
             <h3>Spicy Bee</h3>
             <span class="price">$7</span>
           </div>
-          <p>Chili-cheddar dough. Hot honey glaze. Candied jalape&ntilde;os.</p>
+          <p>Chili-cheddar, hot honey, candied jalape&ntilde;os. The good kind of regret.</p>
         </div>
       </div>
       <div class="p-card">
@@ -783,7 +796,7 @@
             <h3>Devil's Delight</h3>
             <span class="price">$7</span>
           </div>
-          <p>Gooey pepperjack cheese and pepperoni.</p>
+          <p>Gooey pepperjack. Crispy pepperoni. Holy nothing.</p>
         </div>
       </div>
     </div>
@@ -822,7 +835,7 @@
       <span class="head-title">Bombs</span>
     </div>
 
-    <p class="label">A Riskier Take on Pretzel Bites</p>
+    <p class="label">Round. Salted. Dangerous.</p>
     <div class="bomb-grid">
       <div class="b-card">
         <img src="https://www.dangerouspretzel.com/images/menu-photos/salty-bombs.jpg" alt="Salty Bombs">
@@ -860,9 +873,9 @@
         <span class="hero-badge">Save 25%</span>
         <div class="p-card-full-head">
           <h3>Party Pretzel Bombs</h3>
-          <span class="price">$16</span>
+          <span><span class="price-anchor">$21</span><span class="price">$16</span></span>
         </div>
-        <p>Serves 3. Pick Salty, Saint, or For The Kids.</p>
+        <p>Feeds the crew. Pick Salty, Saint, or For The Kids.</p>
       </div>
     </div>
 
@@ -893,8 +906,8 @@
     </div>
 
     <div class="dips-section">
-      <p class="label">Dips</p>
-      <p class="dips-sub">House-made &middot; 3oz each &middot; <strong>$2</strong></p>
+      <p class="label dips-label">Dips &mdash; $2 each</p>
+      <p class="dips-sub">House-made &middot; 3oz</p>
       <div class="dips-list-cards">
         <div class="dip-row">
           <span class="dip-name">Dangerous Dip</span>
@@ -925,7 +938,7 @@
         <div class="d-card">
           <div class="d-card-text">
             <h3>Draft Beer</h3>
-            <p>Rotating local taps &mdash; Kiitos, Templin Family, Uinta, Bohemian, Second Summit and more.</p>
+            <p>Rotating local Utah taps. Ask us what&rsquo;s pouring.</p>
           </div>
           <span class="price">$7&ndash;$9</span>
         </div>
