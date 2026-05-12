@@ -1360,7 +1360,9 @@ async function handleFohCalendar(request, env) {
       skuAliases: prod.skuAliases,
       lookaheadDays: 14,
     });
-    sched.batches.forEach((batch) => {
+    // Defensive: scheduleDip returns {batches: []} for SKUs missing from
+    // DIP_CONFIG (PR #18). Don't assume `.batches` is iterable.
+    (sched?.batches || []).forEach((batch) => {
       retailDipBatches.push({ dipSku, cfg, batch });
     });
   });
