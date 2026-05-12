@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 9999; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    /* ── Hero ── */
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
+    .hero h1 { font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif; color: #fff; margin: 0; }
+
+    /* ── Sections ── */
+    .section-cream { background: #F5F0E8; padding: clamp(32px, 5vw, 60px) 5%; }
+    .section-dark  { background: #1A1A1A; padding: clamp(32px, 5vw, 60px) 5%; }
+    .section-dark h2 { font: 900 italic clamp(24px, 3vw, 36px)/1.05 Georgia, serif; color: #fff; margin-bottom: 24px; }
+    .max-800  { max-width: 800px;  margin: 0 auto; }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Cards ── */
+    .card { background: #fff; border-radius: 10px; padding: 22px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .card-title { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
+    .card-dark { background: #2e2e2e; box-shadow: none; }
+    .card-dark .card-title { color: #666; }
+    .card-dark .field-group label { color: #888; }
+    .card-dark .field-group input,
+    .card-dark .field-group select { background: #3a3a3a; border-color: #444; color: #fff; }
+    .card-dark .field-group input::placeholder { color: #666; }
+    .card-dark .field-group input:focus,
+    .card-dark .field-group select:focus { border-color: #C41E1E; }
+    .card-dark .product-selector { background: transparent; }
+    .card-dark .product-selector input { background: #3a3a3a; border-color: #444; color: #fff; }
+    .card-dark .product-selector input::placeholder { color: #666; }
+    .card-dark .product-selector input:focus { border-color: #C41E1E; }
+    .card-dark .product-options { background: #222; border-color: #444; }
+    .card-dark .product-option:hover { background: #383838; }
+    .card-dark .option-name { color: #ddd; }
+    .card-dark .option-pack { color: #555; }
+    .card-dark .product-option-empty { color: #666; }
+
+    /* ── Form fields ── */
+    .field-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .field-group label { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 0.8px; text-transform: uppercase; }
+    .field-group input,
+    .field-group select { font: 400 15px 'Manrope', sans-serif; padding: 11px 14px; border: 2px solid #ddd; border-radius: 6px; background: #fff; color: #1A1A1A; outline: none; transition: border-color 0.2s; }
+    .field-group input:focus,
+    .field-group select:focus { border-color: #C41E1E; }
+    .field-group input[type="number"] { -moz-appearance: textfield; }
+    .field-group input[type="number"]::-webkit-outer-spin-button,
+    .field-group input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    /* ── Buttons ── */
+    .btn-primary { width: 100%; padding: 14px; font: 700 15px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+    .btn-primary:hover:not(:disabled) { background: #a01818; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-submit { width: 100%; padding: 14px; font: 700 15px 'Manrope', sans-serif; background: #1A1A1A; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
+    .btn-submit:hover:not(:disabled) { background: #333; }
+    .btn-submit:disabled { background: #888; cursor: not-allowed; }
+    .btn-refresh { background: transparent; border: 2px solid #ccc; color: #888; font: 700 12px 'Manrope', sans-serif; border-radius: 6px; padding: 7px 14px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .btn-refresh:hover:not(:disabled) { border-color: #C41E1E; color: #C41E1E; }
+    .btn-refresh:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Product selector ── */
+    .product-selector { position: relative; margin-bottom: 14px; }
+    .product-selector > label { display: block; font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 6px; }
+    .product-selector > input { width: 100%; font: 400 15px 'Manrope', sans-serif; padding: 11px 14px; border: 2px solid #ddd; border-radius: 6px; background: #fff; color: #1A1A1A; outline: none; transition: border-color 0.2s; }
+    .product-selector > input:focus { border-color: #C41E1E; }
+    .product-options { position: absolute; top: 100%; left: 0; right: 0; z-index: 200; background: #fff; border: 2px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto; }
+    .product-option { padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .product-option:hover { background: #F5F0E8; }
+    .option-name { font: 600 13px 'Manrope', sans-serif; color: #1A1A1A; }
+    .option-pack { font: 400 12px 'Manrope', sans-serif; color: #999; white-space: nowrap; }
+    .product-option-empty { padding: 12px 14px; font: 400 13px 'Manrope', sans-serif; color: #bbb; font-style: italic; }
+
+    /* ── Selected product display ── */
+    .product-card { background: #F5F0E8; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; border-left: 4px solid #C41E1E; }
+    .product-label { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+    .product-name-display { display: block; font: 700 14px 'Manrope', sans-serif; color: #1A1A1A; }
+    .product-pack-display { display: block; font: 400 12px 'Manrope', sans-serif; color: #777; margin-top: 2px; }
+    .card-dark .product-card { background: #3a3a3a; border-left-color: #C41E1E; }
+    .card-dark .product-name-display { color: #fff; }
+    .card-dark .product-pack-display { color: #888; }
+    .card-dark .product-label { color: #666; }
+
+    /* ── Session items list ── */
+    .session-items-heading { font: 700 11px 'Manrope', sans-serif; color: #777; letter-spacing: 1px; text-transform: uppercase; margin: 20px 0 10px; }
+    .session-item { background: #3a3a3a; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { display: block; font: 600 14px 'Manrope', sans-serif; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-pack { display: block; font: 400 12px 'Manrope', sans-serif; color: #666; margin-top: 2px; }
+    .item-remove { background: none; border: none; color: #555; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; flex-shrink: 0; transition: color 0.15s; }
+    .item-remove:hover { color: #C41E1E; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #1A1A1A; color: #fff; font: 600 14px 'Manrope', sans-serif; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); opacity: 1; transition: opacity 0.4s; pointer-events: none; }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    /* ════════════════════════════════════════
+       INVENTORY TABLE
+    ════════════════════════════════════════ */
+    .table-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .toggle-label { display: flex; align-items: center; gap: 8px; font: 600 13px 'Manrope', sans-serif; color: #555; cursor: pointer; user-select: none; }
+    .toggle-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #C41E1E; }
+
+    .inv-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .inv-table { width: 100%; border-collapse: collapse; background: #fff; }
+    .inv-table th { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 2px solid #f0ece6; white-space: nowrap; }
+    .inv-table td { font: 400 14px 'Manrope', sans-serif; color: #1A1A1A; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+    .inv-table tr:last-child td { border-bottom: none; }
+    .inv-table tr.low-stock { background: #fff8f8; }
+    .inv-table tbody tr:hover td { background: #faf8f5; }
+    .inv-table tbody tr.low-stock:hover td { background: #fdf2f2; }
+
+    .stock-ok      { color: #2a7a2a; font-weight: 700; }
+    .stock-low     { color: #C41E1E; font-weight: 700; }
+    .stock-neutral { color: #1A1A1A; font-weight: 400; }
+
+    .status-badge { display: inline-block; font: 700 10px 'Manrope', sans-serif; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+    .status-badge.ok   { background: #e6f4e6; color: #2a7a2a; }
+    .status-badge.low  { background: #fde8e8; color: #C41E1E; }
+    .status-badge.none { background: #f0f0f0; color: #aaa; }
+
+    /* PAR cell */
+    .par-cell { display: flex; align-items: center; gap: 6px; }
+    .par-value { font: 400 14px 'Manrope', sans-serif; color: #1A1A1A; }
+    .btn-par-edit { background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; padding: 2px 4px; line-height: 1; transition: color 0.15s; flex-shrink: 0; }
+    .btn-par-edit:hover { color: #C41E1E; }
+    .par-edit-wrap { display: flex; align-items: center; gap: 6px; }
+    .par-edit-wrap input { width: 72px; font: 400 14px 'Manrope', sans-serif; padding: 5px 8px; border: 2px solid #C41E1E; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; }
+    .par-edit-wrap input::-webkit-outer-spin-button,
+    .par-edit-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .btn-par-save { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+    .btn-par-save:hover { background: #a01818; }
+    .btn-par-save:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-par-cancel { background: none; border: none; color: #bbb; font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-par-cancel:hover { color: #555; }
+
+    .table-status { text-align: center; padding: 40px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
+    .table-status.error { color: #C41E1E; font-weight: 700; }
+
+    /* ════════════════════════════════════════
+       USAGE SECTION
+    ════════════════════════════════════════ */
+    .usage-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { font: 700 13px 'Manrope', sans-serif; padding: 8px 22px; border-radius: 20px; border: 2px solid #444; background: transparent; color: #666; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background: #fff; color: #1A1A1A; border-color: #fff; }
+    .tab-btn:hover:not(.active) { border-color: #888; color: #bbb; }
+
+    /* ════════════════════════════════════════
+       ADJUSTMENT COLLAPSIBLE
+    ════════════════════════════════════════ */
+    .collapsible-wrap { margin-top: 28px; border-top: 1px solid #2e2e2e; }
+    .collapsible-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 16px 0 12px; user-select: none; }
+    .collapsible-header h3 { font: 700 11px 'Manrope', sans-serif; color: #666; letter-spacing: 1px; text-transform: uppercase; }
+    .collapsible-icon { color: #555; font-size: 20px; line-height: 1; transition: transform 0.25s; }
+    .collapsible-open .collapsible-icon { transform: rotate(180deg); }
+    .collapsible-body { display: none; }
+    .collapsible-open .collapsible-body { display: block; }
+
+    .adjust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .adjust-grid .span-2 { grid-column: span 2; }
+
+    /* ── Mobile ── */
+    @media (max-width: 680px) {
+      .inv-table th:nth-child(6),
+      .inv-table td:nth-child(6),
+      .inv-table th:nth-child(7),
+      .inv-table td:nth-child(7) { display: none; }
+      .adjust-grid { grid-template-columns: 1fr; }
+      .adjust-grid .span-2 { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+        <a href="../barcode-lookup/index.html">Barcode Lookup</a>
+        <a href="../receiving-history/index.html">Receiving History</a>
+        <a href="../inventory/index.html">Inventory</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>INVENTORY.</h1>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       INVENTORY TABLE
+  ══════════════════════════════════════════ -->
+  <div class="section-cream">
+    <div class="max-1100">
+
+      <div class="table-controls">
+        <label class="toggle-label">
+          <input type="checkbox" id="low-stock-toggle">
+          Show low stock only
+        </label>
+        <button class="btn-refresh" id="refresh-btn">↻ Refresh</button>
+      </div>
+
+      <div id="table-status" class="table-status">Loading inventory…</div>
+
+      <div class="inv-table-wrap" id="inv-table-wrap" hidden>
+        <table class="inv-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Unit</th>
+              <th>Stock</th>
+              <th>PAR</th>
+              <th>Status</th>
+              <th>Last Received</th>
+              <th>Last Used</th>
+            </tr>
+          </thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       USAGE FORMS
+  ══════════════════════════════════════════ -->
+  <div class="section-dark">
+    <div class="max-800">
+
+      <h2>LOG USAGE.</h2>
+
+      <div class="usage-tabs">
+        <button class="tab-btn active" data-tab="quick">Quick Entry</button>
+        <button class="tab-btn" data-tab="session">Session</button>
+      </div>
+
+      <!-- ── Quick Entry ── -->
+      <div id="panel-quick">
+        <div class="card card-dark">
+          <div class="card-title">Quick Usage Entry</div>
+
+          <div class="field-group">
+            <label for="quick-employee">Employee Name</label>
+            <input type="text" id="quick-employee" placeholder="Your name" autocomplete="off">
+          </div>
+
+          <div class="product-selector" id="quick-selector">
+            <label for="quick-product-search">Product</label>
+            <input type="text" id="quick-product-search" placeholder="Type to search products…" autocomplete="off">
+            <div id="quick-product-options" class="product-options"></div>
+          </div>
+
+          <div id="quick-selected-product" class="product-card" hidden>
+            <div class="product-label">Selected Product</div>
+            <span class="product-name-display" id="quick-product-name"></span>
+            <span class="product-pack-display" id="quick-product-pack"></span>
+          </div>
+
+          <div class="adjust-grid" style="margin-bottom:14px;">
+            <div class="field-group" style="margin-bottom:0;">
+              <label for="quick-quantity">Quantity Used</label>
+              <input type="number" id="quick-quantity" placeholder="0" min="1" step="1">
+            </div>
+            <div class="field-group" style="margin-bottom:0;">
+              <label for="quick-note">Note (optional)</label>
+              <input type="text" id="quick-note" placeholder="e.g. prep for catering" autocomplete="off">
+            </div>
+          </div>
+
+          <button class="btn-submit" id="quick-submit-btn" disabled>Log Usage</button>
+        </div>
+      </div>
+
+      <!-- ── Session ── -->
+      <div id="panel-session" hidden>
+        <div class="card card-dark">
+          <div class="card-title">Session Details</div>
+          <div class="field-group" style="margin-bottom:0;">
+            <label for="session-employee">Employee Name</label>
+            <input type="text" id="session-employee" placeholder="Your name" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="card card-dark">
+          <div class="card-title">Add Item</div>
+
+          <div class="product-selector">
+            <label for="sess-product-search">Product</label>
+            <input type="text" id="sess-product-search" placeholder="Type to search products…" autocomplete="off">
+            <div id="sess-product-options" class="product-options"></div>
+          </div>
+
+          <div id="sess-selected-product" class="product-card" hidden>
+            <div class="product-label">Selected Product</div>
+            <span class="product-name-display" id="sess-product-name"></span>
+            <span class="product-pack-display" id="sess-product-pack"></span>
+          </div>
+
+          <div class="field-group">
+            <label for="sess-quantity">Quantity</label>
+            <input type="number" id="sess-quantity" placeholder="0" min="1" step="1">
+          </div>
+
+          <button class="btn-primary" id="sess-add-btn" disabled>+ Add to Session</button>
+        </div>
+
+        <div id="sess-items-section" hidden>
+          <div class="session-items-heading">Items This Session</div>
+          <div id="sess-items-list"></div>
+          <button class="btn-submit" id="sess-submit-btn" disabled>Submit Session</button>
+        </div>
+      </div>
+
+      <!-- ── Manual Adjustment (collapsible) ── -->
+      <div class="collapsible-wrap" id="adjustment-collapsible">
+        <div class="collapsible-header" id="adj-toggle">
+          <h3>Manual Adjustment</h3>
+          <span class="collapsible-icon">⌄</span>
+        </div>
+        <div class="collapsible-body">
+          <div class="card card-dark">
+
+            <div class="adjust-grid" style="margin-bottom:14px;">
+              <div class="field-group" style="margin-bottom:0;">
+                <label for="adj-employee">Adjusted By</label>
+                <input type="text" id="adj-employee" placeholder="Your name" autocomplete="off">
+              </div>
+              <div class="field-group" style="margin-bottom:0;">
+                <label for="adj-quantity">Qty (+ add, − remove)</label>
+                <input type="number" id="adj-quantity" placeholder="e.g. −2 or 5" step="1">
+              </div>
+              <div class="field-group span-2" style="margin-bottom:0;">
+                <label for="adj-note">Note</label>
+                <input type="text" id="adj-note" placeholder="e.g. waste, spillage, stock count correction" autocomplete="off">
+              </div>
+            </div>
+
+            <div class="product-selector">
+              <label for="adj-product-search">Product</label>
+              <input type="text" id="adj-product-search" placeholder="Type to search products…" autocomplete="off">
+              <div id="adj-product-options" class="product-options"></div>
+            </div>
+
+            <div id="adj-selected-product" class="product-card" hidden style="margin-bottom:14px;">
+              <div class="product-label">Selected Product</div>
+              <span class="product-name-display" id="adj-product-name"></span>
+              <span class="product-pack-display" id="adj-product-pack"></span>
+            </div>
+
+            <button class="btn-submit" id="adj-submit-btn" disabled>Save Adjustment</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+
+    const RECEIVING_PATH = '/dangpretz/receiving';
+    const INVENTORY_PATH = '/dangpretz/inventory';
+
+    // ── Product catalog ──────────────────────────────────────────────────────
+    const PRODUCTS = [
+      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB',   usFoodsCode: '0877506' },
+      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB',   usFoodsCode: '0033858' },
+      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB',   usFoodsCode: '1008416' },
+      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL',   usFoodsCode: '4364063' },
+      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB',   usFoodsCode: '7016876' },
+      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL',   usFoodsCode: '7329113' },
+      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB',    usFoodsCode: '0746479' },
+      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL',   usFoodsCode: '1324079' },
+      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB',    usFoodsCode: '1492816' },
+      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB',    usFoodsCode: '3547205' },
+      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL',   usFoodsCode: '5328406' },
+      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ',   usFoodsCode: '6773394' },
+      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB',    usFoodsCode: '7017429' },
+      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB',    usFoodsCode: '8123322' },
+      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA',  usFoodsCode: '5329420' },
+      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB',   usFoodsCode: '8340861' },
+      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA', usFoodsCode: '7807993' },
+      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB',   usFoodsCode: '3022647' },
+      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB',    usFoodsCode: '6401780' },
+      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB',    usFoodsCode: '3737152' },
+      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB',  usFoodsCode: '7330202' },
+      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB',    usFoodsCode: '1332642' },
+      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB',    usFoodsCode: '7326432' },
+      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ',   usFoodsCode: '3330487' },
+      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB',   usFoodsCode: '9929174' },
+      // ── Add new products below this line ──
+    ];
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function generateId() {
+      return (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    function showToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 3500);
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '—';
+      try {
+        return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch (_) { return dateStr; }
+    }
+
+    function parsePackSize(packSize) {
+      const parts = (packSize || '').split('/');
+      if (parts.length < 3) return { innerUnitsPerCase: 1, innerUnitLabel: packSize || 'unit' };
+      const count = parseFloat(parts[0]);
+      return {
+        innerUnitsPerCase: isNaN(count) ? 1 : count,
+        innerUnitLabel: `${parts[1]} ${parts[2]}`,
+      };
+    }
+
+    // ── Dynamic products (from new_product receiving entries) ─────────────────
+    function buildDynamicProducts(receivingLogs) {
+      receivingLogs
+        .filter((r) => r.action === 'new_product')
+        .forEach((r) => {
+          const exists = PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode);
+          if (!exists && r.usFoodsCode && r.productName) {
+            PRODUCTS.push({
+              id: `new-${r.usFoodsCode}`,
+              name: r.productName,
+              packSize: r.packSize || '',
+              usFoodsCode: r.usFoodsCode,
+            });
+          }
+        });
+    }
+
+    // ── Inventory computation ─────────────────────────────────────────────────
+    function computeInventory(receivingLogs, inventoryLogs) {
+      const map = new Map();
+
+      // Seed from PRODUCTS
+      for (const p of PRODUCTS) {
+        map.set(p.id, {
+          productId: p.id,
+          productName: p.name,
+          packSize: p.packSize,
+          stock: 0,
+          par: null,
+          lastReceived: null,
+          lastUsed: null,
+        });
+      }
+
+      // Receiving: add stock
+      for (const r of receivingLogs) {
+        if (r.action !== 'receive') continue;
+        const id = r.productId;
+        if (!map.has(id)) {
+          map.set(id, {
+            productId: id,
+            productName: r.productName || id,
+            packSize: r.packSize || '',
+            stock: 0,
+            par: null,
+            lastReceived: null,
+            lastUsed: null,
+          });
+        }
+        const row = map.get(id);
+        row.stock += parsePackSize(r.packSize).innerUnitsPerCase;
+        if (r.date && (!row.lastReceived || r.date > row.lastReceived)) row.lastReceived = r.date;
+      }
+
+      // Inventory log: use / adjust / par
+      for (const r of inventoryLogs) {
+        const id = r.productId;
+        if (!map.has(id)) continue;
+        const row = map.get(id);
+        if (r.action === 'use') {
+          row.stock -= Number(r.quantity) || 0;
+          if (r.date && (!row.lastUsed || r.date > row.lastUsed)) row.lastUsed = r.date;
+        } else if (r.action === 'adjust') {
+          row.stock += Number(r.quantity) || 0;
+        } else if (r.action === 'par') {
+          const v = Number(r.par);
+          if (!isNaN(v)) row.par = v;
+        }
+      }
+
+      return map;
+    }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let inventoryMap = new Map();
+    let showLowOnly = false;
+
+    // ── Load data ─────────────────────────────────────────────────────────────
+    async function loadData() {
+      const statusEl = document.getElementById('table-status');
+      const wrapEl   = document.getElementById('inv-table-wrap');
+      statusEl.className = 'table-status';
+      statusEl.textContent = 'Loading inventory…';
+      statusEl.hidden = false;
+      wrapEl.hidden = true;
+
+      try {
+        const [rRaw, iRaw] = await Promise.all([
+          fetchLog(RECEIVING_PATH),
+          fetchLog(INVENTORY_PATH),
+        ]);
+        const rLogs = Array.isArray(rRaw) ? rRaw : [];
+        const iLogs = Array.isArray(iRaw) ? iRaw : [];
+        buildDynamicProducts(rLogs);
+        inventoryMap = computeInventory(rLogs, iLogs);
+        renderTable();
+      } catch (err) {
+        statusEl.className = 'table-status error';
+        statusEl.textContent = 'Failed to load inventory: ' + (err.message || 'unknown error');
+      }
+    }
+
+    // ── Render table ──────────────────────────────────────────────────────────
+    function renderTable() {
+      const tbody  = document.getElementById('inv-tbody');
+      const wrapEl = document.getElementById('inv-table-wrap');
+      const statusEl = document.getElementById('table-status');
+
+      let rows = Array.from(inventoryMap.values());
+
+      // Sort: low-stock first, then alphabetical
+      rows.sort((a, b) => {
+        const aLow = a.par !== null && a.stock < a.par;
+        const bLow = b.par !== null && b.stock < b.par;
+        if (aLow && !bLow) return -1;
+        if (!aLow && bLow) return 1;
+        return a.productName.localeCompare(b.productName);
+      });
+
+      if (showLowOnly) {
+        rows = rows.filter((r) => r.par !== null && r.stock < r.par);
+      }
+
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="table-status">${showLowOnly ? 'No low-stock items.' : 'No inventory data.'}</td></tr>`;
+      } else {
+        tbody.innerHTML = rows.map(buildTableRow).join('');
+        tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
+      }
+
+      statusEl.hidden = true;
+      wrapEl.hidden = false;
+    }
+
+    function buildTableRow(row) {
+      const { productId, productName, packSize, stock, par, lastReceived, lastUsed } = row;
+      const isLow = par !== null && stock < par;
+      const { innerUnitLabel } = parsePackSize(packSize);
+
+      const stockClass = par === null ? 'stock-neutral' : (isLow ? 'stock-low' : 'stock-ok');
+      const statusBadge = par === null
+        ? '<span class="status-badge none">—</span>'
+        : isLow
+          ? '<span class="status-badge low">LOW</span>'
+          : '<span class="status-badge ok">OK</span>';
+
+      const parDisplay = par !== null ? String(par) : '—';
+
+      const parCell = `<div class="par-cell" data-product-id="${escapeHtml(productId)}">
+        <span class="par-value">${escapeHtml(parDisplay)}</span>
+        <button class="btn-par-edit" title="Edit PAR" data-product-id="${escapeHtml(productId)}">✏</button>
+      </div>`;
+
+      return `<tr class="${isLow ? 'low-stock' : ''}" data-product-id="${escapeHtml(productId)}">
+        <td>${escapeHtml(productName)}</td>
+        <td>${escapeHtml(innerUnitLabel)}</td>
+        <td class="${stockClass}">${stock}</td>
+        <td>${parCell}</td>
+        <td>${statusBadge}</td>
+        <td>${formatDate(lastReceived)}</td>
+        <td>${formatDate(lastUsed)}</td>
+      </tr>`;
+    }
+
+    // ── PAR inline edit ───────────────────────────────────────────────────────
+    function wireParEdit(btn) {
+      btn.addEventListener('click', () => {
+        const productId  = btn.dataset.productId;
+        const cell       = btn.closest('.par-cell');
+        const row        = inventoryMap.get(productId);
+        const currentPar = row?.par ?? '';
+        const originalHtml = cell.innerHTML;
+
+        cell.innerHTML = `<div class="par-edit-wrap">
+          <input type="number" class="par-edit-input" min="0" step="1" value="${currentPar}" placeholder="0">
+          <button class="btn-par-save">Save</button>
+          <button class="btn-par-cancel">&times;</button>
+        </div>`;
+
+        const input     = cell.querySelector('.par-edit-input');
+        const saveBtn   = cell.querySelector('.btn-par-save');
+        const cancelBtn = cell.querySelector('.btn-par-cancel');
+
+        input.focus();
+        input.select();
+
+        cancelBtn.addEventListener('click', () => {
+          cell.innerHTML = originalHtml;
+          wireParEdit(cell.querySelector('.btn-par-edit'));
+        });
+
+        async function doSave() {
+          const val = parseInt(input.value, 10);
+          if (isNaN(val) || val < 0) {
+            showToast('PAR must be a non-negative whole number', 'error');
+            input.focus();
+            return;
+          }
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
+          try {
+            await appendLog(INVENTORY_PATH, {
+              action: 'par',
+              productId,
+              par: String(val),
+              timeStamp: new Date().toISOString(),
+              updatedBy: '',
+            });
+            if (inventoryMap.has(productId)) inventoryMap.get(productId).par = val;
+            renderTable();
+            showToast('PAR updated', 'success');
+          } catch (err) {
+            cell.innerHTML = originalHtml;
+            wireParEdit(cell.querySelector('.btn-par-edit'));
+            showToast('Failed to save PAR: ' + (err.message || 'unknown error'), 'error');
+          }
+        }
+
+        saveBtn.addEventListener('click', doSave);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
+          if (e.key === 'Escape') cancelBtn.click();
+        });
+      });
+    }
+
+    // ── Table controls ────────────────────────────────────────────────────────
+    document.getElementById('low-stock-toggle').addEventListener('change', (e) => {
+      showLowOnly = e.target.checked;
+      renderTable();
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+      const btn = document.getElementById('refresh-btn');
+      btn.disabled = true;
+      loadData().finally(() => { btn.disabled = false; });
+    });
+
+    // ── Product selector (reusable) ───────────────────────────────────────────
+    function wireProductSelector(searchInputId, optionsContainerId, onSelect) {
+      const searchInput = document.getElementById(searchInputId);
+      const optionsEl   = document.getElementById(optionsContainerId);
+
+      function renderOptions(query) {
+        const q = (query || '').toLowerCase().trim();
+        const matches = q
+          ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(q))
+          : [...PRODUCTS].sort((a, b) => a.name.localeCompare(b.name));
+
+        if (!matches.length) {
+          optionsEl.innerHTML = '<div class="product-option-empty">No products found</div>';
+        } else {
+          optionsEl.innerHTML = matches.map((p) =>
+            `<div class="product-option" data-id="${escapeHtml(p.id)}">
+              <span class="option-name">${escapeHtml(p.name)}</span>
+              <span class="option-pack">${escapeHtml(p.packSize)}</span>
+            </div>`
+          ).join('');
+          optionsEl.querySelectorAll('.product-option').forEach((el) => {
+            el.addEventListener('click', () => {
+              const product = PRODUCTS.find((p) => p.id === el.dataset.id);
+              if (!product) return;
+              searchInput.value = product.name;
+              optionsEl.innerHTML = '';
+              onSelect(product);
+            });
+          });
+        }
+      }
+
+      searchInput.addEventListener('input',  () => renderOptions(searchInput.value));
+      searchInput.addEventListener('focus',  () => renderOptions(searchInput.value));
+      document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !optionsEl.contains(e.target)) {
+          optionsEl.innerHTML = '';
+        }
+      });
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-quick').hidden = btn.dataset.tab !== 'quick';
+        document.getElementById('panel-session').hidden = btn.dataset.tab !== 'session';
+      });
+    });
+
+    // ════════════════════════════════════════
+    // QUICK ENTRY
+    // ════════════════════════════════════════
+    let quickSelectedProduct = null;
+
+    wireProductSelector('quick-product-search', 'quick-product-options', (product) => {
+      quickSelectedProduct = product;
+      document.getElementById('quick-product-name').textContent = product.name;
+      document.getElementById('quick-product-pack').textContent = product.packSize;
+      document.getElementById('quick-selected-product').hidden = false;
+      updateQuickSubmitBtn();
+    });
+
+    function updateQuickSubmitBtn() {
+      const emp = document.getElementById('quick-employee').value.trim();
+      const qty = parseInt(document.getElementById('quick-quantity').value, 10);
+      document.getElementById('quick-submit-btn').disabled = !(emp && quickSelectedProduct && qty > 0);
+    }
+
+    document.getElementById('quick-employee').addEventListener('input', updateQuickSubmitBtn);
+    document.getElementById('quick-quantity').addEventListener('input', updateQuickSubmitBtn);
+
+    document.getElementById('quick-submit-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('quick-submit-btn');
+      const usedBy   = document.getElementById('quick-employee').value.trim();
+      const quantity = parseInt(document.getElementById('quick-quantity').value, 10);
+      const note     = document.getElementById('quick-note').value.trim();
+      const now = new Date();
+
+      btn.disabled = true;
+      btn.textContent = 'Logging…';
+      try {
+        await appendLog(INVENTORY_PATH, {
+          action:      'use',
+          sessionId:   generateId(),
+          usedBy,
+          date:        now.toISOString().slice(0, 10),
+          timeStamp:   now.toISOString(),
+          productId:   quickSelectedProduct.id,
+          productName: quickSelectedProduct.name,
+          quantity:    String(quantity),
+          note,
+        });
+        showToast('✓ Usage logged', 'success');
+        document.getElementById('quick-quantity').value = '';
+        document.getElementById('quick-note').value = '';
+        document.getElementById('quick-product-search').value = '';
+        document.getElementById('quick-product-options').innerHTML = '';
+        document.getElementById('quick-selected-product').hidden = true;
+        quickSelectedProduct = null;
+        updateQuickSubmitBtn();
+        await loadData();
+      } catch (err) {
+        showToast('Failed to log usage: ' + (err.message || 'unknown error'), 'error');
+        btn.disabled = false;
+      } finally {
+        btn.textContent = 'Log Usage';
+        updateQuickSubmitBtn();
+      }
+    });
+
+    // ════════════════════════════════════════
+    // SESSION
+    // ════════════════════════════════════════
+    let sessionSelectedProduct = null;
+    let sessionItems = [];
+
+    wireProductSelector('sess-product-search', 'sess-product-options', (product) => {
+      sessionSelectedProduct = product;
+      document.getElementById('sess-product-name').textContent = product.name;
+      document.getElementById('sess-product-pack').textContent = product.packSize;
+      document.getElementById('sess-selected-product').hidden = false;
+      updateSessAddBtn();
+    });
+
+    function updateSessAddBtn() {
+      const qty = parseInt(document.getElementById('sess-quantity').value, 10);
+      document.getElementById('sess-add-btn').disabled = !(sessionSelectedProduct && qty > 0);
+    }
+
+    document.getElementById('sess-quantity').addEventListener('input', updateSessAddBtn);
+
+    document.getElementById('sess-add-btn').addEventListener('click', () => {
+      const qty = parseInt(document.getElementById('sess-quantity').value, 10);
+      if (!sessionSelectedProduct || qty <= 0) return;
+      sessionItems.push({ product: sessionSelectedProduct, quantity: qty });
+      // Reset add-item inputs
+      document.getElementById('sess-product-search').value = '';
+      document.getElementById('sess-product-options').innerHTML = '';
+      document.getElementById('sess-selected-product').hidden = true;
+      document.getElementById('sess-quantity').value = '';
+      sessionSelectedProduct = null;
+      updateSessAddBtn();
+      renderSessionItems();
+    });
+
+    function renderSessionItems() {
+      const section  = document.getElementById('sess-items-section');
+      const list     = document.getElementById('sess-items-list');
+      const submitBtn = document.getElementById('sess-submit-btn');
+
+      if (!sessionItems.length) {
+        section.hidden = true;
+        submitBtn.disabled = true;
+        return;
+      }
+      section.hidden = false;
+      submitBtn.disabled = false;
+
+      list.innerHTML = sessionItems.map((item, i) =>
+        `<div class="session-item">
+          <div class="item-info">
+            <span class="item-name">${escapeHtml(item.product.name)}</span>
+            <span class="item-pack">Qty: ${item.quantity} &nbsp;·&nbsp; ${escapeHtml(item.product.packSize)}</span>
+          </div>
+          <button class="item-remove" data-index="${i}">&times;</button>
+        </div>`
+      ).join('');
+
+      list.querySelectorAll('.item-remove').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          sessionItems.splice(parseInt(btn.dataset.index, 10), 1);
+          renderSessionItems();
+        });
+      });
+    }
+
+    document.getElementById('sess-submit-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('sess-submit-btn');
+      const usedBy = document.getElementById('session-employee').value.trim();
+      if (!usedBy) {
+        showToast('Please enter your name', 'error');
+        document.getElementById('session-employee').focus();
+        return;
+      }
+      if (!sessionItems.length) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      const sharedSessionId = generateId();
+      const now = new Date();
+      const date = now.toISOString().slice(0, 10);
+
+      try {
+        for (const item of sessionItems) {
+          await appendLog(INVENTORY_PATH, {
+            action:      'use',
+            sessionId:   sharedSessionId,
+            usedBy,
+            date,
+            timeStamp:   new Date().toISOString(),
+            productId:   item.product.id,
+            productName: item.product.name,
+            quantity:    String(item.quantity),
+            note:        '',
+          });
+        }
+        const count = sessionItems.length;
+        showToast(`✓ ${count} item${count !== 1 ? 's' : ''} logged`, 'success');
+        sessionItems = [];
+        renderSessionItems();
+        await loadData();
+      } catch (err) {
+        showToast('Submit failed: ' + (err.message || 'unknown error'), 'error');
+        btn.disabled = false;
+      } finally {
+        btn.textContent = 'Submit Session';
+        if (sessionItems.length) btn.disabled = false;
+      }
+    });
+
+    // ════════════════════════════════════════
+    // MANUAL ADJUSTMENT
+    // ════════════════════════════════════════
+    document.getElementById('adj-toggle').addEventListener('click', () => {
+      document.getElementById('adjustment-collapsible').classList.toggle('collapsible-open');
+    });
+
+    let adjSelectedProduct = null;
+
+    wireProductSelector('adj-product-search', 'adj-product-options', (product) => {
+      adjSelectedProduct = product;
+      document.getElementById('adj-product-name').textContent = product.name;
+      document.getElementById('adj-product-pack').textContent = product.packSize;
+      document.getElementById('adj-selected-product').hidden = false;
+      updateAdjBtn();
+    });
+
+    function updateAdjBtn() {
+      const emp  = document.getElementById('adj-employee').value.trim();
+      const qty  = document.getElementById('adj-quantity').value.trim();
+      const qtyNum = Number(qty);
+      document.getElementById('adj-submit-btn').disabled =
+        !(emp && adjSelectedProduct && qty !== '' && !isNaN(qtyNum) && qtyNum !== 0);
+    }
+
+    document.getElementById('adj-employee').addEventListener('input', updateAdjBtn);
+    document.getElementById('adj-quantity').addEventListener('input', updateAdjBtn);
+
+    document.getElementById('adj-submit-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('adj-submit-btn');
+      const adjustedBy = document.getElementById('adj-employee').value.trim();
+      const quantity   = Number(document.getElementById('adj-quantity').value);
+      const note       = document.getElementById('adj-note').value.trim();
+      const now = new Date();
+
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        await appendLog(INVENTORY_PATH, {
+          action:      'adjust',
+          adjustedBy,
+          date:        now.toISOString().slice(0, 10),
+          timeStamp:   now.toISOString(),
+          productId:   adjSelectedProduct.id,
+          productName: adjSelectedProduct.name,
+          quantity:    String(quantity),
+          note,
+        });
+        showToast('✓ Adjustment saved', 'success');
+        document.getElementById('adj-quantity').value = '';
+        document.getElementById('adj-note').value = '';
+        document.getElementById('adj-product-search').value = '';
+        document.getElementById('adj-product-options').innerHTML = '';
+        document.getElementById('adj-selected-product').hidden = true;
+        adjSelectedProduct = null;
+        updateAdjBtn();
+        await loadData();
+      } catch (err) {
+        showToast('Save failed: ' + (err.message || 'unknown error'), 'error');
+        btn.disabled = false;
+      } finally {
+        btn.textContent = 'Save Adjustment';
+      }
+    });
+
+    // ── Boot ──────────────────────────────────────────────────────────────────
+    loadData();
+  </script>
+</body>
+</html>
