@@ -1063,7 +1063,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-11-foh-stock';
+  } from '../../scripts/inventory.js?v=2026-05-11-dip-fixes';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -2869,11 +2869,19 @@
       // on physical count rather than retyping from scratch.
       const doughDisplay  = report.effective.coldFerment[sku] || 0;
       const frozenDisplay = report.effective.frozen[sku] || 0;
-      // For lifecycle-less SKUs, the legacy snapshot may have the count in
-      // `frozen` (pre-Phase-3a). Sum both so the input pre-fills with the
-      // total — manager re-saves and it lands in onHand cleanly.
+      // For lifecycle-less SKUs the input pre-fills with the FULL effective
+      // sum (cf + fr + oh) so that:
+      //  - Batches logged via the Dips-tab stepper (which credit cf) are
+      //    reflected in the Stock-tab number. If we only showed oh here,
+      //    the manager would see "0" right after making a batch, save 0,
+      //    and the cf credit would be filtered out by the snapshot
+      //    timestamp — losing the batch.
+      //  - Legacy pre-Phase-3a snapshots that stored cheese in fr are
+      //    absorbed into oh on next save.
+      // The Dips-tab ON HAND metric uses the same sum, so the two views
+      // never disagree.
       const onHandDisplay = isLifecycleless
-        ? (report.effective.onHand?.[sku] || 0) + frozenDisplay
+        ? (report.effective.onHand?.[sku] || 0) + frozenDisplay + doughDisplay
         : (report.effective.onHand?.[sku] || 0);
       const fc         = forecasts[sku];
       const ageDays    = oldestDoughAge[sku];
@@ -2948,8 +2956,16 @@
       // on-hand count (cheese / bulk dip / future retail dips). Both render
       // in the same column slot — saveStock() reads data-stock-section to
       // route the value to the correct snapshot field.
+      //
+      // Lifecycle-less SKUs also get a small ↺ button below the input that
+      // pre-fills 0 without saving — handy when FOH does a physical count
+      // and finds an SKU empty. They still click the main Save Stock Count
+      // to commit, so misclicks are easy to recover from.
       const rightInput = isLifecycleless
-        ? `<input class="stock-input" type="number" min="0" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" placeholder="0" title="On hand">`
+        ? `<div style="display:flex;flex-direction:column;gap:2px;align-items:stretch">
+             <input class="stock-input" type="number" min="0" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" placeholder="0" title="On hand">
+             <button type="button" data-stock-zero data-zero-sku="${esc(sku)}" style="background:none;border:none;font:500 10px 'Manrope',sans-serif;color:var(--gray-3);cursor:pointer;padding:0;line-height:1.2" title="${appLang === 'es' ? 'Poner en cero (no guarda)' : 'Set to zero (does not save)'}">↺ ${appLang === 'es' ? 'cero' : 'zero'}</button>
+           </div>`
         : `<input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" placeholder="0">`;
       return `<div class="stock-row">
         <div><span class="stock-sku">${esc(sku)}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
@@ -3001,6 +3017,14 @@
     const tabTitle = isFohRole
       ? (appLang === 'es' ? 'Salsas en inventario' : 'Dips on hand')
       : t('stock_title');
+    // Heads-up bar for FOH: saving here overwrites any cheese_done batches
+    // logged today. Phrased so they don't accidentally zero out the count.
+    const fohHeadsUp = isFohRole ? `
+      <div style="margin:0 0 12px;padding:10px 12px;background:#FFF7E6;border-left:3px solid #E5C16A;border-radius:4px;font:500 12px 'Manrope',sans-serif;color:#5a4a1a">
+        💡 ${appLang === 'es'
+          ? '<strong>Importante:</strong> Guardar aquí reemplaza cualquier tanda que hayas registrado hoy. Confirma que coincida con la cuenta física en el refrigerador.'
+          : '<strong>Heads up:</strong> Save here overwrites any batches you have logged today. Match the physical count in the fridge.'}
+      </div>` : '';
     return `<div class="team-card"><div class="team-body">
       <div class="stock-tab-header">
         <div>
@@ -3008,6 +3032,7 @@
           <div class="stock-tab-note">${esc(lastSavedStr)}${esc(deductNote)}</div>
         </div>
       </div>
+      ${fohHeadsUp}
       ${isFohRole ? '' : summaryHtml}
       <div class="stock-col-head">
         <span>${t('sku_col')}</span>
@@ -3095,7 +3120,7 @@
             </div>
             <div class="wmetric">
               <div class="wmetric-label">${appLang === 'es' ? 'INVENTARIO' : 'ON HAND'}</div>
-              <div class="wmetric-value"><strong>${Math.round(onHand)}</strong></div>
+              <div class="wmetric-value" data-onhand-edit="${esc(dipSku)}" title="${appLang === 'es' ? 'Toca para corregir' : 'Tap to fix'}" style="cursor:pointer"><strong>${Math.round(onHand)}</strong> <span style="font-size:10px;color:var(--gray-3);font-weight:normal">✎</span></div>
             </div>
           </div>
           <div class="wstepper" style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">
@@ -3126,7 +3151,7 @@
           <div class="wcard-metrics" style="margin-top:8px">
             <div class="wmetric">
               <div class="wmetric-label">${appLang === 'es' ? 'INVENTARIO' : 'ON HAND'}</div>
-              <div class="wmetric-value"><strong>${Math.round(onHand)}</strong></div>
+              <div class="wmetric-value" data-onhand-edit="${esc(dipSku)}" title="${appLang === 'es' ? 'Toca para corregir' : 'Tap to fix'}" style="cursor:pointer"><strong>${Math.round(onHand)}</strong> <span style="font-size:10px;color:var(--gray-3);font-weight:normal">✎</span></div>
             </div>
             <div class="wmetric">
               <div class="wmetric-label">${appLang === 'es' ? 'FOH / DÍA' : 'FOH / DAY'}</div>
@@ -3156,12 +3181,57 @@
         }).join('')}
       </div>`;
 
+    // Recent batches disclosure — lets manager undo a previously-logged
+    // batch from any of the last 7 days. Each entry shows date, size,
+    // dips, and an ↩ undo link that writes a negative cheese_done row.
+    // Hidden by default (the <details> element); collapsed state preferred
+    // because most days the manager doesn't need to dig in.
+    const todayISO = dateStr;
+    const sevenDaysAgo = (() => {
+      const d = parseDate(todayISO);
+      d.setDate(d.getDate() - 7);
+      return toDateStr(d);
+    })();
+    const recentBatchRows = [];
+    Object.keys(productionState)
+      .filter(ds => ds >= sevenDaysAgo && ds <= todayISO)
+      .sort()
+      .reverse()
+      .forEach((ds) => {
+        const list = (productionState[ds].cheeseDone || []).filter(c => c.sku === dipSku && (Number(c.batches) || 0) > 0);
+        list.forEach((c) => {
+          const sz = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
+          const units = (Number(c.batches) || 0) * sz;
+          const sizeLabel = c.size === 'double' ? (appLang === 'es' ? 'doble' : 'double') : (appLang === 'es' ? 'sencilla' : 'single');
+          recentBatchRows.push({
+            date: ds,
+            dateLabel: `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`,
+            batches: c.batches,
+            size: c.size || 'single',
+            sizeLabel,
+            units,
+          });
+        });
+      });
+    const recentHtml = recentBatchRows.length === 0 ? '' : `
+      <details style="margin-top:8px">
+        <summary style="font:500 11px 'Manrope',sans-serif;color:var(--gray-3);cursor:pointer;padding:6px 12px;text-transform:uppercase;letter-spacing:0.5px">
+          ${appLang === 'es' ? `Tandas recientes (${recentBatchRows.length})` : `Recent batches (${recentBatchRows.length})`}
+        </summary>
+        ${recentBatchRows.map(r => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid #f3f3f3;font:500 12px 'Manrope',sans-serif">
+            <span><strong>${esc(r.dateLabel)}</strong> · ${r.batches} × ${esc(r.sizeLabel)} (${r.units})</span>
+            <button type="button" data-dip-undo data-sku="${esc(dipSku)}" data-date="${esc(r.date)}" data-size="${esc(r.size)}" data-batches="${r.batches}" style="background:none;border:none;color:var(--red);font:600 11px 'Manrope',sans-serif;cursor:pointer;padding:4px 8px" title="${appLang === 'es' ? 'Deshacer esta tanda' : 'Undo this batch'}">↩ ${appLang === 'es' ? 'deshacer' : 'undo'}</button>
+          </div>`).join('')}
+      </details>`;
+
     // No per-dip section heading above the card — the card itself shows
     // the dip name + emoji + status pill + on-hand metric. Adding a
     // duplicate heading line outside the card was redundant noise.
     return `<div style="margin-bottom:18px">
       ${todayHtml}
       ${upcomingHtml}
+      ${recentHtml}
     </div>`;
   }
 
@@ -3209,6 +3279,25 @@
   // Backward-compat for any remaining cheese-only call sites.
   async function logCheeseDelta(delta) {
     return logDipDelta(CHEESE_KEY, 'single', delta);
+  }
+
+  // Inline ON HAND editor: writes a single-SKU inventory snapshot. Same
+  // shape as Stock-tab save but scoped to just this dip. The snapshot
+  // timestamp is "now" so prior cf credits from cheese_done get filtered
+  // and the typed value becomes the authoritative on-hand count.
+  async function saveDipOnHand(sku, value) {
+    const n = parseInt(value, 10);
+    if (Number.isNaN(n) || n < 0) return;
+    const snap = { sku, coldFerment: 0, frozen: 0, onHand: n };
+    await appendLog(PRODUCTION_LOG, {
+      action: 'inventory',
+      date: toDateStr(new Date()),
+      snapshots: JSON.stringify([snap]),
+      timeStamp: new Date().toISOString(),
+    });
+    await loadProduction();
+    schedule = buildOptimalSchedule();
+    render();
   }
 
   async function saveStock() {
@@ -3846,6 +3935,80 @@
         logDipDelta(sku, size, delta).catch(err => alert('Error logging dip: ' + err.message));
       });
     });
+    // Recent-batches undo on Dips cards — writes a negative cheese_done
+    // row on the original batch date, cancelling the credit. Confirms
+    // before sending so misclicks are reversible.
+    document.querySelectorAll('[data-dip-undo]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const sku = btn.dataset.sku;
+        const date = btn.dataset.date;
+        const size = btn.dataset.size || 'single';
+        const batches = Number(btn.dataset.batches) || 1;
+        const cfg = DIP_CONFIG[sku];
+        const units = (size === 'double' ? cfg?.doubleBatchSize : cfg?.singleBatchSize) || 0;
+        const msg = appLang === 'es'
+          ? `Deshacer ${batches} × ${size} (${batches * units} dips) en ${date}?`
+          : `Undo ${batches} × ${size} (${batches * units} dips) on ${date}?`;
+        if (!window.confirm(msg)) return;
+        try {
+          const completions = JSON.stringify([{ sku, batches: -batches, size }]);
+          await appendLog(PRODUCTION_LOG, {
+            action: 'cheese_done',
+            date,
+            completions,
+            timeStamp: new Date().toISOString(),
+          });
+          await loadProduction();
+          schedule = buildOptimalSchedule();
+          render();
+        } catch (err) {
+          alert('Error undoing batch: ' + err.message);
+        }
+      });
+    });
+    // Inline ON HAND editor on Dips cards. Click the metric value → swaps
+    // to a number input. Enter or blur commits via saveDipOnHand; Escape
+    // restores the original render.
+    document.querySelectorAll('[data-onhand-edit]').forEach(metricEl => {
+      metricEl.addEventListener('click', () => {
+        const sku = metricEl.dataset.onhandEdit;
+        const currentText = metricEl.querySelector('strong')?.textContent || '0';
+        const originalHtml = metricEl.innerHTML;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.value = currentText;
+        input.style.cssText = 'width:80px;padding:4px 6px;border:1.5px solid var(--gray-2);border-radius:6px;font:700 18px "Manrope",sans-serif;text-align:center;color:var(--dark)';
+        metricEl.innerHTML = '';
+        metricEl.appendChild(input);
+        input.focus();
+        input.select();
+        let committed = false;
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          const val = input.value.trim();
+          if (val === '' || val === currentText) {
+            metricEl.innerHTML = originalHtml;
+            return;
+          }
+          saveDipOnHand(sku, val).catch(err => {
+            metricEl.innerHTML = originalHtml;
+            alert('Error saving on-hand: ' + err.message);
+          });
+        };
+        const cancel = () => {
+          if (committed) return;
+          committed = true;
+          metricEl.innerHTML = originalHtml;
+        };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+      });
+    });
     // Backward-compat: handle any remaining data-cheese-step buttons.
     document.querySelectorAll('[data-cheese-step]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -3881,6 +4044,20 @@
     });
     const stockSaveBtn = document.getElementById('stock-save');
     if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
+    // ↺ zero button: pre-fill the SKU's on-hand input to 0 without saving.
+    // Manager / FOH still has to click Save Stock Count to commit, so a
+    // misclick is easily fixed by editing the field back to the right value.
+    document.querySelectorAll('[data-stock-zero]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sku = btn.dataset.zeroSku;
+        const inp = document.querySelector(`input[data-stock-section="onhand"][data-sku="${sku.replace(/"/g, '\\"')}"]`);
+        if (inp) {
+          inp.value = '0';
+          inp.focus();
+          inp.select();
+        }
+      });
+    });
     // Stock tab → Box mappings list — click a row to re-open its config sheet.
     document.querySelectorAll('[data-box-edit]').forEach(row => {
       row.addEventListener('click', () => openCfgSheet(row.dataset.boxEdit));
