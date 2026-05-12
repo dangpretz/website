@@ -1578,7 +1578,9 @@
   //   bfp   → only BFP tab
   //   foh   → only Dips (Cheese tab) + Stock tabs — FOH manages dip
   //           production and on-hand counts; doesn't touch shape/BFP.
-  const _roleParam = new URLSearchParams(window.location.search).get('role');
+  // Normalize to lowercase so ?role=FOH / ?role=Shape / etc. all work the
+  // same. Unknown values fall through to 'manager'.
+  const _roleParam = (new URLSearchParams(window.location.search).get('role') || '').toLowerCase().trim();
   const userRole   = _roleParam === 'shape' ? 'shape'
                   : _roleParam === 'bfp'   ? 'bfp'
                   : _roleParam === 'foh'   ? 'foh'
@@ -3978,6 +3980,9 @@
         input.type = 'number';
         input.min = '0';
         input.value = currentText;
+        // Class is picked up by _isInputBusy so a softRefresh tick can't
+        // erase the input mid-type.
+        input.className = 'inline-onhand-edit';
         input.style.cssText = 'width:80px;padding:4px 6px;border:1.5px solid var(--gray-2);border-radius:6px;font:700 18px "Manrope",sans-serif;text-align:center;color:var(--dark)';
         metricEl.innerHTML = '';
         metricEl.appendChild(input);
@@ -4498,8 +4503,10 @@
 
   // Auto-refresh — visibility regain + soft 60s interval. Both gated by
   // active input focus + pending save (so we don't clobber typing).
+  // .inline-onhand-edit is the dynamic input from the Dips-tab ON HAND
+  // editor; without it softRefresh would erase the input mid-type.
   const _isInputBusy = () =>
-    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val')
+    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit')
     || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null);
 
   // Track when the current worker session started so we don't toast diffs

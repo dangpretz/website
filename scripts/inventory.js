@@ -470,21 +470,23 @@ export function resolveProductionLogs(logs) {
     const s = state[date];
 
     if (action === 'inventory') {
+      // Per-SKU merge into the day's state. Multiple inventory rows on the
+      // same date (e.g. Stock-tab Save All in the morning, then a per-dip
+      // saveDipOnHand at noon) each update only their own SKUs without
+      // wiping unrelated ones. Each SKU's value is still last-write-wins
+      // across rows; rows just don't blow each other away.
       try {
         const snaps = JSON.parse(row.snapshots || '[]');
-        const cf = {};
-        const fr = {};
-        const oh = {}; // on-hand bucket — for SKUs with no dough/bake lifecycle (cheese, dips)
+        if (!s.coldFerment) s.coldFerment = {};
+        if (!s.frozen) s.frozen = {};
+        if (!s.onHand) s.onHand = {};
         snaps.forEach((sn) => {
           const k = canonicalSku(sn.sku);
           if (!k) return;
-          cf[k] = Number(sn.coldFerment) || 0;
-          fr[k] = Number(sn.frozen) || 0;
-          oh[k] = Number(sn.onHand) || 0;
+          s.coldFerment[k] = Number(sn.coldFerment) || 0;
+          s.frozen[k] = Number(sn.frozen) || 0;
+          s.onHand[k] = Number(sn.onHand) || 0;
         });
-        s.coldFerment = cf;
-        s.frozen = fr;
-        s.onHand = oh;
       } catch {}
       if (row.timeStamp && (!latestInventoryTs || row.timeStamp > latestInventoryTs)) {
         latestInventoryTs = row.timeStamp;
@@ -759,7 +761,14 @@ export function getInventoryReport(args) {
           bs = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
         } else {
           bs = getBatchSize(key);
-          if (!bs) return;
+          if (!bs) {
+            // Unconfigured SKU — neither DIP_CONFIG nor BATCH_SIZES knows
+            // its yield. Warn so this isn't silently lost. Manager should
+            // add the SKU to DIP_CONFIG or skuConfig before logging more.
+            // eslint-disable-next-line no-console
+            console.warn(`cheese_done: unconfigured SKU "${key}" — batch not credited (add to DIP_CONFIG or sku_config).`);
+            return;
+          }
         }
         const batches = Number(c.batches) || 0;
         const p = batches * bs;
@@ -850,7 +859,18 @@ export function getInventoryReport(args) {
         }
 
         if (!flowDelivered[key]) flowDelivered[key] = [];
-        flowDelivered[key].push({ customer: cust, qty, confirmedAt: delivery._confirmedAt || '' });
+        flowDelivered[key].push({
+          customer: cust,
+          qty,
+          fulfilled: qty - remaining,
+          // shortage > 0 means the delivery shipped without enough on-hand
+          // inventory to cover it — useful signal for the coverage UI and
+          // future "delivery audit" reports. Today the cascade caps at 0
+          // per bucket, so nothing goes negative; we just track that there
+          // was a gap.
+          shortage: remaining,
+          confirmedAt: delivery._confirmedAt || '',
+        });
       });
     });
 
