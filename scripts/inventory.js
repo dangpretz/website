@@ -524,19 +524,33 @@ export function resolveProductionLogs(logs) {
       return;
     }
     if (action === 'cheese_done') {
-      // FOH cheese maker logs a batch (or partial batch via a stepper).
-      // Each batch = CHEESE_BATCH_SIZE dips → cf += N × CHEESE_BATCH_SIZE.
-      // Same accumulation pattern as shape_done/bfp_done.
+      // FOH dip maker logs a batch (single or double) via the Dips-tab
+      // stepper. Inventory math (getInventoryReport) reads the raw log
+      // row directly and credits cf based on size; this per-date
+      // aggregation is for the Dips-tab "DIPS MADE today" display.
+      //
+      // Merge key includes size so doubles and singles tally separately —
+      // 1 single + 1 double for hot ranch = 35 + 70 = 105 dips made
+      // (was incorrectly 70 = 2 × 35 before).
       try {
         const incoming = JSON.parse(row.completions || '[]');
         const merged = {};
-        (s.cheeseDone || []).forEach((c) => { merged[c.sku] = (merged[c.sku] || 0) + (Number(c.batches) || 0); });
-        incoming.forEach((c) => {
-          const k = canonicalSku(c.sku);
-          if (!k) return;
+        (s.cheeseDone || []).forEach((c) => {
+          const sz = c.size || 'single';
+          const k = `${c.sku}|${sz}`;
           merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
         });
-        s.cheeseDone = Object.entries(merged).map(([sku, batches]) => ({ sku, batches }));
+        incoming.forEach((c) => {
+          const sk = canonicalSku(c.sku);
+          if (!sk) return;
+          const sz = c.size || 'single';
+          const k = `${sk}|${sz}`;
+          merged[k] = (merged[k] || 0) + (Number(c.batches) || 0);
+        });
+        s.cheeseDone = Object.entries(merged).map(([key, batches]) => {
+          const [sku, size] = key.split('|');
+          return { sku, batches, size };
+        });
         s.cheeseWorkers = Number(row.workers) || 1;
         s.cheeseTime = row.timeStamp;
       } catch {}
