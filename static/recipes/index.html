@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipes | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 400; border-bottom: 1px solid #333; overflow-x: auto; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; min-width: max-content; }
+    .nav-logo { height: 46px; flex-shrink: 0; }
+    .nav-links { display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; margin-left: 20px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; white-space: nowrap; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    /* ── Hero ── */
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px,4vw,50px) 5% clamp(16px,3vw,28px); }
+    .hero h1 { font: 900 italic clamp(32px,5vw,52px)/1.05 Georgia, serif; color: #fff; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #1A1A1A; color: #fff; font: 600 14px 'Manrope', sans-serif; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 1; transition: opacity .4s; pointer-events: none; }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    /* ── Status bar ── */
+    .recipes-status { background: #F5F0E8; padding: 14px 5%; }
+    .recipes-status-inner { max-width: 1100px; margin: 0 auto; font: 400 13px 'Manrope', sans-serif; color: #888; }
+    .recipes-status-inner.loading { color: #888; }
+    .recipes-status-inner.ready   { color: #2a7a2a; font-weight: 600; }
+    .recipes-status-inner.error   { color: #C41E1E; font-weight: 700; }
+
+    /* ── Main section ── */
+    .recipes-section { background: #1A1A1A; padding: clamp(32px,5vw,60px) 5%; min-height: calc(100vh - 200px); }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+    .recipes-intro { font: 400 14px/1.6 'Manrope', sans-serif; color: #777; margin-bottom: 28px; }
+
+    /* ════════════════════════════════════
+       SKU CARDS
+    ════════════════════════════════════ */
+    .sku-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+
+    .sku-card { background: #2e2e2e; border-radius: 10px; overflow: hidden; }
+    .sku-card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; transition: border-color .2s; }
+    .sku-card.expanded .sku-card-header { border-bottom-color: #3a3a3a; }
+    .sku-card-name { font: 700 14px 'Manrope', sans-serif; color: #fff; }
+    .sku-card-meta { font: 400 11px 'Manrope', sans-serif; color: #666; margin-top: 2px; }
+    .sku-card-chevron { color: #555; font-size: 18px; transition: transform .25s; flex-shrink: 0; }
+    .sku-card.expanded .sku-card-chevron { transform: rotate(180deg); }
+    .sku-card-body { display: none; padding: 16px 18px; }
+    .sku-card.expanded .sku-card-body { display: block; }
+
+    /* Scale inputs */
+    .scale-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .scale-field { display: flex; flex-direction: column; gap: 4px; }
+    .scale-label { font: 700 10px 'Manrope', sans-serif; color: #777; letter-spacing: .7px; text-transform: uppercase; }
+    .scale-input { font: 400 14px 'Manrope', sans-serif; padding: 8px 10px; border: 2px solid #444; border-radius: 5px; background: #3a3a3a; color: #fff; outline: none; transition: border-color .2s; -moz-appearance: textfield; }
+    .scale-input:focus { border-color: #C41E1E; }
+    .scale-input::-webkit-outer-spin-button,
+    .scale-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .scale-input[readonly] { background: #252525; color: #666; border-color: #333; cursor: default; }
+
+    /* Ingredient table */
+    .recipe-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .recipe-ing-table th { font: 700 10px 'Manrope', sans-serif; color: #666; letter-spacing: .7px; text-transform: uppercase; padding: 6px 8px; text-align: left; border-bottom: 1px solid #3a3a3a; white-space: nowrap; }
+    .recipe-ing-table td { padding: 5px 8px; border-bottom: 1px solid #252525; vertical-align: middle; }
+    .recipe-ing-table tr:last-child td { border-bottom: none; }
+    .ing-name { font: 400 12px 'Manrope', sans-serif; color: #ccc; }
+    .recipe-qty-input { width: 72px; font: 400 13px 'Manrope', sans-serif; padding: 5px 7px; border: 1.5px solid #444; border-radius: 4px; background: #3a3a3a; color: #fff; outline: none; text-align: right; transition: border-color .2s; -moz-appearance: textfield; }
+    .recipe-qty-input:focus { border-color: #C41E1E; }
+    .recipe-qty-input::-webkit-outer-spin-button,
+    .recipe-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .recipe-qty-derived { font: 400 12px 'Manrope', sans-serif; color: #555; text-align: right; min-width: 54px; display: inline-block; }
+    .ing-unit { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; }
+    .sku-save-row { display: flex; align-items: center; gap: 10px; }
+    .sku-save-btn { padding: 9px 20px; font: 700 13px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background .2s; }
+    .sku-save-btn:hover:not(:disabled) { background: #a01818; }
+    .sku-save-btn:disabled { background: #555; cursor: not-allowed; }
+    .sku-save-status { font: 400 12px 'Manrope', sans-serif; color: #666; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      .sku-grid { grid-template-columns: 1fr; }
+      .scale-row { grid-template-columns: 1fr 1fr; }
+      .scale-row .auto-col { display: none; }
+      .recipe-ing-table th:nth-child(3),
+      .recipe-ing-table td:nth-child(3),
+      .recipe-ing-table th:nth-child(4),
+      .recipe-ing-table td:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+        <a href="../barcode-lookup/index.html">Barcode Lookup</a>
+        <a href="../receiving-history/index.html">Receiving History</a>
+        <a href="../inventory/index.html">Inventory</a>
+        <a href="../inventory-forecast/index.html">Forecast</a>
+        <a href="../recipes/index.html">Recipes</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>RECIPES.</h1>
+  </section>
+
+  <div class="recipes-status">
+    <div class="recipes-status-inner loading" id="status">Loading recipes…</div>
+  </div>
+
+  <div class="recipes-section">
+    <div class="max-1100">
+      <p class="recipes-intro">
+        For each SKU, enter how many pretzels fit on one tray and how many trays are in one batch.
+        Then enter how many units of each ingredient go into one batch.
+        Per-tray and per-pretzel quantities are calculated automatically.
+      </p>
+      <div class="sku-grid" id="sku-grid"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+
+    const RECIPES_PATH = '/dangpretz/recipes';
+
+    // ── SKUs ─────────────────────────────────────────────────────────────────
+    const SKUS = [
+      '21oz mammoth pretzel', '10oz mustache', '10oz plain',
+      '10oz bbk', '10oz spicy bee', '6.5oz plain', '6.5oz bbk',
+      '6.5oz spicy bee', '4oz twist plain', '4oz twist bbk',
+      '4oz twist spicy bee', '3oz cheese dip',
+      'bulk dangerous dip (25 srv)', 'plain bombs', 'bees bats',
+      'Dangerous Dip Box', 'Honey Mustard Dip Box', 'Hot Ranch Dip Box', 'Sweet Cream Dip Box',
+    ];
+
+    // ── Product catalog ──────────────────────────────────────────────────────
+    const PRODUCTS = [
+      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB'   },
+      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB'   },
+      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB'   },
+      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL'   },
+      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB'   },
+      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL'   },
+      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB'    },
+      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL'   },
+      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB'    },
+      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB'    },
+      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL'   },
+      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ'   },
+      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB'    },
+      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB'    },
+      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA'  },
+      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB'   },
+      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA' },
+      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB'   },
+      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB'    },
+      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB'    },
+      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB'  },
+      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB'    },
+      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB'    },
+      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ'   },
+      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB'   },
+    ];
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function showToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 3500);
+    }
+    function fmt2(n) { return isNaN(n) ? '—' : (Math.round(n * 100) / 100).toString(); }
+    function parsePackSize(ps) {
+      const parts = (ps || '').split('/');
+      if (parts.length < 3) return { innerUnitLabel: ps || 'unit' };
+      return { innerUnitLabel: `${parts[1]} ${parts[2]}` };
+    }
+
+    // ── Recipe maps ──────────────────────────────────────────────────────────
+    let scaleMap  = {}; // { sku: { pretzelsPerTray, traysPerBatch } }
+    let recipeMap = {}; // { sku: { productId: quantityPerBatch } }
+
+    function buildRecipeMaps(logs) {
+      scaleMap  = {};
+      recipeMap = {};
+      for (const r of logs) {
+        if (r.action === 'sku_scale' && r.sku) {
+          scaleMap[r.sku] = {
+            pretzelsPerTray: parseFloat(r.pretzelsPerTray) || 0,
+            traysPerBatch:   parseFloat(r.traysPerBatch)   || 0,
+          };
+        }
+        if (r.action === 'recipe' && r.sku && r.productId) {
+          if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
+          recipeMap[r.sku][r.productId] = parseFloat(r.quantityPerBatch) ?? 0;
+        }
+      }
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+    function renderAll() {
+      const grid = document.getElementById('sku-grid');
+      grid.innerHTML = SKUS.map((sku) => buildSkuCard(sku)).join('');
+      grid.querySelectorAll('.sku-card-header').forEach((hdr) => {
+        hdr.addEventListener('click', () => hdr.closest('.sku-card').classList.toggle('expanded'));
+      });
+      grid.querySelectorAll('.sku-card').forEach(wireSkuCard);
+    }
+
+    function buildSkuCard(sku) {
+      const scale = scaleMap[sku] || {};
+      const ppt = scale.pretzelsPerTray || '';
+      const tpb = scale.traysPerBatch   || '';
+      const ppb = (ppt && tpb) ? String(ppt * tpb) : '';
+
+      const recipe = recipeMap[sku] || {};
+      const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
+
+      const ingRows = PRODUCTS.map((p) => {
+        const { innerUnitLabel } = parsePackSize(p.packSize);
+        const perBatch = recipe[p.id] != null ? recipe[p.id] : '';
+        const perTray  = (perBatch !== '' && tpb) ? fmt2(perBatch / tpb) : '';
+        const perPret  = (perBatch !== '' && ppt && tpb) ? fmt2(perBatch / (ppt * tpb)) : '';
+        return `<tr>
+          <td><span class="ing-name">${escapeHtml(p.name)}</span></td>
+          <td><input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${perBatch}" placeholder="—" min="0" step="0.001"></td>
+          <td><span class="recipe-qty-derived per-tray">${perTray || '—'}</span></td>
+          <td><span class="recipe-qty-derived per-pretzel">${perPret || '—'}</span></td>
+          <td><span class="ing-unit">${escapeHtml(innerUnitLabel)}</span></td>
+        </tr>`;
+      }).join('');
+
+      return `<div class="sku-card${hasAny ? ' expanded' : ''}" data-sku="${escapeHtml(sku)}">
+        <div class="sku-card-header">
+          <div>
+            <div class="sku-card-name">${escapeHtml(sku)}</div>
+            <div class="sku-card-meta">${hasAny ? `${ppt || '?'} pretzels/tray · ${tpb || '?'} trays/batch` : 'No recipe defined'}</div>
+          </div>
+          <span class="sku-card-chevron">⌄</span>
+        </div>
+        <div class="sku-card-body">
+          <div class="scale-row">
+            <div class="scale-field">
+              <label class="scale-label">Pretzels / Tray</label>
+              <input type="number" class="scale-input ppt-input" value="${ppt}" placeholder="0" min="1" step="1">
+            </div>
+            <div class="scale-field">
+              <label class="scale-label">Trays / Batch</label>
+              <input type="number" class="scale-input tpb-input" value="${tpb}" placeholder="0" min="1" step="1">
+            </div>
+            <div class="scale-field auto-col">
+              <label class="scale-label">Pretzels / Batch</label>
+              <input type="number" class="scale-input ppb-display" value="${ppb}" placeholder="—" readonly tabindex="-1">
+            </div>
+          </div>
+          <table class="recipe-ing-table">
+            <thead><tr>
+              <th>Ingredient</th>
+              <th>Per Batch</th>
+              <th>Per Tray</th>
+              <th>Per Pretzel</th>
+              <th>Unit</th>
+            </tr></thead>
+            <tbody>${ingRows}</tbody>
+          </table>
+          <div class="sku-save-row">
+            <button class="sku-save-btn">Save Recipe</button>
+            <span class="sku-save-status"></span>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function wireSkuCard(card) {
+      const sku = card.dataset.sku;
+      const pptInput  = card.querySelector('.ppt-input');
+      const tpbInput  = card.querySelector('.tpb-input');
+      const ppbDisplay = card.querySelector('.ppb-display');
+
+      function updateDerived() {
+        const ppt = parseFloat(pptInput.value) || 0;
+        const tpb = parseFloat(tpbInput.value) || 0;
+        const ppb = ppt && tpb ? ppt * tpb : 0;
+        if (ppbDisplay) ppbDisplay.value = ppb ? String(ppb) : '';
+
+        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
+          const val = parseFloat(inp.value);
+          const row = inp.closest('tr');
+          const perTrayEl    = row.querySelector('.per-tray');
+          const perPretzelEl = row.querySelector('.per-pretzel');
+          if (!isNaN(val)) {
+            if (perTrayEl)    perTrayEl.textContent    = tpb ? fmt2(val / tpb) : '—';
+            if (perPretzelEl) perPretzelEl.textContent = ppb ? fmt2(val / ppb)  : '—';
+          } else {
+            if (perTrayEl)    perTrayEl.textContent    = '—';
+            if (perPretzelEl) perPretzelEl.textContent = '—';
+          }
+        });
+      }
+
+      pptInput.addEventListener('input', updateDerived);
+      tpbInput.addEventListener('input', updateDerived);
+      card.querySelectorAll('.recipe-qty-input').forEach((inp) => inp.addEventListener('input', updateDerived));
+
+      card.querySelector('.sku-save-btn').addEventListener('click', async () => {
+        const saveBtn    = card.querySelector('.sku-save-btn');
+        const statusSpan = card.querySelector('.sku-save-status');
+        const ppt = parseFloat(pptInput.value);
+        const tpb = parseFloat(tpbInput.value);
+
+        if ((!isNaN(ppt) && ppt > 0) !== (!isNaN(tpb) && tpb > 0)) {
+          showToast('Enter both pretzels/tray and trays/batch', 'error'); return;
+        }
+
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; statusSpan.textContent = '';
+        const now = new Date().toISOString();
+        const writes = [];
+
+        if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) {
+          writes.push(appendLog(RECIPES_PATH, {
+            action: 'sku_scale', sku, pretzelsPerTray: String(ppt), traysPerBatch: String(tpb), timeStamp: now, updatedBy: '',
+          }));
+        }
+
+        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
+          const productId = inp.dataset.productId;
+          const val = parseFloat(inp.value);
+          if (!isNaN(val) && val >= 0) {
+            writes.push(appendLog(RECIPES_PATH, {
+              action: 'recipe', sku, productId, quantityPerBatch: String(val), timeStamp: now, updatedBy: '',
+            }));
+          }
+        });
+
+        if (!writes.length) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; return; }
+
+        try {
+          await Promise.all(writes);
+          // Update in-memory maps
+          if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) scaleMap[sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
+          if (!recipeMap[sku]) recipeMap[sku] = {};
+          card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
+            const val = parseFloat(inp.value);
+            if (!isNaN(val) && val >= 0) recipeMap[sku][inp.dataset.productId] = val;
+          });
+          const metaEl = card.querySelector('.sku-card-meta');
+          if (metaEl && scaleMap[sku]) {
+            metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
+          }
+          showToast('✓ Recipe saved', 'success');
+          statusSpan.textContent = 'Saved ✓';
+        } catch (err) {
+          showToast('Save failed: ' + (err.message || 'error'), 'error');
+          statusSpan.textContent = 'Error saving';
+        } finally {
+          saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe';
+        }
+      });
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    function setStatus(state, msg) {
+      const el = document.getElementById('status');
+      el.className = 'recipes-status-inner ' + state;
+      el.textContent = msg;
+    }
+
+    async function init() {
+      try {
+        const logs = await fetchLog(RECIPES_PATH);
+        buildRecipeMaps(Array.isArray(logs) ? logs : []);
+        const defined = SKUS.filter((s) => recipeMap[s] && Object.keys(recipeMap[s]).length > 0).length;
+        setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined`);
+        renderAll();
+      } catch (err) {
+        setStatus('error', 'Failed to load recipes: ' + (err.message || 'unknown error'));
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -129,52 +129,6 @@
     .today-divider::before, .today-divider::after { content: ''; flex: 1; height: 1px; background: #e0d8cc; }
     .today-label { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
 
-    /* ════════════════════════════════════
-       RECIPE EDITOR
-    ════════════════════════════════════ */
-    .recipe-editor-section { padding: clamp(32px,5vw,60px) 5%; background: #1A1A1A; }
-    .recipe-editor-section h2 { font: 900 italic clamp(24px,3vw,36px)/1.05 Georgia, serif; color: #fff; margin-bottom: 8px; }
-    .recipe-editor-section .recipe-intro { font: 400 14px/1.6 'Manrope', sans-serif; color: #777; margin-bottom: 28px; }
-
-    .sku-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
-
-    .sku-card { background: #2e2e2e; border-radius: 10px; overflow: hidden; }
-    .sku-card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; transition: border-color .2s; }
-    .sku-card.expanded .sku-card-header { border-bottom-color: #3a3a3a; }
-    .sku-card-name { font: 700 14px 'Manrope', sans-serif; color: #fff; }
-    .sku-card-meta { font: 400 11px 'Manrope', sans-serif; color: #666; margin-top: 2px; }
-    .sku-card-chevron { color: #555; font-size: 18px; transition: transform .25s; flex-shrink: 0; }
-    .sku-card.expanded .sku-card-chevron { transform: rotate(180deg); }
-    .sku-card-body { display: none; padding: 16px 18px; }
-    .sku-card.expanded .sku-card-body { display: block; }
-
-    /* Scale inputs */
-    .scale-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-    .scale-field { display: flex; flex-direction: column; gap: 4px; }
-    .scale-label { font: 700 10px 'Manrope', sans-serif; color: #777; letter-spacing: .7px; text-transform: uppercase; }
-    .scale-input { font: 400 14px 'Manrope', sans-serif; padding: 8px 10px; border: 2px solid #444; border-radius: 5px; background: #3a3a3a; color: #fff; outline: none; transition: border-color .2s; -moz-appearance: textfield; }
-    .scale-input:focus { border-color: #C41E1E; }
-    .scale-input::-webkit-outer-spin-button,
-    .scale-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-    .scale-input[readonly] { background: #252525; color: #666; border-color: #333; cursor: default; }
-
-    /* Ingredient table */
-    .recipe-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-    .recipe-ing-table th { font: 700 10px 'Manrope', sans-serif; color: #666; letter-spacing: .7px; text-transform: uppercase; padding: 6px 8px; text-align: left; border-bottom: 1px solid #3a3a3a; white-space: nowrap; }
-    .recipe-ing-table td { padding: 5px 8px; border-bottom: 1px solid #252525; vertical-align: middle; }
-    .recipe-ing-table tr:last-child td { border-bottom: none; }
-    .ing-name { font: 400 12px 'Manrope', sans-serif; color: #ccc; }
-    .recipe-qty-input { width: 72px; font: 400 13px 'Manrope', sans-serif; padding: 5px 7px; border: 1.5px solid #444; border-radius: 4px; background: #3a3a3a; color: #fff; outline: none; text-align: right; transition: border-color .2s; -moz-appearance: textfield; }
-    .recipe-qty-input:focus { border-color: #C41E1E; }
-    .recipe-qty-input::-webkit-outer-spin-button,
-    .recipe-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-    .recipe-qty-derived { font: 400 12px 'Manrope', sans-serif; color: #555; text-align: right; min-width: 54px; display: inline-block; }
-    .ing-unit { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; }
-    .sku-save-row { display: flex; align-items: center; gap: 10px; }
-    .sku-save-btn { padding: 9px 20px; font: 700 13px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background .2s; }
-    .sku-save-btn:hover:not(:disabled) { background: #a01818; }
-    .sku-save-btn:disabled { background: #555; cursor: not-allowed; }
-    .sku-save-status { font: 400 12px 'Manrope', sans-serif; color: #666; }
 
     /* ── Mobile ── */
     @media (max-width: 640px) {
@@ -185,15 +139,6 @@
       .forecast-table td:nth-child(4),
       .forecast-table th:nth-child(6),
       .forecast-table td:nth-child(6) { display: none; }
-      /* Recipe editor: single-column grid, hide auto-calc columns */
-      .sku-grid { grid-template-columns: 1fr; }
-      .scale-row { grid-template-columns: 1fr 1fr; }
-      .scale-row .auto-col { display: none; }
-      /* Hide per-tray and per-pretzel auto columns in ingredient table */
-      .recipe-ing-table th:nth-child(3),
-      .recipe-ing-table td:nth-child(3),
-      .recipe-ing-table th:nth-child(4),
-      .recipe-ing-table td:nth-child(4) { display: none; }
     }
   </style>
 </head>
@@ -211,6 +156,7 @@
         <a href="../receiving-history/index.html">Receiving History</a>
         <a href="../inventory/index.html">Inventory</a>
         <a href="../inventory-forecast/index.html">Forecast</a>
+        <a href="../recipes/index.html">Recipes</a>
       </div>
     </div>
   </nav>
@@ -228,7 +174,7 @@
       <div class="forecast-controls">
         <div class="forecast-window" id="forecast-window">Next 7 days</div>
         <div class="forecast-actions">
-          <button class="btn-ghost" id="edit-recipes-btn">✎ Edit Recipes</button>
+          <a class="btn-ghost" href="../recipes/index.html">✎ Edit Recipes</a>
           <button class="btn-ghost" id="refresh-btn">↻ Refresh</button>
         </div>
       </div>
@@ -253,24 +199,9 @@
       </div>
 
       <div id="no-recipe-note" class="no-recipe-note" hidden>
-        Some ingredients show "—" because no recipe has been defined for their SKUs yet. Click "Edit Recipes" to set up recipes.
+        Some ingredients show "—" because no recipe has been defined for their SKUs yet. <a href="../recipes/index.html" style="color:#C41E1E">Set up recipes →</a>
       </div>
 
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════
-       RECIPE EDITOR (toggled)
-  ══════════════════════════════════════ -->
-  <div class="recipe-editor-section" id="recipe-editor-section" hidden>
-    <div class="max-1100">
-      <h2>RECIPES.</h2>
-      <p class="recipe-intro">
-        For each pretzel SKU, enter how many pretzels fit on one tray and how many trays are in one batch.
-        Then enter how many units of each ingredient go into one batch.
-        Per-tray and per-pretzel quantities are calculated automatically.
-      </p>
-      <div class="sku-grid" id="sku-grid"></div>
     </div>
   </div>
 
@@ -563,9 +494,7 @@
 
         updateWindowLabel();
         renderForecastTable();
-        if (document.getElementById('recipe-editor-section').offsetParent !== null) {
-          renderRecipeEditor();
-        }
+
       } catch (err) {
         statusEl.className = 'table-status error';
         statusEl.textContent = 'Failed to load: ' + (err.message || 'unknown error');
@@ -767,183 +696,6 @@
     document.getElementById('panel-overlay').addEventListener('click', closePanel);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
 
-    // ── Recipe editor ─────────────────────────────────────────────────────────
-    document.getElementById('edit-recipes-btn').addEventListener('click', () => {
-      const sec = document.getElementById('recipe-editor-section');
-      const btn = document.getElementById('edit-recipes-btn');
-      const isOpen = !sec.hidden;
-      sec.hidden = isOpen;
-      btn.classList.toggle('active', !isOpen);
-      if (!isOpen) renderRecipeEditor();
-    });
-
-    function renderRecipeEditor() {
-      const grid = document.getElementById('sku-grid');
-      grid.innerHTML = SKUS.map((sku) => buildSkuCard(sku)).join('');
-      grid.querySelectorAll('.sku-card-header').forEach((hdr) => {
-        hdr.addEventListener('click', () => hdr.closest('.sku-card').classList.toggle('expanded'));
-      });
-      grid.querySelectorAll('.sku-card').forEach(wireSkuCard);
-    }
-
-    function buildSkuCard(sku) {
-      const scale = scaleMap[sku] || {};
-      const ppt = scale.pretzelsPerTray || '';
-      const tpb = scale.traysPerBatch   || '';
-      const ppb = (ppt && tpb) ? String(ppt * tpb) : '—';
-
-      const recipe = recipeMap[sku] || {};
-      const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
-
-      const ingRows = PRODUCTS.map((p) => {
-        const { innerUnitLabel } = parsePackSize(p.packSize);
-        const perBatch = recipe[p.id] != null ? recipe[p.id] : '';
-        const perTray  = (perBatch !== '' && tpb) ? fmt2(perBatch / tpb) : '';
-        const perPret  = (perBatch !== '' && ppt && tpb) ? fmt2(perBatch / (ppt * tpb)) : '';
-        return `<tr>
-          <td><span class="ing-name">${escapeHtml(p.name)}</span></td>
-          <td><input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${perBatch}" placeholder="—" min="0" step="0.001"></td>
-          <td><span class="recipe-qty-derived per-tray">${perTray || '—'}</span></td>
-          <td><span class="recipe-qty-derived per-pretzel">${perPret || '—'}</span></td>
-          <td><span class="ing-unit">${escapeHtml(innerUnitLabel)}</span></td>
-        </tr>`;
-      }).join('');
-
-      return `<div class="sku-card${hasAny ? ' expanded' : ''}" data-sku="${escapeHtml(sku)}">
-        <div class="sku-card-header">
-          <div>
-            <div class="sku-card-name">${escapeHtml(sku)}</div>
-            <div class="sku-card-meta">${hasAny ? `${ppt || '?'} pretzels/tray · ${tpb || '?'} trays/batch` : 'No recipe defined'}</div>
-          </div>
-          <span class="sku-card-chevron">⌄</span>
-        </div>
-        <div class="sku-card-body">
-          <div class="scale-row">
-            <div class="scale-field">
-              <label class="scale-label">Pretzels / Tray</label>
-              <input type="number" class="scale-input ppt-input" value="${ppt}" placeholder="0" min="1" step="1">
-            </div>
-            <div class="scale-field">
-              <label class="scale-label">Trays / Batch</label>
-              <input type="number" class="scale-input tpb-input" value="${tpb}" placeholder="0" min="1" step="1">
-            </div>
-            <div class="scale-field auto-col">
-              <label class="scale-label">Pretzels / Batch</label>
-              <input type="number" class="scale-input ppb-display" value="${ppb === '—' ? '' : ppb}" placeholder="—" readonly tabindex="-1">
-            </div>
-          </div>
-          <table class="recipe-ing-table">
-            <thead><tr>
-              <th>Ingredient</th>
-              <th>Per Batch</th>
-              <th>Per Tray</th>
-              <th>Per Pretzel</th>
-              <th>Unit</th>
-            </tr></thead>
-            <tbody>${ingRows}</tbody>
-          </table>
-          <div class="sku-save-row">
-            <button class="sku-save-btn">Save Recipe</button>
-            <span class="sku-save-status"></span>
-          </div>
-        </div>
-      </div>`;
-    }
-
-    function wireSkuCard(card) {
-      const sku = card.dataset.sku;
-      const pptInput = card.querySelector('.ppt-input');
-      const tpbInput = card.querySelector('.tpb-input');
-      const ppbDisplay = card.querySelector('.ppb-display');
-
-      function updateDerived() {
-        const ppt = parseFloat(pptInput.value) || 0;
-        const tpb = parseFloat(tpbInput.value) || 0;
-        const ppb = ppt && tpb ? ppt * tpb : 0;
-        if (ppbDisplay) ppbDisplay.value = ppb ? String(ppb) : '';
-
-        // Update per-tray and per-pretzel derived columns live
-        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-          const val = parseFloat(inp.value);
-          const row = inp.closest('tr');
-          const perTrayEl    = row.querySelector('.per-tray');
-          const perPretzelEl = row.querySelector('.per-pretzel');
-          if (!isNaN(val)) {
-            if (perTrayEl)    perTrayEl.textContent    = tpb ? fmt2(val / tpb) : '—';
-            if (perPretzelEl) perPretzelEl.textContent = ppb ? fmt2(val / ppb)  : '—';
-          } else {
-            if (perTrayEl)    perTrayEl.textContent    = '—';
-            if (perPretzelEl) perPretzelEl.textContent = '—';
-          }
-        });
-      }
-
-      pptInput.addEventListener('input', updateDerived);
-      tpbInput.addEventListener('input', updateDerived);
-      card.querySelectorAll('.recipe-qty-input').forEach((inp) => inp.addEventListener('input', updateDerived));
-
-      // Save button
-      card.querySelector('.sku-save-btn').addEventListener('click', async () => {
-        const saveBtn    = card.querySelector('.sku-save-btn');
-        const statusSpan = card.querySelector('.sku-save-status');
-        const ppt = parseFloat(pptInput.value);
-        const tpb = parseFloat(tpbInput.value);
-
-        if ((!isNaN(ppt) && ppt > 0) !== (!isNaN(tpb) && tpb > 0)) {
-          showToast('Enter both pretzels/tray and trays/batch', 'error'); return;
-        }
-
-        saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; statusSpan.textContent = '';
-        const now = new Date().toISOString();
-        const writes = [];
-
-        // Write scale if set
-        if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) {
-          writes.push(appendLog(RECIPES_PATH, {
-            action: 'sku_scale', sku, pretzelsPerTray: String(ppt), traysPerBatch: String(tpb), timeStamp: now, updatedBy: '',
-          }));
-        }
-
-        // Write each ingredient that has a value
-        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-          const productId = inp.dataset.productId;
-          const val = parseFloat(inp.value);
-          if (!isNaN(val) && val >= 0) {
-            writes.push(appendLog(RECIPES_PATH, {
-              action: 'recipe', sku, productId, quantityPerBatch: String(val), timeStamp: now, updatedBy: '',
-            }));
-          }
-        });
-
-        if (!writes.length) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; return; }
-
-        try {
-          await Promise.all(writes);
-          // Update in-memory maps
-          if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) scaleMap[sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
-          if (!recipeMap[sku]) recipeMap[sku] = {};
-          card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-            const val = parseFloat(inp.value);
-            if (!isNaN(val) && val >= 0) recipeMap[sku][inp.dataset.productId] = val;
-          });
-          // Update card meta
-          const metaEl = card.querySelector('.sku-card-meta');
-          if (metaEl && scaleMap[sku]) metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
-          // Re-run forecast with updated recipe data
-          const deliveries = resolveDeliveries([]); // need raw logs — just reload
-          await loadAll();
-          showToast('✓ Recipe saved', 'success');
-          statusSpan.textContent = 'Saved ✓';
-        } catch (err) {
-          showToast('Save failed: ' + (err.message || 'error'), 'error');
-          statusSpan.textContent = 'Error saving';
-          saveBtn.disabled = false;
-        } finally {
-          saveBtn.textContent = 'Save Recipe';
-          if (saveBtn.disabled) saveBtn.disabled = false;
-        }
-      });
-    }
 
     // ── Controls ──────────────────────────────────────────────────────────────
     document.getElementById('refresh-btn').addEventListener('click', () => {

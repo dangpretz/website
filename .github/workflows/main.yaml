@@ -12,3 +12,13 @@ jobs:
         node-version: 20
     - run: npm ci
     - run: npm run lint
+    - name: Publish static pages to AEM Live
+      if: github.ref == 'refs/heads/main'
+      run: |
+        find static -name "*.html" | while read FILE; do
+          AEM_PATH="/${FILE}"
+          echo "Publishing ${AEM_PATH}…"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://admin.hlx.page/publish/dangpretz/website/main${AEM_PATH}")
+          echo "  → HTTP ${STATUS}"
+        done
