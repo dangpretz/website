@@ -104,16 +104,14 @@
     gap: var(--space-1);
   }
   .header__title {
-    font: var(--weight-heavy) var(--size-screen-title)/0.9 var(--font);
+    font: 900 italic var(--size-screen-title)/0.95 var(--font-italic-serif);
     color: var(--color-text-on-dark);
-    letter-spacing: -0.02em;
-    text-transform: uppercase;
+    letter-spacing: -0.01em;
   }
   .header__subtitle {
-    font: var(--weight-bold) var(--size-section) var(--font);
+    font: 400 italic var(--size-section)/1.05 var(--font-italic-serif);
     color: var(--color-accent);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0;
   }
 
   /* ─── Section label ─── */
@@ -145,10 +143,10 @@
   .card-a__image-wrap {
     position: relative;
     width: 100%;
-    height: 168px;
+    height: 140px;
   }
   .card-a--featured { grid-column: span 2; }
-  .card-a--featured .card-a__image-wrap { height: 224px; }
+  .card-a--featured .card-a__image-wrap { height: 200px; }
   .card-a__image {
     width: 100%;
     height: 100%;
@@ -167,10 +165,11 @@
     position: relative;
   }
   .card-a__placeholder::before {
-    content: 'B';
-    font: 900 italic 200px/1 var(--font-italic-serif);
-    color: rgba(255, 255, 255, 0.18);
-    letter-spacing: -0.05em;
+    content: 'BOOTLEGGER';
+    font: var(--weight-heavy) 28px var(--font);
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.4em;
+    white-space: nowrap;
   }
   .card-a__pill {
     position: absolute;
@@ -221,6 +220,12 @@
     flex-direction: column;
     gap: var(--space-2);
   }
+  .card-b__title {
+    font: 900 italic 36px/1 var(--font-italic-serif);
+    color: var(--color-text-on-dark);
+    margin-bottom: var(--space-1);
+  }
+  .card-b--cream .card-b__title { color: var(--color-text-on-cream); }
   .card-b--cream { background: var(--color-card-cream); }
   .card-b--dark { background: var(--color-card-dark); }
   .card-b--red { background: var(--color-accent-dark); }
@@ -244,6 +249,16 @@
   .card-b__row--2col { grid-template-columns: 1fr auto; gap: var(--space-3); }
   .card-b__row--3col { grid-template-columns: 240px 1fr auto; gap: var(--space-4); }
   .card-b__row--deal { grid-template-columns: 1fr auto auto; gap: var(--space-3); }
+  .card-b__row--deal-2line {
+    grid-template-columns: 1fr auto auto;
+    grid-template-rows: auto auto;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) 0;
+  }
+  .card-b__row--deal-2line .card-b__sub {
+    grid-column: 1 / -1;
+    color: rgba(255, 255, 255, 0.78);
+  }
 
   .card-b__label {
     font: var(--weight-heavy) var(--size-item)/1.05 var(--font);
@@ -269,10 +284,8 @@
   .card-b--red .card-b__sub { color: var(--color-text-muted-dark); }
 
   .card-b__pairs {
-    font: var(--weight-bold) var(--size-meta) var(--font);
-    color: var(--color-accent);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: var(--weight-bold) var(--size-body)/1.3 var(--font);
+    color: var(--color-text-muted-cream);
     text-align: right;
   }
   .card-b__pairs small {
@@ -282,6 +295,18 @@
     letter-spacing: 0.16em;
     margin-bottom: var(--space-1);
     font-weight: var(--weight-regular);
+    text-transform: uppercase;
+  }
+
+  /* Dip rows: smaller name, more padding, stronger divider */
+  .card-b--cream .card-b__row--dip {
+    padding: var(--space-3) 0;
+  }
+  .card-b--cream .card-b__row--dip + .card-b__row--dip {
+    border-top: 1px solid rgba(26, 26, 26, 0.12);
+  }
+  .card-b--cream .card-b__row--dip .card-b__label {
+    font: var(--weight-heavy) 34px/1.05 var(--font);
   }
 
   /* ═══ Pills ═══ */
@@ -374,9 +399,8 @@
     padding: var(--space-4);
   }
   .catering__title {
-    font: var(--weight-heavy) var(--size-item)/1 var(--font);
+    font: 900 italic 48px/1 var(--font-italic-serif);
     color: var(--color-text-on-dark);
-    letter-spacing: -0.02em;
     margin-bottom: var(--space-1);
   }
   .catering__sub {
@@ -432,7 +456,7 @@
     <header class="header">
       <img class="header__logo" src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
       <div class="header__titles">
-        <span class="header__title">Pretzels.</span>
+        <span class="header__title">Pretzels</span>
       </div>
     </header>
 
@@ -448,7 +472,7 @@
               <span class="card-a__name">Salty</span>
               <span class="card-a__price">$6</span>
             </div>
-            <p class="card-a__desc">Pure soft pretzel. Invented by monks.</p>
+            <p class="card-a__desc">Pure, unadulterated soft pretzel. Invented by monks, perfected for punks.</p>
           </div>
         </div>
 
@@ -484,7 +508,7 @@
           </div>
           <div class="card-a__body">
             <div class="card-a__head">
-              <span class="card-a__name">Devil's</span>
+              <span class="card-a__name">Devil's Delight</span>
               <span class="card-a__price">$7</span>
             </div>
             <p class="card-a__desc">Gooey pepperjack. Crispy pepperoni. Holy nothing.</p>
@@ -501,7 +525,7 @@
               <span class="card-a__name">Bootlegger</span>
               <span class="card-a__price">$7</span>
             </div>
-            <p class="card-a__desc">Bourbon, maple, bacon. Hidden in the trunk, gone before you ask.</p>
+            <p class="card-a__desc">Bourbon, maple, bacon &mdash; once hidden in the trunk of a fast car, always about to run out.</p>
           </div>
         </div>
 
@@ -539,22 +563,25 @@
     </div>
 
     <div class="section">
-      <p class="section-label">Deals</p>
       <div class="card-b card-b--red">
-        <div class="card-b__row card-b__row--deal">
+        <h3 class="card-b__title">Deals</h3>
+        <div class="card-b__row card-b__row--deal-2line">
           <span class="card-b__label">Date Night</span>
           <span class="card-b__value">$14</span>
           <span class="pill pill--save">Save $2</span>
+          <p class="card-b__sub">1 Salty + 1 Saint + 2 dips. Dinner for two, ruined.</p>
         </div>
-        <div class="card-b__row card-b__row--deal">
+        <div class="card-b__row card-b__row--deal-2line">
           <span class="card-b__label">The 4-Pack</span>
           <span class="card-b__value">$28</span>
           <span class="pill pill--save">Save $6</span>
+          <p class="card-b__sub">Any 4 pretzels + 4 dips. Built to share, eaten alone.</p>
         </div>
-        <div class="card-b__row card-b__row--deal">
+        <div class="card-b__row card-b__row--deal-2line">
           <span class="card-b__label">Half Dozen</span>
           <span class="card-b__value">$29</span>
           <span class="pill pill--save">Save $10</span>
+          <p class="card-b__sub">Six pretzels. Show up like a problem.</p>
         </div>
       </div>
     </div>
@@ -571,7 +598,7 @@
     <header class="header">
       <img class="header__logo" src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
       <div class="header__titles">
-        <span class="header__title">Bombs.</span>
+        <span class="header__title">Bombs</span>
         <span class="header__subtitle">Round. Salted. Dangerous.</span>
       </div>
     </header>
@@ -650,7 +677,7 @@
 
     <div class="catering">
       <div>
-        <p class="catering__title">Catering</p>
+        <p class="catering__title">Bigger event?</p>
         <p class="catering__sub">Weddings, corporate, festivals. We've got you.</p>
       </div>
       <div class="qr qr--dark">
@@ -674,35 +701,35 @@
     <header class="header">
       <img class="header__logo" src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co.">
       <div class="header__titles">
-        <span class="header__title">Sides.</span>
-        <span class="header__subtitle">Dunk It. Pair It.</span>
+        <span class="header__title">Sides</span>
+        <span class="header__subtitle">Dunk it. Pair it.</span>
       </div>
     </header>
 
     <div class="section">
       <p class="section-label">Dips &mdash; $2 Each</p>
       <div class="card-b card-b--cream">
-        <div class="card-b__row card-b__row--3col">
+        <div class="card-b__row card-b__row--3col card-b__row--dip">
           <span class="card-b__label">Dangerous Dip</span>
           <span class="card-b__sub">Creamy house cheese, right amount of spice.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Salty &middot; Bootlegger</span>
         </div>
-        <div class="card-b__row card-b__row--3col">
+        <div class="card-b__row card-b__row--3col card-b__row--dip">
           <span class="card-b__label">House Mustard</span>
           <span class="card-b__sub">Yellow mustard-ish.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Salty &middot; BBK</span>
         </div>
-        <div class="card-b__row card-b__row--3col">
+        <div class="card-b__row card-b__row--3col card-b__row--dip">
           <span class="card-b__label">Honey Mustard</span>
           <span class="card-b__sub">Stone ground classic. Sweet and tangy.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Saint &middot; For The Kids</span>
         </div>
-        <div class="card-b__row card-b__row--3col">
+        <div class="card-b__row card-b__row--3col card-b__row--dip">
           <span class="card-b__label">Hot Ranch</span>
           <span class="card-b__sub">Our take on buffalo ranch.</span>
-          <span class="card-b__pairs"><small>Pairs With</small>Spicy Bee &middot; Devil's</span>
+          <span class="card-b__pairs"><small>Pairs With</small>Spicy Bee &middot; Devil's Delight</span>
         </div>
-        <div class="card-b__row card-b__row--3col">
+        <div class="card-b__row card-b__row--3col card-b__row--dip">
           <span class="card-b__label">Sweet Cream</span>
           <span class="card-b__sub">Sweet + cream + cheese.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Saint &middot; Saint Bombs</span>
