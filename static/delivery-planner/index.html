@@ -957,7 +957,7 @@
       isShapeOnlyDelivery,
       expandBoxLineItems,
       caseSizeOptionsFor,
-    } from '../../scripts/inventory.js?v=2026-05-12-foh-dough-audit-1';
+    } from '../../scripts/inventory.js?v=2026-05-12-drift-fixes-plus-audit';
 
     // Shape-only catering + box expansion. ENABLED BY DEFAULT — kept in
     // sync with production app via the same localStorage key.
@@ -1181,7 +1181,19 @@
       const latestBarcodes = {};
       logs.forEach((row, idx) => {
         const id = row.deliveryId || `legacy-${row.timeStamp || idx}`;
-        if (row.action === 'delete') { delete byId[id]; return; }
+        if (row.action === 'delete') {
+          const prev = byId[id];
+          // Confirmed delivery + delete = ghost record (pretzels physically
+          // shipped before the cancel; UI hides them, inventory keeps the
+          // deduction). Mirrors the same handling in inventory.js's
+          // resolveDeliveries so the two paths stay in sync.
+          if (prev && ['delivered', 'picked_up'].includes(prev.status)) {
+            prev._deleted = true;
+            return;
+          }
+          delete byId[id];
+          return;
+        }
         if (row.action === 'barcodes') {
           try { latestBarcodes[id] = JSON.parse(row.barcodes || '[]'); } catch (_) { latestBarcodes[id] = []; }
           return;
@@ -1209,14 +1221,23 @@
           return;
         }
         if (row.action === 'update') {
-          const prevBarcodes = byId[id] ? byId[id].barcodes : undefined;
-          const prevConfirmation = byId[id] ? byId[id].confirmation : undefined;
+          const prev = byId[id];
+          const prevBarcodes = prev ? prev.barcodes : undefined;
+          const prevConfirmation = prev ? prev.confirmation : undefined;
+          const prevStatus = prev ? prev.status : undefined;
           byId[id] = { ...row, deliveryId: id };
           if (prevBarcodes) byId[id].barcodes = prevBarcodes;
           if (prevConfirmation) byId[id].confirmation = prevConfirmation;
           let s = row.status || 'scheduled';
           if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
           byId[id].status = s;
+          // Preserve confirmation status across Square re-syncs. Mirrors
+          // the same preservation in inventory.js's resolveDeliveries so
+          // the planner's confirm button doesn't re-appear after a Square
+          // metadata-only update of an already-confirmed delivery.
+          if (prev && ['delivered', 'picked_up'].includes(prevStatus) && prevConfirmation) {
+            byId[id].status = prevStatus;
+          }
           return;
         }
         const prevBarcodes = byId[id] ? byId[id].barcodes : undefined;
@@ -1231,7 +1252,10 @@
       Object.entries(latestBarcodes).forEach(([id, codes]) => {
         if (byId[id]) byId[id].barcodes = codes;
       });
-      return Object.values(byId).sort((a, b) => {
+      // Hide _deleted ghosts from the planner UI — they exist only so the
+      // production app's inventory math keeps deducting confirmed-then-
+      // cancelled shipments.
+      return Object.values(byId).filter((d) => !d._deleted).sort((a, b) => {
         const d = (a.date || '').localeCompare(b.date || '');
         return d !== 0 ? d : (a.timeStamp || '').localeCompare(b.timeStamp || '');
       });

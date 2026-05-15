@@ -365,7 +365,20 @@ export function resolveDeliveries(logs, options = {}) {
   if (!Array.isArray(logs)) return [];
   logs.forEach((row, idx) => {
     const id = row.deliveryId || `legacy-${idx}`;
-    if (row.action === 'delete') { delete byId[id]; return; }
+    if (row.action === 'delete') {
+      const prev = byId[id];
+      // If the delivery was already confirmed (pretzels physically left
+      // the building), preserve a "ghost" record so inventory deductions
+      // stick. Active-delivery views filter on `_deleted`. Without this,
+      // Square cancellations after fulfillment would silently restore the
+      // delivery's pretzels to the system view.
+      if (prev && ['delivered', 'picked_up'].includes(prev.status)) {
+        prev._deleted = true;
+        return;
+      }
+      delete byId[id];
+      return;
+    }
     if (row.action === 'barcodes') return;
     if (row.action === 'confirm') {
       if (byId[id]) {
@@ -386,6 +399,17 @@ export function resolveDeliveries(logs, options = {}) {
       const prev = byId[id];
       byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
       if (prev?.barcodes) byId[id].barcodes = prev.barcodes;
+      // Preserve confirmation state across update events. Square re-syncs
+      // hit this path whenever a customer touches their order (notes, times,
+      // any line item edit) — without this preservation, a delivery that
+      // had been confirmed silently flips back to `scheduled` and its
+      // inventory deduction reverses, inflating stock. Manager can still
+      // explicitly un-confirm via the planner if a Square edit really
+      // means "this won't ship after all".
+      if (prev && ['delivered', 'picked_up'].includes(prev.status) && prev._confirmedAt) {
+        byId[id].status = prev.status;
+        byId[id]._confirmedAt = prev._confirmedAt;
+      }
       return;
     }
     byId[id] = { ...row, deliveryId: id, status: row.status || 'scheduled' };
@@ -857,89 +881,144 @@ export function getInventoryReport(args) {
     }
   });
 
-  (allDeliveries || [])
-    .filter((d) => {
-      if (!['delivered', 'picked_up'].includes(d.status)) return false;
-      if (!latestInventoryTs) return true;
-      return d._confirmedAt && d._confirmedAt > latestInventoryTs;
-    })
-    .forEach((delivery) => {
-      let items = [];
-      try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
-      const cust = delivery.customer || delivery.location || '?';
-      // Shape-only deliveries (catering boxes, FOH Placeholder) leave the
-      // pipeline at the dough stage — FOH bakes them fresh from
-      // coldFerment at fulfillment. Lifecycle-less SKUs (cheese, dips)
-      // live in onHand regardless. Each delivered line item cascades
-      // through buckets in priority order, deducting exactly `qty` units
-      // total across the three buckets.
-      const isShapeOnly = !!delivery._shapeOnly;
-      items.forEach(({ sku, quantity }) => {
-        let key = sku?.trim();
-        if (!key) return;
-        if (skuAliases[key]) key = skuAliases[key];
-        const qty = Number(quantity) || 0;
-        if (qty <= 0) return;
+  // Track every delivery's deduction decision + per-line-item breakdown so
+  // the Stock audit UI can explain why a SKU's value is what it is. Each
+  // entry: {deliveryId, customer, date, status, decision, reason, items[]}.
+  const deductionExplanations = [];
 
-        // Cascade: onHand → (cf for shape-only) → frozen. Each step takes
-        // only what it has, spills the remainder. Fixes the prior
-        // double-deduction bug where shape-only deliveries with cheese
-        // (cf populated by cheese_done + oh populated by stock snapshot)
-        // had both buckets deduct the full qty.
-        let remaining = qty;
+  const filterDecision = (d) => {
+    if (!['delivered', 'picked_up'].includes(d.status)) {
+      return { include: false, reason: `status="${d.status || 'scheduled'}" (not confirmed)` };
+    }
+    if (!latestInventoryTs) {
+      return { include: true, reason: 'no inventory snapshot yet' };
+    }
+    if (!d.date || !latestInvDate) {
+      const ok = d._confirmedAt && d._confirmedAt > latestInventoryTs;
+      return {
+        include: !!ok,
+        reason: ok
+          ? `confirmedAt ${d._confirmedAt} > snapshot ${latestInventoryTs}`
+          : `confirmedAt ${d._confirmedAt || '(none)'} ≤ snapshot ${latestInventoryTs}`,
+      };
+    }
+    if (d.date > latestInvDate) {
+      return { include: true, reason: `delivery date ${d.date} > snapshot date ${latestInvDate} (future)` };
+    }
+    if (d.date < latestInvDate) {
+      return { include: false, reason: `delivery date ${d.date} < snapshot date ${latestInvDate} (snapshot already excludes)` };
+    }
+    // Same-date — fall back to confirmation timestamp
+    const ok = d._confirmedAt && d._confirmedAt > latestInventoryTs;
+    return {
+      include: !!ok,
+      reason: ok
+        ? `same date as snapshot, confirmedAt ${d._confirmedAt} > snapshot ${latestInventoryTs}`
+        : `same date as snapshot, confirmedAt ${d._confirmedAt || '(none)'} ≤ snapshot ${latestInventoryTs}`,
+    };
+  };
 
-        // 1) onHand — canonical for cheese, retail dips, bulk dip, etc.
-        if (oh[key] != null && oh[key] > 0 && remaining > 0) {
-          const take = Math.min(oh[key], remaining);
-          oh[key] = Math.max(0, oh[key] - take);
-          remaining -= take;
-        }
-
-        // 2) cf — only for shape-only pretzel deliveries (catering boxes,
-        //    FOH Placeholder). FIFO consume the dough queue alongside so
-        //    age tracking stays accurate.
-        if (remaining > 0 && isShapeOnly && cf[key] != null && cf[key] > 0) {
-          const take = Math.min(cf[key], remaining);
-          cf[key] = Math.max(0, cf[key] - take);
-          if (doughQueue[key]) {
-            let toConsume = take;
-            while (toConsume > 0 && doughQueue[key].length > 0) {
-              const oldest = doughQueue[key][0];
-              const t = Math.min(oldest.pretzels, toConsume);
-              oldest.pretzels -= t;
-              toConsume -= t;
-              if (oldest.pretzels <= 0) doughQueue[key].shift();
-            }
-          }
-          remaining -= take;
-        }
-
-        // 3) frozen — standard pretzel ship-out path. Also covers legacy
-        //    pre-Phase-3a cheese snapshots stored in fr, and FOH-only
-        //    catering-portion SKUs (3oz dangerous dip, 3oz sweet cream
-        //    dip) where the manager enters stock via the right-column
-        //    input that writes to fr for non-lifecycle-less rows.
-        if (remaining > 0 && fr[key] != null && fr[key] > 0) {
-          const take = Math.min(fr[key], remaining);
-          fr[key] = Math.max(0, fr[key] - take);
-          remaining -= take;
-        }
-
-        if (!flowDelivered[key]) flowDelivered[key] = [];
-        flowDelivered[key].push({
-          customer: cust,
-          qty,
-          fulfilled: qty - remaining,
-          // shortage > 0 means the delivery shipped without enough on-hand
-          // inventory to cover it — useful signal for the coverage UI and
-          // future "delivery audit" reports. Today the cascade caps at 0
-          // per bucket, so nothing goes negative; we just track that there
-          // was a gap.
-          shortage: remaining,
+  (allDeliveries || []).forEach((delivery) => {
+    const decision = filterDecision(delivery);
+    if (!decision.include) {
+      // Filtered out — capture reason for the audit trail. Skip 'scheduled'
+      // entries (the bulk of allDeliveries) since they'd flood the trail.
+      if (['delivered', 'picked_up', 'cancelled'].includes(delivery.status)) {
+        deductionExplanations.push({
+          deliveryId: delivery.deliveryId || '',
+          customer: delivery.customer || delivery.location || '?',
+          date: delivery.date || '',
+          status: delivery.status || 'scheduled',
           confirmedAt: delivery._confirmedAt || '',
+          decision: 'skipped',
+          reason: decision.reason,
+          deleted: !!delivery._deleted,
+          items: [],
         });
+      }
+      return;
+    }
+    // Cascade deduction with per-item audit trail. Logic unchanged from
+    // the prior implementation; we just capture which bucket each pretzel
+    // came from so the Stock audit UI can show "−24 from frozen for Lux".
+    let items = [];
+    try { items = JSON.parse(delivery.lineItems || '[]'); } catch {}
+    const cust = delivery.customer || delivery.location || '?';
+    const isShapeOnly = !!delivery._shapeOnly;
+    const itemTrail = [];
+    items.forEach(({ sku, quantity }) => {
+      let key = sku?.trim();
+      if (!key) return;
+      if (skuAliases[key]) key = skuAliases[key];
+      const qty = Number(quantity) || 0;
+      if (qty <= 0) return;
+
+      let remaining = qty;
+      let fromOh = 0; let fromCf = 0; let fromFr = 0;
+
+      // 1) onHand — canonical for cheese, retail dips, bulk dip, etc.
+      if (oh[key] != null && oh[key] > 0 && remaining > 0) {
+        fromOh = Math.min(oh[key], remaining);
+        oh[key] = Math.max(0, oh[key] - fromOh);
+        remaining -= fromOh;
+      }
+
+      // 2) cf — only for shape-only pretzel deliveries (catering boxes,
+      //    FOH Placeholder). FIFO consume the dough queue alongside so
+      //    age tracking stays accurate.
+      if (remaining > 0 && isShapeOnly && cf[key] != null && cf[key] > 0) {
+        fromCf = Math.min(cf[key], remaining);
+        cf[key] = Math.max(0, cf[key] - fromCf);
+        if (doughQueue[key]) {
+          let toConsume = fromCf;
+          while (toConsume > 0 && doughQueue[key].length > 0) {
+            const oldest = doughQueue[key][0];
+            const t = Math.min(oldest.pretzels, toConsume);
+            oldest.pretzels -= t;
+            toConsume -= t;
+            if (oldest.pretzels <= 0) doughQueue[key].shift();
+          }
+        }
+        remaining -= fromCf;
+      }
+
+      // 3) frozen — standard pretzel ship-out path. Also covers legacy
+      //    pre-Phase-3a cheese snapshots stored in fr, and FOH-only
+      //    catering-portion SKUs where the manager entered stock via the
+      //    right-column input that writes to fr for non-lifecycle-less rows.
+      if (remaining > 0 && fr[key] != null && fr[key] > 0) {
+        fromFr = Math.min(fr[key], remaining);
+        fr[key] = Math.max(0, fr[key] - fromFr);
+        remaining -= fromFr;
+      }
+
+      if (!flowDelivered[key]) flowDelivered[key] = [];
+      flowDelivered[key].push({
+        customer: cust,
+        qty,
+        fulfilled: qty - remaining,
+        // shortage > 0 means the delivery shipped without enough on-hand
+        // inventory to cover it — useful signal for the coverage UI and
+        // future "delivery audit" reports. Today the cascade caps at 0
+        // per bucket, so nothing goes negative; we just track that there
+        // was a gap.
+        shortage: remaining,
+        confirmedAt: delivery._confirmedAt || '',
       });
+      itemTrail.push({ sku: key, qty, fromOh, fromCf, fromFr, shortage: remaining });
     });
+    deductionExplanations.push({
+      deliveryId: delivery.deliveryId || '',
+      customer: cust,
+      date: delivery.date || '',
+      status: delivery.status || 'scheduled',
+      confirmedAt: delivery._confirmedAt || '',
+      decision: 'deducted',
+      reason: decision.reason,
+      deleted: !!delivery._deleted,
+      items: itemTrail,
+    });
+  });
 
   Object.keys(cf).forEach((k) => { cf[k] = Math.max(0, Math.round(cf[k])); });
   Object.keys(fr).forEach((k) => { fr[k] = Math.max(0, Math.round(fr[k])); });
@@ -995,6 +1074,10 @@ export function getInventoryReport(args) {
     },
     alerts: { agingDough, bfpOverbake: bfpOverbakeEvents, fohOverPull: fohOverPullEvents },
     snapshot: { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
+    // Per-delivery decision trail: each entry says whether this delivery
+    // deducted inventory and why (or why it was skipped). Powers the
+    // Stock audit modal on the manager view.
+    deductionExplanations,
   };
 }
 

@@ -899,6 +899,70 @@
       font: 600 11px 'Manrope', sans-serif; color: #888;
       margin-top: 6px; text-align: right;
     }
+
+    /* Stock audit modal — manager-only diagnostic for inventory drift.
+       Shows per-SKU walkthrough: snapshot baseline → flows → deductions.
+       Same dark-card visual language as the schedule-diff toast. */
+    .stock-audit-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 1100; display: flex; align-items: center; justify-content: center;
+      padding: 16px; animation: fadeIn 0.15s ease;
+    }
+    .stock-audit-modal {
+      background: #1A1A1A; color: #fff;
+      width: 100%; max-width: 640px;
+      max-height: calc(100vh - 32px);
+      border-radius: 10px; padding: 20px; overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      font: 500 13px 'Manrope', sans-serif;
+    }
+    .stock-audit-modal h3 {
+      font: 800 18px 'Manrope', sans-serif; margin: 0 0 4px;
+    }
+    .stock-audit-meta { font-size: 12px; color: #888; margin-bottom: 14px; }
+    .stock-audit-sku {
+      margin-bottom: 12px; border: 1px solid #2a2a2a; border-radius: 6px;
+      padding: 10px 12px; background: #0f0f0f;
+    }
+    .stock-audit-sku-name {
+      font: 700 14px 'Manrope', sans-serif; color: #fff; margin-bottom: 6px;
+    }
+    .stock-audit-row {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 10px; padding: 2px 0;
+      font: 500 12px 'Manrope', sans-serif; color: #ccc;
+    }
+    .stock-audit-row .label { color: #aaa; }
+    .stock-audit-row .add  { color: #c8f0d4; }
+    .stock-audit-row .sub  { color: #f8d7da; }
+    .stock-audit-row.total {
+      border-top: 1px solid #444; padding-top: 4px; margin-top: 4px;
+      font-weight: 700; color: #fff;
+    }
+    .stock-audit-skipped {
+      margin-top: 8px; padding-top: 6px; border-top: 1px dashed #2a2a2a;
+      font-size: 11px; color: #888;
+    }
+    .stock-audit-skipped-title { font-weight: 700; margin-bottom: 2px; color: #aaa; }
+    .stock-audit-skipped-row { padding: 1px 0; }
+    .stock-audit-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 16px;
+    }
+    .stock-audit-close {
+      background: var(--paper); color: #1A1A1A; border: none; border-radius: 5px;
+      padding: 8px 18px; font: 700 13px 'Manrope', sans-serif; cursor: pointer;
+    }
+    .stock-audit-close:hover { background: #fff; }
+    .stock-audit-empty { color: #888; font-style: italic; padding: 8px 0; }
+    /* Audit button next to Save Stock — manager-only, secondary style */
+    #stock-audit {
+      background: transparent; color: var(--paper); border: 1px solid var(--paper);
+      border-radius: 5px; padding: 8px 14px;
+      font: 600 13px 'Manrope', sans-serif; cursor: pointer;
+      margin-left: 8px;
+    }
+    #stock-audit:hover { background: var(--paper); color: #1A1A1A; }
   </style>
 </head>
 <body>
@@ -1061,7 +1125,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-12-foh-dough-audit-1';
+  } from '../../scripts/inventory.js?v=2026-05-12-drift-fixes-plus-audit';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -3056,7 +3120,10 @@
         <span style="text-align:center">${t('frozen_col')}</span>
       </div>
       ${rows}
-      <button class="btn-primary" id="stock-save" style="margin-top:20px">${t('save_stock')}</button>
+      <div style="display:flex; align-items:center; margin-top:20px">
+        <button class="btn-primary" id="stock-save">${t('save_stock')}</button>
+        ${isFohRole ? '' : `<button type="button" id="stock-audit" title="${appLang === 'es' ? 'Por qué los números son los que son' : 'Why the numbers are what they are'}">🔍 ${appLang === 'es' ? 'Auditoría' : 'Audit'}</button>`}
+      </div>
       ${isFohRole ? '' : boxMappingsHtml}
     </div></div>`;
   }
@@ -3586,6 +3653,159 @@
     toast.addEventListener('click', remove);
     const ttl = (perDay.length === 0 && newOverdue.length === 0) ? 2500 : 6000;
     setTimeout(remove, ttl);
+  }
+
+  /**
+   * Stock audit modal — manager-only diagnostic. Walks the user through
+   * exactly how each SKU's current displayed inventory value is computed:
+   *   snapshot baseline  + shape_done  + bfp_done  − deliveries  − foh_done
+   *                                                                = displayed
+   * Plus a per-SKU list of deliveries that were SKIPPED from deduction
+   * along with the reason (status not confirmed, past-dated already in
+   * snapshot, etc.) so the manager can spot drift sources.
+   *
+   * Pure UI — reads from the same `getInventoryReportLocal()` the rest of
+   * the page consumes, mutates no state.
+   */
+  function showStockAuditModal() {
+    // Remove any prior audit modal (re-open replaces)
+    document.querySelectorAll('.stock-audit-overlay').forEach(n => n.remove());
+
+    const rpt = getInventoryReportLocal();
+    const snapshotTs = rpt.snapshot?.timestamp || '';
+    const snapshotDate = rpt.snapshot?.date || '';
+    const snapshotRaw = rpt.snapshot?.raw || { coldFerment: {}, frozen: {}, onHand: {} };
+    const effective = rpt.effective || { coldFerment: {}, frozen: {}, onHand: {} };
+    const flowShape = rpt.flowsSinceSnapshot?.shape || {};
+    const flowBfp   = rpt.flowsSinceSnapshot?.bfp   || {};
+    const flowFoh   = rpt.flowsSinceSnapshot?.foh   || {};
+    const flowDelv  = rpt.flowsSinceSnapshot?.delivered || {};
+    const explanations = rpt.deductionExplanations || [];
+
+    // Collect SKUs to display: any SKU present in snapshot, effective,
+    // or in any of the flows. Sort by display name.
+    const skuSet = new Set();
+    Object.keys(snapshotRaw.coldFerment || {}).forEach(k => skuSet.add(k));
+    Object.keys(snapshotRaw.frozen || {}).forEach(k => skuSet.add(k));
+    Object.keys(snapshotRaw.onHand || {}).forEach(k => skuSet.add(k));
+    Object.keys(effective.coldFerment || {}).forEach(k => skuSet.add(k));
+    Object.keys(effective.frozen || {}).forEach(k => skuSet.add(k));
+    Object.keys(effective.onHand || {}).forEach(k => skuSet.add(k));
+    Object.keys(flowShape).forEach(k => skuSet.add(k));
+    Object.keys(flowBfp).forEach(k => skuSet.add(k));
+    Object.keys(flowFoh).forEach(k => skuSet.add(k));
+    Object.keys(flowDelv).forEach(k => skuSet.add(k));
+    const skus = [...skuSet].sort();
+
+    // Pre-group skipped deliveries by SKU so we can show them in-context.
+    // Also group deducted deliveries' itemTrail for per-SKU rendering.
+    const deductedBySku = {};
+    const skippedAll = [];
+    explanations.forEach((exp) => {
+      if (exp.decision === 'deducted') {
+        (exp.items || []).forEach((it) => {
+          if (!deductedBySku[it.sku]) deductedBySku[it.sku] = [];
+          deductedBySku[it.sku].push({ ...it, customer: exp.customer, date: exp.date, deliveryId: exp.deliveryId, deleted: exp.deleted });
+        });
+      } else {
+        // Skipped: we don't know which SKUs it affected without parsing
+        // its lineItems again (skipped deliveries don't decompose). Show
+        // these at the top of the modal under a global "skipped" list,
+        // not per-SKU.
+        skippedAll.push(exp);
+      }
+    });
+
+    const fmtSnapTime = snapshotTs
+      ? new Date(snapshotTs).toLocaleString('en-US', { timeZone: 'America/Denver', dateStyle: 'medium', timeStyle: 'short' })
+      : '(no snapshot yet)';
+
+    const skuSections = skus.map((sku) => {
+      const snapCf = Number(snapshotRaw.coldFerment?.[sku] || 0);
+      const snapFr = Number(snapshotRaw.frozen?.[sku] || 0);
+      const snapOh = Number(snapshotRaw.onHand?.[sku] || 0);
+      const snapTotal = snapCf + snapFr + snapOh;
+      const effCf = Number(effective.coldFerment?.[sku] || 0);
+      const effFr = Number(effective.frozen?.[sku] || 0);
+      const effOh = Number(effective.onHand?.[sku] || 0);
+      const effTotal = effCf + effFr + effOh;
+
+      const shapeBatches = Number(flowShape[sku] || 0);
+      const bfpBatches   = Number(flowBfp[sku]   || 0);
+      const fohSheets    = Number(flowFoh[sku]   || 0);
+      const bs = getBatchSize(sku) || 0;
+      const ts2 = getTraySize(sku) || 0;
+      const shapeP = shapeBatches * bs;
+      const bfpP   = bfpBatches   * bs;
+      const fohP   = fohSheets    * ts2;
+
+      const deliveryRows = (deductedBySku[sku] || []).filter(d => (d.fromOh + d.fromCf + d.fromFr) > 0);
+      const deliveryTotal = deliveryRows.reduce((s, d) => s + d.fromOh + d.fromCf + d.fromFr, 0);
+
+      // Skip SKUs with no meaningful activity AND no snapshot
+      if (snapTotal === 0 && shapeP === 0 && bfpP === 0 && fohP === 0 && deliveryTotal === 0 && effTotal === 0) {
+        return '';
+      }
+
+      const rows = [];
+      rows.push(`<div class="stock-audit-row"><span class="label">${appLang === 'es' ? 'Inventario inicial' : 'Snapshot baseline'} (${esc(snapshotDate || '—')})</span><span>${snapTotal}p</span></div>`);
+      if (shapeP > 0) rows.push(`<div class="stock-audit-row"><span class="label">+ ${appLang === 'es' ? 'Formado' : 'Shape done'}</span><span class="add">+${shapeP}p (${shapeBatches} ${shapeBatches === 1 ? (appLang === 'es' ? 'tanda' : 'batch') : (appLang === 'es' ? 'tandas' : 'batches')})</span></div>`);
+      if (bfpP > 0) rows.push(`<div class="stock-audit-row"><span class="label">+ ${appLang === 'es' ? 'Horneado/Cong' : 'BFP done'}</span><span class="add">+${bfpP}p</span></div>`);
+      if (fohP > 0) rows.push(`<div class="stock-audit-row"><span class="label">− ${appLang === 'es' ? 'FOH usó' : 'FOH consumed'}</span><span class="sub">−${fohP}p (${fohSheets} ${fohSheets === 1 ? 'sheet' : 'sheets'})</span></div>`);
+      deliveryRows.forEach((dr) => {
+        const buckets = [];
+        if (dr.fromOh > 0) buckets.push(`${dr.fromOh}p on-hand`);
+        if (dr.fromCf > 0) buckets.push(`${dr.fromCf}p dough`);
+        if (dr.fromFr > 0) buckets.push(`${dr.fromFr}p frozen`);
+        const total = dr.fromOh + dr.fromCf + dr.fromFr;
+        const tag = dr.deleted ? ' <em style="color:#888">(deleted, kept for math)</em>' : '';
+        rows.push(`<div class="stock-audit-row"><span class="label">− ${esc(dr.customer || '?')} ${dr.date ? `(${esc(dr.date)})` : ''}${tag}</span><span class="sub">−${total}p · ${esc(buckets.join(' + '))}</span></div>`);
+      });
+      rows.push(`<div class="stock-audit-row total"><span>${appLang === 'es' ? 'Mostrado ahora' : 'Displayed now'}</span><span>${effTotal}p</span></div>`);
+
+      // Skipped deliveries for THIS sku: parse explanation lineItems
+      // looking for this SKU. Inline by extracting from exp.items
+      // (deducted only), so for skipped we'd need to re-parse — but we
+      // already stashed skippedAll at the top of the modal globally.
+      // Leave per-SKU section clean; skipped deliveries appear at the
+      // bottom of the modal.
+
+      return `<div class="stock-audit-sku">
+        <div class="stock-audit-sku-name">${esc(sku)}</div>
+        ${rows.join('')}
+      </div>`;
+    }).filter(Boolean).join('');
+
+    const skippedHtml = skippedAll.length === 0 ? '' : `
+      <div class="stock-audit-sku">
+        <div class="stock-audit-sku-name">${appLang === 'es' ? 'Entregas omitidas (no deducidas)' : 'Skipped deliveries (NOT deducted)'}</div>
+        <div class="stock-audit-skipped-title">${appLang === 'es' ? 'Estas entregas confirmadas/canceladas no afectaron el inventario:' : 'These confirmed/cancelled deliveries did not affect inventory:'}</div>
+        ${skippedAll.map((s) => {
+          const tag = s.deleted ? ' <em style="color:#888">(deleted)</em>' : '';
+          return `<div class="stock-audit-skipped-row">• <strong>${esc(s.customer)}</strong> (${esc(s.date || '—')}, ${esc(s.status)})${tag} — ${esc(s.reason)}</div>`;
+        }).join('')}
+      </div>`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'stock-audit-overlay';
+    overlay.innerHTML = `
+      <div class="stock-audit-modal" role="dialog" aria-labelledby="stock-audit-title">
+        <h3 id="stock-audit-title">${appLang === 'es' ? '🔍 Auditoría de inventario' : '🔍 Stock audit'}</h3>
+        <div class="stock-audit-meta">${appLang === 'es' ? 'Inventario guardado' : 'Snapshot saved'}: <strong>${esc(fmtSnapTime)}</strong></div>
+        ${skuSections || `<div class="stock-audit-empty">${appLang === 'es' ? 'Sin actividad de inventario.' : 'No inventory activity.'}</div>`}
+        ${skippedHtml}
+        <div class="stock-audit-footer">
+          <span style="color:#888; font-size:11px">${appLang === 'es' ? 'Haz clic fuera o pulsa Cerrar.' : 'Click outside or press Close.'}</span>
+          <button type="button" class="stock-audit-close">${appLang === 'es' ? 'Cerrar' : 'Close'}</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('.stock-audit-close').addEventListener('click', close);
   }
 
   // FOH dough-pull confirmation. Reuses the schedule-diff-toast CSS so no
@@ -4227,6 +4447,8 @@
     });
     const stockSaveBtn = document.getElementById('stock-save');
     if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
+    const stockAuditBtn = document.getElementById('stock-audit');
+    if (stockAuditBtn) stockAuditBtn.addEventListener('click', showStockAuditModal);
     // FOH dough-transfer save button (only present on FOH home view).
     const fohTransferBtn = document.getElementById('foh-transfer-save');
     if (fohTransferBtn) fohTransferBtn.addEventListener('click', saveFohTransfer);
