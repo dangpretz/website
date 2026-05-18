@@ -133,6 +133,25 @@
     .stock-low     { color: #C41E1E; font-weight: 700; }
     .stock-neutral { color: #1A1A1A; font-weight: 400; }
 
+    /* Stock inline adjustment */
+    .stock-cell { white-space: nowrap; }
+    .stock-need { display: block; font: 600 11px 'Manrope', sans-serif; color: #C41E1E; margin-top: 2px; }
+    .btn-stock-adj { background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; padding: 2px 4px; line-height: 1; transition: color .15s; vertical-align: middle; }
+    .btn-stock-adj:hover { color: #C41E1E; }
+    .stock-adj-wrap { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+    .stock-adj-wrap input { width: 60px; font: 400 13px 'Manrope', sans-serif; padding: 4px 7px; border: 2px solid #888; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; text-align: right; }
+    .stock-adj-wrap input:focus { border-color: #1A1A1A; }
+    .stock-adj-wrap input::-webkit-outer-spin-button,
+    .stock-adj-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .btn-adj-add { background: #2a7a2a; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+    .btn-adj-add:hover { background: #1e5e1e; }
+    .btn-adj-add:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-adj-sub { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+    .btn-adj-sub:hover { background: #a01818; }
+    .btn-adj-sub:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-adj-cancel { background: none; border: none; color: #bbb; font-size: 17px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-adj-cancel:hover { color: #555; }
+
     .status-badge { display: inline-block; font: 700 10px 'Manrope', sans-serif; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
     .status-badge.ok   { background: #e6f4e6; color: #2a7a2a; }
     .status-badge.low  { background: #fde8e8; color: #C41E1E; }
@@ -584,6 +603,7 @@
       } else {
         tbody.innerHTML = rows.map(buildTableRow).join('');
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
+        tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
       }
 
       statusEl.hidden = true;
@@ -603,16 +623,22 @@
           : '<span class="status-badge ok">OK</span>';
 
       const parDisplay = par !== null ? String(par) : '—';
+      const needQty    = isLow ? (par - stock) : 0;
 
       const parCell = `<div class="par-cell" data-product-id="${escapeHtml(productId)}">
         <span class="par-value">${escapeHtml(parDisplay)}</span>
         <button class="btn-par-edit" title="Edit PAR" data-product-id="${escapeHtml(productId)}">✏</button>
       </div>`;
 
+      const stockCell = `<div class="stock-cell">
+        <span class="${stockClass}">${stock}${isLow ? `<span class="stock-need">buy ${needQty} more</span>` : ''}</span>
+        <button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Adjust stock">±</button>
+      </div>`;
+
       return `<tr class="${isLow ? 'low-stock' : ''}" data-product-id="${escapeHtml(productId)}">
         <td>${escapeHtml(productName)}</td>
         <td>${escapeHtml(innerUnitLabel)}</td>
-        <td class="${stockClass}">${stock}</td>
+        <td>${stockCell}</td>
         <td>${parCell}</td>
         <td>${statusBadge}</td>
         <td>${formatDate(lastReceived)}</td>
@@ -678,6 +704,71 @@
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
           if (e.key === 'Escape') cancelBtn.click();
+        });
+      });
+    }
+
+    // ── Stock inline adjustment ───────────────────────────────────────────────
+    function wireStockAdj(btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const productId   = btn.dataset.productId;
+        const productName = btn.dataset.productName;
+        const cell        = btn.closest('.stock-cell');
+        const originalHtml = cell.innerHTML;
+
+        cell.innerHTML = `<div class="stock-adj-wrap">
+          <input type="number" class="stock-adj-input" min="0" step="1" placeholder="qty">
+          <button class="btn-adj-add">+ Add</button>
+          <button class="btn-adj-sub">− Remove</button>
+          <button class="btn-adj-cancel">&times;</button>
+        </div>`;
+
+        const input     = cell.querySelector('.stock-adj-input');
+        const addBtn    = cell.querySelector('.btn-adj-add');
+        const subBtn    = cell.querySelector('.btn-adj-sub');
+        const cancelBtn = cell.querySelector('.btn-adj-cancel');
+
+        input.focus();
+
+        cancelBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          cell.innerHTML = originalHtml;
+          wireStockAdj(cell.querySelector('.btn-stock-adj'));
+        });
+
+        async function doAdjust(sign) {
+          const qty = parseInt(input.value, 10);
+          if (isNaN(qty) || qty <= 0) { showToast('Enter a quantity greater than 0', 'error'); input.focus(); return; }
+          addBtn.disabled = true; subBtn.disabled = true;
+          addBtn.textContent = '…'; subBtn.textContent = '…';
+          const delta = sign * qty;
+          try {
+            await appendLog(INVENTORY_PATH, {
+              action: 'adjust',
+              productId,
+              productName,
+              quantity: String(delta),
+              adjustedBy: '',
+              note: 'manual adjustment',
+              date: new Date().toISOString().slice(0, 10),
+              timeStamp: new Date().toISOString(),
+            });
+            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock += delta;
+            renderTable();
+            showToast(`Stock ${sign > 0 ? 'increased' : 'decreased'} by ${qty}`, 'success');
+          } catch (err) {
+            cell.innerHTML = originalHtml;
+            wireStockAdj(cell.querySelector('.btn-stock-adj'));
+            showToast('Failed to save: ' + (err.message || 'error'), 'error');
+          }
+        }
+
+        addBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doAdjust(1); });
+        subBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doAdjust(-1); });
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter')  { ev.preventDefault(); doAdjust(1); }
+          if (ev.key === 'Escape') cancelBtn.click();
         });
       });
     }
