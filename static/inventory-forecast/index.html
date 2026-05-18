@@ -76,6 +76,7 @@
     .val-low      { color: #b07000; font-weight: 700; }
     .val-ok       { color: #2a7a2a; font-weight: 700; }
     .val-neutral  { color: #1A1A1A; }
+    .stock-need   { display: block; font: 600 11px 'Manrope', sans-serif; color: #C41E1E; margin-top: 2px; white-space: nowrap; }
 
     .status-badge { display: inline-block; font: 700 10px 'Manrope', sans-serif; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
     .status-badge.short  { background: #fde8e8; color: #C41E1E; }
@@ -563,7 +564,12 @@
           statusClass = 'ok'; statusLabel = 'OK'; rowClass = ''; projClass = 'val-ok';
         }
 
-        const stockClass = hasRecipe ? (stock <= 0 ? 'val-short' : 'val-neutral') : 'val-neutral';
+        const belowPar    = par !== null && stock < par;
+        const stockClass  = belowPar ? 'val-short' : (stock <= 0 ? 'val-short' : 'val-neutral');
+        const needQty     = belowPar ? (par - stock) : 0;
+        const stockCell   = belowPar
+          ? `${stock}<span class="stock-need">buy ${needQty} more</span>`
+          : `${stock}`;
         const expDisplay  = hasRecipe ? fmt2(expectedUsage) : '—';
         const projDisplay = hasRecipe ? fmt2(projectedRemaining) : '—';
         const parDisplay  = par !== null ? String(par) : '—';
@@ -571,7 +577,7 @@
         return `<tr class="${rowClass}" data-product-id="${escapeHtml(productId)}">
           <td>${escapeHtml(productName)}</td>
           <td>${escapeHtml(innerUnitLabel)}</td>
-          <td class="${stockClass}">${stock}</td>
+          <td class="${stockClass}">${stockCell}</td>
           <td>${expDisplay}</td>
           <td class="${projClass}">${projDisplay}</td>
           <td class="par-cell">${parDisplay} <button class="btn-par-edit" data-product-id="${escapeHtml(productId)}" title="Edit PAR">✏</button></td>
