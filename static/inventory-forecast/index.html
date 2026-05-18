@@ -87,6 +87,20 @@
     .table-status.error { color: #C41E1E; font-weight: 700; }
     .no-recipe-note { margin-top: 12px; font: 400 12px 'Manrope', sans-serif; color: #999; font-style: italic; }
 
+    /* ── PAR inline edit ── */
+    .par-cell { white-space: nowrap; }
+    .btn-par-edit { background: none; border: none; cursor: pointer; color: #ccc; font-size: 12px; padding: 2px 4px; line-height: 1; transition: color .15s; vertical-align: middle; }
+    .btn-par-edit:hover { color: #C41E1E; }
+    .par-edit-wrap { display: flex; align-items: center; gap: 5px; }
+    .par-edit-wrap input { width: 66px; font: 400 13px 'Manrope', sans-serif; padding: 4px 7px; border: 2px solid #C41E1E; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; }
+    .par-edit-wrap input::-webkit-outer-spin-button,
+    .par-edit-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .btn-par-save { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+    .btn-par-save:hover { background: #a01818; }
+    .btn-par-save:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-par-cancel { background: none; border: none; color: #bbb; font-size: 17px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-par-cancel:hover { color: #555; }
+
     /* ════════════════════════════════════
        SLIDE-OUT PANEL
     ════════════════════════════════════ */
@@ -527,6 +541,7 @@
     let inventoryMap  = new Map();
     let scaleMap      = {};
     let recipeMap     = {};
+    let allDeliveryLogs  = [];
     let allReceivingLogs = [];
     let allInventoryLogs = [];
 
@@ -551,6 +566,7 @@
         const iLogs  = Array.isArray(iRaw)  ? iRaw  : [];
         const rcLogs = Array.isArray(rcRaw) ? rcRaw : [];
 
+        allDeliveryLogs  = dLogs;
         allReceivingLogs = rLogs;
         allInventoryLogs = iLogs;
 
@@ -629,15 +645,21 @@
           <td class="${stockClass}">${stock}</td>
           <td>${expDisplay}</td>
           <td class="${projClass}">${projDisplay}</td>
-          <td>${parDisplay}</td>
+          <td class="par-cell">${parDisplay} <button class="btn-par-edit" data-product-id="${escapeHtml(productId)}" title="Edit PAR">✏</button></td>
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
         </tr>`;
       }).join('');
 
-      // Wire row clicks for panel
+      // Wire row clicks for panel (ignore clicks on the PAR cell)
       tbody.querySelectorAll('tr[data-product-id]').forEach((tr) => {
-        tr.addEventListener('click', () => openPanel(tr.dataset.productId));
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('.par-cell')) return;
+          openPanel(tr.dataset.productId);
+        });
       });
+
+      // Wire PAR edit buttons
+      tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
 
       statusEl.hidden = true;
       wrapEl.hidden = false;
@@ -756,6 +778,63 @@
       // Open panel
       document.getElementById('detail-panel').classList.add('open');
       document.getElementById('panel-overlay').classList.add('open');
+    }
+
+    // ── PAR inline edit ──────────────────────────────────────────────────────
+    function wireParEdit(btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const productId  = btn.dataset.productId;
+        const cell       = btn.closest('.par-cell');
+        const row        = inventoryMap.get(productId);
+        const currentPar = row?.par ?? '';
+        const originalHtml = cell.innerHTML;
+
+        cell.innerHTML = `<div class="par-edit-wrap">
+          <input type="number" class="par-edit-input" min="0" step="1" value="${currentPar}" placeholder="0">
+          <button class="btn-par-save">Save</button>
+          <button class="btn-par-cancel">&times;</button>
+        </div>`;
+
+        const input     = cell.querySelector('.par-edit-input');
+        const saveBtn   = cell.querySelector('.btn-par-save');
+        const cancelBtn = cell.querySelector('.btn-par-cancel');
+
+        input.focus(); input.select();
+
+        cancelBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          cell.innerHTML = originalHtml;
+          wireParEdit(cell.querySelector('.btn-par-edit'));
+        });
+
+        async function doSave() {
+          const val = parseInt(input.value, 10);
+          if (isNaN(val) || val < 0) { showToast('PAR must be a non-negative whole number', 'error'); input.focus(); return; }
+          saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+          try {
+            await appendLog(INVENTORY_PATH, {
+              action: 'par', productId, par: String(val), timeStamp: new Date().toISOString(), updatedBy: '',
+            });
+            if (inventoryMap.has(productId)) inventoryMap.get(productId).par = val;
+            // Recompute forecast so status badges & sort order update immediately
+            const deliveries = resolveDeliveries(allDeliveryLogs);
+            forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap);
+            renderForecastTable();
+            showToast('PAR updated', 'success');
+          } catch (err) {
+            cell.innerHTML = originalHtml;
+            wireParEdit(cell.querySelector('.btn-par-edit'));
+            showToast('Failed to save PAR: ' + (err.message || 'error'), 'error');
+          }
+        }
+
+        saveBtn.addEventListener('click', (e) => { e.stopPropagation(); doSave(); });
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
+          if (e.key === 'Escape') cancelBtn.click();
+        });
+      });
     }
 
     function closePanel() {
