@@ -1005,7 +1005,9 @@ export function getInventoryReport(args) {
         shortage: remaining,
         confirmedAt: delivery._confirmedAt || '',
       });
-      itemTrail.push({ sku: key, qty, fromOh, fromCf, fromFr, shortage: remaining });
+      itemTrail.push({
+        sku: key, qty, fromOh, fromCf, fromFr, shortage: remaining,
+      });
     });
     deductionExplanations.push({
       deliveryId: delivery.deliveryId || '',
