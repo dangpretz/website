@@ -102,6 +102,19 @@
     .btn-par-cancel { background: none; border: none; color: #bbb; font-size: 17px; cursor: pointer; padding: 0 2px; line-height: 1; }
     .btn-par-cancel:hover { color: #555; }
 
+    /* Stock adj inline widget */
+    .btn-stock-adj { background: none; border: none; cursor: pointer; color: #ccc; font-size: 12px; padding: 2px 4px; line-height: 1; transition: color .15s; vertical-align: middle; }
+    .btn-stock-adj:hover { color: #C41E1E; }
+    .stock-adj-wrap { display: flex; align-items: center; gap: 5px; }
+    .stock-adj-input { width: 66px; font: 400 13px 'Manrope', sans-serif; padding: 4px 7px; border: 2px solid #C41E1E; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; }
+    .stock-adj-input::-webkit-outer-spin-button,
+    .stock-adj-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .btn-stock-save { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+    .btn-stock-save:hover { background: #a01818; }
+    .btn-stock-save:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-adj-cancel { background: none; border: none; color: #bbb; font-size: 17px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-adj-cancel:hover { color: #555; }
+
     /* ════════════════════════════════════
        SLIDE-OUT PANEL
     ════════════════════════════════════ */
@@ -567,9 +580,10 @@
         const belowPar    = par !== null && stock < par;
         const stockClass  = belowPar ? 'val-short' : (stock <= 0 ? 'val-short' : 'val-neutral');
         const needQty     = belowPar ? (par - stock) : 0;
-        const stockCell   = belowPar
+        const stockInner  = belowPar
           ? `${stock}<span class="stock-need">buy ${needQty} more</span>`
           : `${stock}`;
+        const stockCell   = `<div class="stock-cell" style="display:flex;align-items:center;gap:5px;" data-product-id="${escapeHtml(productId)}"><span class="${stockClass}">${stockInner}</span><button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" title="Adjust stock">±</button></div>`;
         const expDisplay  = hasRecipe ? fmt2(expectedUsage) : '—';
         const projDisplay = hasRecipe ? fmt2(projectedRemaining) : '—';
         const parDisplay  = par !== null ? String(par) : '—';
@@ -577,7 +591,7 @@
         return `<tr class="${rowClass}" data-product-id="${escapeHtml(productId)}">
           <td>${escapeHtml(productName)}</td>
           <td>${escapeHtml(innerUnitLabel)}</td>
-          <td class="${stockClass}">${stockCell}</td>
+          <td>${stockCell}</td>
           <td>${expDisplay}</td>
           <td class="${projClass}">${projDisplay}</td>
           <td class="par-cell">${parDisplay} <button class="btn-par-edit" data-product-id="${escapeHtml(productId)}" title="Edit PAR">✏</button></td>
@@ -595,6 +609,9 @@
 
       // Wire PAR edit buttons
       tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
+
+      // Wire stock adj buttons
+      tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
 
       statusEl.hidden = true;
       wrapEl.hidden = false;
@@ -761,6 +778,70 @@
             cell.innerHTML = originalHtml;
             wireParEdit(cell.querySelector('.btn-par-edit'));
             showToast('Failed to save PAR: ' + (err.message || 'error'), 'error');
+          }
+        }
+
+        saveBtn.addEventListener('click', (e) => { e.stopPropagation(); doSave(); });
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
+          if (e.key === 'Escape') cancelBtn.click();
+        });
+      });
+    }
+
+    // ── Stock inline adjust ──────────────────────────────────────────────────
+    function wireStockAdj(btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const productId    = btn.dataset.productId;
+        const cell         = btn.closest('.stock-cell');
+        const currentStock = inventoryMap.get(productId)?.stock ?? 0;
+        const originalHtml = cell.innerHTML;
+
+        cell.innerHTML = `<div class="stock-adj-wrap">
+  <input type="number" class="stock-adj-input" min="0" step="1" value="${currentStock}">
+  <button class="btn-stock-save">Save</button>
+  <button class="btn-adj-cancel">&times;</button>
+</div>`;
+
+        const input     = cell.querySelector('.stock-adj-input');
+        const saveBtn   = cell.querySelector('.btn-stock-save');
+        const cancelBtn = cell.querySelector('.btn-adj-cancel');
+
+        input.focus(); input.select();
+
+        cancelBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          cell.innerHTML = originalHtml;
+          wireStockAdj(cell.querySelector('.btn-stock-adj'));
+        });
+
+        async function doSave() {
+          const newVal = parseInt(input.value, 10);
+          if (isNaN(newVal) || newVal < 0) {
+            showToast('Enter a valid quantity', 'error');
+            input.focus();
+            return;
+          }
+          const delta = newVal - currentStock;
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
+          try {
+            await appendLog(INVENTORY_PATH, {
+              action:    'adjust',
+              productId,
+              quantity:  String(delta),
+              timeStamp: new Date().toISOString(),
+              note:      'inline stock set',
+            });
+            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
+            forecastMap = computeForecast(resolveDeliveries(allDeliveryLogs), recipeMap, scaleMap, inventoryMap);
+            renderForecastTable();
+            showToast(`Stock set to ${newVal}`, 'success');
+          } catch (err) {
+            cell.innerHTML = originalHtml;
+            wireStockAdj(cell.querySelector('.btn-stock-adj'));
+            showToast('Failed to save: ' + (err.message || 'unknown error'), 'error');
           }
         }
 
