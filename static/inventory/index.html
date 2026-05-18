@@ -117,8 +117,12 @@
        INVENTORY TABLE
     ════════════════════════════════════════ */
     .table-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .table-controls-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .toggle-label { display: flex; align-items: center; gap: 8px; font: 600 13px 'Manrope', sans-serif; color: #555; cursor: pointer; user-select: none; }
     .toggle-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #C41E1E; }
+    .inv-search { font: 400 13px 'Manrope', sans-serif; padding: 7px 12px; border: 2px solid #ddd; border-radius: 6px; outline: none; color: #1A1A1A; background: #fff; width: 220px; transition: border-color .15s; }
+    .inv-search:focus { border-color: #C41E1E; }
+    .inv-search::placeholder { color: #aaa; }
 
     .inv-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     .inv-table { width: 100%; border-collapse: collapse; background: #fff; }
@@ -238,10 +242,13 @@
     <div class="max-1100">
 
       <div class="table-controls">
-        <label class="toggle-label">
-          <input type="checkbox" id="low-stock-toggle">
-          Show low stock only
-        </label>
+        <div class="table-controls-left">
+          <input type="text" id="inv-search" class="inv-search" placeholder="Search ingredients…" autocomplete="off">
+          <label class="toggle-label">
+            <input type="checkbox" id="low-stock-toggle">
+            Show low stock only
+          </label>
+        </div>
         <button class="btn-refresh" id="refresh-btn">↻ Refresh</button>
       </div>
 
@@ -550,7 +557,8 @@
 
     // ── State ────────────────────────────────────────────────────────────────
     let inventoryMap = new Map();
-    let showLowOnly = false;
+    let showLowOnly  = false;
+    let filterQuery  = '';
 
     // ── Load data ─────────────────────────────────────────────────────────────
     async function loadData() {
@@ -598,8 +606,12 @@
         rows = rows.filter((r) => r.par !== null && r.stock < r.par);
       }
 
+      if (filterQuery) {
+        rows = rows.filter((r) => r.productName.toLowerCase().includes(filterQuery));
+      }
+
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="table-status">${showLowOnly ? 'No low-stock items.' : 'No inventory data.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="table-status">${filterQuery ? 'No ingredients match your search.' : showLowOnly ? 'No low-stock items.' : 'No inventory data.'}</td></tr>`;
       } else {
         tbody.innerHTML = rows.map(buildTableRow).join('');
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
@@ -774,6 +786,11 @@
     }
 
     // ── Table controls ────────────────────────────────────────────────────────
+    document.getElementById('inv-search').addEventListener('input', (e) => {
+      filterQuery = e.target.value.trim().toLowerCase();
+      renderTable();
+    });
+
     document.getElementById('low-stock-toggle').addEventListener('change', (e) => {
       showLowOnly = e.target.checked;
       renderTable();
