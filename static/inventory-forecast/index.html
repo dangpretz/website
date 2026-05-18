@@ -351,10 +351,18 @@
 
     // ── Dynamic products (new_product entries from receiving log) ────────────
     function buildDynamicProducts(receivingLogs) {
+      const archived = new Set(
+        receivingLogs.filter((r) => r.action === 'archive_product').map((r) => r.productId),
+      );
+      for (let i = PRODUCTS.length - 1; i >= 0; i--) {
+        if (archived.has(PRODUCTS[i].id)) PRODUCTS.splice(i, 1);
+      }
       receivingLogs.filter((r) => r.action === 'new_product').forEach((r) => {
         if (!r.usFoodsCode || !r.productName) return;
-        if (PRODUCTS.some((p) => p.id === `new-${r.usFoodsCode}`)) return;
-        PRODUCTS.push({ id: `new-${r.usFoodsCode}`, name: r.productName, packSize: r.packSize || '' });
+        const dynamicId = `new-${r.usFoodsCode}`;
+        if (archived.has(dynamicId)) return;
+        if (PRODUCTS.some((p) => p.id === dynamicId)) return;
+        PRODUCTS.push({ id: dynamicId, name: r.productName, packSize: r.packSize || '' });
       });
     }
 

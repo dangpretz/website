@@ -130,6 +130,14 @@
     .inv-table td { font: 400 14px 'Manrope', sans-serif; color: #1A1A1A; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
     .inv-table tr:last-child td { border-bottom: none; }
     .inv-table tr.low-stock { background: #fff8f8; }
+    .inv-table th.col-actions, .inv-table td.col-actions { width: 32px; padding: 0 8px; text-align: center; }
+    .btn-row-delete { background: none; border: none; cursor: pointer; color: #ddd; font-size: 14px; padding: 4px; line-height: 1; transition: color .15s; }
+    .btn-row-delete:hover { color: #C41E1E; }
+    .remove-confirm { display: flex; align-items: center; gap: 6px; white-space: nowrap; font: 600 12px 'Manrope', sans-serif; color: #C41E1E; }
+    .btn-remove-yes { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+    .btn-remove-yes:hover { background: #a01818; }
+    .btn-remove-no  { background: none; border: none; color: #aaa; font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-remove-no:hover { color: #555; }
     .inv-table tbody tr:hover td { background: #faf8f5; }
     .inv-table tbody tr.low-stock:hover td { background: #fdf2f2; }
 
@@ -278,6 +286,7 @@
               <th>Status</th>
               <th>Last Received</th>
               <th>Last Used</th>
+              <th class="col-actions"></th>
             </tr>
           </thead>
           <tbody id="inv-tbody"></tbody>
@@ -524,18 +533,28 @@
 
     // ── Dynamic products (from new_product receiving entries) ─────────────────
     function buildDynamicProducts(receivingLogs) {
+      // Build set of archived product IDs
+      const archived = new Set(
+        receivingLogs.filter((r) => r.action === 'archive_product').map((r) => r.productId),
+      );
+      // Remove archived hardcoded products (iterate backwards to splice safely)
+      for (let i = PRODUCTS.length - 1; i >= 0; i--) {
+        if (archived.has(PRODUCTS[i].id)) PRODUCTS.splice(i, 1);
+      }
+      // Add dynamic products that aren't archived
       receivingLogs
         .filter((r) => r.action === 'new_product')
         .forEach((r) => {
-          const exists = PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode);
-          if (!exists && r.usFoodsCode && r.productName) {
-            PRODUCTS.push({
-              id: `new-${r.usFoodsCode}`,
-              name: r.productName,
-              packSize: r.packSize || '',
-              usFoodsCode: r.usFoodsCode,
-            });
-          }
+          if (!r.usFoodsCode || !r.productName) return;
+          const dynamicId = `new-${r.usFoodsCode}`;
+          if (archived.has(dynamicId)) return;
+          if (PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode)) return;
+          PRODUCTS.push({
+            id: dynamicId,
+            name: r.productName,
+            packSize: r.packSize || '',
+            usFoodsCode: r.usFoodsCode,
+          });
         });
     }
 
@@ -651,11 +670,12 @@
       }
 
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="table-status">${filterQuery ? 'No ingredients match your search.' : showLowOnly ? 'No low-stock items.' : 'No inventory data.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="table-status">${filterQuery ? 'No ingredients match your search.' : showLowOnly ? 'No low-stock items.' : 'No inventory data.'}</td></tr>`;
       } else {
         tbody.innerHTML = rows.map(buildTableRow).join('');
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
         tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
+        tbody.querySelectorAll('.btn-row-delete').forEach(wireDeleteBtn);
       }
 
       statusEl.hidden = true;
@@ -695,6 +715,7 @@
         <td>${statusBadge}</td>
         <td>${formatDate(lastReceived)}</td>
         <td>${formatDate(lastUsed)}</td>
+        <td class="col-actions"><button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button></td>
       </tr>`;
     }
 
@@ -817,6 +838,52 @@
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
           if (e.key === 'Escape') cancelBtn.click();
+        });
+      });
+    }
+
+    // ── Remove ingredient ────────────────────────────────────────────────────
+    function wireDeleteBtn(btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const productId   = btn.dataset.productId;
+        const productName = btn.dataset.productName;
+        const cell        = btn.closest('td');
+
+        cell.innerHTML = `<div class="remove-confirm">
+          Remove?
+          <button class="btn-remove-yes">Yes</button>
+          <button class="btn-remove-no">&times;</button>
+        </div>`;
+
+        cell.querySelector('.btn-remove-no').addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          cell.innerHTML = `<button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button>`;
+          wireDeleteBtn(cell.querySelector('.btn-row-delete'));
+        });
+
+        cell.querySelector('.btn-remove-yes').addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          cell.querySelector('.btn-remove-yes').disabled = true;
+          cell.querySelector('.btn-remove-yes').textContent = '…';
+          try {
+            await appendLog(RECEIVING_PATH, {
+              action: 'archive_product',
+              productId,
+              productName,
+              timeStamp: new Date().toISOString(),
+            });
+            // Remove from in-memory PRODUCTS and inventoryMap
+            const idx = PRODUCTS.findIndex((p) => p.id === productId);
+            if (idx !== -1) PRODUCTS.splice(idx, 1);
+            inventoryMap.delete(productId);
+            renderTable();
+            showToast(`${productName} removed`, 'success');
+          } catch (err) {
+            showToast('Failed to remove: ' + (err.message || 'error'), 'error');
+            cell.innerHTML = `<button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button>`;
+            wireDeleteBtn(cell.querySelector('.btn-row-delete'));
+          }
         });
       });
     }
