@@ -120,6 +120,19 @@
     .btn-par-cancel { background: none; border: none; color: #bbb; font-size: 17px; cursor: pointer; padding: 0 2px; line-height: 1; }
     .btn-par-cancel:hover { color: #555; }
 
+    /* Stock adj inline widget */
+    .btn-stock-adj { background: none; border: none; cursor: pointer; color: #ccc; font-size: 12px; padding: 2px 4px; line-height: 1; transition: color .15s; vertical-align: middle; }
+    .btn-stock-adj:hover { color: #C41E1E; }
+    .stock-adj-wrap { display: flex; align-items: center; gap: 5px; }
+    .stock-adj-input { width: 66px; font: 400 13px 'Manrope', sans-serif; padding: 4px 7px; border: 2px solid #C41E1E; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; }
+    .stock-adj-input::-webkit-outer-spin-button,
+    .stock-adj-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .btn-stock-save { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+    .btn-stock-save:hover { background: #a01818; }
+    .btn-stock-save:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-adj-cancel { background: none; border: none; color: #bbb; font-size: 17px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-adj-cancel:hover { color: #555; }
+
     /* ════════════════════════════════════
        SLIDE-OUT PANEL
     ════════════════════════════════════ */
@@ -588,7 +601,7 @@
         const stockInner  = belowPar
           ? `${stock}<span class="stock-need">buy ${needQty} more</span>`
           : `${stock}`;
-        const stockCell   = `<div class="stock-cell"><span class="${stockClass}">${stockInner}</span> <button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Adjust stock">±</button></div>`;
+        const stockCell   = `<div class="stock-cell"><span class="${stockClass}">${stockInner}</span> <button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" title="Adjust stock">±</button></div>`;
         const expDisplay  = hasRecipe ? fmt2(expectedUsage) : '—';
         const projDisplay = hasRecipe ? fmt2(projectedRemaining) : '—';
         const parDisplay  = par !== null ? String(par) : '—';
@@ -616,6 +629,9 @@
       // Wire PAR edit buttons
       tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
       // Wire stock adjustment buttons
+      tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
+
+      // Wire stock adj buttons
       tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
 
       statusEl.hidden = true;
@@ -794,68 +810,66 @@
       });
     }
 
-    // ── Stock inline adjustment ───────────────────────────────────────────────
+    // ── Stock inline adjust ──────────────────────────────────────────────────
     function wireStockAdj(btn) {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const productId   = btn.dataset.productId;
-        const productName = btn.dataset.productName;
-        const cell        = btn.closest('.stock-cell');
+        const productId    = btn.dataset.productId;
+        const cell         = btn.closest('.stock-cell');
+        const currentStock = inventoryMap.get(productId)?.stock ?? 0;
         const originalHtml = cell.innerHTML;
 
         cell.innerHTML = `<div class="stock-adj-wrap">
-          <input type="number" class="stock-adj-input" min="0" step="1" placeholder="qty">
-          <button class="btn-adj-add">+ Add</button>
-          <button class="btn-adj-sub">− Remove</button>
+          <input type="number" class="stock-adj-input" min="0" step="1" value="${currentStock}">
+          <button class="btn-stock-save">Save</button>
           <button class="btn-adj-cancel">&times;</button>
         </div>`;
 
         const input     = cell.querySelector('.stock-adj-input');
-        const addBtn    = cell.querySelector('.btn-adj-add');
-        const subBtn    = cell.querySelector('.btn-adj-sub');
+        const saveBtn   = cell.querySelector('.btn-stock-save');
         const cancelBtn = cell.querySelector('.btn-adj-cancel');
 
-        input.focus();
+        input.focus(); input.select();
 
-        cancelBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
+        cancelBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
           cell.innerHTML = originalHtml;
           wireStockAdj(cell.querySelector('.btn-stock-adj'));
         });
 
-        async function doAdjust(sign) {
-          const qty = parseInt(input.value, 10);
-          if (isNaN(qty) || qty <= 0) { showToast('Enter a quantity greater than 0', 'error'); input.focus(); return; }
-          addBtn.disabled = true; subBtn.disabled = true;
-          addBtn.textContent = '…'; subBtn.textContent = '…';
-          const delta = sign * qty;
+        async function doSave() {
+          const newVal = parseInt(input.value, 10);
+          if (isNaN(newVal) || newVal < 0) {
+            showToast('Enter a valid quantity', 'error');
+            input.focus();
+            return;
+          }
+          const delta = newVal - currentStock;
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
           try {
             await appendLog(INVENTORY_PATH, {
-              action: 'adjust',
+              action:    'adjust',
               productId,
-              productName,
-              quantity: String(delta),
-              adjustedBy: '',
-              note: 'manual adjustment',
-              date: new Date().toISOString().slice(0, 10),
+              quantity:  String(delta),
               timeStamp: new Date().toISOString(),
+              note:      'inline stock set',
             });
-            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock += delta;
+            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
             forecastMap = computeForecast(resolveDeliveries(allDeliveryLogs), recipeMap, scaleMap, inventoryMap);
             renderForecastTable();
-            showToast(`Stock ${sign > 0 ? 'increased' : 'decreased'} by ${qty}`, 'success');
+            showToast(`Stock set to ${newVal}`, 'success');
           } catch (err) {
             cell.innerHTML = originalHtml;
             wireStockAdj(cell.querySelector('.btn-stock-adj'));
-            showToast('Failed to save: ' + (err.message || 'error'), 'error');
+            showToast('Failed to save: ' + (err.message || 'unknown error'), 'error');
           }
         }
 
-        addBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doAdjust(1); });
-        subBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doAdjust(-1); });
-        input.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter')  { ev.preventDefault(); doAdjust(1); }
-          if (ev.key === 'Escape') cancelBtn.click();
+        saveBtn.addEventListener('click', (e) => { e.stopPropagation(); doSave(); });
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
+          if (e.key === 'Escape') cancelBtn.click();
         });
       });
     }

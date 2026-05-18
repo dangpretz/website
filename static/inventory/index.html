@@ -172,6 +172,19 @@
     .btn-par-cancel { background: none; border: none; color: #bbb; font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1; }
     .btn-par-cancel:hover { color: #555; }
 
+    /* Stock adj inline widget */
+    .btn-stock-adj { background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; padding: 2px 4px; line-height: 1; transition: color 0.15s; flex-shrink: 0; }
+    .btn-stock-adj:hover { color: #C41E1E; }
+    .stock-adj-wrap { display: flex; align-items: center; gap: 6px; }
+    .stock-adj-input { width: 72px; font: 400 14px 'Manrope', sans-serif; padding: 5px 8px; border: 2px solid #C41E1E; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; }
+    .stock-adj-input::-webkit-outer-spin-button,
+    .stock-adj-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .btn-stock-save { background: #C41E1E; color: #fff; font: 700 11px 'Manrope', sans-serif; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+    .btn-stock-save:hover { background: #a01818; }
+    .btn-stock-save:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-adj-cancel { background: none; border: none; color: #bbb; font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .btn-adj-cancel:hover { color: #555; }
+
     .table-status { text-align: center; padding: 40px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
     .table-status.error { color: #C41E1E; font-weight: 700; }
 
@@ -394,6 +407,33 @@
             </div>
 
             <button class="btn-submit" id="adj-submit-btn" disabled>Save Adjustment</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Add New Ingredient (collapsible) ── -->
+      <div class="collapsible-wrap" id="new-ingredient-collapsible">
+        <div class="collapsible-header" id="new-ingredient-toggle">
+          <h3>Add New Ingredient</h3>
+          <span class="collapsible-icon">⌄</span>
+        </div>
+        <div class="collapsible-body">
+          <div class="card card-dark">
+            <div class="adjust-grid" style="margin-bottom:14px;">
+              <div class="field-group span-2" style="margin-bottom:0;">
+                <label for="new-ing-name">Ingredient Name</label>
+                <input type="text" id="new-ing-name" placeholder="e.g. Butter, Salted Solid AA" autocomplete="off">
+              </div>
+              <div class="field-group" style="margin-bottom:0;">
+                <label for="new-ing-code">US Foods Code <span style="font-weight:400;color:#888">(optional)</span></label>
+                <input type="text" id="new-ing-code" placeholder="e.g. 1008416" autocomplete="off">
+              </div>
+              <div class="field-group" style="margin-bottom:0;">
+                <label for="new-ing-pack">Pack Size <span style="font-weight:400;color:#888">(optional)</span></label>
+                <input type="text" id="new-ing-pack" placeholder="e.g. 1/50/LB or 4/1/GAL" autocomplete="off">
+              </div>
+            </div>
+            <button class="btn-submit" id="new-ing-submit-btn" disabled>Add Ingredient</button>
           </div>
         </div>
       </div>
@@ -632,7 +672,7 @@
 
       const stockCell = `<div class="stock-cell">
         <span class="${stockClass}">${stock}${isLow ? `<span class="stock-need">buy ${needQty} more</span>` : ''}</span>
-        <button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Adjust stock">±</button>
+        <button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" title="Adjust stock">±</button>
       </div>`;
 
       return `<tr class="${isLow ? 'low-stock' : ''}" data-product-id="${escapeHtml(productId)}">
@@ -708,67 +748,63 @@
       });
     }
 
-    // ── Stock inline adjustment ───────────────────────────────────────────────
+    // ── Stock inline adjust ───────────────────────────────────────────────────
     function wireStockAdj(btn) {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const productId   = btn.dataset.productId;
-        const productName = btn.dataset.productName;
-        const cell        = btn.closest('.stock-cell');
+      btn.addEventListener('click', () => {
+        const productId    = btn.dataset.productId;
+        const cell         = btn.closest('.stock-cell');
+        const currentStock = inventoryMap.get(productId)?.stock ?? 0;
         const originalHtml = cell.innerHTML;
 
         cell.innerHTML = `<div class="stock-adj-wrap">
-          <input type="number" class="stock-adj-input" min="0" step="1" placeholder="qty">
-          <button class="btn-adj-add">+ Add</button>
-          <button class="btn-adj-sub">− Remove</button>
+          <input type="number" class="stock-adj-input" min="0" step="1" value="${currentStock}">
+          <button class="btn-stock-save">Save</button>
           <button class="btn-adj-cancel">&times;</button>
         </div>`;
 
         const input     = cell.querySelector('.stock-adj-input');
-        const addBtn    = cell.querySelector('.btn-adj-add');
-        const subBtn    = cell.querySelector('.btn-adj-sub');
+        const saveBtn   = cell.querySelector('.btn-stock-save');
         const cancelBtn = cell.querySelector('.btn-adj-cancel');
 
-        input.focus();
+        input.focus(); input.select();
 
-        cancelBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
+        cancelBtn.addEventListener('click', () => {
           cell.innerHTML = originalHtml;
           wireStockAdj(cell.querySelector('.btn-stock-adj'));
         });
 
-        async function doAdjust(sign) {
-          const qty = parseInt(input.value, 10);
-          if (isNaN(qty) || qty <= 0) { showToast('Enter a quantity greater than 0', 'error'); input.focus(); return; }
-          addBtn.disabled = true; subBtn.disabled = true;
-          addBtn.textContent = '…'; subBtn.textContent = '…';
-          const delta = sign * qty;
+        async function doSave() {
+          const newVal = parseInt(input.value, 10);
+          if (isNaN(newVal) || newVal < 0) {
+            showToast('Enter a valid quantity', 'error');
+            input.focus();
+            return;
+          }
+          const delta = newVal - currentStock;
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
           try {
             await appendLog(INVENTORY_PATH, {
-              action: 'adjust',
+              action:    'adjust',
               productId,
-              productName,
-              quantity: String(delta),
-              adjustedBy: '',
-              note: 'manual adjustment',
-              date: new Date().toISOString().slice(0, 10),
+              quantity:  String(delta),
               timeStamp: new Date().toISOString(),
+              note:      'inline stock set',
             });
-            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock += delta;
+            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
             renderTable();
-            showToast(`Stock ${sign > 0 ? 'increased' : 'decreased'} by ${qty}`, 'success');
+            showToast(`Stock set to ${newVal}`, 'success');
           } catch (err) {
             cell.innerHTML = originalHtml;
             wireStockAdj(cell.querySelector('.btn-stock-adj'));
-            showToast('Failed to save: ' + (err.message || 'error'), 'error');
+            showToast('Failed to save: ' + (err.message || 'unknown error'), 'error');
           }
         }
 
-        addBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doAdjust(1); });
-        subBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doAdjust(-1); });
-        input.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter')  { ev.preventDefault(); doAdjust(1); }
-          if (ev.key === 'Escape') cancelBtn.click();
+        saveBtn.addEventListener('click', doSave);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
+          if (e.key === 'Escape') cancelBtn.click();
         });
       });
     }
@@ -1069,6 +1105,68 @@
         btn.disabled = false;
       } finally {
         btn.textContent = 'Save Adjustment';
+      }
+    });
+
+    // ════════════════════════════════════════
+    // ADD NEW INGREDIENT
+    // ════════════════════════════════════════
+    document.getElementById('new-ingredient-toggle').addEventListener('click', () => {
+      document.getElementById('new-ingredient-collapsible').classList.toggle('collapsible-open');
+    });
+
+    function updateNewIngBtn() {
+      const name = document.getElementById('new-ing-name').value.trim();
+      document.getElementById('new-ing-submit-btn').disabled = !name;
+    }
+
+    document.getElementById('new-ing-name').addEventListener('input', updateNewIngBtn);
+
+    document.getElementById('new-ing-submit-btn').addEventListener('click', async () => {
+      const btn      = document.getElementById('new-ing-submit-btn');
+      const name     = document.getElementById('new-ing-name').value.trim();
+      let   code     = document.getElementById('new-ing-code').value.trim();
+      const packSize = document.getElementById('new-ing-pack').value.trim();
+
+      if (!name) return;
+      if (!code) code = `custom-${Date.now()}`;
+
+      btn.disabled = true;
+      btn.textContent = 'Adding…';
+      try {
+        await appendLog(RECEIVING_PATH, {
+          action:      'new_product',
+          productName: name,
+          usFoodsCode: code,
+          packSize,
+          timeStamp:   new Date().toISOString(),
+        });
+
+        const newId = `new-${code}`;
+        PRODUCTS.push({ id: newId, name, packSize, usFoodsCode: code });
+        inventoryMap.set(newId, {
+          productId:    newId,
+          productName:  name,
+          packSize,
+          stock:        0,
+          par:          null,
+          lastReceived: null,
+          lastUsed:     null,
+        });
+
+        renderTable();
+        showToast(`'${name}' added to inventory`, 'success');
+
+        document.getElementById('new-ing-name').value = '';
+        document.getElementById('new-ing-code').value = '';
+        document.getElementById('new-ing-pack').value = '';
+        updateNewIngBtn();
+      } catch (err) {
+        showToast('Failed to add ingredient: ' + (err.message || 'unknown error'), 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Add Ingredient';
+        updateNewIngBtn();
       }
     });
 
