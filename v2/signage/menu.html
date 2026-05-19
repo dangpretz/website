@@ -30,29 +30,31 @@
     --color-divider-cream:    rgba(26, 26, 26, 0.08);
 
     /* Type — Manrope only (italic serif lives in HOUSE MOVE only) */
+    /* Sizes in vw so content auto-scales to whatever the TV viewport is.
+       Ratios calibrated for a 1920-wide landscape baseline (1vw = 19.2px). */
     --font:                'Manrope', system-ui, sans-serif;
     --font-italic-serif:   Georgia, serif;
     --weight-regular:      400;
     --weight-bold:         700;
     --weight-heavy:        800;
-    --size-screen-title:   96px;
-    --size-section:        32px;
-    --size-item:           48px;
-    --size-body:           24px;
-    --size-meta:           18px;
+    --size-screen-title:   5vw;     /* was 96px */
+    --size-section:        1.67vw;  /* was 32px */
+    --size-item:           2.5vw;   /* was 48px */
+    --size-body:           1.25vw;  /* was 24px */
+    --size-meta:           0.94vw;  /* was 18px */
 
-    /* Spacing scale (8-multiples) */
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 16px;
-    --space-4: 24px;
-    --space-5: 32px;
-    --space-6: 48px;
-    --space-7: 64px;
-    --space-8: 96px;
+    /* Spacing scale (8-multiples, vw-equivalent of 4/8/16/24/32/48/64/96 px) */
+    --space-1: 0.21vw;
+    --space-2: 0.42vw;
+    --space-3: 0.83vw;
+    --space-4: 1.25vw;
+    --space-5: 1.67vw;
+    --space-6: 2.5vw;
+    --space-7: 3.33vw;
+    --space-8: 5vw;
 
     /* Radius */
-    --radius: 16px;
+    --radius: 0.83vw;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,7 +98,7 @@
     border-bottom: 2px solid var(--color-accent);
     margin-bottom: var(--space-5);
   }
-  .header__logo { height: 64px; display: block; }
+  .header__logo { height: 3.33vw; display: block; }
   .header__titles {
     display: flex;
     flex-direction: column;
@@ -143,10 +145,10 @@
   .card-a__image-wrap {
     position: relative;
     width: 100%;
-    height: 140px;
+    height: 7.29vw;
   }
   .card-a--featured { grid-column: span 2; }
-  .card-a--featured .card-a__image-wrap { height: 200px; }
+  .card-a--featured .card-a__image-wrap { height: 10.42vw; }
   .card-a__image {
     width: 100%;
     height: 100%;
@@ -203,7 +205,7 @@
     gap: var(--space-2);
   }
   .card-b__title {
-    font: 900 italic 36px/1 var(--font-italic-serif);
+    font: 900 italic 1.875vw/1 var(--font-italic-serif);
     color: var(--color-text-on-dark);
     margin-bottom: var(--space-1);
   }
@@ -229,7 +231,7 @@
 
   /* Row variants */
   .card-b__row--2col { grid-template-columns: 1fr auto; gap: var(--space-3); }
-  .card-b__row--3col { grid-template-columns: 240px 1fr auto; gap: var(--space-4); }
+  .card-b__row--3col { grid-template-columns: 12.5vw 1fr auto; gap: var(--space-4); }
   .card-b__row--deal { grid-template-columns: 1fr auto auto; gap: var(--space-3); }
   .card-b__row--deal-2line {
     grid-template-columns: 1fr auto auto;
@@ -272,7 +274,7 @@
   }
   .card-b__pairs small {
     display: block;
-    font-size: 12px;
+    font-size: 0.625vw;
     color: var(--color-text-muted-cream);
     letter-spacing: 0.16em;
     margin-bottom: var(--space-1);
@@ -288,15 +290,15 @@
     border-top: 1px solid rgba(26, 26, 26, 0.12);
   }
   .card-b--cream .card-b__row--dip .card-b__label {
-    font: var(--weight-heavy) 34px/1.05 var(--font);
+    font: var(--weight-heavy) 1.77vw/1.05 var(--font);
   }
 
   /* ═══ Pills ═══ */
   .pill {
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 16px;
-    font: var(--weight-bold) var(--size-meta)/32px var(--font);
+    height: 1.67vw;
+    padding: 0 0.625vw;
+    border-radius: 0.83vw;
+    font: var(--weight-bold) var(--size-meta)/1.67vw var(--font);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     display: inline-flex;
@@ -339,7 +341,7 @@
     padding: var(--space-4);
   }
   .catering__title {
-    font: 900 italic 48px/1 var(--font-italic-serif);
+    font: 900 italic 2.5vw/1 var(--font-italic-serif);
     color: var(--color-text-on-dark);
     margin-bottom: var(--space-1);
   }
@@ -356,7 +358,7 @@
     padding-top: var(--space-3);
     margin-top: auto;
     border-top: 1px solid var(--color-divider-dark);
-    font: var(--weight-regular) 14px var(--font);
+    font: var(--weight-regular) 0.73vw var(--font);
     color: #6e6e6e;
     letter-spacing: 0.12em;
     text-transform: uppercase;
