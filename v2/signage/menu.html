@@ -716,9 +716,6 @@
       document.body.classList.add(cls);
     })();
 
-    // Auto-refresh every 10 min using location.replace() to avoid
-    // triggering Amazon Silk's browser chrome (meta refresh causes full navigation)
-    setTimeout(function () { location.replace(location.href); }, 600000);
   </script>
 </body>
 </html>
