@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch Tracking | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 400; border-bottom: 1px solid #333; overflow-x: auto; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; min-width: max-content; }
+    .nav-logo { height: 46px; flex-shrink: 0; }
+    .nav-links { display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; margin-left: 20px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; white-space: nowrap; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    /* ── Hero ── */
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px,4vw,50px) 5% clamp(16px,3vw,28px); }
+    .hero h1 { font: 900 italic clamp(32px,5vw,52px)/1.05 Georgia, serif; color: #fff; }
+
+    /* ── Sections ── */
+    .section-cream { background: #F5F0E8; padding: clamp(32px,5vw,60px) 5%; }
+    .section-dark  { background: #1A1A1A; padding: clamp(32px,5vw,60px) 5%; }
+    .section-dark h2 { font: 900 italic clamp(24px,3vw,36px)/1.05 Georgia, serif; color: #fff; margin-bottom: 24px; }
+    .max-800  { max-width: 800px;  margin: 0 auto; }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Cards ── */
+    .card { background: #fff; border-radius: 10px; padding: 22px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .card-dark { background: #2e2e2e; box-shadow: none; }
+
+    /* ── Form fields ── */
+    .field-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+    .field-group label { font: 700 11px 'Manrope', sans-serif; color: #888; letter-spacing: 0.8px; text-transform: uppercase; }
+    .field-group input,
+    .field-group select {
+      font: 400 14px 'Manrope', sans-serif;
+      padding: 9px 12px;
+      border: 2px solid #e8e0d5;
+      border-radius: 6px;
+      background: #fff;
+      color: #1A1A1A;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    .field-group input:focus,
+    .field-group select:focus { border-color: #C41E1E; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #1A1A1A; color: #fff; font: 600 14px 'Manrope', sans-serif; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 1; transition: opacity .4s; pointer-events: none; }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    /* ── Buttons ── */
+    .btn-primary { display: block; width: 100%; padding: 12px 20px; font: 700 14px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background .2s; text-align: center; }
+    .btn-primary:hover:not(:disabled) { background: #a01818; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* ── Language toggle ── */
+    .lang-toggle { position: absolute; top: 0; right: 0; display: flex; align-items: center; gap: 4px; }
+    .lang-btn { background: none; border: 2px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.5); font: 700 12px 'Manrope',sans-serif; padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: all .15s; }
+    .lang-btn.active { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
+    .lang-sep { color: rgba(255,255,255,0.3); font-size: 14px; }
+
+    /* ── Batch code preview ── */
+    .code-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; font: 600 13px 'Manrope',sans-serif; color: #555; }
+    .batch-code-display { font: 700 20px 'Courier New',monospace; color: #1A1A1A; letter-spacing: 2px; background: #F5F0E8; padding: 6px 14px; border-radius: 6px; }
+
+    /* ── Active batch card ── */
+    .active-batch-card { margin-bottom: 0; }
+    .active-batch-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .active-batch-label { font: 700 10px 'Manrope',sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+    .active-batch-code { font: 700 24px 'Courier New',monospace; color: #1A1A1A; letter-spacing: 2px; }
+    .active-batch-sub { font: 400 13px 'Manrope',sans-serif; color: #777; margin-top: 4px; }
+    .btn-done { background: #2a7a2a; color: #fff; font: 700 13px 'Manrope',sans-serif; border: none; border-radius: 8px; padding: 12px 22px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .btn-done:hover { background: #1e5e1e; }
+
+    /* ── Scan input ── */
+    .scan-label { display: block; font: 700 11px 'Manrope',sans-serif; color: #999; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
+    .search-wrap { display: flex; gap: 8px; }
+    .search-wrap input { flex: 1; font: 400 16px 'Manrope',sans-serif; padding: 12px 16px; border: 2px solid #ddd; border-radius: 8px; outline: none; transition: border-color .2s; }
+    .search-wrap input:focus { border-color: #C41E1E; }
+    .search-wrap input:disabled { background: #f5f5f5; color: #aaa; }
+    .search-wrap button { background: #C41E1E; color: #fff; font: 700 14px 'Manrope',sans-serif; border: none; border-radius: 8px; padding: 12px 22px; cursor: pointer; white-space: nowrap; }
+    .search-wrap button:hover:not(:disabled) { background: #a01818; }
+    .search-wrap button:disabled { background: #ccc; cursor: not-allowed; }
+    .scan-hint { font: 400 12px 'Manrope',sans-serif; color: #aaa; margin-top: 8px; font-style: italic; }
+
+    /* ── Scanned list ── */
+    .scanned-list { margin-top: 16px; }
+    .scanned-item { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 8px; padding: 10px 16px; margin-bottom: 8px; border-left: 4px solid #ccc; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .scanned-item.resolved   { border-left-color: #2a7a2a; }
+    .scanned-item.unresolved { border-left-color: #ddd; }
+    .scanned-barcode { font: 600 13px 'Courier New',monospace; color: #1A1A1A; }
+    .scanned-name { flex: 1; font: 400 13px 'Manrope',sans-serif; color: #555; }
+    .scanned-name.unknown { color: #aaa; font-style: italic; }
+    .scanned-time { font: 400 11px 'Manrope',sans-serif; color: #bbb; white-space: nowrap; }
+
+    /* ── History filters ── */
+    .history-filters { margin-bottom: 20px; }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .filter-row input, .filter-row select { font: 400 13px 'Manrope',sans-serif; padding: 8px 12px; border: 2px solid #444; border-radius: 6px; background: #3a3a3a; color: #fff; outline: none; transition: border-color .15s; }
+    .filter-row input:focus, .filter-row select:focus { border-color: #C41E1E; }
+    .filter-row input::placeholder { color: #666; }
+    .filter-row select option { background: #2e2e2e; }
+    .btn-filter-clear { background: none; border: 2px solid #555; color: #888; font: 700 12px 'Manrope',sans-serif; border-radius: 6px; padding: 8px 16px; cursor: pointer; white-space: nowrap; transition: all .15s; }
+    .btn-filter-clear:hover { border-color: #C41E1E; color: #C41E1E; }
+
+    /* ── History batch cards ── */
+    .history-status { color: #888; font: 400 14px 'Manrope',sans-serif; text-align: center; padding: 32px 0; }
+    .batch-card { background: #2e2e2e; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+    .batch-card-header { display: flex; align-items: center; gap: 16px; padding: 14px 18px; cursor: pointer; user-select: none; }
+    .batch-card-header:hover { background: #333; }
+    .batch-card-code { font: 700 16px 'Courier New',monospace; color: #fff; letter-spacing: 1px; }
+    .batch-card-product { font: 600 13px 'Manrope',sans-serif; color: #aaa; flex: 1; }
+    .batch-card-date { font: 400 12px 'Manrope',sans-serif; color: #666; white-space: nowrap; }
+    .batch-card-count { font: 400 12px 'Manrope',sans-serif; color: #666; white-space: nowrap; }
+    .batch-card-chevron { color: #555; font-size: 18px; transition: transform .2s; }
+    .batch-card.open .batch-card-chevron { transform: rotate(180deg); }
+    .batch-card-body { display: none; border-top: 1px solid #3a3a3a; }
+    .batch-card.open .batch-card-body { display: block; }
+    .batch-ing-table { width: 100%; border-collapse: collapse; }
+    .batch-ing-table td { font: 400 13px 'Manrope',sans-serif; padding: 9px 18px; border-bottom: 1px solid #3a3a3a; color: #ccc; }
+    .batch-ing-table tr:last-child td { border-bottom: none; }
+    .batch-ing-table .ing-barcode { font-family: 'Courier New',monospace; color: #fff; }
+    .batch-ing-table .ing-name { color: #aaa; }
+    .batch-ing-table .ing-name.unknown { color: #555; font-style: italic; }
+    .batch-ing-table .ing-time { color: #555; white-space: nowrap; font-size: 11px; }
+    .no-results { color: #555; font: 400 14px 'Manrope',sans-serif; text-align: center; padding: 32px 0; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      .active-batch-meta { flex-direction: column; align-items: flex-start; }
+      .filter-row input, .filter-row select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-wrap">
+    <a href="../v2/index.html"><img class="nav-logo" src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co."></a>
+    <div class="nav-links">
+      <a href="../v2/menu.html">Menu</a>
+      <a href="../v2/catering.html">Catering</a>
+      <a href="../v2/index.html">Home</a>
+      <a href="../delivery-planner/index.html">Delivery Planner</a>
+      <a href="../barcode-lookup/index.html">Barcode Lookup</a>
+      <a href="../receiving-history/index.html">Receiving History</a>
+      <a href="../inventory/index.html">Inventory</a>
+      <a href="../inventory-forecast/index.html">Forecast</a>
+      <a href="../recipes/index.html">Recipes</a>
+      <a href="../batch-tracking/index.html">Batch Tracking</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div style="position:relative; max-width:1100px; margin:0 auto; padding:0 5%;">
+    <h1 data-i18n="hero">PRODUCTION.</h1>
+    <div class="lang-toggle">
+      <button id="lang-en" class="lang-btn active">EN</button>
+      <span class="lang-sep">|</span>
+      <button id="lang-es" class="lang-btn">ES</button>
+    </div>
+  </div>
+</section>
+
+<section class="section-cream">
+  <div class="max-800">
+
+    <!-- START VIEW -->
+    <div id="start-view">
+      <div class="card">
+        <div class="field-group">
+          <label data-i18n="labelProduct">Product</label>
+          <select id="product-select">
+            <option value="" data-i18n-option="selectProduct">Select a product…</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label data-i18n="labelDate">Date</label>
+          <input type="date" id="batch-date">
+        </div>
+        <div class="code-preview" id="code-preview-wrap" hidden>
+          <span data-i18n="labelBatchCode">Batch Code</span>
+          <span class="batch-code-display" id="code-preview">—</span>
+        </div>
+        <button class="btn-primary" id="start-batch-btn" disabled data-i18n="startBatch">Start Batch</button>
+      </div>
+    </div>
+
+    <!-- SCAN VIEW -->
+    <div id="scan-view" hidden>
+      <div class="active-batch-card card">
+        <div class="active-batch-meta">
+          <div>
+            <div class="active-batch-label" data-i18n="labelBatchCode">Batch Code</div>
+            <div class="active-batch-code" id="active-code">—</div>
+            <div class="active-batch-sub" id="active-sub"></div>
+          </div>
+          <button class="btn-done" id="finish-batch-btn" data-i18n="done">✓ Done</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <label class="scan-label" data-i18n="labelScan">Scan Ingredient</label>
+        <div class="search-wrap">
+          <input id="barcode-input" type="text" autocomplete="off" spellcheck="false" disabled
+                 data-i18n-placeholder="scanPlaceholder">
+          <button id="scan-btn" disabled data-i18n="logBtn">Log</button>
+        </div>
+        <p class="scan-hint" data-i18n="scanHint">Press Enter to log ingredient</p>
+      </div>
+
+      <div id="scanned-list" class="scanned-list"></div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section-dark">
+  <div class="max-1100">
+    <h2 data-i18n="historyTitle">Batch History</h2>
+
+    <div class="history-filters card card-dark">
+      <div class="filter-row">
+        <input type="text" id="filter-batch" data-i18n-placeholder="filterBatch">
+        <input type="text" id="filter-barcode" data-i18n-placeholder="filterBarcode">
+        <input type="date" id="filter-date-from">
+        <input type="date" id="filter-date-to">
+        <select id="filter-product">
+          <option value="" data-i18n-option="filterProduct">All products</option>
+        </select>
+        <button class="btn-filter-clear" id="filter-clear" data-i18n="clearFilters">Clear</button>
+      </div>
+    </div>
+
+    <div id="history-status" class="history-status" data-i18n="loading">Loading…</div>
+    <div id="history-results" hidden></div>
+  </div>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+
+<script type="module">
+  import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+
+  const PRODUCTION_PATH = '/dangpretz/production';
+  const RECEIVING_PATH  = '/dangpretz/receiving';
+
+  const PRODUCTS = [
+    { code: 'PBB10', name: 'Baseball Bats',       nameEs: 'Bates de béisbol' },
+    { code: 'PVM10', name: 'Mustache',             nameEs: 'Bigote' },
+    { code: 'PPM20', name: 'Mammoth',              nameEs: 'Mamut' },
+    { code: 'PPL10', name: 'Plain 10oz',           nameEs: 'Plain 10oz' },
+    { code: 'PPL07', name: 'Plain 7oz',            nameEs: 'Plain 7oz' },
+    { code: 'TPL04', name: 'Plain Twist',          nameEs: 'Twist Plain' },
+    { code: 'PGP10', name: 'BBK 10oz',             nameEs: 'BBK 10oz' },
+    { code: 'PGP07', name: 'BBK 7oz',              nameEs: 'BBK 7oz' },
+    { code: 'TGP04', name: 'BBK Twist',            nameEs: 'BBK Twist' },
+    { code: 'PSB10', name: 'Spicy Bee 10oz',       nameEs: 'Abeja Picante 10oz' },
+    { code: 'PSB07', name: 'Spicy Bee 7oz',        nameEs: 'Abeja Picante 7oz' },
+    { code: 'TSB04', name: 'Spicy Bee Twist',      nameEs: 'Abeja Picante Twist' },
+    { code: 'PDD07', name: "Devil's Delight 7oz",  nameEs: 'Deleite del Diablo 7oz' },
+    { code: 'PBL07', name: 'Bootlegger 7oz',       nameEs: 'Bootlegger 7oz' },
+    { code: 'BPL01', name: 'Plain Bombs',          nameEs: 'Bombas Plain' },
+    { code: 'DDC03', name: 'Dangerous Dip',        nameEs: 'Dip Peligroso' },
+  ];
+
+  // ── i18n ──────────────────────────────────────────────────────────────────────
+  const STRINGS = {
+    en: {
+      hero: 'PRODUCTION.',
+      labelProduct: 'Product',
+      selectProduct: 'Select a product…',
+      labelDate: 'Date',
+      labelBatchCode: 'Batch Code',
+      startBatch: 'Start Batch',
+      labelScan: 'Scan Ingredient',
+      scanPlaceholder: 'Scan or type a barcode…',
+      logBtn: 'Log',
+      scanHint: 'Press Enter to log ingredient',
+      done: '✓ Done',
+      historyTitle: 'Batch History',
+      filterBatch: 'Batch code…',
+      filterBarcode: 'Ingredient barcode…',
+      filterProduct: 'All products',
+      clearFilters: 'Clear',
+      loading: 'Loading…',
+      noResults: 'No batches found.',
+      unknown: 'Unknown barcode',
+      ingredients: 'ingredients',
+    },
+    es: {
+      hero: 'PRODUCCIÓN.',
+      labelProduct: 'Producto',
+      selectProduct: 'Seleccionar producto…',
+      labelDate: 'Fecha',
+      labelBatchCode: 'Código de Lote',
+      startBatch: 'Iniciar Lote',
+      labelScan: 'Escanear Ingrediente',
+      scanPlaceholder: 'Escanear o escribir código de barras…',
+      logBtn: 'Registrar',
+      scanHint: 'Presiona Enter para registrar ingrediente',
+      done: '✓ Listo',
+      historyTitle: 'Historial de Lotes',
+      filterBatch: 'Código de lote…',
+      filterBarcode: 'Código de barras…',
+      filterProduct: 'Todos los productos',
+      clearFilters: 'Limpiar',
+      loading: 'Cargando…',
+      noResults: 'No se encontraron lotes.',
+      unknown: 'Código desconocido',
+      ingredients: 'ingredientes',
+    },
+  };
+
+  let lang = localStorage.getItem('prod-lang') || 'en';
+  let prodLogs = [];
+  let receivingLogs = [];
+  let batchMap = new Map(); // batchCode → { meta, ingredients: [] }
+  let activeBatch = null;   // { batchCode, productCode, productName, date }
+  let scanDebounceTimer = null;
+
+  // ── Utilities ─────────────────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast' + (type ? ' ' + type : '');
+    el.hidden = false;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.classList.add('fade'); setTimeout(() => { el.hidden = true; el.classList.remove('fade'); }, 400); }, 2500);
+  }
+
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function fmtDate(dateStr) {
+    if (!dateStr) return '—';
+    const [y, m, d] = dateStr.split('-');
+    return `${m}/${d}/${y}`;
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── i18n ──────────────────────────────────────────────────────────────────────
+  function applyStrings() {
+    const S = STRINGS[lang];
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.dataset.i18n;
+      if (S[key] !== undefined) el.textContent = S[key];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const key = el.dataset.i18nPlaceholder;
+      if (S[key] !== undefined) el.placeholder = S[key];
+    });
+    // Update product select options with translated names
+    const sel = document.getElementById('product-select');
+    if (sel) {
+      const current = sel.value;
+      sel.innerHTML = `<option value="">${S.selectProduct}</option>` +
+        PRODUCTS.map((p) => `<option value="${p.code}">${lang === 'es' ? p.nameEs : p.name}</option>`).join('');
+      sel.value = current;
+    }
+    // Update filter product options
+    const fsel = document.getElementById('filter-product');
+    if (fsel) {
+      const cur = fsel.value;
+      fsel.innerHTML = `<option value="">${S.filterProduct}</option>` +
+        PRODUCTS.map((p) => `<option value="${p.code}">${lang === 'es' ? p.nameEs : p.name}</option>`).join('');
+      fsel.value = cur;
+    }
+    // Active/inactive toggle buttons
+    document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+    document.getElementById('lang-es').classList.toggle('active', lang === 'es');
+  }
+
+  // ── Batch code helpers ────────────────────────────────────────────────────────
+  function dateToParts(dateStr) {
+    return dateStr.replace(/-/g, ''); // '2026-05-19' → '20260519'
+  }
+
+  function computeNextCounter(productCode, date) {
+    const count = prodLogs.filter(
+      (r) => r.action === 'create_batch' && r.productCode === productCode && r.date === date,
+    ).length;
+    return String(count + 1).padStart(2, '0');
+  }
+
+  function buildCode(productCode, date) {
+    const counter = computeNextCounter(productCode, date);
+    return productCode + dateToParts(date) + counter;
+  }
+
+  // ── Code preview (live update) ─────────────────────────────────────────────
+  function updateCodePreview() {
+    const code = document.getElementById('product-select').value;
+    const date = document.getElementById('batch-date').value;
+    const wrap = document.getElementById('code-preview-wrap');
+    const preview = document.getElementById('code-preview');
+    const btn = document.getElementById('start-batch-btn');
+    if (code && date) {
+      preview.textContent = buildCode(code, date);
+      wrap.hidden = false;
+      btn.disabled = false;
+    } else {
+      wrap.hidden = true;
+      btn.disabled = true;
+    }
+  }
+
+  // ── Barcode resolution ────────────────────────────────────────────────────────
+  function resolveBarcode(barcode) {
+    // Search receiving logs most-recent-first for matching barcode
+    for (let i = receivingLogs.length - 1; i >= 0; i--) {
+      const r = receivingLogs[i];
+      if (r.barcode === barcode && r.productName) return r.productName;
+    }
+    return '';
+  }
+
+  // ── Build batch map from logs ─────────────────────────────────────────────────
+  function buildBatchMap(logs) {
+    const map = new Map();
+    for (const r of logs) {
+      if (r.action === 'create_batch') {
+        map.set(r.batchCode, { meta: r, ingredients: [] });
+      } else if (r.action === 'batch_ingredient') {
+        if (map.has(r.batchCode)) {
+          map.get(r.batchCode).ingredients.push(r);
+        } else {
+          // orphaned ingredient (batch created in earlier session) — create stub
+          map.set(r.batchCode, { meta: { batchCode: r.batchCode, productName: '—', date: '' }, ingredients: [r] });
+        }
+      }
+    }
+    return map;
+  }
+
+  // ── Start batch ───────────────────────────────────────────────────────────────
+  async function startBatch() {
+    const productCode = document.getElementById('product-select').value;
+    const date = document.getElementById('batch-date').value;
+    if (!productCode || !date) return;
+
+    const product = PRODUCTS.find((p) => p.code === productCode);
+    const productName = product ? product.name : productCode;
+    const counter = computeNextCounter(productCode, date);
+    const batchCode = productCode + dateToParts(date) + counter;
+
+    const btn = document.getElementById('start-batch-btn');
+    btn.disabled = true;
+    btn.textContent = '…';
+
+    try {
+      const entry = { action: 'create_batch', batchCode, productCode, productName, date, counter, timeStamp: new Date().toISOString() };
+      await appendLog(PRODUCTION_PATH, entry);
+      prodLogs.push(entry);
+      batchMap = buildBatchMap(prodLogs);
+
+      activeBatch = { batchCode, productCode, productName, date };
+      showScanView();
+      showToast(batchCode, 'success');
+    } catch (err) {
+      showToast('Failed to start batch: ' + (err.message || 'error'), 'error');
+      btn.disabled = false;
+      applyStrings();
+    }
+  }
+
+  // ── Show scan view ────────────────────────────────────────────────────────────
+  function showScanView() {
+    document.getElementById('start-view').hidden = true;
+    document.getElementById('scan-view').hidden = false;
+    document.getElementById('active-code').textContent = activeBatch.batchCode;
+    const product = PRODUCTS.find((p) => p.code === activeBatch.productCode);
+    const pName = product ? (lang === 'es' ? product.nameEs : product.name) : activeBatch.productName;
+    document.getElementById('active-sub').textContent = pName + ' · ' + fmtDate(activeBatch.date);
+    document.getElementById('scanned-list').innerHTML = '';
+    document.getElementById('barcode-input').disabled = false;
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('barcode-input').focus();
+  }
+
+  // ── Finish batch ──────────────────────────────────────────────────────────────
+  function finishBatch() {
+    activeBatch = null;
+    document.getElementById('scan-view').hidden = true;
+    document.getElementById('start-view').hidden = false;
+    document.getElementById('product-select').value = '';
+    document.getElementById('code-preview-wrap').hidden = true;
+    document.getElementById('start-batch-btn').disabled = true;
+    document.getElementById('barcode-input').disabled = true;
+    document.getElementById('scan-btn').disabled = true;
+    renderHistory();
+  }
+
+  // ── Scan ingredient ──────────────────────────────────────────────────────────
+  async function scanIngredient() {
+    const input = document.getElementById('barcode-input');
+    const barcode = input.value.trim();
+    if (!barcode || !activeBatch) return;
+
+    const ingredientName = resolveBarcode(barcode);
+    const entry = {
+      action: 'batch_ingredient',
+      batchCode: activeBatch.batchCode,
+      barcode,
+      ingredientName,
+      timeStamp: new Date().toISOString(),
+    };
+
+    // Disable during save
+    input.disabled = true;
+    document.getElementById('scan-btn').disabled = true;
+
+    try {
+      await appendLog(PRODUCTION_PATH, entry);
+      prodLogs.push(entry);
+      if (batchMap.has(activeBatch.batchCode)) {
+        batchMap.get(activeBatch.batchCode).ingredients.push(entry);
+      }
+      // Prepend to scanned list
+      prependScannedItem(entry);
+      input.value = '';
+      input.disabled = false;
+      document.getElementById('scan-btn').disabled = false;
+      input.focus();
+    } catch (err) {
+      showToast('Failed to log: ' + (err.message || 'error'), 'error');
+      input.disabled = false;
+      document.getElementById('scan-btn').disabled = false;
+      input.focus();
+    }
+  }
+
+  function prependScannedItem(entry) {
+    const S = STRINGS[lang];
+    const resolved = entry.ingredientName && entry.ingredientName.trim();
+    const list = document.getElementById('scanned-list');
+    const div = document.createElement('div');
+    div.className = 'scanned-item ' + (resolved ? 'resolved' : 'unresolved');
+    div.innerHTML = `
+      <span class="scanned-barcode">${escapeHtml(entry.barcode)}</span>
+      <span class="scanned-name${resolved ? '' : ' unknown'}">${resolved ? escapeHtml(entry.ingredientName) : S.unknown}</span>
+      <span class="scanned-time">${fmtTime(entry.timeStamp)}</span>`;
+    list.insertBefore(div, list.firstChild);
+  }
+
+  // ── Render history ─────────────────────────────────────────────────────────────
+  function renderHistory() {
+    const S = STRINGS[lang];
+    const results = document.getElementById('history-results');
+    const status = document.getElementById('history-status');
+
+    const batchFilter   = document.getElementById('filter-batch').value.trim().toLowerCase();
+    const barcodeFilter = document.getElementById('filter-barcode').value.trim();
+    const dateFrom      = document.getElementById('filter-date-from').value;
+    const dateTo        = document.getElementById('filter-date-to').value;
+    const productFilter = document.getElementById('filter-product').value;
+
+    let batches = Array.from(batchMap.values());
+
+    // Apply filters
+    if (batchFilter)   batches = batches.filter((b) => b.meta.batchCode.toLowerCase().includes(batchFilter));
+    if (barcodeFilter) batches = batches.filter((b) => b.ingredients.some((i) => i.barcode === barcodeFilter));
+    if (dateFrom)      batches = batches.filter((b) => b.meta.date >= dateFrom);
+    if (dateTo)        batches = batches.filter((b) => b.meta.date <= dateTo);
+    if (productFilter) batches = batches.filter((b) => b.meta.productCode === productFilter);
+
+    // Sort newest first
+    batches.sort((a, b) => (b.meta.date || '').localeCompare(a.meta.date || '') || b.meta.batchCode.localeCompare(a.meta.batchCode));
+
+    status.hidden = true;
+    results.hidden = false;
+
+    if (!batches.length) {
+      results.innerHTML = `<div class="no-results">${escapeHtml(S.noResults)}</div>`;
+      return;
+    }
+
+    results.innerHTML = batches.map((b) => {
+      const { batchCode, productName, date } = b.meta;
+      const count = b.ingredients.length;
+      const ingRows = b.ingredients.map((ing) => {
+        const resolved = ing.ingredientName && ing.ingredientName.trim();
+        return `<tr>
+          <td class="ing-barcode">${escapeHtml(ing.barcode)}</td>
+          <td class="ing-name${resolved ? '' : ' unknown'}">${resolved ? escapeHtml(ing.ingredientName) : S.unknown}</td>
+          <td class="ing-time">${fmtTime(ing.timeStamp)}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="batch-card" data-code="${escapeHtml(batchCode)}">
+        <div class="batch-card-header">
+          <span class="batch-card-code">${escapeHtml(batchCode)}</span>
+          <span class="batch-card-product">${escapeHtml(productName)}</span>
+          <span class="batch-card-date">${fmtDate(date)}</span>
+          <span class="batch-card-count">${count} ${S.ingredients}</span>
+          <span class="batch-card-chevron">⌄</span>
+        </div>
+        <div class="batch-card-body">
+          ${count ? `<table class="batch-ing-table">${ingRows}</table>` : `<p style="padding:14px 18px;color:#555;font-style:italic;">${S.noResults}</p>`}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Wire expand/collapse
+    results.querySelectorAll('.batch-card-header').forEach((hdr) => {
+      hdr.addEventListener('click', () => hdr.closest('.batch-card').classList.toggle('open'));
+    });
+  }
+
+  // ── Load all data ─────────────────────────────────────────────────────────────
+  async function loadAll() {
+    try {
+      const [pRaw, rRaw] = await Promise.all([
+        fetchLog(PRODUCTION_PATH),
+        fetchLog(RECEIVING_PATH),
+      ]);
+      prodLogs      = Array.isArray(pRaw) ? pRaw : [];
+      receivingLogs = Array.isArray(rRaw) ? rRaw : [];
+      batchMap = buildBatchMap(prodLogs);
+
+      // Enable scan input if an active batch is open
+      document.getElementById('barcode-input').disabled = !activeBatch;
+      document.getElementById('scan-btn').disabled = !activeBatch;
+
+      renderHistory();
+    } catch (err) {
+      document.getElementById('history-status').textContent = 'Error loading data.';
+      document.getElementById('history-status').hidden = false;
+      console.error(err);
+    }
+  }
+
+  // ── Wire everything ────────────────────────────────────────────────────────────
+  document.getElementById('batch-date').value = todayStr();
+  document.getElementById('product-select').addEventListener('change', updateCodePreview);
+  document.getElementById('batch-date').addEventListener('change', updateCodePreview);
+  document.getElementById('start-batch-btn').addEventListener('click', startBatch);
+  document.getElementById('finish-batch-btn').addEventListener('click', finishBatch);
+  document.getElementById('scan-btn').addEventListener('click', scanIngredient);
+
+  document.getElementById('barcode-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); scanIngredient(); }
+  });
+  // 400ms debounce — same as barcode-lookup page
+  document.getElementById('barcode-input').addEventListener('input', () => {
+    clearTimeout(scanDebounceTimer);
+    scanDebounceTimer = setTimeout(() => {
+      if (document.getElementById('barcode-input').value.trim()) scanIngredient();
+    }, 400);
+  });
+
+  // History filters — live re-render on any change
+  ['filter-batch','filter-barcode','filter-date-from','filter-date-to','filter-product'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', renderHistory);
+    document.getElementById(id).addEventListener('change', renderHistory);
+  });
+  document.getElementById('filter-clear').addEventListener('click', () => {
+    ['filter-batch','filter-barcode','filter-date-from','filter-date-to'].forEach((id) => { document.getElementById(id).value = ''; });
+    document.getElementById('filter-product').value = '';
+    renderHistory();
+  });
+
+  // Language toggle
+  document.getElementById('lang-en').addEventListener('click', () => { lang = 'en'; localStorage.setItem('prod-lang', lang); applyStrings(); renderHistory(); if (activeBatch) showScanView(); });
+  document.getElementById('lang-es').addEventListener('click', () => { lang = 'es'; localStorage.setItem('prod-lang', lang); applyStrings(); renderHistory(); if (activeBatch) showScanView(); });
+
+  // Initial render
+  applyStrings();
+  loadAll();
+</script>
+</body>
+</html>
