@@ -125,10 +125,17 @@
     .batch-card-product { font: 600 13px 'Manrope',sans-serif; color: #aaa; flex: 1; }
     .batch-card-date { font: 400 12px 'Manrope',sans-serif; color: #666; white-space: nowrap; }
     .batch-card-count { font: 400 12px 'Manrope',sans-serif; color: #666; white-space: nowrap; }
-    .batch-card-chevron { color: #555; font-size: 18px; transition: transform .2s; }
+    .batch-card-chevron { color: #555; font-size: 18px; transition: transform .2s; margin-left: auto; }
     .batch-card.open .batch-card-chevron { transform: rotate(180deg); }
     .batch-card-body { display: none; border-top: 1px solid #3a3a3a; }
     .batch-card.open .batch-card-body { display: block; }
+    .btn-batch-delete { background: none; border: none; cursor: pointer; font-size: 16px; color: #666; padding: 2px 4px; line-height: 1; border-radius: 4px; flex-shrink: 0; }
+    .btn-batch-delete:hover { color: #e55; background: rgba(255,80,80,.1); }
+    .batch-delete-confirm { display: flex; align-items: center; gap: 10px; padding: 10px 18px; background: #2a1a1a; border-top: 1px solid #4a2a2a; font-size: 13px; color: #ccc; }
+    .btn-batch-delete-yes { background: #c0392b; color: #fff; border: none; border-radius: 4px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .btn-batch-delete-yes:hover { background: #e74c3c; }
+    .btn-batch-delete-cancel { background: none; border: 1px solid #555; color: #aaa; border-radius: 4px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+    .btn-batch-delete-cancel:hover { background: #333; }
     .batch-ing-table { width: 100%; border-collapse: collapse; }
     .batch-ing-table td { font: 400 13px 'Manrope',sans-serif; padding: 9px 18px; border-bottom: 1px solid #3a3a3a; color: #ccc; }
     .batch-ing-table tr:last-child td { border-bottom: none; }
@@ -263,19 +270,19 @@
     { code: 'PBB10', name: 'Baseball Bats',       nameEs: 'Bates de béisbol' },
     { code: 'PVM10', name: 'Mustache',             nameEs: 'Bigote' },
     { code: 'PPM20', name: 'Mammoth',              nameEs: 'Mamut' },
-    { code: 'PPL10', name: 'Plain 10oz',           nameEs: 'Plain 10oz' },
-    { code: 'PPL07', name: 'Plain 7oz',            nameEs: 'Plain 7oz' },
+    { code: 'PPL10', name: 'Plain 10oz',           nameEs: 'Plain medio' },
+    { code: 'PPL07', name: 'Plain 7oz',            nameEs: 'Plain chico' },
     { code: 'TPL04', name: 'Plain Twist',          nameEs: 'Twist Plain' },
-    { code: 'PGP10', name: 'BBK 10oz',             nameEs: 'BBK 10oz' },
-    { code: 'PGP07', name: 'BBK 7oz',              nameEs: 'BBK 7oz' },
+    { code: 'PGP10', name: 'BBK 10oz',             nameEs: 'BBK medio' },
+    { code: 'PGP07', name: 'BBK 7oz',              nameEs: 'BBK chico' },
     { code: 'TGP04', name: 'BBK Twist',            nameEs: 'BBK Twist' },
-    { code: 'PSB10', name: 'Spicy Bee 10oz',       nameEs: 'Abeja Picante 10oz' },
-    { code: 'PSB07', name: 'Spicy Bee 7oz',        nameEs: 'Abeja Picante 7oz' },
-    { code: 'TSB04', name: 'Spicy Bee Twist',      nameEs: 'Abeja Picante Twist' },
-    { code: 'PDD07', name: "Devil's Delight 7oz",  nameEs: 'Deleite del Diablo 7oz' },
-    { code: 'PBL07', name: 'Bootlegger 7oz',       nameEs: 'Bootlegger 7oz' },
-    { code: 'BPL01', name: 'Plain Bombs',          nameEs: 'Bombas Plain' },
-    { code: 'DDC03', name: 'Dangerous Dip',        nameEs: 'Dip Peligroso' },
+    { code: 'PSB10', name: 'Spicy Bee 10oz',       nameEs: 'Spicy medio' },
+    { code: 'PSB07', name: 'Spicy Bee 7oz',        nameEs: 'Spicy chico' },
+    { code: 'TSB04', name: 'Spicy Bee Twist',      nameEs: 'Spicy Twist' },
+    { code: 'PDD07', name: "Devil's Delight 7oz",  nameEs: 'Pepperoni chico' },
+    { code: 'PBL07', name: 'Bootlegger 7oz',       nameEs: 'Tocino chico' },
+    { code: 'BPL01', name: 'Plain Bombs',          nameEs: 'Bombas Veganas' },
+    { code: 'DDC03', name: 'Dangerous Dip',        nameEs: 'Queso' },
   ];
 
   // ── i18n ──────────────────────────────────────────────────────────────────────
@@ -301,6 +308,8 @@
       noResults: 'No batches found.',
       unknown: 'Unknown barcode',
       ingredients: 'ingredients',
+      deleteConfirm: 'Delete this batch?',
+      deleteYes: 'Yes, delete',
     },
     es: {
       hero: 'PRODUCCIÓN.',
@@ -323,6 +332,8 @@
       noResults: 'No se encontraron lotes.',
       unknown: 'Código desconocido',
       ingredients: 'ingredientes',
+      deleteConfirm: '¿Eliminar este lote?',
+      deleteYes: 'Sí, eliminar',
     },
   };
 
@@ -441,14 +452,17 @@
 
   // ── Build batch map from logs ─────────────────────────────────────────────────
   function buildBatchMap(logs) {
+    const archived = new Set(logs.filter((r) => r.action === 'archive_batch').map((r) => r.batchCode));
     const map = new Map();
     for (const r of logs) {
       if (r.action === 'create_batch') {
-        map.set(r.batchCode, { meta: r, ingredients: [] });
+        if (!archived.has(r.batchCode)) {
+          map.set(r.batchCode, { meta: r, ingredients: [] });
+        }
       } else if (r.action === 'batch_ingredient') {
         if (map.has(r.batchCode)) {
           map.get(r.batchCode).ingredients.push(r);
-        } else {
+        } else if (!archived.has(r.batchCode)) {
           // orphaned ingredient (batch created in earlier session) — create stub
           map.set(r.batchCode, { meta: { batchCode: r.batchCode, productName: '—', date: '' }, ingredients: [r] });
         }
@@ -617,6 +631,12 @@
           <span class="batch-card-date">${fmtDate(date)}</span>
           <span class="batch-card-count">${count} ${S.ingredients}</span>
           <span class="batch-card-chevron">⌄</span>
+          <button class="btn-batch-delete" data-code="${escapeHtml(batchCode)}" title="Delete batch">🗑</button>
+        </div>
+        <div class="batch-delete-confirm" hidden>
+          <span>${S.deleteConfirm}</span>
+          <button class="btn-batch-delete-yes" data-code="${escapeHtml(batchCode)}">${S.deleteYes}</button>
+          <button class="btn-batch-delete-cancel">✕</button>
         </div>
         <div class="batch-card-body">
           ${count ? `<table class="batch-ing-table">${ingRows}</table>` : `<p style="padding:14px 18px;color:#555;font-style:italic;">${S.noResults}</p>`}
@@ -626,8 +646,48 @@
 
     // Wire expand/collapse
     results.querySelectorAll('.batch-card-header').forEach((hdr) => {
-      hdr.addEventListener('click', () => hdr.closest('.batch-card').classList.toggle('open'));
+      hdr.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-batch-delete')) return; // don't toggle on delete click
+        hdr.closest('.batch-card').classList.toggle('open');
+      });
     });
+
+    // Wire delete buttons
+    results.querySelectorAll('.btn-batch-delete').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = btn.closest('.batch-card');
+        card.querySelector('.batch-delete-confirm').hidden = false;
+      });
+    });
+    results.querySelectorAll('.btn-batch-delete-cancel').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        btn.closest('.batch-delete-confirm').hidden = true;
+      });
+    });
+    results.querySelectorAll('.btn-batch-delete-yes').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteBatch(btn.dataset.code, btn);
+      });
+    });
+  }
+
+  // ── Delete batch ──────────────────────────────────────────────────────────────
+  async function deleteBatch(batchCode, btn) {
+    btn.disabled = true;
+    try {
+      const entry = { action: 'archive_batch', batchCode, timeStamp: new Date().toISOString() };
+      await appendLog(PRODUCTION_PATH, entry);
+      prodLogs.push(entry);
+      batchMap = buildBatchMap(prodLogs);
+      renderHistory();
+      showToast(batchCode + ' deleted', 'success');
+    } catch (err) {
+      showToast('Failed to delete: ' + (err.message || 'error'), 'error');
+      btn.disabled = false;
+    }
   }
 
   // ── Load all data ─────────────────────────────────────────────────────────────
