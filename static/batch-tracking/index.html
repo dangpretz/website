@@ -151,9 +151,13 @@
       .nav-links { gap: 14px; }
       .nav-links a { font-size: 13px; }
 
-      /* Hero */
-      .hero h1 { font-size: 28px; }
-      .lang-toggle { top: -4px; }
+      /* Hero — put title left, toggle right in a flex row */
+      .hero > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .hero h1 { font-size: 28px; text-align: left; flex: 1; }
+      .lang-toggle { position: static; flex-shrink: 0; }
+
+      /* Date input — prevent overflow beyond card */
+      #batch-date { max-width: 100%; }
 
       /* Sections */
       .section-cream, .section-dark { padding: 24px 4%; }
@@ -224,7 +228,7 @@
 
 <section class="hero">
   <div style="position:relative; max-width:1100px; margin:0 auto; padding:0 5%;">
-    <h1 data-i18n="hero">PRODUCTION.</h1>
+    <h1 data-i18n="hero">PRODUCTION</h1>
     <div class="lang-toggle">
       <button id="lang-en" class="lang-btn active">EN</button>
       <span class="lang-sep">|</span>
@@ -339,7 +343,7 @@
   // ── i18n ──────────────────────────────────────────────────────────────────────
   const STRINGS = {
     en: {
-      hero: 'PRODUCTION.',
+      hero: 'PRODUCTION',
       labelProduct: 'Product',
       selectProduct: 'Select a product…',
       labelDate: 'Date',
@@ -363,7 +367,7 @@
       deleteYes: 'Yes, delete',
     },
     es: {
-      hero: 'PRODUCCIÓN.',
+      hero: 'PRODUCCIÓN',
       labelProduct: 'Producto',
       selectProduct: 'Seleccionar producto…',
       labelDate: 'Fecha',
