@@ -2085,7 +2085,7 @@ export default {
                 type: 'FIXED_AMOUNT',
               };
               // eslint-disable-next-line no-console -- worker diagnostics
-              console.log(`[catering-checkout] Promo token validated: $${validateData.discount_cents/100} off for customer ${validateData.customer_id || 'unknown'}`);
+              console.log(`[catering-checkout] Promo token validated: $${validateData.discount_cents / 100} off for customer ${validateData.customer_id || 'unknown'}`);
             } else {
               // eslint-disable-next-line no-console -- worker diagnostics
               console.warn(`[catering-checkout] Promo token rejected: ${validateData.reason || 'unknown'}`);
