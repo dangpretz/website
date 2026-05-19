@@ -147,8 +147,58 @@
 
     /* ── Mobile ── */
     @media (max-width: 640px) {
-      .active-batch-meta { flex-direction: column; align-items: flex-start; }
-      .filter-row input, .filter-row select { width: 100%; }
+      /* Nav */
+      .nav-links { gap: 14px; }
+      .nav-links a { font-size: 13px; }
+
+      /* Hero */
+      .hero h1 { font-size: 28px; }
+      .lang-toggle { top: -4px; }
+
+      /* Sections */
+      .section-cream, .section-dark { padding: 24px 4%; }
+
+      /* Active batch */
+      .active-batch-meta { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .active-batch-code { font-size: 18px; letter-spacing: 1px; word-break: break-all; }
+      .btn-done { width: 100%; text-align: center; padding: 14px; font-size: 16px; }
+
+      /* Scan input — 16px prevents iOS auto-zoom */
+      .search-wrap { flex-direction: column; gap: 10px; }
+      .search-wrap input { font-size: 16px; padding: 14px 16px; }
+      .search-wrap button { width: 100%; padding: 14px; font-size: 16px; }
+
+      /* Scanned items — barcode above, name below */
+      .scanned-item { flex-wrap: wrap; row-gap: 2px; padding: 10px 14px; }
+      .scanned-barcode { width: 100%; font-size: 11px; color: #999; order: 1; }
+      .scanned-name { width: calc(100% - 60px); font-size: 14px; order: 2; }
+      .scanned-time { width: 60px; text-align: right; order: 2; align-self: flex-end; }
+
+      /* Batch card header — code on own line, details below */
+      .batch-card-header { flex-wrap: wrap; gap: 4px 10px; padding: 12px 14px; }
+      .batch-card-code { width: 100%; font-size: 14px; margin-bottom: 2px; }
+      .batch-card-product { font-size: 12px; }
+      .batch-card-date { font-size: 11px; }
+      .batch-card-count { font-size: 11px; }
+      .batch-card-chevron { margin-left: auto; }
+      .btn-batch-delete { padding: 4px 8px; font-size: 18px; min-width: 36px; min-height: 36px; }
+
+      /* Delete confirm */
+      .batch-delete-confirm { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+      .btn-batch-delete-yes, .btn-batch-delete-cancel { padding: 8px 16px; font-size: 13px; }
+
+      /* Ingredient table */
+      .batch-ing-table td { padding: 8px 14px; font-size: 12px; }
+      .batch-ing-table .ing-barcode { font-size: 11px; }
+      .batch-ing-table .ing-time { font-size: 10px; }
+
+      /* Filters */
+      .filter-row { gap: 8px; }
+      .filter-row input, .filter-row select { width: 100%; font-size: 16px; }
+      .btn-filter-clear { width: 100%; text-align: center; padding: 10px; }
+
+      /* Form fields */
+      .field-group input, .field-group select { font-size: 16px; padding: 12px 14px; }
     }
   </style>
 </head>
@@ -223,7 +273,8 @@
       <div class="card" style="margin-top:16px;">
         <label class="scan-label" data-i18n="labelScan">Scan Ingredient</label>
         <div class="search-wrap">
-          <input id="barcode-input" type="text" autocomplete="off" spellcheck="false" disabled
+          <input id="barcode-input" type="text" autocomplete="off" autocorrect="off"
+                 autocapitalize="none" spellcheck="false" inputmode="text" disabled
                  data-i18n-placeholder="scanPlaceholder">
           <button id="scan-btn" disabled data-i18n="logBtn">Log</button>
         </div>
