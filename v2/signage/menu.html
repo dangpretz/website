@@ -350,50 +350,8 @@
     color: rgba(255, 255, 255, 0.92);
   }
 
-  /* ═══ QR block (corner or inline) ═══ */
-  .qr {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    flex-shrink: 0;
-  }
-  .qr__img {
-    width: 120px;
-    height: 120px;
-    background: #fff;
-    padding: var(--space-1);
-    border-radius: var(--space-2);
-    flex-shrink: 0;
-  }
-  .qr__text { display: flex; flex-direction: column; gap: var(--space-1); }
-  .qr__label {
-    font: var(--weight-bold) var(--size-meta) var(--font);
-    color: var(--color-text-on-dark);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-  }
-  .qr__sub {
-    font: var(--weight-regular) var(--size-meta) var(--font);
-    color: rgba(255, 255, 255, 0.82);
-  }
-  .qr--dark .qr__label,
-  .qr--dark .qr__sub { color: var(--color-text-on-dark); }
-
-  /* QR corner block (Screen 1 & 3) sits in its own dark card */
-  .qr-corner {
-    background: var(--color-card-dark);
-    border-radius: var(--radius);
-    padding: var(--space-4);
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  /* Catering row (Screen 2): grid + inline QR */
+  /* Catering row (Screen 2) */
   .catering {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--space-4);
-    align-items: center;
     background: var(--color-card-dark);
     border-radius: var(--radius);
     padding: var(--space-4);
@@ -552,13 +510,6 @@
           <h3 class="house-move__title">Spicy Bee</h3>
           <p class="house-move__desc">The one our regulars order on repeat. Sweet, hot, ruined.</p>
         </div>
-        <div class="qr">
-          <img class="qr__img" src="./qr/order.svg" alt="">
-          <div class="qr__text">
-            <span class="qr__label">Order Online</span>
-            <span class="qr__sub">Skip the line</span>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -678,14 +629,7 @@
     <div class="catering">
       <div>
         <p class="catering__title">Bigger event?</p>
-        <p class="catering__sub">Weddings, corporate, festivals. We've got you.</p>
-      </div>
-      <div class="qr qr--dark">
-        <img class="qr__img" src="./qr/catering.svg" alt="">
-        <div class="qr__text">
-          <span class="qr__label">Book Catering</span>
-          <span class="qr__sub">Scan to inquire</span>
-        </div>
+        <p class="catering__sub">Weddings, corporate, festivals. We've got you. Visit dangerouspretzel.com/catering or ask at the counter.</p>
       </div>
     </div>
 
@@ -764,13 +708,6 @@
           <p class="house-move__label">House Move</p>
           <h3 class="house-move__title">Spicy Bee + Hot Ranch</h3>
           <p class="house-move__desc">Sweet heat meets cool buffalo. The combo our regulars order on repeat.</p>
-        </div>
-        <div class="qr">
-          <img class="qr__img" src="./qr/order.svg" alt="">
-          <div class="qr__text">
-            <span class="qr__label">Order Online</span>
-            <span class="qr__sub">Skip the line</span>
-          </div>
         </div>
       </div>
     </div>
