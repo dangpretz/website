@@ -893,6 +893,11 @@ body.cart-open #tw { bottom: 90px; }
     overlay.classList.add('visible');
     errorEl.style.display = 'none';
 
+    // Pick up promo token from URL (Catering Reactivation 2026 campaign).
+    // Magic links from the campaign include ?promo=<token>; the worker validates
+    // it and applies a $25 line discount to the Square Payment Link order.
+    const promoToken = new URLSearchParams(window.location.search).get('promo');
+
     try {
       const res = await fetch(WORKER_URL, {
         method: 'POST',
@@ -906,6 +911,7 @@ body.cart-open #tw { bottom: 90px; }
             address: isDelivery ? address : undefined,
           },
           customer: { name, email, phone, notes },
+          promo_token: promoToken || undefined,
         }),
       });
 

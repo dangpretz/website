@@ -2047,7 +2047,7 @@ export default {
 
     try {
       const body = await request.json();
-      const { items, fulfillment, customer } = body;
+      const { items, fulfillment, customer, promo_token } = body;
 
       // Validate required fields
       if (!items?.length) return json({ error: 'No items in order' }, 400);
@@ -2055,6 +2055,50 @@ export default {
       if (!fulfillment?.date || !fulfillment?.time) return json({ error: 'Date and time required' }, 400);
       if (!customer?.name || !customer?.email || !customer?.phone) {
         return json({ error: 'Name, email, and phone required' }, 400);
+      }
+
+      // ── Promo token (catering reactivation campaign, May 19 2026) ──
+      // If the customer arrived from a campaign SMS/email with a magic URL,
+      // validate the token and prepare a discount line to attach to the order.
+      // Token format: <random>.<hmac_sha256(random + customer_id + expires_at, secret)>
+      // The pretzel-os worker exposes /retail/catering-reactivation/redeem-token
+      // which validates against the catering_promo_tokens table and returns the
+      // discount amount + customer info if redeemable. Single-use enforced server-side.
+      let promoDiscount = null;
+      if (promo_token && env.PRETZEL_OS_URL) {
+        try {
+          const validateResp = await fetch(`${env.PRETZEL_OS_URL}/retail/catering-reactivation/redeem-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Pretzel-Auth': env.PRETZEL_OS_AUTH_TOKEN || '',
+            },
+            body: JSON.stringify({ token: promo_token, customer_phone: customer.phone, customer_email: customer.email }),
+          });
+          if (validateResp.ok) {
+            const validateData = await validateResp.json();
+            if (validateData.valid && validateData.discount_cents > 0) {
+              promoDiscount = {
+                name: validateData.discount_name || 'Catering Reactivation',
+                amount_money: { amount: validateData.discount_cents, currency: 'USD' },
+                scope: 'ORDER',
+                type: 'FIXED_AMOUNT',
+              };
+              // eslint-disable-next-line no-console -- worker diagnostics
+              console.log(`[catering-checkout] Promo token validated: $${validateData.discount_cents/100} off for customer ${validateData.customer_id || 'unknown'}`);
+            } else {
+              // eslint-disable-next-line no-console -- worker diagnostics
+              console.warn(`[catering-checkout] Promo token rejected: ${validateData.reason || 'unknown'}`);
+            }
+          } else {
+            // eslint-disable-next-line no-console -- worker diagnostics
+            console.warn(`[catering-checkout] Promo token validation failed: HTTP ${validateResp.status}`);
+          }
+        } catch (err) {
+          // Validation failure is non-fatal — proceed without discount.
+          // eslint-disable-next-line no-console -- worker diagnostics
+          console.error('[catering-checkout] Promo token validation error:', err);
+        }
       }
 
       // Build order line items from catalog variation IDs
@@ -2167,6 +2211,10 @@ export default {
           line_items: lineItems,
           note: noteLines.join('\n'),
           fulfillments,
+          // Inject promo discount if a validated token was supplied. Square Payment
+          // Links accept order.discounts[] for FIXED_AMOUNT discounts at order scope.
+          // Customer sees this as a "Catering Reactivation: -$25" line on checkout.
+          ...(promoDiscount ? { discounts: [promoDiscount] } : {}),
         },
         checkout_options: {
           allow_tipping: true,
