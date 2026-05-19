@@ -100,10 +100,13 @@
   }
   .header__logo { height: 3.33vw; display: block; }
   .header__titles {
+    /* Inline (row) so the subtitle sits next to the title on its baseline
+       instead of below it. Keeps all three screens' header heights equal
+       (= title height) regardless of whether a subtitle is present. */
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--space-1);
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-4);
   }
   .header__title {
     font: 900 italic var(--size-screen-title)/0.95 var(--font-italic-serif);
@@ -111,7 +114,7 @@
     letter-spacing: -0.01em;
   }
   .header__subtitle {
-    font: 400 italic var(--size-section)/1.05 var(--font-italic-serif);
+    font: 400 italic var(--size-section)/1 var(--font-italic-serif);
     color: var(--color-accent);
     letter-spacing: 0;
   }
