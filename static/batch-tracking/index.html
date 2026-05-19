@@ -51,7 +51,10 @@
       outline: none;
       transition: border-color 0.2s;
       width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
+    input[type="date"] { -webkit-appearance: none; appearance: none; }
     .field-group input:focus,
     .field-group select:focus { border-color: #C41E1E; }
 
@@ -156,8 +159,9 @@
       .hero h1 { font-size: 28px; text-align: left; flex: 1; }
       .lang-toggle { position: static; flex-shrink: 0; }
 
-      /* Date input — prevent overflow beyond card */
-      #batch-date { max-width: 100%; }
+      /* Date inputs — force them to respect container width on iOS */
+      input[type="date"] { width: 100% !important; max-width: 100%; }
+      .card { overflow: hidden; }
 
       /* Sections */
       .section-cream, .section-dark { padding: 24px 4%; }
