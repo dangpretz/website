@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="refresh" content="600">
 <title>Dangerous Pretzel Co. — Digital Menu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -706,7 +705,7 @@
     </div>
   </section>
 
-  <a class="relaunch" href="./index.html" aria-label="Re-launch screen picker">&#x2630;</a>
+  <a class="relaunch" href="./index.html" tabindex="-1" aria-label="Re-launch screen picker">&#x2630;</a>
 
   <script>
     // Screen switcher: ?screen=1 / 2 / 3
@@ -716,6 +715,10 @@
       const cls = (n === 1 || n === 2 || n === 3) ? 's' + n : 's1';
       document.body.classList.add(cls);
     })();
+
+    // Auto-refresh every 10 min using location.replace() to avoid
+    // triggering Amazon Silk's browser chrome (meta refresh causes full navigation)
+    setTimeout(function () { location.replace(location.href); }, 600000);
   </script>
 </body>
 </html>
