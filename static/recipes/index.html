@@ -81,6 +81,14 @@
     .recipe-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; }
     .recipe-qty-derived { font: 400 12px 'Manrope', sans-serif; color: #555; text-align: right; min-width: 54px; display: inline-block; }
     .ing-unit { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; }
+    .purchase-units { font: 600 12px 'Manrope', sans-serif; color: #C41E1E; white-space: nowrap; }
+    .ing-row-ea { opacity: 0.45; }
+    .density-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .density-label { font: 400 10px 'Manrope', sans-serif; color: #666; white-space: nowrap; }
+    .density-input { width: 70px; font: 400 12px 'Manrope', sans-serif; padding: 3px 6px; border: 1.5px solid #555; border-radius: 4px; background: #2a2a2a; color: #aaa; outline: none; text-align: right; -moz-appearance: textfield; }
+    .density-input:focus { border-color: #C41E1E; }
+    .density-input::-webkit-outer-spin-button,
+    .density-input::-webkit-inner-spin-button { -webkit-appearance: none; }
     .sku-save-row { display: flex; align-items: center; gap: 10px; }
     .sku-save-btn { padding: 9px 20px; font: 700 13px 'Manrope', sans-serif; background: #C41E1E; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background .2s; }
     .sku-save-btn:hover:not(:disabled) { background: #a01818; }
@@ -240,17 +248,32 @@
     function fmt2(n) { return isNaN(n) ? '—' : (Math.round(n * 100) / 100).toString(); }
     function parsePackSize(ps) {
       const parts = (ps || '').split('/');
-      if (parts.length < 3) return { innerUnitLabel: ps || 'unit' };
-      return { innerUnitLabel: `${parts[1]} ${parts[2]}` };
+      if (parts.length < 3) return { innerUnitLabel: ps || 'unit', unit: '', gramsPerInnerUnit: null };
+      const qty  = parseFloat(parts[1]);
+      const unit = parts[2].trim().toUpperCase();
+      let gramsPerInnerUnit = null;
+      if (unit === 'LB') gramsPerInnerUnit = qty * 453.592;
+      else if (unit === 'OZ') gramsPerInnerUnit = qty * 28.3495;
+      // GAL: density must be supplied per-product; EA: not applicable
+      return { innerUnitLabel: `${parts[1]} ${parts[2]}`, unit, gramsPerInnerUnit };
     }
 
+    // Convert grams → "X.XXX × N UNIT" label for cross-check display
+    function fmtPurchaseUnits(grams, gpu, innerUnitLabel) {
+      if (!gpu || isNaN(grams) || grams === '') return '—';
+      return `${fmt3(grams / gpu)} × ${innerUnitLabel}`;
+    }
+    function fmt3(n) { return isNaN(n) ? '—' : (Math.round(n * 1000) / 1000).toFixed(3); }
+
     // ── Recipe maps ──────────────────────────────────────────────────────────
-    let scaleMap  = {}; // { sku: { pretzelsPerTray, traysPerBatch } }
-    let recipeMap = {}; // { sku: { productId: quantityPerBatch } }
+    let scaleMap   = {}; // { sku: { pretzelsPerTray, traysPerBatch } }
+    let recipeMap  = {}; // { sku: { productId: gramsPerBatch } }
+    let densityMap = {}; // { productId: gramsPerInnerUnit } — for GAL products
 
     function buildRecipeMaps(logs) {
-      scaleMap  = {};
-      recipeMap = {};
+      scaleMap   = {};
+      recipeMap  = {};
+      densityMap = {};
       for (const r of logs) {
         if (r.action === 'sku_scale' && r.sku) {
           scaleMap[r.sku] = {
@@ -258,9 +281,12 @@
             traysPerBatch:   parseFloat(r.traysPerBatch)   || 0,
           };
         }
-        if (r.action === 'recipe' && r.sku && r.productId) {
+        if (r.action === 'recipe_v2' && r.sku && r.productId) {
           if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
-          recipeMap[r.sku][r.productId] = parseFloat(r.quantityPerBatch) ?? 0;
+          recipeMap[r.sku][r.productId] = parseFloat(r.gramsPerBatch) ?? 0;
+        }
+        if (r.action === 'ingredient_density' && r.productId) {
+          densityMap[r.productId] = parseFloat(r.gramsPerInnerUnit) || 0;
         }
       }
     }
@@ -285,15 +311,23 @@
       const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
 
       const ingRows = PRODUCTS.map((p) => {
-        const { innerUnitLabel } = parsePackSize(p.packSize);
+        const { innerUnitLabel, unit, gramsPerInnerUnit } = parsePackSize(p.packSize);
+        const isEa  = unit === 'EA';
+        const isGal = unit === 'GAL';
+        const gpu   = gramsPerInnerUnit || densityMap[p.id] || 0;
         const perBatch = recipe[p.id] != null ? recipe[p.id] : '';
         const perTray  = (perBatch !== '' && tpb) ? fmt2(perBatch / tpb) : '';
         const perPret  = (perBatch !== '' && ppt && tpb) ? fmt2(perBatch / (ppt * tpb)) : '';
-        return `<tr>
-          <td><span class="ing-name">${escapeHtml(p.name)}</span></td>
-          <td><input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${perBatch}" placeholder="—" min="0" step="0.001"></td>
-          <td><span class="recipe-qty-derived per-tray">${perTray || '—'}</span></td>
-          <td><span class="recipe-qty-derived per-pretzel">${perPret || '—'}</span></td>
+        const purchase = isEa ? '—' : (gpu ? fmtPurchaseUnits(perBatch, gpu, innerUnitLabel) : (isGal ? '<em style="color:#888;font-size:11px">set density ↓</em>' : '—'));
+        const densityInput = isGal
+          ? `<div class="density-row"><label class="density-label">g per ${innerUnitLabel}:</label><input type="number" class="density-input" data-product-id="${escapeHtml(p.id)}" value="${densityMap[p.id] || ''}" placeholder="e.g. 3785" min="1" step="1"></div>`
+          : '';
+        return `<tr class="ing-row${isEa ? ' ing-row-ea' : ''}">
+          <td><span class="ing-name">${escapeHtml(p.name)}</span>${densityInput}</td>
+          <td>${isEa ? '<span class="ing-unit">—</span>' : `<input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${perBatch}" placeholder="—" min="0" step="0.1">`}</td>
+          <td><span class="recipe-qty-derived per-tray">${isEa ? '—' : (perTray || '—')}</span></td>
+          <td><span class="recipe-qty-derived per-pretzel">${isEa ? '—' : (perPret || '—')}</span></td>
+          <td><span class="purchase-units">${purchase}</span></td>
           <td><span class="ing-unit">${escapeHtml(innerUnitLabel)}</span></td>
         </tr>`;
       }).join('');
@@ -324,10 +358,11 @@
           <table class="recipe-ing-table">
             <thead><tr>
               <th>Ingredient</th>
-              <th>Per Batch</th>
-              <th>Per Tray</th>
-              <th>Per Pretzel</th>
-              <th>Unit</th>
+              <th>g / Batch</th>
+              <th>g / Tray</th>
+              <th>g / Pretzel</th>
+              <th>Purchase Units</th>
+              <th>Pack</th>
             </tr></thead>
             <tbody>${ingRows}</tbody>
           </table>
@@ -353,9 +388,12 @@
 
         card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
           const val = parseFloat(inp.value);
+          const productId = inp.dataset.productId;
+          const product   = PRODUCTS.find((p) => p.id === productId);
           const row = inp.closest('tr');
           const perTrayEl    = row.querySelector('.per-tray');
           const perPretzelEl = row.querySelector('.per-pretzel');
+          const purchaseEl   = row.querySelector('.purchase-units');
           if (!isNaN(val)) {
             if (perTrayEl)    perTrayEl.textContent    = tpb ? fmt2(val / tpb) : '—';
             if (perPretzelEl) perPretzelEl.textContent = ppb ? fmt2(val / ppb)  : '—';
@@ -363,12 +401,35 @@
             if (perTrayEl)    perTrayEl.textContent    = '—';
             if (perPretzelEl) perPretzelEl.textContent = '—';
           }
+          if (purchaseEl && product) {
+            const { innerUnitLabel, gramsPerInnerUnit } = parsePackSize(product.packSize);
+            const gpu = gramsPerInnerUnit || densityMap[productId] || 0;
+            purchaseEl.innerHTML = gpu ? fmtPurchaseUnits(val, gpu, innerUnitLabel) : '<em style="color:#888;font-size:11px">set density ↓</em>';
+          }
         });
       }
 
       pptInput.addEventListener('input', updateDerived);
       tpbInput.addEventListener('input', updateDerived);
       card.querySelectorAll('.recipe-qty-input').forEach((inp) => inp.addEventListener('input', updateDerived));
+
+      // Density inputs (GAL products) — update purchase units live
+      card.querySelectorAll('.density-input').forEach((inp) => {
+        inp.addEventListener('input', () => {
+          const productId = inp.dataset.productId;
+          const gpu = parseFloat(inp.value) || 0;
+          densityMap[productId] = gpu;
+          const product = PRODUCTS.find((p) => p.id === productId);
+          if (!product) return;
+          const { innerUnitLabel } = parsePackSize(product.packSize);
+          const qtyInp = card.querySelector(`.recipe-qty-input[data-product-id="${productId}"]`);
+          const purchaseEl = inp.closest('tr').querySelector('.purchase-units');
+          if (purchaseEl) {
+            const grams = parseFloat(qtyInp?.value);
+            purchaseEl.innerHTML = gpu ? fmtPurchaseUnits(grams, gpu, innerUnitLabel) : '<em style="color:#888;font-size:11px">set density ↓</em>';
+          }
+        });
+      });
 
       card.querySelector('.sku-save-btn').addEventListener('click', async () => {
         const saveBtn    = card.querySelector('.sku-save-btn');
@@ -395,7 +456,18 @@
           const val = parseFloat(inp.value);
           if (!isNaN(val) && val >= 0) {
             writes.push(appendLog(RECIPES_PATH, {
-              action: 'recipe', sku, productId, quantityPerBatch: String(val), timeStamp: now, updatedBy: '',
+              action: 'recipe_v2', sku, productId, gramsPerBatch: String(val), timeStamp: now, updatedBy: '',
+            }));
+          }
+        });
+
+        // Save density overrides for GAL products
+        card.querySelectorAll('.density-input').forEach((inp) => {
+          const productId = inp.dataset.productId;
+          const val = parseFloat(inp.value);
+          if (!isNaN(val) && val > 0) {
+            writes.push(appendLog(RECIPES_PATH, {
+              action: 'ingredient_density', productId, gramsPerInnerUnit: String(val), timeStamp: now, updatedBy: '',
             }));
           }
         });
@@ -410,6 +482,10 @@
           card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
             const val = parseFloat(inp.value);
             if (!isNaN(val) && val >= 0) recipeMap[sku][inp.dataset.productId] = val;
+          });
+          card.querySelectorAll('.density-input').forEach((inp) => {
+            const val = parseFloat(inp.value);
+            if (!isNaN(val) && val > 0) densityMap[inp.dataset.productId] = val;
           });
           const metaEl = card.querySelector('.sku-card-meta');
           if (metaEl && scaleMap[sku]) {
@@ -452,15 +528,18 @@
         const usedIngredients = PRODUCTS.filter((p) => recipe[p.id] != null && recipe[p.id] > 0);
 
         const ingRows = usedIngredients.map((p) => {
-          const { innerUnitLabel } = parsePackSize(p.packSize);
+          const { innerUnitLabel, gramsPerInnerUnit } = parsePackSize(p.packSize);
+          const gpu      = gramsPerInnerUnit || densityMap[p.id] || 0;
           const perBatch = recipe[p.id];
           const perTray  = (perBatch != null && scale.traysPerBatch)   ? fmt2(perBatch / scale.traysPerBatch) : '—';
           const perPret  = (perBatch != null && ppb && ppb !== '—')    ? fmt2(perBatch / ppb) : '—';
+          const purchase = gpu ? fmtPurchaseUnits(perBatch, gpu, innerUnitLabel) : '—';
           return `<tr>
             <td>${escapeHtml(p.name)}</td>
-            <td class="num">${fmt2(perBatch)}</td>
-            <td class="num">${perTray}</td>
-            <td class="num">${perPret}</td>
+            <td class="num">${fmt2(perBatch)}g</td>
+            <td class="num">${perTray}${perTray !== '—' ? 'g' : ''}</td>
+            <td class="num">${perPret}${perPret !== '—' ? 'g' : ''}</td>
+            <td class="num">${purchase}</td>
             <td class="unit">${escapeHtml(innerUnitLabel)}</td>
           </tr>`;
         }).join('');
@@ -483,10 +562,11 @@
             <table class="summary-ing-table">
               <thead><tr>
                 <th>Ingredient</th>
-                <th style="text-align:right">Per Batch</th>
-                <th style="text-align:right">Per Tray</th>
-                <th style="text-align:right">Per Pretzel</th>
-                <th>Unit</th>
+                <th style="text-align:right">g / Batch</th>
+                <th style="text-align:right">g / Tray</th>
+                <th style="text-align:right">g / Pretzel</th>
+                <th style="text-align:right">Purchase Units</th>
+                <th>Pack</th>
               </tr></thead>
               <tbody>${ingRows}</tbody>
             </table>` : noIngredientsNote}
