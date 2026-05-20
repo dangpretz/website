@@ -202,7 +202,8 @@
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
-    const RECIPES_PATH = '/dangpretz/recipes';
+    const RECIPES_PATH   = '/dangpretz/recipes';
+    const RECEIVING_PATH = '/dangpretz/receiving';
 
     // ── SKUs ─────────────────────────────────────────────────────────────────
     const SKUS = [
@@ -214,34 +215,28 @@
       'Dangerous Dip Box', 'Honey Mustard Dip Box', 'Hot Ranch Dip Box', 'Sweet Cream Dip Box',
     ];
 
-    // ── Product catalog ──────────────────────────────────────────────────────
-    const PRODUCTS = [
-      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB'   },
-      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB'   },
-      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB'   },
-      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL'   },
-      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB'   },
-      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL'   },
-      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB'    },
-      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL'   },
-      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB'    },
-      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB'    },
-      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL'   },
-      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ'   },
-      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB'    },
-      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB'    },
-      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA'  },
-      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB'   },
-      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA' },
-      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB'   },
-      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB'    },
-      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB'    },
-      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB'  },
-      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB'    },
-      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB'    },
-      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ'   },
-      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB'   },
-    ];
+    // ── Product catalog — populated dynamically from receiving log ───────────
+    const PRODUCTS = [];
+
+    function buildDynamicProducts(receivingLogs) {
+      const archived = new Set(
+        receivingLogs.filter((r) => r.action === 'archive_product').map((r) => r.productId),
+      );
+      receivingLogs
+        .filter((r) => r.action === 'new_product')
+        .forEach((r) => {
+          if (!r.usFoodsCode || !r.productName) return;
+          const dynamicId = `new-${r.usFoodsCode}`;
+          if (archived.has(dynamicId)) return;
+          if (PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode)) return;
+          PRODUCTS.push({
+            id: dynamicId,
+            name: r.productName,
+            packSize: r.packSize || '',
+            usFoodsCode: r.usFoodsCode,
+          });
+        });
+    }
 
     // ── Utilities ────────────────────────────────────────────────────────────
     function escapeHtml(s) {
@@ -682,10 +677,14 @@
 
     async function init() {
       try {
-        const logs = await fetchLog(RECIPES_PATH);
-        buildRecipeMaps(Array.isArray(logs) ? logs : []);
+        const [recipeLogs, receivingLogs] = await Promise.all([
+          fetchLog(RECIPES_PATH),
+          fetchLog(RECEIVING_PATH),
+        ]);
+        buildDynamicProducts(Array.isArray(receivingLogs) ? receivingLogs : []);
+        buildRecipeMaps(Array.isArray(recipeLogs) ? recipeLogs : []);
         const defined = SKUS.filter((s) => recipeMap[s] && Object.keys(recipeMap[s]).length > 0).length;
-        setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined`);
+        setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined · ${PRODUCTS.length} ingredients available`);
         renderAll();
       } catch (err) {
         setStatus('error', 'Failed to load recipes: ' + (err.message || 'unknown error'));
