@@ -147,33 +147,6 @@
 body.cart-open { padding-bottom: 80px; }
 body.cart-open #tw { bottom: 90px; }
 
-/* Mobile: cart bar collapses to stacked column ~150px tall; give content
-   enough room so the notes textarea isn't clipped, and tuck the chat
-   widget further out of the way. */
-@media (max-width: 500px) {
-  body.cart-open { padding-bottom: 180px; }
-  body.cart-open #tw { display: none; }
-  /* Keep input fields out from under the cart bar when iOS auto-scrolls
-     to a focused input (keyboard expand, anchor click, etc). */
-  html { scroll-padding-bottom: 160px; }
-}
-
-/* Tell the browser our dark form controls so native pickers (date input,
-   select dropdowns) render with light text/icons instead of black-on-black. */
-.fulfillment-wrap input,
-.fulfillment-wrap select { color-scheme: dark; }
-/* Belt-and-suspenders for iOS/Chrome's native date placeholder text. */
-input[type="date"]::-webkit-datetime-edit { color: #888; }
-input[type="date"]:focus::-webkit-datetime-edit,
-input[type="date"][value]:not([value=""])::-webkit-datetime-edit { color: #fff; }
-input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
-
-/* Stack form rows (Date+Time, Email+Phone) on small screens so fields
-   don't get crushed. */
-@media (max-width: 600px) {
-  .fulfillment-wrap .form-row { grid-template-columns: 1fr; gap: 10px; }
-}
-
 /* ─── Fulfillment Section ─── */
 .fulfillment-wrap {
   max-width: 600px;
