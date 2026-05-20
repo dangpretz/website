@@ -147,6 +147,19 @@
 body.cart-open { padding-bottom: 80px; }
 body.cart-open #tw { bottom: 90px; }
 
+/* Mobile-only: cart bar stacks to ~150px tall; give content room so the
+   notes textarea isn't clipped, and tuck the chat widget out of the way. */
+@media (max-width: 500px) {
+  body.cart-open { padding-bottom: 180px; }
+  body.cart-open #tw { display: none; }
+}
+
+/* Stack form rows (Date+Time, Email+Phone) on phones so fields don't get
+   crushed into two narrow columns. */
+@media (max-width: 600px) {
+  .fulfillment-wrap .form-row { grid-template-columns: 1fr; gap: 10px; }
+}
+
 /* ─── Fulfillment Section ─── */
 .fulfillment-wrap {
   max-width: 600px;
@@ -548,7 +561,7 @@ body.cart-open #tw { bottom: 90px; }
     <div class="form-row" style="margin-bottom:12px">
       <div>
         <label class="field-label" style="color:#fff">Date</label>
-        <input type="date" id="order-date" class="inquiry-input" style="text-align:left">
+        <input type="text" id="order-date" class="inquiry-input" placeholder="MM/DD/YYYY" inputmode="numeric" autocomplete="off" style="text-align:left">
       </div>
       <div>
         <label class="field-label" style="color:#fff">Time</label>
@@ -797,10 +810,42 @@ body.cart-open #tw { bottom: 90px; }
 
   window.addEventListener('scroll', updateCheckoutButton);
 
+  // Module-level minimum date (ISO YYYY-MM-DD) — updated by updateLeadTime
+  // based on cart total. We can no longer rely on <input type=date>.min since
+  // we switched to a plain text input (iOS Safari rendered type=date poorly).
+  let minOrderDateISO = null;
+
+  // ── DATE PARSING ──
+  // Accepts MM/DD/YYYY, M/D/YYYY, MM/DD/YY, M/D/YY (slashes or hyphens).
+  // Returns YYYY-MM-DD on success, null on failure.
+  function parseDateInput(raw) {
+    if (!raw) return null;
+    const cleaned = raw.replace(/[^\d/\-.]/g, '').replace(/[.\-]/g, '/');
+    const m = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (!m) return null;
+    let [, mm, dd, yy] = m;
+    mm = parseInt(mm, 10);
+    dd = parseInt(dd, 10);
+    yy = parseInt(yy, 10);
+    if (yy < 100) yy += 2000;             // 26 -> 2026
+    if (mm < 1 || mm > 12) return null;
+    if (dd < 1 || dd > 31) return null;
+    if (yy < 2020 || yy > 2099) return null;
+    // Verify it's a real date (e.g. rejects 2/30)
+    const d = new Date(yy, mm - 1, dd);
+    if (d.getFullYear() !== yy || d.getMonth() !== mm - 1 || d.getDate() !== dd) return null;
+    return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+
+  // For the "use a date like X" hint in error messages.
+  function suggestedDateExample() {
+    const d = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+  }
+
   // ── LEAD TIME ──
   function updateLeadTime(totalCents) {
     const note = document.getElementById('lead-time-note');
-    const dateInput = document.getElementById('order-date');
     const now = new Date();
     let minHours = 12;
 
@@ -811,7 +856,7 @@ body.cart-open #tw { bottom: 90px; }
     const yyyy = minDate.getFullYear();
     const mm = String(minDate.getMonth() + 1).padStart(2, '0');
     const dd = String(minDate.getDate()).padStart(2, '0');
-    dateInput.min = `${yyyy}-${mm}-${dd}`;
+    minOrderDateISO = `${yyyy}-${mm}-${dd}`;
 
     // Highlight active tier
     const tiers = [
@@ -872,7 +917,7 @@ body.cart-open #tw { bottom: 90px; }
     }
 
     const isDelivery = document.querySelector('.toggle-btn[data-type="delivery"]').classList.contains('active');
-    const date = document.getElementById('order-date').value;
+    const dateRaw = document.getElementById('order-date').value.trim();
     const time = document.getElementById('order-time').value;
     const name = document.getElementById('cust-name').value.trim();
     const email = document.getElementById('cust-email').value.trim();
@@ -880,7 +925,18 @@ body.cart-open #tw { bottom: 90px; }
     const notes = document.getElementById('cust-notes').value.trim();
     const address = document.getElementById('address').value.trim();
 
-    if (!date) { alert('Please select a date.'); return; }
+    if (!dateRaw) { alert('Please enter a date (MM/DD/YYYY).'); return; }
+    // Parse MM/DD/YYYY (or M/D/YY) -> YYYY-MM-DD and validate lead time
+    const date = parseDateInput(dateRaw);
+    if (!date) {
+      alert('Date format looks off. Please use MM/DD/YYYY (e.g., ' + suggestedDateExample() + ').');
+      return;
+    }
+    if (minOrderDateISO && date < minOrderDateISO) {
+      const [y, m, d] = minOrderDateISO.split('-');
+      alert('We need more lead time for orders this size. Please pick ' + m + '/' + d + '/' + y + ' or later.');
+      return;
+    }
     if (!time) { alert('Please select a time.'); return; }
     if (!name) { alert('Please enter your name.'); return; }
     if (!email) { alert('Please enter your email.'); return; }
