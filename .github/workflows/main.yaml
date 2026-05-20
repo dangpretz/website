@@ -17,8 +17,12 @@ jobs:
       run: |
         find static -name "*.html" | while read FILE; do
           AEM_PATH="/${FILE}"
+          echo "Previewing ${AEM_PATH}…"
+          PRE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://admin.hlx.page/preview/dangpretz/website/main${AEM_PATH}")
+          echo "  preview → HTTP ${PRE}"
           echo "Publishing ${AEM_PATH}…"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          PUB=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "https://admin.hlx.page/publish/dangpretz/website/main${AEM_PATH}")
-          echo "  → HTTP ${STATUS}"
+          echo "  publish → HTTP ${PUB}"
         done
