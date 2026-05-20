@@ -339,9 +339,14 @@
     function fmt2(n) { return isNaN(n) ? '—' : (Math.round(n * 100) / 100).toString(); }
     function parsePackSize(ps) {
       const parts = (ps || '').split('/');
-      if (parts.length < 3) return { innerUnitsPerCase: 1, innerUnitLabel: ps || 'unit' };
-      const c = parseFloat(parts[0]);
-      return { innerUnitsPerCase: isNaN(c) ? 1 : c, innerUnitLabel: `${parts[1]} ${parts[2]}` };
+      if (parts.length < 3) return { innerUnitsPerCase: 1, innerUnitLabel: ps || 'unit', gramsPerInnerUnit: null };
+      const c    = parseFloat(parts[0]);
+      const qty  = parseFloat(parts[1]);
+      const unit = parts[2].trim().toUpperCase();
+      let gramsPerInnerUnit = null;
+      if (unit === 'LB') gramsPerInnerUnit = qty * 453.592;
+      else if (unit === 'OZ') gramsPerInnerUnit = qty * 28.3495;
+      return { innerUnitsPerCase: isNaN(c) ? 1 : c, innerUnitLabel: `${parts[1]} ${parts[2]}`, gramsPerInnerUnit };
     }
     function todayStr() { return new Date().toISOString().slice(0, 10); }
     function addDays(dateStr, n) {
@@ -429,8 +434,9 @@
 
     // ── Build recipe maps ────────────────────────────────────────────────────
     function buildRecipeMaps(recipeLogs) {
-      const scaleMap  = {};  // sku → { pretzelsPerTray, traysPerBatch }
-      const recipeMap = {};  // sku → { productId → quantityPerBatch }
+      const scaleMap   = {};  // sku → { pretzelsPerTray, traysPerBatch }
+      const recipeMap  = {};  // sku → { productId → gramsPerBatch }
+      const densityMap = {};  // productId → gramsPerInnerUnit (for GAL products)
       for (const r of recipeLogs) {
         if (r.action === 'sku_scale') {
           const ppt = Number(r.pretzelsPerTray);
@@ -439,17 +445,21 @@
             scaleMap[r.sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
           }
         }
-        if (r.action === 'recipe') {
+        if (r.action === 'recipe_v2') {
           if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
-          const v = Number(r.quantityPerBatch);
+          const v = Number(r.gramsPerBatch);
           if (!isNaN(v)) recipeMap[r.sku][r.productId] = v;
         }
+        if (r.action === 'ingredient_density') {
+          const v = Number(r.gramsPerInnerUnit);
+          if (!isNaN(v) && v > 0) densityMap[r.productId] = v;
+        }
       }
-      return { scaleMap, recipeMap };
+      return { scaleMap, recipeMap, densityMap };
     }
 
     // ── Compute forecast ─────────────────────────────────────────────────────
-    function computeForecast(deliveries, recipeMap, scaleMap, inventoryMap) {
+    function computeForecast(deliveries, recipeMap, scaleMap, inventoryMap, densityMap = {}) {
       const today = todayStr();
       const end   = addDays(today, 6);
 
@@ -493,10 +503,15 @@
           const recipe = recipeMap[sku];
           if (!recipe) continue;
 
-          for (const [productId, qtyPerBatch] of Object.entries(recipe)) {
+          for (const [productId, gramsPerBatch] of Object.entries(recipe)) {
             if (!forecastMap.has(productId)) continue;
             const row = forecastMap.get(productId);
-            const usage = batchesNeeded * qtyPerBatch;
+            // Convert grams → inner units using pack size or density override
+            const { gramsPerInnerUnit } = parsePackSize(row.packSize);
+            const gpu = gramsPerInnerUnit || densityMap[productId] || 0;
+            if (!gpu) continue; // no conversion available (GAL without density set)
+            const innerUnitsPerBatch = gramsPerBatch / gpu;
+            const usage = batchesNeeded * innerUnitsPerBatch;
             row.expectedUsage += usage;
             row.projectedRemaining = row.stock - row.expectedUsage;
             row.hasRecipe = true;
@@ -513,6 +528,7 @@
     let inventoryMap  = new Map();
     let scaleMap      = {};
     let recipeMap     = {};
+    let densityMap    = {};
     let allDeliveryLogs  = [];
     let allReceivingLogs = [];
     let allInventoryLogs = [];
@@ -543,11 +559,11 @@
         allInventoryLogs = iLogs;
 
         buildDynamicProducts(rLogs);
-        ({ scaleMap, recipeMap } = buildRecipeMaps(rcLogs));
+        ({ scaleMap, recipeMap, densityMap } = buildRecipeMaps(rcLogs));
         inventoryMap = computeInventory(rLogs, iLogs);
 
         const deliveries = resolveDeliveries(dLogs);
-        forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap);
+        forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap, densityMap);
 
         updateWindowLabel();
         renderForecastTable();
@@ -801,7 +817,7 @@
             if (inventoryMap.has(productId)) inventoryMap.get(productId).par = val;
             // Recompute forecast so status badges & sort order update immediately
             const deliveries = resolveDeliveries(allDeliveryLogs);
-            forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap);
+            forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap, densityMap);
             renderForecastTable();
             showToast('PAR updated', 'success');
           } catch (err) {
@@ -865,7 +881,7 @@
               note:      'inline stock set',
             });
             if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
-            forecastMap = computeForecast(resolveDeliveries(allDeliveryLogs), recipeMap, scaleMap, inventoryMap);
+            forecastMap = computeForecast(resolveDeliveries(allDeliveryLogs), recipeMap, scaleMap, inventoryMap, densityMap);
             renderForecastTable();
             showToast(`Stock set to ${newVal}`, 'success');
           } catch (err) {
