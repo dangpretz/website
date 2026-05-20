@@ -69,18 +69,21 @@
     .scale-input::-webkit-inner-spin-button { -webkit-appearance: none; }
     .scale-input[readonly] { background: #252525; color: #666; border-color: #333; cursor: default; }
 
-    /* Ingredient table */
-    .recipe-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-    .recipe-ing-table th { font: 700 10px 'Manrope', sans-serif; color: #666; letter-spacing: .7px; text-transform: uppercase; padding: 6px 8px; text-align: left; border-bottom: 1px solid #3a3a3a; white-space: nowrap; }
-    .recipe-ing-table td { padding: 5px 8px; border-bottom: 1px solid #252525; vertical-align: middle; }
-    .recipe-ing-table tr:last-child td { border-bottom: none; }
-    .ing-name { font: 400 12px 'Manrope', sans-serif; color: #ccc; }
-    .recipe-qty-input { width: 72px; font: 400 13px 'Manrope', sans-serif; padding: 5px 7px; border: 1.5px solid #444; border-radius: 4px; background: #3a3a3a; color: #fff; outline: none; text-align: right; transition: border-color .2s; -moz-appearance: textfield; }
+    /* Ingredient blocks (stacked layout) */
+    .recipe-ing-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .ing-block { background: #252525; border-radius: 6px; padding: 10px 12px; }
+    .ing-block-header { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
+    .ing-block-name { font: 400 13px/1.3 'Manrope', sans-serif; color: #ccc; flex: 1; }
+    .ing-block-pack { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; flex-shrink: 0; }
+    .ing-block-inputs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .ing-batch-label { font: 700 10px 'Manrope', sans-serif; color: #666; letter-spacing: .5px; text-transform: uppercase; white-space: nowrap; }
+    .ing-block-derived { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+    .ing-derived-item { font: 400 11px 'Manrope', sans-serif; color: #555; }
+    .ing-derived-item strong { color: #888; font-weight: 600; }
+    .recipe-qty-input { width: 80px; font: 400 13px 'Manrope', sans-serif; padding: 5px 7px; border: 1.5px solid #444; border-radius: 4px; background: #3a3a3a; color: #fff; outline: none; text-align: right; transition: border-color .2s; -moz-appearance: textfield; }
     .recipe-qty-input:focus { border-color: #C41E1E; }
     .recipe-qty-input::-webkit-outer-spin-button,
     .recipe-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-    .recipe-qty-derived { font: 400 12px 'Manrope', sans-serif; color: #555; text-align: right; min-width: 54px; display: inline-block; }
-    .ing-unit { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; }
     .purchase-units { font: 600 12px 'Manrope', sans-serif; color: #C41E1E; white-space: nowrap; }
     .density-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
     .density-label { font: 400 10px 'Manrope', sans-serif; color: #666; white-space: nowrap; }
@@ -136,10 +139,6 @@
       .sku-grid { grid-template-columns: 1fr; }
       .scale-row { grid-template-columns: 1fr 1fr; }
       .scale-row .auto-col { display: none; }
-      .recipe-ing-table th:nth-child(4),
-      .recipe-ing-table td:nth-child(4),
-      .recipe-ing-table th:nth-child(5),
-      .recipe-ing-table td:nth-child(5) { display: none; }
       .summary-ing-table th:nth-child(3),
       .summary-ing-table td:nth-child(3),
       .summary-ing-table th:nth-child(4),
@@ -312,7 +311,7 @@
       grid.querySelectorAll('.sku-card').forEach(wireSkuCard);
     }
 
-    function buildIngRowHtml(p, gramsVal, ppt, tpb) {
+    function buildIngBlockHtml(p, gramsVal, ppt, tpb) {
       const { innerUnitLabel, unit, gramsPerInnerUnit } = parsePackSize(p.packSize);
       const isGal = unit === 'GAL';
       const gpu   = gramsPerInnerUnit || densityMap[p.id] || 0;
@@ -322,17 +321,25 @@
       const perPret = (!isNaN(gv) && ppb) ? fmt2(gv / ppb) : '—';
       const purchase = gpu ? fmtPurchaseUnits(gv, gpu, innerUnitLabel) : (isGal ? '<em style="color:#888;font-size:11px">set density ↓</em>' : '—');
       const densityHtml = isGal
-        ? `<div class="density-row"><label class="density-label">g per ${innerUnitLabel}:</label><input type="number" class="density-input" data-product-id="${escapeHtml(p.id)}" value="${densityMap[p.id] || ''}" placeholder="e.g. 3785" min="1" step="1"></div>`
+        ? `<div class="density-row" style="margin-top:8px"><label class="density-label">g per ${innerUnitLabel}:</label><input type="number" class="density-input" data-product-id="${escapeHtml(p.id)}" value="${densityMap[p.id] || ''}" placeholder="e.g. 3785" min="1" step="1"></div>`
         : '';
-      return `<tr class="ing-row" data-product-id="${escapeHtml(p.id)}">
-          <td><button class="btn-remove-ing" title="Remove">×</button></td>
-          <td><span class="ing-name">${escapeHtml(p.name)}</span>${densityHtml}</td>
-          <td><input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${gramsVal}" placeholder="—" min="0" step="0.1"></td>
-          <td><span class="recipe-qty-derived per-tray">${perTray}</span></td>
-          <td><span class="recipe-qty-derived per-pretzel">${perPret}</span></td>
-          <td><span class="purchase-units">${purchase}</span></td>
-          <td><span class="ing-unit">${escapeHtml(innerUnitLabel)}</span></td>
-        </tr>`;
+      return `<div class="ing-block" data-product-id="${escapeHtml(p.id)}">
+          <div class="ing-block-header">
+            <button class="btn-remove-ing" title="Remove">×</button>
+            <span class="ing-block-name">${escapeHtml(p.name)}</span>
+            <span class="ing-block-pack">${escapeHtml(innerUnitLabel)}</span>
+          </div>
+          <div class="ing-block-inputs">
+            <span class="ing-batch-label">g / Batch</span>
+            <input type="number" class="recipe-qty-input" data-product-id="${escapeHtml(p.id)}" value="${gramsVal}" placeholder="—" min="0" step="0.1">
+            <span class="purchase-units">${purchase}</span>
+          </div>
+          <div class="ing-block-derived">
+            <span class="ing-derived-item">g/Tray: <strong class="per-tray">${perTray}</strong></span>
+            <span class="ing-derived-item">g/Pretzel: <strong class="per-pretzel">${perPret}</strong></span>
+          </div>
+          ${densityHtml}
+        </div>`;
     }
 
     function buildSkuCard(sku) {
@@ -344,10 +351,10 @@
       const recipe = recipeMap[sku] || {};
       const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
 
-      // Only render rows for ingredients already in the recipe
+      // Only render blocks for ingredients already in the recipe
       const ingRows = PRODUCTS
         .filter((p) => recipe[p.id] != null)
-        .map((p) => buildIngRowHtml(p, recipe[p.id] != null ? recipe[p.id] : '', ppt, tpb))
+        .map((p) => buildIngBlockHtml(p, recipe[p.id] != null ? recipe[p.id] : '', ppt, tpb))
         .join('');
 
       return `<div class="sku-card${hasAny ? ' expanded' : ''}" data-sku="${escapeHtml(sku)}">
@@ -373,18 +380,7 @@
               <input type="number" class="scale-input ppb-display" value="${ppb}" placeholder="—" readonly tabindex="-1">
             </div>
           </div>
-          <table class="recipe-ing-table">
-            <thead><tr>
-              <th></th>
-              <th>Ingredient</th>
-              <th>g / Batch</th>
-              <th>g / Tray</th>
-              <th>g / Pretzel</th>
-              <th>Purchase Units</th>
-              <th>Pack</th>
-            </tr></thead>
-            <tbody class="recipe-ing-body">${ingRows}</tbody>
-          </table>
+          <div class="recipe-ing-list recipe-ing-body">${ingRows}</div>
           <div class="ingredient-add-wrap">
             <div class="ingredient-search-wrap">
               <input type="text" class="ingredient-search" placeholder="Add ingredient…" autocomplete="off" spellcheck="false">
@@ -423,10 +419,10 @@
           const val       = parseFloat(inp.value);
           const productId = inp.dataset.productId;
           const product   = PRODUCTS.find((p) => p.id === productId);
-          const row       = inp.closest('tr');
-          const perTrayEl    = row.querySelector('.per-tray');
-          const perPretzelEl = row.querySelector('.per-pretzel');
-          const purchaseEl   = row.querySelector('.purchase-units');
+          const block     = inp.closest('.ing-block');
+          const perTrayEl    = block.querySelector('.per-tray');
+          const perPretzelEl = block.querySelector('.per-pretzel');
+          const purchaseEl   = block.querySelector('.purchase-units');
           if (!isNaN(val)) {
             if (perTrayEl)    perTrayEl.textContent    = tpb ? fmt2(val / tpb) : '—';
             if (perPretzelEl) perPretzelEl.textContent = ppb ? fmt2(val / ppb)  : '—';
@@ -442,12 +438,12 @@
         });
       }
 
-      function wireRow(tr) {
-        const productId = tr.dataset.productId;
-        const qtyInp = tr.querySelector('.recipe-qty-input');
+      function wireRow(block) {
+        const productId = block.dataset.productId;
+        const qtyInp = block.querySelector('.recipe-qty-input');
         if (qtyInp) qtyInp.addEventListener('input', updateDerived);
 
-        const densInp = tr.querySelector('.density-input');
+        const densInp = block.querySelector('.density-input');
         if (densInp) {
           densInp.addEventListener('input', () => {
             const pid = densInp.dataset.productId;
@@ -456,7 +452,7 @@
             const product = PRODUCTS.find((p) => p.id === pid);
             if (!product) return;
             const { innerUnitLabel } = parsePackSize(product.packSize);
-            const purchaseEl = tr.querySelector('.purchase-units');
+            const purchaseEl = block.querySelector('.purchase-units');
             if (purchaseEl) {
               const grams = parseFloat(qtyInp ? qtyInp.value : '');
               purchaseEl.innerHTML = gpu ? fmtPurchaseUnits(grams, gpu, innerUnitLabel) : '<em style="color:#888;font-size:11px">set density ↓</em>';
@@ -464,11 +460,11 @@
           });
         }
 
-        const removeBtn = tr.querySelector('.btn-remove-ing');
+        const removeBtn = block.querySelector('.btn-remove-ing');
         if (removeBtn) {
           removeBtn.addEventListener('click', () => {
             addedIds.delete(productId);
-            tr.remove();
+            block.remove();
             if (document.activeElement === searchInput) renderDropdown(searchInput.value);
           });
         }
@@ -477,11 +473,11 @@
       function addIngredientRow(product, gramsVal = '') {
         const ppt = parseFloat(pptInput.value) || 0;
         const tpb = parseFloat(tpbInput.value) || 0;
-        tbody.insertAdjacentHTML('beforeend', buildIngRowHtml(product, gramsVal, ppt, tpb));
-        const tr = tbody.lastElementChild;
-        wireRow(tr);
+        tbody.insertAdjacentHTML('beforeend', buildIngBlockHtml(product, gramsVal, ppt, tpb));
+        const block = tbody.lastElementChild;
+        wireRow(block);
         addedIds.add(product.id);
-        const inp = tr.querySelector('.recipe-qty-input');
+        const inp = block.querySelector('.recipe-qty-input');
         if (inp) inp.focus();
       }
 
@@ -517,8 +513,8 @@
         setTimeout(() => { dropdown.hidden = true; searchInput.value = ''; }, 150);
       });
 
-      // Wire existing rows
-      tbody.querySelectorAll('tr.ing-row').forEach(wireRow);
+      // Wire existing blocks
+      tbody.querySelectorAll('.ing-block').forEach(wireRow);
 
       card.querySelector('.sku-save-btn').addEventListener('click', async () => {
         const saveBtn    = card.querySelector('.sku-save-btn');
