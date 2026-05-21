@@ -1134,6 +1134,22 @@ export function attributeDeliveryCoverage({
   const frozenLeft = { ...inventoryReport.effective.frozen };
   const doughLeft = { ...inventoryReport.effective.coldFerment };
 
+  // onHand items are immediately ready (inventory snapshots / manual stock counts).
+  // Include them in frozenLeft so they register as "ready" coverage.
+  for (const [k, v] of Object.entries(inventoryReport.effective.onHand || {})) {
+    if (v > 0) frozenLeft[k] = (frozenLeft[k] || 0) + v;
+  }
+  // Dip SKUs have no BFP step — cheese_done credits coldFerment (refrigerated)
+  // but the product is immediately ready. Move dip coldFerment into frozenLeft
+  // so coverage shows "ready" rather than "baking".
+  for (const dipKey of Object.keys(DIP_CONFIG)) {
+    const cf = doughLeft[dipKey] || 0;
+    if (cf > 0) {
+      frozenLeft[dipKey] = (frozenLeft[dipKey] || 0) + cf;
+      doughLeft[dipKey] = 0;
+    }
+  }
+
   const coverage = new Map();
 
   sortedDeliveries.forEach((delivery) => {
