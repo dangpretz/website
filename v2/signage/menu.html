@@ -284,15 +284,22 @@
     text-transform: uppercase;
   }
 
-  /* Dip rows: smaller name, more padding, stronger divider */
+  /* Dip rows: smaller name, more padding, stronger divider, vertically centered */
   .card-b--cream .card-b__row--dip {
     padding: var(--space-3) 0;
+    align-items: center;
   }
   .card-b--cream .card-b__row--dip + .card-b__row--dip {
     border-top: 1px solid rgba(26, 26, 26, 0.12);
   }
   .card-b--cream .card-b__row--dip .card-b__label {
     font: var(--weight-heavy) 1.77vw/1.05 var(--font);
+  }
+
+  /* Suds & Sodas rows: vertically centered; left column sizes to widest label */
+  .card-b--dark .card-b__row--3col {
+    align-items: center;
+    grid-template-columns: max-content 1fr auto;
   }
 
   /* ═══ Pills ═══ */
