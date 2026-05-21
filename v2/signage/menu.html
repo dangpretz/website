@@ -296,10 +296,20 @@
     font: var(--weight-heavy) 1.77vw/1.05 var(--font);
   }
 
-  /* Suds & Sodas rows: vertically centered; left column sizes to widest label */
-  .card-b--dark .card-b__row--3col {
-    align-items: center;
+  /* Suds & Sodas: parent grid defines the columns so all rows share the same
+     max-content width for the label column. Each row uses subgrid to inherit
+     those tracks, keeping descriptions aligned regardless of label length. */
+  .card-b--dark {
+    display: grid;
     grid-template-columns: max-content 1fr auto;
+    column-gap: var(--space-4);
+    row-gap: var(--space-2);
+  }
+  .card-b--dark .card-b__row--3col {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
   }
 
   /* ═══ Pills ═══ */
