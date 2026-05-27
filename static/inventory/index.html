@@ -224,10 +224,13 @@
 
     /* ── Mobile ── */
     @media (max-width: 680px) {
+      .inv-table th:nth-child(5),
+      .inv-table td:nth-child(5),
       .inv-table th:nth-child(6),
       .inv-table td:nth-child(6),
       .inv-table th:nth-child(7),
       .inv-table td:nth-child(7) { display: none; }
+      .btn-par-edit { display: none; }
       .adjust-grid { grid-template-columns: 1fr; }
       .adjust-grid .span-2 { grid-column: span 1; }
     }
