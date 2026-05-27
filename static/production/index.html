@@ -1283,7 +1283,7 @@
   // ─── BUSINESS RULES ───────────────────────────────────────────────────────
   // Edit these to match operational reality. Each is a single source of truth
   // for the rule it represents — no other place hardcodes these numbers.
-  const BATCHES_PER_WORKER  = 5;   // batches per worker per day (cap)
+  const BATCHES_PER_WORKER  = 6;   // batches per worker per day (cap)
   const SHAPE_MIN_LEAD      = 2;   // shape must happen at least N days before delivery
   const SHAPE_MAX_LEAD      = 7;   // shape can happen up to N days before delivery
   const BFP_MIN_LEAD        = 1;   // BFP must happen at least N days before delivery
@@ -1721,7 +1721,7 @@
   const getWorkers = (type, date) => {
     const fromLog = (productionState[date] || {})[type === 'shape' ? 'shapeWorkers' : 'bfpWorkers'];
     if (fromLog && fromLog > 0) return Math.max(1, fromLog);
-    return Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 1);
+    return Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 2);
   };
   // saveWorkers updates THREE things:
   //   1. productionState in-memory  (so the next getWorkers/render() call sees
