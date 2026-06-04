@@ -1247,6 +1247,8 @@
     '6.5oz plain',
     '6.5oz bbk',
     '6.5oz spicy bee',
+    '6.5oz bootlegger',
+    '6.5oz pepperoni',
     'plain bombs',
     'bees bats',
   ];
@@ -1635,6 +1637,14 @@
     return typeof entry === 'function' ? entry(params || {}) : entry;
   };
   const _localeStr = () => appLang === 'es' ? 'es-MX' : 'en-US';
+
+  // Per-SKU Spanish display names. Only needed for SKUs whose Spanish name
+  // differs from the canonical English key stored in the log.
+  const SKU_NAMES_ES = {
+    '6.5oz bootlegger': '6.5oz Tocino',
+  };
+  // Returns the display name for a SKU in the current language.
+  const skuDisplayName = (sku) => (appLang === 'es' && SKU_NAMES_ES[sku]) ? SKU_NAMES_ES[sku] : sku;
 
   // Batch counts can be fractional from typed pretzel inputs (e.g., 47 pretzels
   // in a batch of 72 = 0.65 batches). Round to whole when very close, else
@@ -2455,7 +2465,7 @@
       const summaryKey = useTrays ? 'done_summary_trays' : 'done_summary';
       return `<div class="wcard wcard-compact status-done" style="${stripeStyle}" data-expand-sku="${esc(d.sku)}">
         <span class="wcard-check">✅</span>
-        <span class="wcard-compact-text"><strong>${esc(d.sku)}</strong> · ${t(summaryKey, { n: dispMade, total: dispTotal, p: madeP })}</span>
+        <span class="wcard-compact-text"><strong>${esc(skuDisplayName(d.sku))}</strong> · ${t(summaryKey, { n: dispMade, total: dispTotal, p: madeP })}</span>
         <span class="wcard-expand-hint">↓</span>
       </div>`;
     }
@@ -2646,7 +2656,7 @@
     return `<div class="wcard status-${d.bucket}" style="--wcard-stripe:${stripe}">
       <div class="wcard-head">
         <div>
-          <div class="wcard-name">${esc(d.sku)}</div>
+          <div class="wcard-name">${esc(skuDisplayName(d.sku))}</div>
           ${cheeseChip}
         </div>
         <span class="wcard-pill ${d.bucket}">${pillIcon}${t(pillKey)}</span>
@@ -3048,7 +3058,7 @@
            </div>`
         : `<input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" placeholder="0">`;
       return `<div class="stock-row">
-        <div><span class="stock-sku">${esc(sku)}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
+        <div><span class="stock-sku">${esc(skuDisplayName(sku))}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
         ${(isFohSku || isLifecycleless)
           ? `<span class="stock-na">—</span>`
           : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" placeholder="0">`}
@@ -3397,7 +3407,7 @@
       // drains below an order's needs but fr still has trays.
       const pretzels = Math.max(0, cf[sku] || 0) + Math.max(0, fr[sku] || 0);
       const sheetsReady = ts > 0 ? Math.floor(pretzels / ts) : 0;
-      const label = sku; // intentionally raw — FOH knows their SKU names
+      const label = skuDisplayName(sku); // translated name where available
       const readyTxt = ts > 0
         ? `${sheetsReady} ${appLang === 'es' ? (sheetsReady === 1 ? 'hoja lista' : 'hojas listas') : (sheetsReady === 1 ? 'sheet ready' : 'sheets ready')}`
         : (appLang === 'es' ? '⚠️ sin tamaño de bandeja — avisa al gerente' : '⚠️ tray size unset — tell manager');
@@ -4165,7 +4175,7 @@
         return Object.entries(m).map(([sku, b]) => {
           const bs = getBatchSize(sku);
           const p  = Math.round(b * bs);
-          return `${esc(sku)} · <strong>${p}</strong> pretzel${p !== 1 ? 's' : ''} (${b} batch${b !== 1 ? 'es' : ''})`;
+          return `${esc(skuDisplayName(sku))} · <strong>${p}</strong> pretzel${p !== 1 ? 's' : ''} (${b} batch${b !== 1 ? 'es' : ''})`;
         }).join(' · ');
       };
       const showShape  = userRole === 'manager' || userRole === 'shape';
