@@ -6,8 +6,8 @@
   <title>Delivery Planner | Dangerous Pretzel Co.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" onload="this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap"></noscript>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=optional" onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=optional"></noscript>
   <style>
     /* v2 design system: #C41E1E red, #F5F0E8 cream, #1A1A1A dark */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -406,6 +406,7 @@
       padding: 6px 12px; border-radius: 6px; cursor: pointer;
       font: 600 12px 'Manrope', sans-serif;
       margin-left: 8px;
+      visibility: hidden; /* reserves space from first paint — no CLS when token check shows it */
     }
     .sync-square-btn:hover { background: #333; color: #fff; }
     .sync-square-btn:disabled { opacity: 0.5; cursor: default; }
@@ -754,7 +755,7 @@
       <div class="schedule-header">
         <h2>SCHEDULED DELIVERIES &amp; PICKUPS</h2>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="sync-square-btn" id="sync-square-btn" hidden title="Pull catering orders from Square">↻ Sync from Square</button>
+          <button class="sync-square-btn" id="sync-square-btn" title="Pull catering orders from Square">↻ Sync from Square</button>
           <button class="new-order-btn" id="new-order-btn">+ New Order</button>
         </div>
       </div>
@@ -1035,7 +1036,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('sync-square-btn');
       if (!btn) return;
-      if (ADMIN_TOKEN) btn.hidden = false;
+      if (ADMIN_TOKEN) btn.style.visibility = 'visible';
       btn.addEventListener('click', syncFromSquare);
     });
 
