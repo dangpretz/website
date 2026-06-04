@@ -1507,6 +1507,8 @@
       // Keep placeholder + new-customer option, remove existing customer options
       [...select.options].filter((o) => o.value !== '' && o.value !== '__new__').forEach((o) => o.remove());
       const normalized = new Map();
+      // Always include FOH Placeholder so shape-only batches can be assigned without prior history
+      normalized.set('foh placeholder', 'FOH Placeholder');
       if (Array.isArray(deliveries)) {
         deliveries.forEach((row) => {
           const name = normalizeCustomer(row.customer || row.location || '');
