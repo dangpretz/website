@@ -957,7 +957,7 @@
       isShapeOnlyDelivery,
       expandBoxLineItems,
       caseSizeOptionsFor,
-    } from '../../scripts/inventory.js?v=2026-05-21-dip-coverage-fix';
+    } from '../../scripts/inventory.js?v=2026-05-22-new-skus';
 
     // Shape-only catering + box expansion. ENABLED BY DEFAULT — kept in
     // sync with production app via the same localStorage key.
@@ -1262,7 +1262,7 @@
     }
 
     async function loadSkus() {
-      const res = await fetch('skus.json');
+      const res = await fetch('skus.json?v=2026-05-22-new-skus');
       skus = await res.json();
     }
 

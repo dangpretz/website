@@ -1125,7 +1125,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
     isShapeOnlyDelivery,
-  } from '../../scripts/inventory.js?v=2026-05-21-dip-coverage-fix';
+  } from '../../scripts/inventory.js?v=2026-05-22-new-skus';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -4747,7 +4747,7 @@
 
   async function loadSkus() {
     try {
-      const r = await fetch('../delivery-planner/skus.json');
+      const r = await fetch('../delivery-planner/skus.json?v=2026-05-22-new-skus');
       allSkus = await r.json();
     } catch { allSkus = Object.keys(BATCH_SIZES); } // fallback to hardcoded list
   }
