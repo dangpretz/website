@@ -1005,7 +1005,7 @@
   <div class="tab-bar" id="tab-bar" style="display:none">
     <button class="tab-btn active" data-tab="shape">🥨 Shape</button>
     <button class="tab-btn" data-tab="bfp">🔥 BFP</button>
-    <button class="tab-btn" data-tab="cheese">🧀 Cheese</button>
+    <button class="tab-btn" data-tab="dips">🧀 Dips</button>
     <button class="tab-btn" data-tab="stock">📦 Stock</button>
   </div>
   <div id="main-view"><div class="no-prod">Loading…</div></div>
@@ -1320,7 +1320,7 @@
   const _urlSearch    = new URLSearchParams(window.location.search);
   const _langParam    = _urlSearch.get('lang');
   const _roleParamRaw = _urlSearch.get('role');
-  const _isWorkerView = _roleParamRaw === 'shape' || _roleParamRaw === 'bfp';
+  const _isWorkerView = _roleParamRaw === 'shape' || _roleParamRaw === 'bfp' || _roleParamRaw === 'dips';
   const _langStored   = (() => { try { return localStorage.getItem('prod-lang'); } catch { return null; } })();
   const _langBrowser  = (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
   let appLang = ['en','es'].includes(_langParam)  ? _langParam
@@ -1336,6 +1336,7 @@
       shape_tab:      'Shape',
       bfp_tab:        'BFP',
       stock_tab:      'Stock',
+      dips_tab:       'Dips',
       // Status
       must_do_today:  '🔴 Must do today',
       pulling_ahead:  '🟡 Pulling ahead',
@@ -1393,7 +1394,7 @@
       bfp_label:      'BFP',
       new_sku:        ({sku}) => `⚠️ New SKU in orders: <strong>${sku}</strong>`,
       set_up:         'Set up →',
-      unconfirmed:    ({n}) => `📦 ${n} delivery${n !== 1 ? 'ies' : 'y'} today not yet confirmed — `,
+      unconfirmed:    ({n}) => `📦 ${n} deliver${n !== 1 ? 'ies' : 'y'} today not yet confirmed — `,
       go_to_planner:  'Go to planner →',
       dup_alert:      ({n}) => `⚠️ ${n} possible duplicate delivery${n > 1 ? 's' : ''} — `,
       review_planner: 'Review →',
@@ -1457,6 +1458,7 @@
       // Phase A — UIUX redesign keys
       header_shape_team: 'Shape Team',
       header_bfp_team:   'BFP Team',
+      header_dips_team:  'Dips Team',
       section_pending:   'PENDING TODAY',
       section_progress:  'IN PROGRESS',
       section_done:      'DONE',
@@ -1492,6 +1494,7 @@
       shape_tab:      'Formar',
       bfp_tab:        'HCE',
       stock_tab:      'Inventario',
+      dips_tab:       'Salsas',
       must_do_today:  '🔴 Hacer hoy',
       pulling_ahead:  '🟡 Adelantado',
       overdue:        '🚨 Atrasado',
@@ -1601,6 +1604,7 @@
       // Phase A — UIUX redesign keys
       header_shape_team: 'Equipo de Masa',
       header_bfp_team:   'Equipo HCE',
+      header_dips_team:  'Equipo de Salsas',
       section_pending:   'PENDIENTE HOY',
       section_progress:  'EN PROGRESO',
       section_done:      'LISTO',
@@ -1668,10 +1672,12 @@
   const userRole   = _roleParam === 'shape' ? 'shape'
                   : _roleParam === 'bfp'   ? 'bfp'
                   : _roleParam === 'foh'   ? 'foh'
+                  : _roleParam === 'dips'  ? 'dips'
                   : 'manager';
   if (userRole === 'shape')      document.title = appLang === 'es' ? 'Formar · Producción' : 'Shape · Production';
   else if (userRole === 'bfp')   document.title = appLang === 'es' ? 'HCE · Producción'    : 'BFP · Production';
   else if (userRole === 'foh')   document.title = appLang === 'es' ? 'FOH · Salsas'        : 'FOH · Dips';
+  else if (userRole === 'dips')  document.title = appLang === 'es' ? 'Salsas · Producción' : 'Dips · Production';
   else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
 
   // Set body class for role-aware CSS hiding (handled in stylesheet).
@@ -1687,9 +1693,10 @@
     else document.addEventListener('DOMContentLoaded', setBody);
   }
 
-  let dayTab = userRole === 'bfp' ? 'bfp'
-             : userRole === 'foh' ? 'foh-home' // single-screen view: Dips + Dough on one page
-             : 'shape'; // 'shape' | 'bfp' | 'stock' | 'cheese' | 'foh-home' (visibility per role rules)
+  let dayTab = userRole === 'bfp'  ? 'bfp'
+             : userRole === 'foh'  ? 'foh-home' // single-screen view: Dips + Dough on one page
+             : userRole === 'dips' ? 'dips'     // dips-only standalone view (no dough section)
+             : 'shape'; // 'shape' | 'bfp' | 'stock' | 'dips' | 'foh-home' (visibility per role rules)
 
   // Inline logging state
   // loggedPretzels[type][dateStr][sku] = current pretzel count (local, mid-edit)
@@ -2759,15 +2766,17 @@
     const dateStr    = toDateStr(currentDate);
     // FOH role has its own single-page surface (Dips + Dough on one screen)
     // — pin it regardless of which tab the dayTab string says.
-    if (userRole === 'foh') return renderFohHome(dateStr);
-    // Stock + Cheese (Dips) tabs are visible to manager + FOH; shape/BFP get
+    if (userRole === 'foh')  return renderFohHome(dateStr);
+    // Dips role gets a dips-only standalone view (no dough section, no tab bar).
+    if (userRole === 'dips') return renderCheeseTab(dateStr);
+    // Stock + Dips tabs are visible to manager + FOH; shape/BFP get
     // forced back to their team's home tab if they somehow land there.
     const isAllowedStockCheese = userRole === 'manager' || userRole === 'foh';
-    if ((dayTab === 'stock' || dayTab === 'cheese') && !isAllowedStockCheese) {
+    if ((dayTab === 'stock' || dayTab === 'dips') && !isAllowedStockCheese) {
       dayTab = userRole === 'bfp' ? 'bfp' : 'shape';
     }
-    if (dayTab === 'stock')  return renderStockTab();
-    if (dayTab === 'cheese') return renderCheeseTab(dateStr);
+    if (dayTab === 'stock') return renderStockTab();
+    if (dayTab === 'dips')  return renderCheeseTab(dateStr);
 
     const type       = dayTab; // 'shape' or 'bfp'
     const dayState   = productionState[dateStr] || {};
@@ -4843,8 +4852,10 @@
 
     // Worker header — set role name + active-lang highlight (date is set by updateNav)
     if (userRole !== 'manager') {
-      const teamLabel = userRole === 'shape' ? t('header_shape_team') : t('header_bfp_team');
-      const emoji     = userRole === 'shape' ? '🥨' : '🔥';
+      const teamLabel = userRole === 'shape' ? t('header_shape_team')
+                      : userRole === 'bfp'   ? t('header_bfp_team')
+                      : t('header_dips_team');
+      const emoji     = userRole === 'shape' ? '🥨' : userRole === 'bfp' ? '🔥' : '🧀';
       setHTML('worker-header-name', `${emoji} ${esc(teamLabel)}`);
       const esEl = document.getElementById('worker-lang-es');
       const enEl = document.getElementById('worker-lang-en');
@@ -4861,6 +4872,8 @@
     if (tShape) tShape.textContent = '🥨 ' + t('shape_tab');
     if (tBfp)   tBfp.textContent   = '🔥 ' + t('bfp_tab');
     if (tStock) tStock.textContent = '📦 ' + t('stock_tab');
+    const tDips = document.querySelector('.tab-btn[data-tab="dips"]');
+    if (tDips)  tDips.textContent  = '🧀 ' + t('dips_tab');
 
     const wt = document.getElementById('week-toggle');
     if (wt) wt.textContent = appLang === 'es' ? 'Sem' : 'Week';
