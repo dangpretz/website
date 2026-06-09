@@ -1976,6 +1976,43 @@ export default {
     }
     // ── end TEMP admin routing ──
 
+    // Rotate Square's webhook signature key + return the new value so the
+    // operator can update the worker secret. Use case: webhook stops
+    // delivering because Square's signing key fell out of sync with the
+    // env secret (silent 401 failures, Square retries 24h then drops).
+    //
+    // Recovery flow (one curl, one wrangler command):
+    //   curl -X POST '.../admin/rotate-webhook-key?token=ADMIN_TOKEN'
+    //   echo -n '<new_key_from_response>' | wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
+    if (url.pathname === '/admin/rotate-webhook-key' && request.method === 'POST') {
+      const authErr = checkAdminToken(request, env);
+      if (authErr) return authErr;
+      const subId = url.searchParams.get('id') || 'wbhk_08748232775d4fadb43dc0efbc60e65f';
+      const r = await fetch(`${SQUARE_BASE}/webhooks/subscriptions/${subId}/signature-key`, {
+        method: 'POST',
+        headers: {
+          'Square-Version': '2025-01-23',
+          Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+      });
+      const text = await r.text();
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch (_) {}
+      const newKey = parsed?.signature_key;
+      return json({
+        ok: r.ok,
+        status: r.status,
+        subscriptionId: subId,
+        signature_key: newKey || null,
+        next_step: newKey
+          ? `Run: echo -n '${newKey}' | wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY`
+          : 'No signature_key in Square response',
+        raw: parsed ?? text.slice(0, 400),
+      });
+    }
+
     // ── Square catering sync ──
     if (url.pathname === '/admin/import-catering' && request.method === 'POST') {
       try {
