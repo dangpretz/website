@@ -26,6 +26,13 @@ FOH_CAL_FROM = "DPC Production Schedule <noreply@dangerouspretzel.com>"
 binding = "FOH_CAL_STATE"
 id = "3f111dbe5ac44c7e9b168f8049754b22"
 
+# Service binding to pretzel-os — required for inter-worker calls on the same
+# Cloudflare account (public-URL fetch returns CF error 1042). Used by the
+# catering reactivation promo-token validation flow.
+[[services]]
+binding = "PRETZEL_OS"
+service = "pretzel-os"
+
 # Cron — every 30 min. Sends new/changed events as METHOD:REQUEST and
 # disappeared events as METHOD:CANCEL to getdangerous@myecalendar.com.
 # DISABLED 2026-05-06: Resend's MIME structure (attachment-only) isn't being

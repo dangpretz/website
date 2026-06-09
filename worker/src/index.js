@@ -822,10 +822,18 @@ async function verifySquareSignature(request, signatureKey) {
 
 async function handleSquareWebhook(request, env) {
   if (!env.SQUARE_WEBHOOK_SIGNATURE_KEY) {
+    console.warn('[webhook] FAIL: SQUARE_WEBHOOK_SIGNATURE_KEY not configured');
     return json({ error: 'webhook key not configured' }, 503);
   }
   const body = await verifySquareSignature(request, env.SQUARE_WEBHOOK_SIGNATURE_KEY);
-  if (!body) return json({ error: 'bad signature' }, 401);
+  if (!body) {
+    // Persistent bad-signature usually means Square rotated the subscription's
+    // signing key without the env secret being updated. Re-rotate via
+    // POST /v2/webhooks/subscriptions/{id}/signature-key and `wrangler secret
+    // put SQUARE_WEBHOOK_SIGNATURE_KEY`.
+    console.warn('[webhook] FAIL: bad signature — secret in env may not match Square subscription key');
+    return json({ error: 'bad signature' }, 401);
+  }
 
   let payload;
   try { payload = JSON.parse(body); } catch (_) { return json({ error: 'bad json' }, 400); }
@@ -890,6 +898,10 @@ async function handleSquareWebhook(request, env) {
     console.error('Webhook sync failed:', orderId, err);
     return json({ ok: true, error: err.message, orderId });
   }
+  // One log line per order-relevant sync. Lets future diagnosis see what
+  // events landed and what they synced without flooding for the 200+
+  // event types the subscription is signed up for.
+  console.log('[webhook] synced', payload.type, JSON.stringify({ orderId, ...result }));
 
   return json({ ok: true, eventType: payload.type, ...result });
 }
@@ -2062,25 +2074,25 @@ export default {
       }
 
       // ── Promo token (catering reactivation campaign, May 19 2026) ──
-      // If the customer arrived from a campaign SMS/email with a magic URL,
-      // validate the token and prepare a discount line to attach to the order.
-      // Token format: <random>.<hmac_sha256(random + customer_id + expires_at, secret)>
-      // The pretzel-os worker exposes /retail/catering-reactivation/redeem-token
-      // which validates against the catering_promo_tokens table and returns the
-      // discount amount + customer info if redeemable. Single-use enforced server-side.
+      // Uses Cloudflare Service Binding to call pretzel-os. Public-URL fetch fails with
+      // CF error 1042 because both workers are on the same account; service bindings
+      // are the documented escape hatch. env.PRETZEL_OS.fetch() routes internally.
       let promoDiscount = null;
-      if (promo_token && env.PRETZEL_OS_URL) {
+      if (promo_token && env.PRETZEL_OS) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.log(`[catering-checkout] Validating token via service binding`);
         try {
-          const validateResp = await fetch(`${env.PRETZEL_OS_URL}/retail/catering-reactivation/redeem-token`, {
+          const validateResp = await env.PRETZEL_OS.fetch('https://internal/retail/catering-reactivation/redeem-token', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Pretzel-Auth': env.PRETZEL_OS_AUTH_TOKEN || '',
+              'X-Pretzel-Auth': (env.PRETZEL_OS_AUTH_TOKEN || '').trim(),
             },
             body: JSON.stringify({ token: promo_token, customer_phone: customer.phone, customer_email: customer.email }),
           });
+          const respText = await validateResp.text();
           if (validateResp.ok) {
-            const validateData = await validateResp.json();
+            const validateData = JSON.parse(respText);
             if (validateData.valid && validateData.discount_cents > 0) {
               promoDiscount = {
                 name: validateData.discount_name || 'Catering Reactivation',
@@ -2092,14 +2104,13 @@ export default {
               console.log(`[catering-checkout] Promo token validated: $${validateData.discount_cents / 100} off for customer ${validateData.customer_id || 'unknown'}`);
             } else {
               // eslint-disable-next-line no-console -- worker diagnostics
-              console.warn(`[catering-checkout] Promo token rejected: ${validateData.reason || 'unknown'}`);
+              console.warn(`[catering-checkout] Promo token rejected by pretzel-os: ${respText.slice(0,200)}`);
             }
           } else {
             // eslint-disable-next-line no-console -- worker diagnostics
-            console.warn(`[catering-checkout] Promo token validation failed: HTTP ${validateResp.status}`);
+            console.warn(`[catering-checkout] Promo token validation HTTP ${validateResp.status}: ${respText.slice(0,200)}`);
           }
         } catch (err) {
-          // Validation failure is non-fatal — proceed without discount.
           // eslint-disable-next-line no-console -- worker diagnostics
           console.error('[catering-checkout] Promo token validation error:', err);
         }
