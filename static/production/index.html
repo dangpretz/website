@@ -1736,9 +1736,12 @@
   // devices (manager + Shape tablet + BFP tablet) see the same daily capacity.
   // Falls back to per-device localStorage (legacy + offline edits).
   const getWorkers = (type, date) => {
-    const fromLog = (productionState[date] || {})[type === 'shape' ? 'shapeWorkers' : 'bfpWorkers'];
-    if (fromLog && fromLog > 0) return Math.max(1, fromLog);
-    return Math.max(1, parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10) || 2);
+    const key     = type === 'shape' ? 'shapeWorkers' : 'bfpWorkers';
+    const fromLog = (productionState[date] || {})[key];
+    const minVal  = type === 'shape' ? 0 : 1;
+    if (fromLog != null && !isNaN(fromLog)) return Math.max(minVal, Number(fromLog));
+    const stored = parseInt(localStorage.getItem(`prod-${type}-workers-${date}`), 10);
+    return Math.max(minVal, isNaN(stored) ? 2 : stored);
   };
   // saveWorkers updates THREE things:
   //   1. productionState in-memory  (so the next getWorkers/render() call sees
@@ -1748,7 +1751,7 @@
   //   2. localStorage              (per-device fallback + offline)
   //   3. production log            (synced across devices, fire-and-forget)
   const saveWorkers = (type, date, n) => {
-    const v = Math.max(1, n);
+    const v = Math.max(type === 'shape' ? 0 : 1, n);
     if (!productionState[date]) productionState[date] = {};
     productionState[date][type === 'shape' ? 'shapeWorkers' : 'bfpWorkers'] = v;
     localStorage.setItem(`prod-${type}-workers-${date}`, String(v));
@@ -2785,22 +2788,25 @@
     const hasBfp   = (schedule.bfp[dateStr]   || []).length > 0
                   || (dayState.bfpDone   || []).length > 0;
 
-    if (!hasShape && !hasBfp) {
-      return `<div class="no-prod">${t('nothing_today')}<br>
-        <span style="font-size:13px;color:var(--gray-3)">${t('no_prod_extra')}</span>
-      </div>`;
-    }
     const teamHas = type === 'shape' ? hasShape : hasBfp;
-    if (!teamHas) {
-      const teamLabel  = type === 'shape' ? t('shape_label') : t('bfp_label');
-      const otherLabel = type === 'shape' ? t('bfp_label')   : t('shape_label');
-      const hint = userRole === 'manager'
-        ? `<span style="font-size:13px;color:var(--gray-3)">${t('check_other', { team: otherLabel })}</span>`
-        : `<span style="font-size:13px;color:var(--gray-3)">${t('all_clear')}</span>`;
-      return `<div class="no-prod" style="padding:32px 20px">${t('nothing_for', { team: teamLabel })}<br>${hint}</div>`;
+
+    if (userRole !== 'manager') {
+      // Worker views — keep existing "nothing today" behaviour when their team has no work
+      if (!hasShape && !hasBfp) {
+        return `<div class="no-prod">${t('nothing_today')}<br>
+          <span style="font-size:13px;color:var(--gray-3)">${t('no_prod_extra')}</span>
+        </div>`;
+      }
+      if (!teamHas) {
+        const teamLabel = type === 'shape' ? t('shape_label') : t('bfp_label');
+        return `<div class="no-prod" style="padding:32px 20px">${t('nothing_for', { team: teamLabel })}<br>
+          <span style="font-size:13px;color:var(--gray-3)">${t('all_clear')}</span></div>`;
+      }
+      return renderWorkerDayView(type, dateStr);
     }
-    // Worker view: status-grouped sections + day meter; manager view: existing card
-    if (userRole !== 'manager') return renderWorkerDayView(type, dateStr);
+    // Manager: always render the team card — it handles empty items internally and
+    // always shows the workers stepper. This lets managers set worker counts even on
+    // days with no scheduled batches (e.g. BFP on Sunday).
     return renderTeamCard(type, dateStr);
   }
 
@@ -4320,8 +4326,9 @@
     document.querySelectorAll('[data-worker-dec]').forEach(btn => {
       btn.addEventListener('click', () => {
         const { type, date } = btn.dataset;
-        const cur = getWorkers(type, date);
-        if (cur <= 1) return;
+        const cur    = getWorkers(type, date);
+        const minVal = type === 'shape' ? 0 : 1;
+        if (cur <= minVal) return;
         saveWorkers(type, date, cur - 1);
         schedule = buildOptimalSchedule();
         render();

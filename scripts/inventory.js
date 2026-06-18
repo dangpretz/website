@@ -598,9 +598,11 @@ export function resolveProductionLogs(logs) {
       return;
     }
     if (action === 'workers_config') {
-      const n = Math.max(1, Number(row.workers) || 1);
-      if (row.type === 'shape') s.shapeWorkers = n;
-      else if (row.type === 'bfp') s.bfpWorkers = n;
+      const n      = Number(row.workers);
+      const minVal = row.type === 'shape' ? 0 : 1;
+      const v      = isNaN(n) ? minVal : Math.max(minVal, n);
+      if (row.type === 'shape') s.shapeWorkers = v;
+      else if (row.type === 'bfp') s.bfpWorkers = v;
     }
   });
 
