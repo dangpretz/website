@@ -1862,7 +1862,7 @@
             let key = sku.trim();
             if (skuAliases[key]) key = skuAliases[key]; // resolve old → canonical name
             if (isFOH(key)) { fohSeen.add(key); return; }
-            if (key === CHEESE_KEY) return; // cheese has its own pipeline (Cheese tab); shape/BFP teams don't make it
+            if (DIP_CONFIG[key]) return; // dips have their own pipeline (Dips tab); shape/BFP teams don't make them
             if (!skuMap[key]) skuMap[key] = { shapePretzels: 0, bfpPretzels: 0, orders: [] };
             const q = Number(quantity) || 0;
             skuMap[key].shapePretzels += q;
