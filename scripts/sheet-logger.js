@@ -17,7 +17,7 @@ export async function fetchLog(logpath) {
 // Throws on non-2xx so callers' try/catch can react. The prior silent-
 // success-only behavior meant network blips were invisible — saveStock
 // would log "Saved!" toast even when the row never landed in the sheet.
-export async function appendLog(logpath, message) {
+export async function appendLog(logpath, message, { signal } = {}) {
   const params = new URLSearchParams();
   Object.keys(message).forEach((key) => {
     params.append(key, message[key]);
@@ -27,6 +27,7 @@ export async function appendLog(logpath, message) {
   try {
     resp = await fetch(`${SHEET_LOGGER}${logpath}?${params.toString()}`, {
       method: 'POST',
+      signal, // AbortSignal for per-attempt timeouts; undefined when not passed → no change
     });
   } catch (networkErr) {
     throw new Error(`appendLog ${logpath} network error: ${networkErr.message}`);
