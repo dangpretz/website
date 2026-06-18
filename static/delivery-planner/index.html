@@ -375,6 +375,14 @@
     .delivery-card .card-confirmed {
       font: 400 10px 'Manrope', sans-serif; color: #4a4; margin-top: 4px;
     }
+    /* Signature view modal */
+    .sig-view-field { display: flex; gap: 8px; margin: 8px 0; font: 400 14px 'Manrope', sans-serif; align-items: baseline; }
+    .sig-view-label { color: #666; min-width: 90px; flex-shrink: 0; }
+    .sig-view-img-wrap { margin: 14px 0 4px; }
+    .sig-view-img { max-width: 100%; border: 1px solid #e0e0e0; border-radius: 6px; background: #fff; display: block; }
+    .btn-sig-view { background: none; border: 1px solid #ccc; border-radius: 6px; padding: 5px 10px;
+      font: 600 12px 'Manrope', sans-serif; color: #555; cursor: pointer; white-space: nowrap; }
+    .btn-sig-view:hover { background: #f5f5f5; }
     .delivery-card .recurrence-icon {
       display: inline-block; width: 12px; height: 12px; vertical-align: middle;
       margin-left: 4px; opacity: 0.6;
@@ -943,6 +951,17 @@
       <div class="confirm-actions">
         <button type="button" class="btn btn-secondary" id="barcode-cancel">Cancel</button>
         <button type="button" class="btn btn-red" id="barcode-save">Save Barcodes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature view modal (read-only proof of delivery) -->
+  <div class="confirm-overlay" id="sig-view-overlay">
+    <div class="confirm-modal" id="sig-view-modal">
+      <h2>Proof of Delivery</h2>
+      <div id="sig-view-body"></div>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-secondary" id="sig-view-close">Close</button>
       </div>
     </div>
   </div>
@@ -1803,6 +1822,7 @@
       // narrow columns. Type still visible via the subline + the icon.
       const confirmBtnLabel = type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm';
       const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${confirmBtnLabel}</button>` : '';
+      const sigBtnHtml = isConfirmed && row.confirmation ? `<button class="btn-sig-view" data-action="view-signature" data-delivery-id="${id}">📋 View Signature</button>` : '';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
       const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
@@ -1831,6 +1851,7 @@
           <div class="card-actions-row">
             ${scanBtnHtml}
             ${confirmBtnHtml}
+            ${sigBtnHtml}
           </div>
           ${confirmedHtml}
         </div>`;
@@ -1848,6 +1869,7 @@
       else if (row.sku && row.volume != null) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
       const pillsHtml = items.length ? '<div class="daily-items">' + items.map((it) => renderItemPill(row, it)).join('') + '</div>' : '';
       const isConfirmed = status === 'delivered' || status === 'picked_up';
+      const sigBtnHtml = isConfirmed && row.confirmation ? `<button class="btn-sig-view" data-action="view-signature" data-delivery-id="${id}">📋 View Signature</button>` : '';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
       const barcodeCount = (row.barcodes && row.barcodes.length) || 0;
@@ -1872,6 +1894,7 @@
           <div class="daily-actions">
             ${scanBtnHtml}
             ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm'}</button>` : ''}
+            ${sigBtnHtml}
             <div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
@@ -1975,6 +1998,9 @@
       });
       container.querySelectorAll('[data-action="scan"]').forEach((btn) => {
         btn.addEventListener('click', () => openBarcodeModal(btn.dataset.deliveryId));
+      });
+      container.querySelectorAll('[data-action="view-signature"]').forEach((btn) => {
+        btn.addEventListener('click', () => openSignatureView(btn.dataset.deliveryId));
       });
     }
 
@@ -2194,6 +2220,30 @@
       // Resize canvas after modal is visible so it gets proper dimensions
       requestAnimationFrame(() => { if (sigPad) sigPad._resize(); });
     }
+
+    // ── Signature view (read-only proof-of-delivery) ─────────────────────────
+    function openSignatureView(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row || !row.confirmation) return;
+      const { confirmedBy, signatureData, confirmNote, confirmTimestamp } = row.confirmation;
+      const timeStr = confirmTimestamp
+        ? new Date(confirmTimestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+        : '';
+      let html = `<div class="sig-view-field"><span class="sig-view-label">Received by</span><strong>${escapeHtml(confirmedBy || '—')}</strong></div>`;
+      if (timeStr)     html += `<div class="sig-view-field"><span class="sig-view-label">Time</span><span>${escapeHtml(timeStr)}</span></div>`;
+      if (confirmNote) html += `<div class="sig-view-field"><span class="sig-view-label">Note</span><span>${escapeHtml(confirmNote)}</span></div>`;
+      html += signatureData
+        ? `<div class="sig-view-img-wrap"><img src="${signatureData}" alt="Signature" class="sig-view-img"></div>`
+        : `<div class="sig-view-field" style="color:#999;font-style:italic">No signature captured</div>`;
+      document.getElementById('sig-view-body').innerHTML = html;
+      document.getElementById('sig-view-overlay').classList.add('open');
+    }
+    document.getElementById('sig-view-close').addEventListener('click', () =>
+      document.getElementById('sig-view-overlay').classList.remove('open'));
+    document.getElementById('sig-view-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'sig-view-overlay')
+        document.getElementById('sig-view-overlay').classList.remove('open');
+    });
 
     document.getElementById('sig-clear').addEventListener('click', () => { if (sigPad) sigPad.clear(); });
     document.getElementById('sig-toggle').addEventListener('click', () => {
