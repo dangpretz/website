@@ -598,9 +598,9 @@ export function resolveProductionLogs(logs) {
       return;
     }
     if (action === 'workers_config') {
-      const n      = Number(row.workers);
+      const n = Number(row.workers);
       const minVal = row.type === 'shape' ? 0 : 1;
-      const v      = isNaN(n) ? minVal : Math.max(minVal, n);
+      const v = Number.isNaN(n) ? minVal : Math.max(minVal, n);
       if (row.type === 'shape') s.shapeWorkers = v;
       else if (row.type === 'bfp') s.bfpWorkers = v;
     }
