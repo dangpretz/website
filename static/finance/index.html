@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance — Dangerous Pretzel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <!--
+    SECURITY MODEL: No sensitive token is in this file.
+    Paul authenticates via POST /finance/paul-auth. The password is validated
+    server-side against the PAUL_FINANCE_PASSWORD Workers secret. On success the
+    worker returns a 10-hour HMAC session token stored in sessionStorage only.
+    The master X-Pretzel-Auth token NEVER reaches the browser.
+
+    To go live:
+      cd "~/Code/claude code context/dangerous-pretzel"
+      npx wrangler secret put PAUL_FINANCE_PASSWORD   ← Drew sets the password value
+      npx wrangler secret put PAUL_SESSION_SECRET     ← Drew pastes a random 32+ char string
+      npm run deploy
+      Share dangerouspretzel.com/static/finance/ with Paul.
+  -->
+
+  <style>
+    :root {
+      --bg:            #09090B;
+      --surface:       #111113;
+      --surface-hi:    #18181C;
+      --border:        #27272C;
+      --border-faint:  #1C1C20;
+      --text:          #EEEAE0;
+      --text-mid:      #9A9A8E;
+      --text-dim:      #4A4A44;
+      --amber:         #C8A55A;   /* above / positive */
+      --terra:         #D97A52;   /* below / negative / warning */
+      --sage:          #7A9E82;
+      --slate:         #7A98AA;
+      --lavender:      #9A8AB8;
+      --sand:          #C4A87A;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Grain */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    .hdr {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 22px 32px;
+      border-bottom: 1px solid var(--border-faint);
+      position: sticky;
+      top: 0;
+      background: rgba(9,9,11,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+    .hdr-wordmark {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.01em;
+      color: var(--text);
+    }
+    .hdr-sep { color: var(--text-dim); font-size: 14px; }
+    .hdr-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-mid);
+    }
+    .hdr-date {
+      margin-left: auto;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* ── Page shell ──────────────────────────────────── */
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 28px 80px;
+    }
+
+    .section {
+      padding: 36px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .section:last-child { border-bottom: none; }
+
+    .section-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+    }
+
+    /* ── Break-even ──────────────────────────────────── */
+    .be-grid {
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .be-verdict {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .be-number {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(56px, 9vw, 88px);
+      font-weight: 900;
+      line-height: 0.9;
+      letter-spacing: -0.025em;
+      color: var(--amber);
+      transition: color 0.5s ease;
+      margin-bottom: 16px;
+    }
+    .be-number.below { color: var(--terra); }
+
+    .be-status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .be-status-pill {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .be-status-pill.above { background: rgba(200,165,90,0.12); color: var(--amber); }
+    .be-status-pill.below { background: rgba(217,122,82,0.12); color: var(--terra); }
+
+    .be-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--text-mid);
+      line-height: 1.7;
+    }
+    .be-meta strong { color: var(--text); font-weight: 500; }
+    .be-meta .val-above { color: var(--amber); font-weight: 500; }
+    .be-meta .val-below { color: var(--terra); font-weight: 500; }
+
+    /* Progress bar */
+    .be-bar-wrap { margin-top: 20px; }
+    .be-bar-track {
+      position: relative;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    .be-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--amber);
+      transition: width 1s cubic-bezier(0.4,0,0.2,1), background 0.5s ease;
+    }
+    .be-bar-fill.below { background: var(--terra); }
+    .be-bar-tick {
+      position: absolute;
+      top: -5px;
+      right: 0;
+      width: 1px;
+      height: 14px;
+      background: var(--text-dim);
+    }
+    .be-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* Right column */
+    .be-right { display: flex; flex-direction: column; gap: 12px; }
+
+    .be-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .be-card-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .be-card-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 24px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .be-card-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 3px;
+    }
+
+    /* Channel mini-bars */
+    .be-channels { display: flex; flex-direction: column; gap: 7px; }
+    .ch-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ch-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .ch-name {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: var(--text-mid);
+      flex: 1;
+      white-space: nowrap;
+    }
+    .ch-bar-track {
+      width: 64px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .ch-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .ch-amt {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      min-width: 54px;
+      text-align: right;
+    }
+
+    /* ── P&L ─────────────────────────────────────────── */
+    .pnl-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .pnl-tab {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      padding: 5px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-mid);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .pnl-tab:hover { border-color: var(--text-dim); color: var(--text); }
+    .pnl-tab.active {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: rgba(200,165,90,0.06);
+    }
+    .pnl-tab.current-month { border-style: solid; }
+
+    .pnl-picker {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-mid);
+      padding: 5px 10px;
+      cursor: pointer;
+      color-scheme: dark;
+    }
+    .pnl-picker:focus { outline: none; border-color: var(--text-dim); }
+
+    /* Quad grid */
+    .pnl-quad {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .pnl-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color 0.2s ease;
+    }
+    .pnl-col.current {
+      border-color: rgba(200,165,90,0.35);
+    }
+    .pnl-col-month {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+    .pnl-col.current .pnl-col-month { color: var(--amber); }
+
+    .pnl-col-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .pnl-col-row:last-child { border-bottom: none; }
+    .pnl-col-key {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      color: var(--text-mid);
+    }
+    .pnl-col-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .pnl-col-val.positive { color: var(--amber); }
+    .pnl-col-val.negative { color: var(--terra); }
+    .pnl-col-val.label { color: var(--text-mid); font-size: 10px; }
+
+    .pnl-col-ni {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .pnl-col-ni-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    .pnl-col-ni-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+    }
+    .pnl-col-ni-val.positive { color: var(--amber); }
+    .pnl-col-ni-val.negative { color: var(--terra); }
+
+    /* Single month detail */
+    .pnl-detail {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    .pnl-detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pnl-detail-month {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .pnl-detail-ni {
+      font-family: 'DM Mono', monospace;
+      font-size: 20px;
+      font-weight: 500;
+    }
+    .pnl-detail-ni.positive { color: var(--amber); }
+    .pnl-detail-ni.negative { color: var(--terra); }
+
+    .pnl-detail-channels {
+      margin-bottom: 16px;
+    }
+    .pnl-detail-ch-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .pnl-detail-ch-row:last-child { border-bottom: none; }
+    .pnl-detail-ch-name { font-size: 13px; color: var(--text-mid); flex: 1; }
+    .pnl-detail-ch-amt {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .pnl-detail-total-row {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 2px;
+    }
+    .pnl-detail-total-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-mid);
+    }
+    .pnl-detail-total-amt {
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    /* ── Cash + Liquidity ────────────────────────────── */
+    .cash-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .cash-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    .cash-card-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    .cash-big {
+      font-family: 'DM Mono', monospace;
+      font-size: 40px;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      color: var(--text);
+      line-height: 1;
+    }
+    .cash-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 8px;
+    }
+    .cash-accounts {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .cash-account-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-mid);
+    }
+    .cash-account-amt { color: var(--text); }
+
+    .liq-sentence {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .liq-ok { color: var(--sage); font-weight: 500; }
+    .liq-warn { color: var(--terra); font-weight: 500; }
+    .liq-date { color: var(--text-mid); }
+
+    .liq-floor-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      background: var(--surface-hi);
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+    }
+    .liq-floor-label { color: var(--text-dim); }
+    .liq-floor-val { color: var(--text-mid); }
+
+    /* ── Loading / Error ─────────────────────────────── */
+    .skel {
+      display: inline-block;
+      background: var(--surface-hi);
+      border-radius: 4px;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 0.3; }
+      50%      { opacity: 0.7; }
+    }
+    .err-note {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--terra);
+      padding: 8px 12px;
+      background: rgba(217,122,82,0.07);
+      border: 1px solid rgba(217,122,82,0.18);
+      border-radius: 6px;
+    }
+
+    /* ── Fade ────────────────────────────────────────── */
+    .fade { animation: fadeUp 0.35s ease both; }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(5px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 700px) {
+      .hdr { padding: 16px 20px; }
+      .page { padding: 0 16px 60px; }
+      .be-grid { grid-template-columns: 1fr; }
+      .be-right { flex-direction: row; flex-wrap: wrap; }
+      .be-card { flex: 1; min-width: 140px; }
+      .pnl-quad { grid-template-columns: 1fr 1fr; }
+      .cash-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 440px) {
+      .pnl-quad { grid-template-columns: 1fr; }
+      .be-number { font-size: 52px; }
+    }
+
+    /* ── Auth screen ─────────────────────────────────── */
+    .auth-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 36px 32px 32px;
+    }
+    .auth-wordmark {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .auth-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+    }
+    .auth-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-mid);
+      margin-bottom: 8px;
+    }
+    .auth-input {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--surface-hi);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 16px;
+    }
+    .auth-input:focus { border-color: var(--amber); }
+    .auth-input::placeholder { color: var(--text-dim); }
+    .auth-btn {
+      width: 100%;
+      padding: 11px;
+      background: var(--amber);
+      border: none;
+      border-radius: 8px;
+      color: #0A0A08;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .auth-btn:hover { opacity: 0.88; }
+    .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .auth-error {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--terra);
+      margin-top: 12px;
+      text-align: center;
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Auth screen (shown until session established) ── -->
+<div id="auth-screen" class="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-wordmark">Dangerous Pretzel</div>
+    <div class="auth-sub">Finance</div>
+    <div class="auth-label">Password</div>
+    <input id="auth-pw" class="auth-input" type="password"
+           placeholder="Enter password" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')submitAuth()">
+    <button class="auth-btn" id="auth-btn" onclick="submitAuth()">Sign in</button>
+    <div class="auth-error" id="auth-err"></div>
+  </div>
+</div>
+
+<header class="hdr" id="main-hdr" style="display:none">
+  <span class="hdr-wordmark">Dangerous Pretzel</span>
+  <span class="hdr-sep">/</span>
+  <span class="hdr-label">Finance</span>
+  <span class="hdr-date" id="hdr-date"></span>
+</header>
+
+<main class="page" id="main-page" style="display:none">
+
+  <!-- ── BREAK-EVEN ─────────────────────────────────── -->
+  <section class="section">
+    <div class="section-eyebrow">Break-even</div>
+    <div id="be-body">
+      <div class="be-grid">
+        <div>
+          <div class="be-verdict">Month-to-date revenue</div>
+          <div class="be-number skel" style="width:220px;height:80px" id="be-num">&nbsp;</div>
+          <div id="be-meta"></div>
+          <div id="be-bar"></div>
+        </div>
+        <div class="be-right">
+          <div class="be-card">
+            <div class="be-card-label">Monthly target</div>
+            <div class="be-card-num skel" style="width:80px;height:24px" id="be-target">&nbsp;</div>
+            <div class="be-card-sub" id="be-target-sub"></div>
+          </div>
+          <div class="be-card">
+            <div class="be-card-label">This month by channel</div>
+            <div class="be-channels" id="be-channels">
+              <div class="skel" style="width:100%;height:12px;border-radius:3px"></div>
+              <div class="skel" style="width:80%;height:12px;border-radius:3px"></div>
+              <div class="skel" style="width:60%;height:12px;border-radius:3px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── P&L ─────────────────────────────────────────── -->
+  <section class="section">
+    <div class="section-eyebrow">Profit &amp; Loss</div>
+    <div class="pnl-controls" id="pnl-tabs"></div>
+    <div id="pnl-body">
+      <div class="pnl-quad">
+        <div class="pnl-col"><div class="skel" style="width:100%;height:120px"></div></div>
+        <div class="pnl-col"><div class="skel" style="width:100%;height:120px"></div></div>
+        <div class="pnl-col"><div class="skel" style="width:100%;height:120px"></div></div>
+        <div class="pnl-col"><div class="skel" style="width:100%;height:120px"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CASH + LIQUIDITY ──────────────────────────────── -->
+  <section class="section">
+    <div class="section-eyebrow">Cash &amp; Runway</div>
+    <div class="cash-grid">
+      <div class="cash-card">
+        <div class="cash-card-label">On hand now</div>
+        <div class="cash-big skel" style="width:140px;height:40px" id="cash-big">&nbsp;</div>
+        <div class="cash-sub" id="cash-sub"></div>
+        <div class="cash-accounts" id="cash-accounts"></div>
+      </div>
+      <div class="cash-card">
+        <div class="cash-card-label">90-day outlook</div>
+        <div id="liq-body">
+          <div class="skel" style="width:100%;height:56px;border-radius:6px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────
+  // No token in source. Paul authenticates via /finance/paul-auth;
+  // a short-lived session token is stored in sessionStorage only.
+  const BASE          = 'https://pretzel-os.drew-f39.workers.dev';
+  const SESSION_KEY   = 'paul_finance_session'; // sessionStorage key
+
+  // ── Helpers ─────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+
+  function fmt(n, decimals = 0) {
+    if (n == null || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    const s = abs.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    return n < 0 ? `−$${s}` : `$${s}`;
+  }
+
+  function fmtPct(n) {
+    if (n == null) return '—';
+    return `${Math.round(n)}%`;
+  }
+
+  function fmtMonth(period) {
+    if (!period) return '';
+    const [y, m] = period.split('-');
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${names[+m - 1]} ${y}`;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function timeSince(iso) {
+    if (!iso) return '';
+    const secs = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (secs < 60) return 'just now';
+    if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+    return `${Math.floor(secs/3600)}h ago`;
+  }
+
+  // ── Session management ───────────────────────────────────────────
+  function getSession() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s?.token || !s?.exp || Date.now() >= s.exp) {
+        sessionStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return s;
+    } catch { return null; }
+  }
+
+  function saveSession(token, exp) {
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, exp })); } catch {}
+  }
+
+  function clearSession() {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  }
+
+  async function api(path) {
+    const sess = getSession();
+    if (!sess) throw new Error('session_expired');
+    const r = await fetch(BASE + path, {
+      headers: { 'X-Paul-Session': sess.token },
+    });
+    if (r.status === 401) { clearSession(); showAuth(); throw new Error('session_expired'); }
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+  }
+
+  // ── Auth flow ────────────────────────────────────────────────────
+  async function submitAuth() {
+    const pw  = $('auth-pw').value;
+    const btn = $('auth-btn');
+    const err = $('auth-err');
+    if (!pw) { err.textContent = 'Enter a password.'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    err.textContent = '';
+    try {
+      const r = await fetch(BASE + '/finance/paul-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.token) {
+        err.textContent = r.status === 401 ? 'Incorrect password.' : 'Could not sign in — try again.';
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+        $('auth-pw').value = '';
+        $('auth-pw').focus();
+        return;
+      }
+      saveSession(data.token, data.exp);
+      showApp();
+      init();
+    } catch (e) {
+      err.textContent = 'Network error — check connection.';
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  }
+
+  function showAuth() {
+    $('auth-screen').style.display = 'flex';
+    $('main-hdr').style.display    = 'none';
+    $('main-page').style.display   = 'none';
+    setTimeout(() => $('auth-pw')?.focus(), 50);
+  }
+
+  function showApp() {
+    $('auth-screen').style.display = 'none';
+    $('main-hdr').style.display    = '';
+    $('main-page').style.display   = '';
+  }
+
+  // ── Channel config ───────────────────────────────────────────────
+  const CH_LABEL = {
+    retail:               'Retail',
+    Retail:               'Retail',
+    wholesale:            'Wholesale',
+    Wholesale:            'Wholesale',
+    catering:             'Catering',
+    Catering:             'Catering',
+    delivery:             'Delivery',
+    delivery_marketplace: 'Delivery',
+    Delivery:             'Delivery',
+    event_venue:          'Event Venue',
+    'Event Venue':        'Event Venue',
+    other:                'Other',
+    other_revenue:        'Other',
+    services:             'Other',
+    Other:                'Other',
+  };
+
+  const CH_COLOR = {
+    retail:               '#C8A55A',
+    Retail:               '#C8A55A',
+    wholesale:            '#7A98AA',
+    Wholesale:            '#7A98AA',
+    catering:             '#7A9E82',
+    Catering:             '#7A9E82',
+    delivery:             '#9A8AB8',
+    delivery_marketplace: '#9A8AB8',
+    Delivery:             '#9A8AB8',
+    event_venue:          '#C4A87A',
+    'Event Venue':        '#C4A87A',
+    other:                '#4A4A44',
+    other_revenue:        '#4A4A44',
+    services:             '#4A4A44',
+    Other:                '#4A4A44',
+  };
+
+  // ── Render: break-even ───────────────────────────────────────────
+  function renderBreakeven(be) {
+    const mtdRev    = be.mtd?.total_gl ?? 0;
+    const target    = be.breakeven?.cash?.center ?? 0;
+    const elapsed   = be.as_of?.elapsed_pct ?? 50;
+    const dayOf     = be.as_of?.day_of_month ?? '?';
+    const daysIn    = be.as_of?.days_in_month ?? 30;
+    const runRate   = elapsed > 0 ? mtdRev / (elapsed / 100) : 0;
+    const gap       = runRate - target;
+    const isAbove   = gap >= 0;
+    const barPct    = Math.min((runRate / target) * 100, 100);
+    const channels  = be.mtd?.by_channel ?? [];
+    const maxCh     = channels.length ? Math.max(...channels.map(c => c.mtd)) : 1;
+
+    // Big number
+    const numEl = $('be-num');
+    numEl.className = `be-number fade${isAbove ? '' : ' below'}`;
+    numEl.textContent = fmt(mtdRev);
+
+    // Status + meta
+    $('be-meta').innerHTML = `
+      <div class="be-status-row">
+        <span class="be-status-pill ${isAbove ? 'above' : 'below'}">
+          ${isAbove ? 'Above target' : 'Tracking below'}
+        </span>
+      </div>
+      <div class="be-meta" style="margin-top:10px">
+        Day ${dayOf} of ${daysIn} (${Math.round(elapsed)}% through month)<br>
+        Run-rate <strong>${fmt(runRate)}/mo</strong> vs target ${fmt(target)} ·
+        <span class="${isAbove ? 'val-above' : 'val-below'}">
+          ${gap >= 0 ? '+' : '−'}${fmt(Math.abs(gap))} ${isAbove ? 'above' : 'short'}
+        </span>
+      </div>
+    `;
+
+    // Bar
+    $('be-bar').innerHTML = `
+      <div class="be-bar-wrap">
+        <div class="be-bar-track">
+          <div class="be-bar-fill ${isAbove ? '' : 'below'}" style="width:${barPct.toFixed(1)}%"></div>
+          <div class="be-bar-tick"></div>
+        </div>
+        <div class="be-bar-labels">
+          <span>$0</span>
+          <span>${fmt(target)} target</span>
+        </div>
+      </div>
+    `;
+
+    // Target card
+    const targetEl = $('be-target');
+    targetEl.className = 'be-card-num fade';
+    targetEl.textContent = fmt(target);
+    $('be-target-sub').textContent = 'cash break-even / mo';
+
+    // Channels
+    const chEl = $('be-channels');
+    if (!channels.length) {
+      chEl.innerHTML = '<span class="err-note">No channel data</span>';
+      return;
+    }
+    chEl.innerHTML = channels
+      .sort((a,b) => b.mtd - a.mtd)
+      .map(c => {
+        const label = CH_LABEL[c.channel] ?? c.channel;
+        const color = CH_COLOR[c.channel] ?? '#4A4A44';
+        const pct   = maxCh > 0 ? (c.mtd / maxCh * 100).toFixed(0) : 0;
+        return `
+          <div class="ch-row">
+            <div class="ch-dot" style="background:${color}"></div>
+            <div class="ch-name">${label}</div>
+            <div class="ch-bar-track">
+              <div class="ch-bar-fill" style="width:${pct}%;background:${color};opacity:0.7"></div>
+            </div>
+            <div class="ch-amt">${fmt(c.mtd)}</div>
+          </div>
+        `;
+      }).join('');
+  }
+
+  // ── Render: P&L quad ────────────────────────────────────────────
+  let quadData = null;
+  let activePeriod = 'quad'; // 'quad' | 'YYYY-MM'
+
+  function renderQuad(months) {
+    return `
+      <div class="pnl-quad fade">
+        ${months.map(m => {
+          const ni = m.net_income;
+          const niClass = ni >= 0 ? 'positive' : 'negative';
+          const isCurr  = m.is_current;
+          const src     = m.source === 'live' ? 'MTD' : 'closed';
+          return `
+            <div class="pnl-col ${isCurr ? 'current' : ''}">
+              <div class="pnl-col-month">${fmtMonth(m.period)}</div>
+              <div class="pnl-col-row">
+                <span class="pnl-col-key">Revenue</span>
+                <span class="pnl-col-val">${fmt(m.revenue)}</span>
+              </div>
+              <div class="pnl-col-row">
+                <span class="pnl-col-key">COGS</span>
+                <span class="pnl-col-val">${fmtPct(m.cogs_pct)}</span>
+              </div>
+              <div class="pnl-col-row">
+                <span class="pnl-col-key">Expenses</span>
+                <span class="pnl-col-val">${fmt(m.expense)}</span>
+              </div>
+              <div class="pnl-col-row">
+                <span class="pnl-col-key">Margin</span>
+                <span class="pnl-col-val label">${fmtPct(m.gross_margin_pct)}</span>
+              </div>
+              <div class="pnl-col-ni">
+                <div class="pnl-col-ni-label">Net income${isCurr ? ' (' + src + ')' : ''}</div>
+                <div class="pnl-col-ni-val ${niClass}">${fmt(ni)}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  async function loadMonthDetail(period) {
+    $('pnl-body').innerHTML = `<div class="skel" style="width:100%;height:160px;border-radius:10px"></div>`;
+    try {
+      const pnl = await api(`/finance/pnl/live?period=month:${period}`);
+      const cur  = pnl.current ?? pnl;
+      const byChannel = cur.revenue?.by_channel ?? {};
+      const gross     = cur.revenue?.gross ?? cur.revenue?.total ?? 0;
+      const ni        = cur.net_income ?? (pnl.net_income ?? null);
+      const niClass   = (ni ?? 0) >= 0 ? 'positive' : 'negative';
+
+      const chRows = Object.entries(byChannel)
+        .filter(([, v]) => v > 0)
+        .sort(([,a],[,b]) => b - a)
+        .map(([ch, amt]) => {
+          const label = CH_LABEL[ch] ?? ch;
+          const color = CH_COLOR[ch] ?? '#4A4A44';
+          return `
+            <div class="pnl-detail-ch-row">
+              <div class="ch-dot" style="background:${color};flex-shrink:0"></div>
+              <div class="pnl-detail-ch-name">${label}</div>
+              <div class="pnl-detail-ch-amt">${fmt(amt)}</div>
+            </div>
+          `;
+        }).join('');
+
+      $('pnl-body').innerHTML = `
+        <div class="pnl-detail fade">
+          <div class="pnl-detail-header">
+            <div class="pnl-detail-month">${fmtMonth(period)}</div>
+            ${ni != null
+              ? `<div class="pnl-detail-ni ${niClass}">NI ${fmt(ni)}</div>`
+              : ''}
+          </div>
+          <div class="pnl-detail-channels">${chRows || '<div class="err-note">No channel breakdown available</div>'}</div>
+          <div class="pnl-detail-total-row">
+            <span class="pnl-detail-total-label">Total Revenue</span>
+            <span class="pnl-detail-total-amt">${fmt(gross)}</span>
+          </div>
+        </div>
+      `;
+    } catch(e) {
+      $('pnl-body').innerHTML = `<div class="err-note">Could not load ${fmtMonth(period)}: ${e.message}</div>`;
+    }
+  }
+
+  function buildPnlTabs(months) {
+    const tabsEl = $('pnl-tabs');
+    // One tab per quad month (newest → oldest from right to left)
+    const sorted = [...months].reverse(); // most recent first
+    let html = `
+      <button class="pnl-tab active" data-period="quad" onclick="switchPnl('quad',this)">
+        All months
+      </button>
+    `;
+    sorted.forEach(m => {
+      const isCurr = m.is_current;
+      html += `
+        <button class="pnl-tab ${isCurr ? 'current-month' : ''}"
+                data-period="${m.period}"
+                onclick="switchPnl('${m.period}',this)">
+          ${fmtMonth(m.period)}${isCurr ? ' ·' : ''}
+        </button>
+      `;
+    });
+    html += `
+      <input type="month" class="pnl-picker" id="pnl-picker"
+             title="Pick any month"
+             onchange="switchPnl(this.value, null)"
+             max="${sorted[0]?.period ?? ''}" min="2025-01">
+    `;
+    tabsEl.innerHTML = html;
+  }
+
+  window.switchPnl = function(period, btn) {
+    activePeriod = period;
+    // Update tab styles
+    document.querySelectorAll('.pnl-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    if (period === 'quad' && quadData) {
+      $('pnl-body').innerHTML = renderQuad(quadData.months);
+    } else if (period && period !== 'quad') {
+      loadMonthDetail(period);
+    }
+  };
+
+  // ── Render: cash ─────────────────────────────────────────────────
+  function renderCash(cash) {
+    const total = cash.total ?? 0;
+    const asOf  = cash.as_of;
+    const breakdown = cash.breakdown ?? [];
+
+    $('cash-big').className = 'cash-big fade';
+    $('cash-big').textContent = fmt(total);
+    $('cash-sub').textContent = `Updated ${timeSince(asOf)}`;
+
+    $('cash-accounts').innerHTML = breakdown.map(a => {
+      const name = a.account_name.replace(/Mercury /, '').replace(/•+/, '···');
+      return `
+        <div class="cash-account-row">
+          <span>${name}</span>
+          <span class="cash-account-amt">${fmt(a.balance)}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ── Render: liquidity ────────────────────────────────────────────
+  function renderLiquidity(liq) {
+    const t   = liq.trough?.p50 ?? {};
+    const t10 = liq.trough?.p10 ?? {};
+    const floor = liq.floor ?? 15000;
+    const date  = t.date ? fmtDate(t.date + 'T00:00:00') : '—';
+    const bal   = t.balance ?? null;
+    const isWarn = t.below_floor || (bal != null && bal < floor);
+    const goesNeg = t.goes_negative || t10.goes_negative || (bal != null && bal < 0);
+
+    let sentence = '';
+    if (bal == null) {
+      sentence = 'Liquidity data unavailable.';
+    } else if (goesNeg) {
+      sentence = `Cash is projected to go <span class="liq-warn">negative (${fmt(bal)})</span>
+        around <span class="liq-date">${date}</span> at the p50 scenario.
+        The $15k payroll floor is breached. Review AR collections and wholesale timing.`;
+    } else if (isWarn) {
+      sentence = `Cash dips below the $${(floor/1000).toFixed(0)}k payroll floor to
+        <span class="liq-warn">${fmt(bal)}</span> around <span class="liq-date">${date}</span>.
+        On the optimistic path (p90) it holds above floor.`;
+    } else {
+      sentence = `Cash stays above the $${(floor/1000).toFixed(0)}k payroll floor through
+        <span class="liq-date">${date}</span>.
+        Projected trough: <span class="liq-ok">${fmt(bal)}</span>.`;
+    }
+
+    $('liq-body').innerHTML = `
+      <div class="fade">
+        <div class="liq-sentence">${sentence}</div>
+        <div class="liq-floor-row">
+          <span class="liq-floor-label">Payroll floor</span>
+          <span class="liq-floor-val">${fmt(floor)} / one biweekly run</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Data load ─────────────────────────────────────────────────────
+  async function init() {
+    const [beResult, quadResult, cashResult, liqResult] = await Promise.allSettled([
+      api('/finance/forecasting/breakeven-tracker'),
+      api('/finance/monthly-pl/quad'),
+      api('/finance/canonical/cash-on-hand'),
+      api('/finance/forecasting/liquidity?horizon=90'),
+    ]);
+
+    // Break-even
+    if (beResult.status === 'fulfilled') {
+      renderBreakeven(beResult.value);
+    } else {
+      $('be-num').className = '';
+      $('be-num').innerHTML = `<div class="err-note">Break-even unavailable: ${beResult.reason?.message ?? 'error'}</div>`;
+    }
+
+    // Quad P&L
+    if (quadResult.status === 'fulfilled') {
+      quadData = quadResult.value;
+      buildPnlTabs(quadData.months);
+      $('pnl-body').innerHTML = renderQuad(quadData.months);
+    } else {
+      $('pnl-tabs').innerHTML = '';
+      $('pnl-body').innerHTML = `<div class="err-note">P&L unavailable: ${quadResult.reason?.message ?? 'error'}</div>`;
+    }
+
+    // Cash
+    if (cashResult.status === 'fulfilled') {
+      renderCash(cashResult.value);
+    } else {
+      $('cash-big').textContent = '—';
+      $('cash-sub').innerHTML = `<span class="err-note">Cash data unavailable</span>`;
+    }
+
+    // Liquidity
+    if (liqResult.status === 'fulfilled') {
+      renderLiquidity(liqResult.value);
+    } else {
+      $('liq-body').innerHTML = `<div class="err-note">Liquidity data unavailable</div>`;
+    }
+  }
+
+  // ── Bootstrap ────────────────────────────────────────────────────
+  // Check for a valid existing session; show auth screen if none.
+  (function bootstrap() {
+    $('hdr-date').textContent = new Date().toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+    });
+    if (getSession()) {
+      showApp();
+      init();
+    } else {
+      showAuth();
+    }
+  })();
+</script>
+</body>
+</html>
