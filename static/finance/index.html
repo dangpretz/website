@@ -655,6 +655,364 @@
       text-align: center;
       min-height: 16px;
     }
+
+    /* ── Tab navigation ──────────────────────────────────── */
+    .tab-nav {
+      display: flex;
+      gap: 2px;
+      padding: 0 0 0 0;
+      border-bottom: 1px solid var(--border-faint);
+      margin-bottom: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tab-nav::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 12px 18px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text-mid); }
+    .tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
+    .tab-panel { display: none; padding: 32px 0 80px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Glance row ──────────────────────────────────────── */
+    .glance-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 24px 0 0;
+    }
+    .glance-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      position: relative;
+    }
+    .glance-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .glance-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      line-height: 1;
+    }
+    .glance-num.pos { color: var(--amber); }
+    .glance-num.neg { color: var(--terra); }
+    .glance-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 5px;
+    }
+    .glance-chip {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-top: 6px;
+    }
+    .glance-chip.red { background: rgba(217,122,82,0.15); color: var(--terra); }
+    .glance-chip.amber { background: rgba(200,165,90,0.12); color: var(--amber); }
+    .glance-chip.green { background: rgba(122,158,130,0.12); color: var(--sage); }
+
+    /* ── Interpretation panel ────────────────────────────── */
+    .interp-panel {
+      margin-top: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      transition: border-color 0.4s ease;
+    }
+    .interp-panel.tone-calm    { border-color: rgba(122,158,130,0.35); }
+    .interp-panel.tone-attention { border-color: rgba(200,165,90,0.45); }
+    .interp-panel.tone-urgent  { border-color: rgba(217,122,82,0.55); }
+    .interp-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .interp-tone-chip {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .interp-tone-chip.calm    { background: rgba(122,158,130,0.12); color: var(--sage); }
+    .interp-tone-chip.attention { background: rgba(200,165,90,0.12); color: var(--amber); }
+    .interp-tone-chip.urgent  { background: rgba(217,122,82,0.12); color: var(--terra); }
+    .interp-freshness {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+    .interp-narrative {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    .interp-watch {
+      padding: 10px 14px;
+      border-radius: 7px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+    .interp-watch.calm    { background: rgba(122,158,130,0.08); border-left: 3px solid var(--sage); }
+    .interp-watch.attention { background: rgba(200,165,90,0.08); border-left: 3px solid var(--amber); }
+    .interp-watch.urgent  { background: rgba(217,122,82,0.08); border-left: 3px solid var(--terra); }
+    .interp-watch-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    .interp-highlights {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .interp-highlight-chip {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      padding: 4px 10px;
+      background: var(--surface-hi);
+      border-radius: 20px;
+      color: var(--text-mid);
+    }
+    .interp-explainer-toggle {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .interp-explainer-toggle:hover { color: var(--text-mid); }
+    .interp-explainer {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-faint);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      line-height: 1.75;
+      color: var(--text-mid);
+      display: none;
+    }
+    .interp-explainer.open { display: block; }
+    .interp-explainer strong { color: var(--text); }
+
+    /* ── Section label (reuse, tabs version) ─────────────── */
+    .s-head {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+    }
+    .s-gap { margin-top: 28px; }
+
+    /* ── Generic card ────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    .card-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+    .card-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+    /* ── Table ───────────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-mid);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border-faint);
+      vertical-align: top;
+    }
+    .data-table td.num { text-align: right; color: var(--text); }
+    .data-table td.warn { color: var(--terra); }
+    .data-table td.ok   { color: var(--sage); }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr.expandable { cursor: pointer; }
+    .data-table tr.expandable:hover td { background: var(--surface-hi); }
+    .data-table tr.expand-row td { background: var(--surface-hi); padding: 12px 10px 12px 24px; }
+
+    /* ── Source-type chip ────────────────────────────────── */
+    .src-chip {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--surface-hi);
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+    }
+    .src-chip.reversal { background: rgba(217,122,82,0.1); color: var(--terra); }
+
+    /* ── Aging waterfall ────────────────────────────────── */
+    .aging-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .aging-bucket-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      min-width: 60px;
+    }
+    .aging-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+    }
+    .aging-bar-fill { height: 100%; border-radius: 3px; }
+    .aging-bar-amt {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      min-width: 72px;
+      text-align: right;
+    }
+
+    /* ── SVG chart ───────────────────────────────────────── */
+    .chart-wrap { width: 100%; overflow: hidden; }
+    .chart-wrap svg { width: 100%; display: block; }
+
+    /* ── Inline number row ───────────────────────────────── */
+    .num-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .num-row:last-child { border-bottom: none; }
+    .num-row-key {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: var(--text-mid);
+    }
+    .num-row-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .num-row-val.pos { color: var(--amber); }
+    .num-row-val.neg { color: var(--terra); }
+
+    /* ── Calendar rows ────────────────────────────────────── */
+    .cal-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .cal-row:last-child { border-bottom: none; }
+    .cal-who { font-size: 12px; color: var(--text-mid); }
+    .cal-when { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-dim); }
+    .cal-amt  { font-family: 'DM Mono', monospace; font-size: 12px; }
+    .cal-amt.in  { color: var(--sage); }
+    .cal-amt.out { color: var(--terra); }
+
+    /* ── Meter bar (probability) ─────────────────────────── */
+    .meter-wrap { margin: 8px 0; }
+    .meter-track {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .meter-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--amber);
+      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+    .meter-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* ── Responsive additions ────────────────────────────── */
+    @media (max-width: 700px) {
+      .glance-row { grid-template-columns: 1fr 1fr; }
+      .card-grid-2 { grid-template-columns: 1fr; }
+      .card-grid-3 { grid-template-columns: 1fr 1fr; }
+      .tab-btn { padding: 10px 12px; font-size: 10px; }
+    }
+    @media (max-width: 440px) {
+      .glance-row { grid-template-columns: 1fr; }
+      .card-grid-3 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -682,39 +1040,59 @@
 
 <main class="page" id="main-page" style="display:none">
 
-  <!-- ── BREAK-EVEN ─────────────────────────────────── -->
-  <section class="section">
-    <div class="section-eyebrow">Break-even</div>
-    <div id="be-body">
-      <div class="be-grid">
-        <div>
-          <div class="be-verdict">Month-to-date revenue</div>
-          <div class="be-number skel" style="width:220px;height:80px" id="be-num">&nbsp;</div>
-          <div id="be-meta"></div>
-          <div id="be-bar"></div>
-        </div>
-        <div class="be-right">
-          <div class="be-card">
-            <div class="be-card-label">Monthly target</div>
-            <div class="be-card-num skel" style="width:80px;height:24px" id="be-target">&nbsp;</div>
-            <div class="be-card-sub" id="be-target-sub"></div>
-          </div>
-          <div class="be-card">
-            <div class="be-card-label">This month by channel</div>
-            <div class="be-channels" id="be-channels">
-              <div class="skel" style="width:100%;height:12px;border-radius:3px"></div>
-              <div class="skel" style="width:80%;height:12px;border-radius:3px"></div>
-              <div class="skel" style="width:60%;height:12px;border-radius:3px"></div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <!-- ── ALWAYS-VISIBLE: Glance row + Interpretation ───── -->
+  <div class="glance-row" id="glance-row">
+    <div class="glance-card">
+      <div class="glance-label">MTD Revenue</div>
+      <div class="glance-num skel" style="width:110px;height:28px" id="g-rev">&nbsp;</div>
+      <div class="glance-sub" id="g-rev-sub"></div>
     </div>
-  </section>
+    <div class="glance-card">
+      <div class="glance-label">Break-even gap</div>
+      <div class="glance-num skel" style="width:100px;height:28px" id="g-gap">&nbsp;</div>
+      <div class="glance-sub" id="g-gap-sub"></div>
+    </div>
+    <div class="glance-card">
+      <div class="glance-label">Cash on hand</div>
+      <div class="glance-num skel" style="width:120px;height:28px" id="g-cash">&nbsp;</div>
+      <div class="glance-sub" id="g-cash-sub"></div>
+    </div>
+  </div>
 
-  <!-- ── P&L ─────────────────────────────────────────── -->
-  <section class="section">
-    <div class="section-eyebrow">Profit &amp; Loss</div>
+  <div class="interp-panel" id="interp-panel">
+    <div class="interp-header">
+      <span class="interp-tone-chip calm" id="interp-tone">Loading</span>
+      <span class="interp-freshness" id="interp-fresh"></span>
+    </div>
+    <div class="interp-narrative skel" style="height:56px;border-radius:6px" id="interp-narrative">&nbsp;</div>
+    <div class="interp-watch calm" id="interp-watch" style="display:none">
+      <div class="interp-watch-label">Watch</div>
+      <div id="interp-watch-text"></div>
+    </div>
+    <div class="interp-highlights" id="interp-highlights"></div>
+    <button class="interp-explainer-toggle" onclick="toggleExplainer()">
+      Why break-even, P&amp;L, and cash say different things ↓
+    </button>
+    <div class="interp-explainer" id="interp-explainer">
+      <p><strong>Break-even</strong> is a revenue pace target — "are we earning enough each month to cover our costs?" It tells you if the business model is working at current volume.</p>
+      <p style="margin-top:10px"><strong>P&amp;L net income</strong> is whether you're actually making money this period. It can differ from break-even because of timing corrections, non-cash items (depreciation), or one-time charges. You can be above break-even pace but still report a loss.</p>
+      <p style="margin-top:10px"><strong>Cash</strong> is when money physically moves. We can be profitable on paper while cash is tight — this happens when wholesale customers are slow to pay (AR lag), or when a big outflow hits that isn't spread evenly across the month.</p>
+      <p style="margin-top:10px"><strong>Which one to use:</strong> Revenue pace → "should we push harder on sales this week?" · P&amp;L → "is the business structurally profitable?" · Cash trough → "do we need to accelerate collections or delay a purchase?"</p>
+    </div>
+  </div>
+
+  <!-- ── TAB NAVIGATION ──────────────────────────────────── -->
+  <nav class="tab-nav" id="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('this-month',this)">This Month</button>
+    <button class="tab-btn" onclick="switchTab('cash-runway',this)">Cash &amp; Runway</button>
+    <button class="tab-btn" onclick="switchTab('revenue',this)">Revenue</button>
+    <button class="tab-btn" onclick="switchTab('receivables',this)">Receivables</button>
+    <button class="tab-btn" onclick="switchTab('activity',this)">Activity</button>
+  </nav>
+
+  <!-- ── TAB: THIS MONTH ───────────────────────────────────── -->
+  <div class="tab-panel active" id="tab-this-month">
+    <div class="s-head">Profit &amp; Loss</div>
     <div class="pnl-controls" id="pnl-tabs"></div>
     <div id="pnl-body">
       <div class="pnl-quad">
@@ -724,26 +1102,122 @@
         <div class="pnl-col"><div class="skel" style="width:100%;height:120px"></div></div>
       </div>
     </div>
-  </section>
 
-  <!-- ── CASH + LIQUIDITY ──────────────────────────────── -->
-  <section class="section">
-    <div class="section-eyebrow">Cash &amp; Runway</div>
-    <div class="cash-grid">
-      <div class="cash-card">
-        <div class="cash-card-label">On hand now</div>
-        <div class="cash-big skel" style="width:140px;height:40px" id="cash-big">&nbsp;</div>
-        <div class="cash-sub" id="cash-sub"></div>
-        <div class="cash-accounts" id="cash-accounts"></div>
+    <div class="s-gap s-head">Biggest Moves vs Last Month</div>
+    <div id="biggest-moves-body">
+      <div class="skel" style="width:100%;height:60px;border-radius:8px"></div>
+    </div>
+
+    <div class="s-gap s-head">Top Vendors This Month</div>
+    <div id="top-vendors-body">
+      <div class="skel" style="width:100%;height:80px;border-radius:8px"></div>
+    </div>
+
+    <div class="s-gap s-head">Path to Break-even</div>
+    <div id="be-path-body">
+      <div class="skel" style="width:100%;height:56px;border-radius:8px"></div>
+    </div>
+
+    <div class="s-gap s-head">Payroll as % of Revenue (6 months)</div>
+    <div id="payroll-trend-body">
+      <div class="skel" style="width:100%;height:56px;border-radius:8px"></div>
+    </div>
+  </div>
+
+  <!-- ── TAB: CASH & RUNWAY ────────────────────────────────── -->
+  <div class="tab-panel" id="tab-cash-runway">
+    <div class="card-grid-2">
+      <div class="card">
+        <div class="card-label">Cash on hand</div>
+        <div class="glance-num skel" style="width:140px;height:36px" id="cr-cash-big">&nbsp;</div>
+        <div class="cash-accounts" id="cr-cash-accounts" style="margin-top:12px"></div>
       </div>
-      <div class="cash-card">
-        <div class="cash-card-label">90-day outlook</div>
-        <div id="liq-body">
-          <div class="skel" style="width:100%;height:56px;border-radius:6px"></div>
-        </div>
+      <div class="card">
+        <div class="card-label">90-day trough</div>
+        <div id="cr-trough-body"><div class="skel" style="width:100%;height:60px;border-radius:6px"></div></div>
       </div>
     </div>
-  </section>
+
+    <div class="s-gap s-head">Daily Balance Forecast (P10 / P50 / P90)</div>
+    <div class="card" style="margin-top:0">
+      <div class="chart-wrap" id="balance-chart-wrap">
+        <div class="skel" style="width:100%;height:180px;border-radius:6px"></div>
+      </div>
+    </div>
+
+    <div class="s-gap s-head">Next 30 Days — Cash In / Cash Out</div>
+    <div class="card-grid-2" id="cash-calendar-body">
+      <div class="skel" style="height:120px;border-radius:10px"></div>
+      <div class="skel" style="height:120px;border-radius:10px"></div>
+    </div>
+
+    <div class="s-gap s-head">Revenue Probability This Month</div>
+    <div class="card" id="montecarlo-body">
+      <div class="skel" style="width:100%;height:56px;border-radius:6px"></div>
+    </div>
+  </div>
+
+  <!-- ── TAB: REVENUE ──────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-revenue">
+    <div class="s-head">Revenue vs Break-even (12 months)</div>
+    <div class="card" style="margin-top:0">
+      <div class="chart-wrap" id="rev-trend-chart-wrap">
+        <div class="skel" style="width:100%;height:180px;border-radius:6px"></div>
+      </div>
+    </div>
+
+    <div class="s-gap s-head">Channel Mix Over Time</div>
+    <div class="card" id="channel-mix-body">
+      <div class="skel" style="width:100%;height:120px;border-radius:6px"></div>
+    </div>
+
+    <div class="s-gap s-head">Month-end Projection (P10 / P50 / P90)</div>
+    <div class="card" id="montecarlo-channels-body">
+      <div class="skel" style="width:100%;height:80px;border-radius:6px"></div>
+    </div>
+
+    <div class="s-gap s-head">Wholesale Concentration</div>
+    <div class="card" id="wholesale-conc-body">
+      <div class="skel" style="width:100%;height:100px;border-radius:6px"></div>
+    </div>
+  </div>
+
+  <!-- ── TAB: RECEIVABLES ──────────────────────────────────── -->
+  <div class="tab-panel" id="tab-receivables">
+    <div class="s-head">AR Aging</div>
+    <div class="card" style="margin-top:0" id="aging-body">
+      <div class="skel" style="width:100%;height:100px;border-radius:6px"></div>
+    </div>
+
+    <div class="s-gap s-head">By Customer</div>
+    <div class="card" id="ar-customers-body">
+      <div class="skel" style="width:100%;height:120px;border-radius:6px"></div>
+    </div>
+
+    <div class="s-gap s-head">Unbooked Wholesale Cash</div>
+    <div class="card" id="unbooked-body">
+      <div class="skel" style="width:100%;height:56px;border-radius:6px"></div>
+    </div>
+
+    <div class="s-gap s-head">AR → Cash Trough Connection</div>
+    <div class="card" id="ar-trough-body">
+      <div class="skel" style="width:100%;height:40px;border-radius:6px"></div>
+    </div>
+  </div>
+
+  <!-- ── TAB: ACTIVITY ─────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-activity">
+    <div class="s-head">Categorization Pipeline (view only)</div>
+    <div class="card" id="queue-body">
+      <div class="skel" style="width:100%;height:80px;border-radius:6px"></div>
+    </div>
+
+    <div class="s-gap s-head">GL Transaction Log</div>
+    <div class="pnl-controls" id="gl-controls" style="margin-top:0"></div>
+    <div class="card" id="gl-body">
+      <div class="skel" style="width:100%;height:120px;border-radius:6px"></div>
+    </div>
+  </div>
 
 </main>
 
@@ -756,6 +1230,11 @@
 
   // ── Helpers ─────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function jss(s) { return String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
   function fmt(n, decimals = 0) {
     if (n == null || isNaN(n)) return '—';
@@ -910,6 +1389,155 @@
     Other:                '#4A4A44',
   };
 
+  // ── Tab switching ─────────────────────────────────────────────────
+  let activeTab = 'this-month';
+  const tabLoaded = {};
+
+  window.switchTab = function(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const panel = document.getElementById('tab-' + tab);
+    if (panel) panel.classList.add('active');
+    activeTab = tab;
+    // Lazy-load tab data on first visit
+    if (!tabLoaded[tab]) {
+      tabLoaded[tab] = true;
+      if (tab === 'cash-runway') loadCashRunwayTab();
+      if (tab === 'revenue')     loadRevenueTab();
+      if (tab === 'receivables') loadReceivablesTab();
+      if (tab === 'activity')    loadActivityTab();
+    }
+  };
+
+  // ── Explainer toggle ──────────────────────────────────────────────
+  window.toggleExplainer = function() {
+    const el = $('interp-explainer');
+    el.classList.toggle('open');
+    document.querySelector('.interp-explainer-toggle').textContent =
+      el.classList.contains('open')
+        ? 'Why break-even, P&L, and cash say different things ↑'
+        : 'Why break-even, P&L, and cash say different things ↓';
+  };
+
+  // ── Interpretation: rule-based fallback ───────────────────────────
+  // Called when page-narrative is stale (>24h) or the endpoint fails.
+  // Uses signals already fetched in init() from breakeven-tracker, pnl/live,
+  // liquidity, and ar-aging.
+  function buildFallbackNarrative(signals) {
+    const { gap, ni, troughDate, troughBal, troughGoesNeg, overdueAr } = signals;
+    // STEP 1: pick lead signal
+    let lead = '';
+    let tone = 'calm';
+    const daysToTrough = troughDate
+      ? Math.round((new Date(troughDate) - Date.now()) / 86400000) : 999;
+
+    if (troughGoesNeg && daysToTrough < 45) {
+      tone = 'urgent';
+      lead = `Cash is the urgent story — the pessimistic scenario shows a potential negative balance around ${fmtDate(troughDate + 'T00:00:00')}`;
+    } else if (ni != null && ni < -2000) {
+      tone = 'attention';
+      lead = `You're operating at a loss this month (${fmt(ni)} net income)`;
+    } else if (gap < -3000) {
+      tone = 'attention';
+      lead = `You're tracking below the revenue pace needed for break-even`;
+    } else {
+      tone = 'calm';
+      lead = `You're tracking at or above break-even pace`;
+    }
+
+    // STEP 2: contrast
+    let contrast = '';
+    if (tone === 'urgent' && ni != null && ni > 0) {
+      contrast = ` — even though the P&L shows a profit this month (${fmt(ni)} net). This disconnect is normal: profit is about revenue recognition timing; cash is about when customers actually pay.`;
+    } else if (tone === 'urgent' && ni != null && ni < 0) {
+      contrast = ` — and the P&L confirms it: ${fmt(ni)} net income this month.`;
+    } else if (tone === 'attention' && ni != null && ni < -2000 && troughBal > 15000) {
+      contrast = ` — but cash is stable (${fmt(troughBal)} trough). This is a profitability story, not a liquidity emergency.`;
+    } else if (tone === 'attention' && gap < -3000 && ni != null && ni > 0) {
+      contrast = ` — but you're actually profitable this month (${fmt(ni)} net) because costs came in under plan.`;
+    } else if (tone === 'calm' && troughDate != null && troughBal != null && troughBal < 15000) {
+      contrast = `. Watch the cash forecast: trough of ${fmt(troughBal)} near ${fmtDate(troughDate + 'T00:00:00')}.`;
+    } else if (tone === 'calm' && ni != null) {
+      contrast = `. P&L confirms it: ${fmt(ni)} net income.`;
+    }
+
+    // STEP 3: what to watch
+    let watch = '';
+    if (troughGoesNeg || (troughBal != null && troughBal < 0)) {
+      watch = 'Accelerate AR collections — the cash crunch is driven by collection timing, not profitability.';
+    } else if (overdueAr > 5000) {
+      watch = `${fmt(overdueAr)} in 60+ day overdue receivables. Collection pace is the cash variable.`;
+    } else if (gap < -3000) {
+      watch = `Revenue pace is the variable — run-rate is ${fmt(Math.abs(gap))} below break-even target.`;
+    } else if (ni != null && ni < -2000) {
+      watch = 'The loss is modest. Watch the 3-month trend rather than this single month.';
+    } else {
+      watch = troughDate
+        ? `Next checkpoint: ${fmtDate(troughDate + 'T00:00:00')} cash minimum of ${fmt(troughBal)}.`
+        : 'No immediate watch items.';
+    }
+
+    return { narrative: lead + contrast, watch, tone, mode: 'summary' };
+  }
+
+  // ── Render interpretation panel ───────────────────────────────────
+  function renderInterpretation(data, mode) {
+    // mode: 'live' (from page-narrative) | 'summary' (rule-based fallback)
+    const tone = data.overall_tone ?? data.tone ?? 'calm';
+    const panel = $('interp-panel');
+    panel.className = `interp-panel tone-${tone}`;
+
+    const chip = $('interp-tone');
+    chip.className = `interp-tone-chip ${tone}`;
+    chip.textContent = tone === 'urgent' ? 'Urgent' : tone === 'attention' ? 'Attention' : 'On track';
+
+    $('interp-fresh').textContent = mode === 'live'
+      ? `live · ${data.generated_at ? timeSince(data.generated_at) : ''}`
+      : 'summary view';
+
+    const narr = $('interp-narrative');
+    narr.className = 'interp-narrative fade';
+    narr.textContent = data.narrative ?? '';
+
+    const watchText = data.single_thing_to_watch ?? data.watch ?? '';
+    if (watchText) {
+      $('interp-watch').className = `interp-watch ${tone}`;
+      $('interp-watch').style.display = '';
+      $('interp-watch-text').textContent = watchText;
+    }
+
+    const highlights = data.highlights ?? [];
+    $('interp-highlights').innerHTML = highlights.map(h =>
+      `<span class="interp-highlight-chip">${h}</span>`
+    ).join('');
+  }
+
+  // ── Load interpretation (Sonnet narrative with rule-based fallback) ─
+  async function loadInterpretation(signals) {
+    try {
+      const data = await api('/finance/page-narrative');
+      // Check freshness: stale if >24h
+      const ageHours = data.generated_at
+        ? (Date.now() - new Date(data.generated_at)) / 3600000 : 999;
+      if (data.ok && data.narrative && ageHours < 24) {
+        renderInterpretation(data, 'live');
+        return;
+      }
+      // Stale — fall through to rule-based
+      throw new Error('stale');
+    } catch {
+      // Fallback: compose from live signals already fetched
+      if (signals) {
+        const fb = buildFallbackNarrative(signals);
+        renderInterpretation(fb, 'summary');
+      } else {
+        $('interp-narrative').className = 'interp-narrative';
+        $('interp-narrative').textContent = 'Interpretation unavailable — refresh to retry.';
+      }
+    }
+  }
+
   // ── Render: break-even ───────────────────────────────────────────
   function renderBreakeven(be) {
     const mtdRev    = be.mtd?.total_gl ?? 0;
@@ -1049,9 +1677,9 @@
           const label = CH_LABEL[ch] ?? ch;
           const color = CH_COLOR[ch] ?? '#4A4A44';
           return `
-            <div class="pnl-detail-ch-row">
+            <div class="pnl-detail-ch-row expandable" onclick="drillChannel(event,'revenue','${jss(ch)}','${period}','${jss(label)}')" title="Click to see account breakdown">
               <div class="ch-dot" style="background:${color};flex-shrink:0"></div>
-              <div class="pnl-detail-ch-name">${label}</div>
+              <div class="pnl-detail-ch-name">${label} <span style="color:var(--text-dim);font-size:10px">↓</span></div>
               <div class="pnl-detail-ch-amt">${fmt(amt)}</div>
             </div>
           `;
@@ -1118,6 +1746,806 @@
     }
   };
 
+  // ── This Month tab: extras ──────────────────────────────────────────
+  async function loadThisMonthExtras() {
+    const [vendorsResult, beResult, trendsResult] = await Promise.allSettled([
+      api('/finance/pnl/top-vendors?period=mtd&limit=10'),
+      api('/finance/breakeven'),
+      api('/finance/trends?months=6'),
+    ]);
+
+    // Biggest moves (from quad.biggest_expense_moves)
+    if (quadData?.biggest_expense_moves?.length) {
+      const moves = quadData.biggest_expense_moves;
+      $('biggest-moves-body').innerHTML = `
+        <div class="card">
+          <table class="data-table">
+            <thead><tr>
+              <th>Account</th><th>This month</th><th>Prior</th><th>Change</th>
+            </tr></thead>
+            <tbody>
+              ${moves.map(m => {
+                const delta = m.current - (m.prior ?? 0);
+                const cls = delta > 0 ? 'neg' : 'pos';
+                return `<tr>
+                  <td>${esc(m.account_name)}</td>
+                  <td class="num">${fmt(m.current)}</td>
+                  <td class="num">${fmt(m.prior ?? 0)}</td>
+                  <td class="num ${cls}">${delta > 0 ? '+' : ''}${fmt(delta)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      $('biggest-moves-body').innerHTML = `<div class="err-note">No expense move data available</div>`;
+    }
+
+    // Top vendors
+    if (vendorsResult.status === 'fulfilled') {
+      const vd = vendorsResult.value;
+      const vendors = vd.vendors ?? [];
+      $('top-vendors-body').innerHTML = `
+        <div class="card">
+          <table class="data-table">
+            <thead><tr>
+              <th>Vendor</th><th>This month</th><th>Category</th><th>vs Prior</th>
+            </tr></thead>
+            <tbody>
+              ${vendors.map(v => {
+                const delta = v.pct_change ?? 0;
+                const arrow = delta > 10 ? '↑' : delta < -10 ? '↓' : '→';
+                const cls = delta > 10 ? 'warn' : delta < -10 ? 'ok' : '';
+                return `<tr>
+                  <td>${esc(v.counterparty)}</td>
+                  <td class="num">${fmt(v.total)}</td>
+                  <td style="color:var(--text-dim)">${v.primary_category ?? '—'}</td>
+                  <td class="num ${cls}">${arrow} ${Math.round(Math.abs(delta))}%</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      $('top-vendors-body').innerHTML = `<div class="err-note">Vendor data unavailable</div>`;
+    }
+
+    // Break-even path levers
+    if (beResult.status === 'fulfilled') {
+      const be = beResult.value;
+      const paths = be.paths_to_close ?? [];
+      if (paths.length) {
+        const levers = paths.map(p => {
+          let label = '', val = '';
+          if (p.type === 'add_wholesale_revenue') { label = 'Add wholesale revenue'; val = fmt(p.amount) + '/mo'; }
+          else if (p.type === 'reduce_payroll')   { label = 'Reduce payroll'; val = fmt(p.amount) + '/mo'; }
+          else if (p.type === 'improve_cogs')     { label = 'Improve COGS'; val = `${p.amount?.toFixed(1) ?? '?'} pp`; }
+          else { label = p.type; val = ''; }
+          return `<div class="num-row"><span class="num-row-key">${label}</span><span class="num-row-val">${val}</span></div>`;
+        }).join('');
+        $('be-path-body').innerHTML = `
+          <div class="card">
+            <div class="card-label">To close the break-even gap, you'd need one of:</div>
+            ${levers}
+          </div>
+        `;
+      } else {
+        $('be-path-body').innerHTML = `<div class="card"><div style="color:var(--sage);font-family:'DM Mono',monospace;font-size:13px">Already at or above break-even — no gap to close.</div></div>`;
+      }
+    } else {
+      $('be-path-body').innerHTML = `<div class="err-note">Break-even path unavailable</div>`;
+    }
+
+    // Payroll % trend (6 months)
+    if (trendsResult.status === 'fulfilled') {
+      const series = (trendsResult.value.monthly_series ?? []).slice(-6);
+      if (series.length) {
+        const rows = series.map(m => {
+          const pct = m.payroll_pct ?? 0;
+          const bar = Math.min(pct * 2.5, 100); // scale: 40% => full bar
+          return `<div class="aging-bar-row">
+            <div class="aging-bucket-label">${fmtMonth(m.month)}</div>
+            <div class="aging-bar-track">
+              <div class="aging-bar-fill" style="width:${bar.toFixed(1)}%;background:var(--slate);opacity:0.75"></div>
+            </div>
+            <div class="aging-bar-amt">${pct.toFixed(1)}%</div>
+          </div>`;
+        }).join('');
+        $('payroll-trend-body').innerHTML = `<div class="card">${rows}</div>`;
+      } else {
+        $('payroll-trend-body').innerHTML = `<div class="err-note">Trend data unavailable</div>`;
+      }
+    } else {
+      $('payroll-trend-body').innerHTML = `<div class="err-note">Trend data unavailable</div>`;
+    }
+  }
+
+  // ── P&L drill: click channel → load account-lines ─────────────────
+  window.drillChannel = async function(evt, section, channel, period, label) {
+    const drillId = `drill-${section}-${channel}`.replace(/[^a-zA-Z0-9-]/g, '_');
+    const existing = document.getElementById(drillId);
+    if (existing) { existing.remove(); return; } // toggle off
+
+    const parentRow = evt.currentTarget.closest('.pnl-detail-ch-row');
+    if (!parentRow) return;
+
+    const drillEl = document.createElement('div');
+    drillEl.id = drillId;
+    drillEl.style.cssText = 'background:var(--surface-hi);border-radius:6px;padding:10px 14px;margin:4px 0;';
+    drillEl.innerHTML = `<div class="skel" style="width:100%;height:40px;border-radius:4px"></div>`;
+    parentRow.insertAdjacentElement('afterend', drillEl);
+
+    try {
+      const params = new URLSearchParams({ section, period: `month:${period}`, limit: '50' });
+      if (channel) params.set('channel', channel);
+      const data = await api('/finance/pnl/account-lines?' + params);
+      const lines = data.lines ?? [];
+      drillEl.innerHTML = lines.length
+        ? `<table class="data-table">
+            <thead><tr><th>Account</th><th>JEs</th><th>Date range</th><th>Amount</th></tr></thead>
+            <tbody>${lines.map(l => `<tr>
+              <td>${esc(l.account)}</td>
+              <td class="num" style="color:var(--text-dim)">${l.je_line_count}</td>
+              <td style="color:var(--text-dim);font-size:10px">${l.first_entry_date?.slice(5) ?? ''}–${l.last_entry_date?.slice(5) ?? ''}</td>
+              <td class="num">${fmt(l.amount)}</td>
+            </tr>`).join('')}</tbody>
+           </table>`
+        : `<div style="color:var(--text-dim);font-size:11px;font-family:'DM Mono',monospace">No detail lines found</div>`;
+    } catch(e) {
+      drillEl.innerHTML = `<div class="err-note">Drill failed: ${e.message}</div>`;
+    }
+  };
+
+  // ── Cash & Runway tab ────────────────────────────────────────────────
+  async function loadCashRunwayTab() {
+    const [liqResult, scoreResult, mcResult] = await Promise.allSettled([
+      // Reuse cached _liqData if available
+      window._liqData ? Promise.resolve(window._liqData) : api('/finance/forecasting/liquidity?horizon=90'),
+      api('/finance/scorecard'),
+      api('/finance/projection/montecarlo'),
+    ]);
+
+    // Cash card (reuse from _cashData if available)
+    if (window._cashData) {
+      const cash = window._cashData;
+      $('cr-cash-big').className = 'glance-num fade';
+      $('cr-cash-big').textContent = fmt(cash.total ?? 0);
+      $('cr-cash-accounts').innerHTML = (cash.breakdown ?? []).map(a => `
+        <div class="cash-account-row">
+          <span>${esc(a.account_name.replace(/Mercury /, '').replace(/•+/, '···'))}</span>
+          <span class="cash-account-amt">${fmt(a.balance)}</span>
+        </div>
+      `).join('');
+    }
+
+    // Trough callout
+    if (liqResult.status === 'fulfilled') {
+      const liq = liqResult.value;
+      const t50 = liq.trough?.p50 ?? {};
+      const t10 = liq.trough?.p10 ?? {};
+      const driver = liq.trough?.concentration_driver ?? {};
+      const lever  = liq.trough?.ar_slip_lever ?? {};
+      const date50 = t50.date ? fmtDate(t50.date + 'T00:00:00') : '—';
+      const isNeg  = t10.goes_negative;
+
+      $('cr-trough-body').innerHTML = `
+        <div class="fade">
+          ${isNeg ? `<div class="glance-chip red" style="display:block;margin-bottom:8px">Negative balance risk</div>` : ''}
+          <div class="glance-num ${isNeg ? 'neg' : (t50.below_floor ? 'neg' : '')}">${fmt(t50.balance)}</div>
+          <div class="glance-sub">P50 trough · ${date50}</div>
+          <div class="glance-sub" style="margin-top:4px">
+            P10: ${fmt(t10.balance)} · P90: ${fmt(liq.trough?.p90?.balance)}
+          </div>
+          ${driver.customer ? `<div style="margin-top:10px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-mid)">
+            Driven by: <strong style="color:var(--text)">${esc(driver.customer)}</strong>
+          </div>` : ''}
+          ${lever.node ? `<div style="margin-top:6px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-mid)">
+            If <strong style="color:var(--text)">${esc(lever.node)}</strong> pays ${lever.slip_days} days late → trough drops ${fmt(lever.amount)}
+          </div>` : ''}
+          ${liq.trough?.readout ? `<div class="interp-watch attention" style="margin-top:12px">
+            <div class="interp-watch-label">Readout</div>
+            <div>${esc(liq.trough.readout)}</div>
+          </div>` : ''}
+        </div>
+      `;
+
+      // Daily balance chart (inline SVG)
+      const daily = liq.running_balance ?? [];
+      if (daily.length > 1) renderBalanceChart(daily, liq.trough?.cash_floor ?? 15000);
+      else $('balance-chart-wrap').innerHTML = `<div class="err-note">Daily series unavailable</div>`;
+    } else {
+      $('cr-trough-body').innerHTML = `<div class="err-note">Liquidity data unavailable</div>`;
+    }
+
+    // Next 30-day cash calendar
+    if (scoreResult.status === 'fulfilled') {
+      const sc = scoreResult.value;
+      const ar30 = sc.ar_30d?.top_5_expected ?? [];
+      const bills = [
+        ...(sc.bills_30d?.next_week ?? []),
+        ...(sc.bills_30d?.next_2_week ?? []),
+        ...(sc.bills_30d?.next_3_4_week ?? []),
+      ].slice(0, 8);
+
+      const inRows = ar30.map(a => `
+        <div class="cal-row">
+          <div>
+            <div class="cal-who">${esc(a.customer)}</div>
+            <div class="cal-when">${a.due_date ? fmtDate(a.due_date + 'T00:00:00') : '—'} · ${a.days_out ?? '?'}d</div>
+          </div>
+          <div class="cal-amt in">${fmt(a.amount)}</div>
+        </div>
+      `).join('') || `<div style="color:var(--text-dim);font-size:11px;font-family:'DM Mono',monospace;padding:8px 0">No AR due in 30 days</div>`;
+
+      const outRows = bills.map(b => `
+        <div class="cal-row">
+          <div>
+            <div class="cal-who">${esc(b.vendor)}</div>
+            <div class="cal-when">${b.due_date ? fmtDate(b.due_date + 'T00:00:00') : '—'}</div>
+          </div>
+          <div class="cal-amt out">${fmt(b.amount)}</div>
+        </div>
+      `).join('') || `<div style="color:var(--text-dim);font-size:11px;font-family:'DM Mono',monospace;padding:8px 0">No bills due in 30 days</div>`;
+
+      $('cash-calendar-body').innerHTML = `
+        <div class="card">
+          <div class="card-label">Expected in (AR)</div>
+          ${inRows}
+        </div>
+        <div class="card">
+          <div class="card-label">Scheduled out (Bills)</div>
+          ${outRows}
+        </div>
+      `;
+    } else {
+      $('cash-calendar-body').innerHTML = `<div class="err-note">Scorecard unavailable</div>`;
+    }
+
+    // Monte Carlo probability
+    if (mcResult.status === 'fulfilled') {
+      const mc = mcResult.value;
+      const pct = mc.headline?.p_clear_break_even_pct ?? 0;
+      const p10 = mc.total?.p10 ?? mc.headline?.total_p10;
+      const p50 = mc.total?.p50 ?? mc.headline?.total_p50;
+      const p90 = mc.total?.p90 ?? mc.headline?.total_p90;
+      $('montecarlo-body').innerHTML = `
+        <div class="card-label">Probability of clearing break-even this month</div>
+        <div class="glance-num ${pct >= 50 ? 'pos' : 'neg'}">${Math.round(Math.min(Math.max(pct, 0), 100))}%</div>
+        <div class="meter-wrap" style="margin-top:12px">
+          <div class="meter-track"><div class="meter-fill" style="width:${Math.min(pct,100).toFixed(1)}%"></div></div>
+          <div class="meter-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+        </div>
+        <div class="glance-sub" style="margin-top:10px">
+          Revenue range: ${fmt(p10)} (P10) · ${fmt(p50)} (P50) · ${fmt(p90)} (P90)
+        </div>
+        ${mc.risk?.readout ? `<div class="interp-watch attention" style="margin-top:12px">
+          <div class="interp-watch-label">Risk</div>
+          <div>${esc(mc.risk.readout)}</div>
+        </div>` : ''}
+      `;
+    } else {
+      $('montecarlo-body').innerHTML = `<div class="err-note">Monte Carlo unavailable</div>`;
+    }
+  }
+
+  // ── Balance chart: inline SVG ──────────────────────────────────────
+  function renderBalanceChart(daily, floor) {
+    const W = 840, H = 180, PAD = { top: 12, right: 12, bottom: 24, left: 52 };
+    const iW = W - PAD.left - PAD.right;
+    const iH = H - PAD.top - PAD.bottom;
+
+    const p50s = daily.map(d => d.p50 ?? 0);
+    const p10s = daily.map(d => d.p10 ?? 0);
+    const p90s = daily.map(d => d.p90 ?? 0);
+    const allVals = [...p50s, ...p10s, ...p90s, floor, 0];
+    const minV = Math.min(...allVals);
+    const maxV = Math.max(...allVals);
+    const rangeV = maxV - minV || 1;
+
+    const xScale = i => PAD.left + (i / (daily.length - 1)) * iW;
+    const yScale = v => PAD.top + iH - ((v - minV) / rangeV) * iH;
+
+    const pts50  = daily.map((_, i) => `${xScale(i)},${yScale(p50s[i])}`).join(' ');
+    const pts90  = daily.map((_, i) => `${xScale(i)},${yScale(p90s[i])}`).join(' ');
+    const pts10  = daily.map((_, i) => `${xScale(i)},${yScale(p10s[i])}`).join(' ');
+    // Band polygon: p90 forward then p10 backward
+    const bandPts = [
+      ...daily.map((_, i) => `${xScale(i)},${yScale(p90s[i])}`),
+      ...[...daily].reverse().map((_, i) => `${xScale(daily.length-1-i)},${yScale(p10s[daily.length-1-i])}`),
+    ].join(' ');
+    const floorY = yScale(floor);
+    // x-axis labels: first, mid, last
+    const labelIdxs = [0, Math.floor(daily.length/2), daily.length-1];
+    const labels = labelIdxs.map(i => {
+      const d = daily[i];
+      const date = d?.date ? new Date(d.date + 'T00:00:00') : null;
+      const txt = date ? date.toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '';
+      return `<text x="${xScale(i)}" y="${H-4}" text-anchor="middle" fill="var(--text-dim)" font-size="9" font-family="'DM Mono',monospace">${txt}</text>`;
+    }).join('');
+    // y-axis label
+    const fmtK = v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${Math.round(v)}`;
+    const yLabels = [minV, (minV+maxV)/2, maxV].map(v => {
+      const y = yScale(v);
+      return `<text x="${PAD.left-4}" y="${y+3}" text-anchor="end" fill="var(--text-dim)" font-size="9" font-family="'DM Mono',monospace">${fmtK(v)}</text>`;
+    }).join('');
+
+    $('balance-chart-wrap').innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="fade">
+        <defs>
+          <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--slate)" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="var(--slate)" stop-opacity="0.03"/>
+          </linearGradient>
+        </defs>
+        <!-- Band -->
+        <polygon points="${bandPts}" fill="url(#bandGrad)"/>
+        <!-- P90 -->
+        <polyline points="${pts90}" fill="none" stroke="var(--slate)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+        <!-- P10 -->
+        <polyline points="${pts10}" fill="none" stroke="var(--terra)" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+        <!-- P50 main line -->
+        <polyline points="${pts50}" fill="none" stroke="var(--slate)" stroke-width="2"/>
+        <!-- Floor line -->
+        <line x1="${PAD.left}" y1="${floorY}" x2="${W-PAD.right}" y2="${floorY}"
+              stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="2,4"/>
+        <text x="${W-PAD.right-2}" y="${floorY-3}" text-anchor="end" fill="var(--text-dim)"
+              font-size="8" font-family="'DM Mono',monospace">floor</text>
+        <!-- Labels -->
+        ${labels}${yLabels}
+      </svg>
+    `;
+  }
+
+  // ── Revenue tab ──────────────────────────────────────────────────────
+  async function loadRevenueTab() {
+    const [trendResult, mcResult, custResult] = await Promise.allSettled([
+      api('/finance/forecast/trend'),
+      api('/finance/projection/montecarlo'),
+      api('/finance/customer-intel?limit=10'),
+    ]);
+
+    // Revenue vs break-even trend (12 months)
+    if (trendResult.status === 'fulfilled') {
+      const td = trendResult.value;
+      const series = td.series ?? [];
+      const beVal  = td.break_even ?? 0;
+      if (series.length > 1) renderRevTrendChart(series, beVal, td.current, td.break_even_pl);
+      else $('rev-trend-chart-wrap').innerHTML = `<div class="err-note">Trend data unavailable</div>`;
+
+      // Channel mix stacked bars
+      if (series.length > 1) renderChannelMix(series);
+      else $('channel-mix-body').innerHTML = `<div class="err-note">Channel data unavailable</div>`;
+
+      // Glance text
+      if (td.glance?.readout) {
+        $('rev-trend-chart-wrap').insertAdjacentHTML('beforeend',
+          `<div class="glance-sub" style="margin-top:8px;padding:0 2px">${esc(td.glance.readout)}</div>`);
+      }
+    } else {
+      $('rev-trend-chart-wrap').innerHTML = `<div class="err-note">Revenue trend unavailable</div>`;
+      $('channel-mix-body').innerHTML = `<div class="err-note">Channel mix unavailable</div>`;
+    }
+
+    // Per-channel P10/P50/P90
+    if (mcResult.status === 'fulfilled') {
+      const mc = mcResult.value;
+      const channels = [
+        { key: 'retail',    label: 'Retail',    color: '#C8A55A' },
+        { key: 'wholesale', label: 'Wholesale', color: '#7A98AA' },
+        { key: 'catering',  label: 'Catering',  color: '#7A9E82' },
+      ];
+      const rows = channels.map(ch => {
+        const d = mc.channels?.[ch.key] ?? {};
+        return `<tr>
+          <td><span class="ch-dot" style="background:${ch.color};display:inline-block;margin-right:6px"></span>${ch.label}</td>
+          <td class="num">${fmt(d.p10)}</td>
+          <td class="num">${fmt(d.p50 ?? d.sim_median)}</td>
+          <td class="num">${fmt(d.p90)}</td>
+        </tr>`;
+      }).join('');
+      const total = mc.total ?? mc.headline ?? {};
+      $('montecarlo-channels-body').innerHTML = `
+        <table class="data-table">
+          <thead><tr><th>Channel</th><th>P10 (pessimistic)</th><th>P50 (base)</th><th>P90 (optimistic)</th></tr></thead>
+          <tbody>
+            ${rows}
+            <tr style="border-top:1px solid var(--border);font-weight:500">
+              <td>Total</td>
+              <td class="num">${fmt(total.p10 ?? total.total_p10)}</td>
+              <td class="num">${fmt(total.p50 ?? total.total_p50)}</td>
+              <td class="num">${fmt(total.p90 ?? total.total_p90)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="glance-sub" style="margin-top:10px">P(clear break-even) = ${Math.round(Math.min(Math.max(mc.headline?.p_clear_break_even_pct ?? 0, 0), 100))}%</div>
+      `;
+    } else {
+      $('montecarlo-channels-body').innerHTML = `<div class="err-note">Monte Carlo unavailable</div>`;
+    }
+
+    // Wholesale concentration
+    if (custResult.status === 'fulfilled') {
+      const ci = custResult.value;
+      const summary = ci.summary ?? {};
+      const customers = (ci.customers ?? []).slice(0, 8);
+      const riskCls = summary.concentration_risk === 'high' ? 'neg' : summary.concentration_risk === 'medium' ? '' : 'ok';
+
+      $('wholesale-conc-body').innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div>
+            <div class="glance-label">Top customer revenue share (12mo)</div>
+            <div class="glance-num ${riskCls}">${Math.round(summary.top_customer_share_pct ?? 0)}%</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div class="glance-label">Top 5 share</div>
+            <div class="glance-num">${Math.round(summary.top_5_share_pct ?? 0)}%</div>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Customer</th><th>12mo revenue</th><th>Open AR</th><th>Reliability</th></tr></thead>
+          <tbody>
+            ${customers.map(c => {
+              const rel = c.payment_reliability ?? 0;
+              const relCls = rel >= 80 ? 'ok' : rel >= 50 ? '' : 'warn';
+              return `<tr>
+                <td>${esc(c.customer)}</td>
+                <td class="num">${fmt(c.total_revenue_12mo)}</td>
+                <td class="num ${c.open_balance > 0 ? 'warn' : ''}">${fmt(c.open_balance)}</td>
+                <td class="num ${relCls}">${rel}/100</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      $('wholesale-conc-body').innerHTML = `<div class="err-note">Customer intel unavailable</div>`;
+    }
+  }
+
+  function renderRevTrendChart(series, beVal, current, bePl) {
+    const W = 840, H = 180, PAD = { top: 16, right: 16, bottom: 28, left: 52 };
+    const iW = W - PAD.left - PAD.right;
+    const iH = H - PAD.top - PAD.bottom;
+    const n = series.length;
+
+    const totals = series.map(s => s.total ?? 0);
+    const maxV = Math.max(...totals, beVal, bePl ?? 0) * 1.1;
+    const minV = 0;
+    const rangeV = maxV - minV || 1;
+    const xScale = i => PAD.left + (i / (n - 1)) * iW;
+    const yScale = v => PAD.top + iH - ((v - minV) / rangeV) * iH;
+
+    const revPts = series.map((_, i) => `${xScale(i)},${yScale(totals[i])}`).join(' ');
+    const beLine = `${PAD.left},${yScale(beVal)} ${W - PAD.right},${yScale(beVal)}`;
+    const labels = series.map((s, i) => {
+      if (i % Math.max(1, Math.floor(n / 5)) !== 0 && i !== n-1) return '';
+      const m = s.month ?? '';
+      const [y, mo] = m.split('-');
+      const txt = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo] + " '" + (y?.slice(2) ?? '');
+      return `<text x="${xScale(i)}" y="${H-4}" text-anchor="middle" fill="var(--text-dim)" font-size="9" font-family="'DM Mono',monospace">${txt}</text>`;
+    }).join('');
+    const yLabel = v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${Math.round(v)}`;
+    const yLabels = [0, maxV/2, maxV].map(v =>
+      `<text x="${PAD.left-4}" y="${yScale(v)+3}" text-anchor="end" fill="var(--text-dim)" font-size="9" font-family="'DM Mono',monospace">${yLabel(v)}</text>`
+    ).join('');
+    // Current month projected band
+    let projBand = '';
+    if (current?.band_low && current?.band_high && n > 0) {
+      const xi = xScale(n - 1);
+      const y1 = yScale(current.band_high);
+      const y2 = yScale(current.band_low);
+      projBand = `<rect x="${xi-6}" y="${y1}" width="12" height="${y2-y1}" fill="var(--amber)" opacity="0.2" rx="2"/>`;
+    }
+
+    $('rev-trend-chart-wrap').innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="fade">
+        <!-- BE line -->
+        <polyline points="${beLine}" fill="none" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="3,4"/>
+        <text x="${W-PAD.right+2}" y="${yScale(beVal)+3}" fill="var(--text-dim)" font-size="9" font-family="'DM Mono',monospace">BE</text>
+        <!-- Revenue line -->
+        ${projBand}
+        <polyline points="${revPts}" fill="none" stroke="var(--amber)" stroke-width="2"/>
+        <!-- Dots -->
+        ${series.map((_, i) => {
+          const aboveBe = totals[i] >= beVal;
+          return `<circle cx="${xScale(i)}" cy="${yScale(totals[i])}" r="3"
+            fill="${aboveBe ? 'var(--amber)' : 'var(--terra)'}"/>`;
+        }).join('')}
+        ${labels}${yLabels}
+      </svg>
+    `;
+  }
+
+  function renderChannelMix(series) {
+    const chKeys = ['retail', 'wholesale', 'catering', 'delivery'];
+    const n = series.length;
+    const maxTotal = Math.max(...series.map(s => s.total ?? 0)) || 1;
+    const BAR_W = Math.max(1, Math.floor(840 / n) - 2);
+    const W = 840, H = 120;
+    const bars = series.map((s, i) => {
+      const x = i * (BAR_W + 2) + 1;
+      let y = H;
+      return chKeys.map(ch => {
+        const val = s[ch] ?? 0;
+        const h = (val / maxTotal) * (H - 16);
+        y -= h;
+        const color = CH_COLOR[ch] ?? '#4A4A44';
+        return `<rect x="${x}" y="${y.toFixed(1)}" width="${BAR_W}" height="${h.toFixed(1)}" fill="${color}" opacity="0.75"/>`;
+      }).join('');
+    }).join('');
+    const labels = series.map((s, i) => {
+      if (i % Math.max(1, Math.floor(n/5)) !== 0 && i !== n-1) return '';
+      const m = s.month ?? '';
+      const [y, mo] = m.split('-');
+      const txt = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo]?.slice(0,3) ?? '';
+      const x = i * (BAR_W + 2) + BAR_W/2 + 1;
+      return `<text x="${x}" y="${H+12}" text-anchor="middle" fill="var(--text-dim)" font-size="9" font-family="'DM Mono',monospace">${txt}</text>`;
+    }).join('');
+    $('channel-mix-body').innerHTML = `
+      <svg viewBox="0 0 ${W} ${H+16}" xmlns="http://www.w3.org/2000/svg" class="fade">${bars}${labels}</svg>
+      <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+        ${chKeys.map(ch => `<span style="display:flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">
+          <span style="width:8px;height:8px;border-radius:2px;background:${CH_COLOR[ch]};display:inline-block"></span>
+          ${CH_LABEL[ch]}
+        </span>`).join('')}
+      </div>
+    `;
+  }
+
+  // ── Receivables tab ──────────────────────────────────────────────────
+  async function loadReceivablesTab() {
+    const [arResult, liqResult] = await Promise.allSettled([
+      api('/finance/receivables/aging?include=aging,unbooked'),
+      window._liqData ? Promise.resolve(window._liqData) : api('/finance/forecasting/liquidity?horizon=90'),
+    ]);
+
+    if (arResult.status === 'fulfilled') {
+      const ar = arResult.value;
+      const aging = ar.aging ?? ar;
+      const buckets = aging.buckets ?? {};
+      const grandTotal = aging.grand_total ?? 0;
+      const bucketDefs = [
+        { key: 'current',      label: 'Current',    color: 'var(--sage)' },
+        { key: 'days_1_30',    label: '1–30 days',  color: 'var(--amber)' },
+        { key: 'days_31_60',   label: '31–60 days', color: '#D4A04A' },
+        { key: 'days_61_90',   label: '61–90 days', color: 'var(--terra)' },
+        { key: 'days_90_plus', label: '90+ days',   color: '#C04040' },
+      ];
+      const maxBucket = Math.max(...bucketDefs.map(b => buckets[b.key]?.total ?? 0), 1);
+
+      const agingBars = bucketDefs.map(b => {
+        const total = buckets[b.key]?.total ?? 0;
+        const pct = (total / maxBucket * 100).toFixed(1);
+        return `<div class="aging-bar-row">
+          <div class="aging-bucket-label">${b.label}</div>
+          <div class="aging-bar-track">
+            <div class="aging-bar-fill" style="width:${pct}%;background:${b.color}"></div>
+          </div>
+          <div class="aging-bar-amt">${fmt(total)}</div>
+        </div>`;
+      }).join('');
+
+      $('aging-body').innerHTML = `
+        <div class="glance-num ${grandTotal > 0 ? '' : 'ok'}">${fmt(grandTotal)}</div>
+        <div class="glance-sub" style="margin-bottom:16px">Total open receivables · ${esc(String(aging.customers?.length ?? 0))} customers</div>
+        ${agingBars}
+      `;
+
+      // Customer table
+      const customers = aging.customers ?? [];
+      const custs = customers.slice(0, 15);
+      $('ar-customers-body').innerHTML = custs.length ? `
+        <table class="data-table">
+          <thead><tr><th>Customer</th><th>Open balance</th><th>Oldest (days)</th><th>Bucket</th></tr></thead>
+          <tbody id="ar-cust-tbody">
+            ${custs.map((c, idx) => `
+              <tr class="expandable" onclick="toggleArCustomer(${idx})" data-idx="${idx}">
+                <td>${esc(c.customer)}</td>
+                <td class="num ${c.oldest_days > 60 ? 'warn' : ''}">${fmt(c.total)}</td>
+                <td class="num ${c.oldest_days > 60 ? 'warn' : ''}">${esc(String(c.oldest_days ?? '—'))}</td>
+                <td><span class="src-chip">${esc(c.invoice_list?.[0]?.bucket?.replace(/_/g,' ') ?? '—')}</span></td>
+              </tr>
+              <tr id="ar-cust-detail-${idx}" style="display:none">
+                <td colspan="4">
+                  <table class="data-table" style="margin:0">
+                    <thead><tr><th>Invoice</th><th>Due</th><th>Balance</th><th>Days overdue</th></tr></thead>
+                    <tbody>
+                      ${(c.invoice_list ?? []).map(inv => `<tr>
+                        <td>${esc(inv.doc_number ?? String(inv.id ?? ''))}</td>
+                        <td>${inv.due_date ? fmtDate(inv.due_date + 'T00:00:00') : '—'}</td>
+                        <td class="num ${(inv.days_overdue ?? 0) > 60 ? 'warn' : ''}">${fmt(inv.balance)}</td>
+                        <td class="num">${esc(String(inv.days_overdue ?? 0))}</td>
+                      </tr>`).join('')}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : `<div style="color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px">No open receivables</div>`;
+
+      // Unbooked wholesale cash
+      const unbooked = ar.unbooked_wholesale_cash;
+      if (unbooked?.total > 0) {
+        $('unbooked-body').innerHTML = `
+          <div class="glance-num">${fmt(unbooked.total)}</div>
+          <div class="glance-sub" style="margin-top:6px">${esc(String(unbooked.count))} payment(s) received but not yet matched to invoices</div>
+          <div class="interp-watch attention" style="margin-top:12px">
+            <div class="interp-watch-label">Action for Drew</div>
+            <div>These wholesale cash receipts are in the books but not allocated to specific invoices. Drew reviews and allocates.</div>
+          </div>
+        `;
+      } else {
+        $('unbooked-body').innerHTML = `<div style="color:var(--sage);font-family:'DM Mono',monospace;font-size:12px">No unbooked wholesale cash — all received payments matched to invoices.</div>`;
+      }
+    } else {
+      $('aging-body').innerHTML = `<div class="err-note">AR data unavailable</div>`;
+      $('ar-customers-body').innerHTML = `<div class="err-note">Customer AR unavailable</div>`;
+      $('unbooked-body').innerHTML = `<div class="err-note">Unbooked data unavailable</div>`;
+    }
+
+    // AR → trough connection
+    if (liqResult.status === 'fulfilled') {
+      const lever = liqResult.value.trough?.ar_slip_lever ?? {};
+      const driver = liqResult.value.trough?.concentration_driver ?? {};
+      if (lever.node) {
+        $('ar-trough-body').innerHTML = `
+          <div class="interp-watch ${lever.amount > 5000 ? 'urgent' : 'attention'}">
+            <div class="interp-watch-label">AR → Cash connection</div>
+            <div>If <strong>${esc(lever.node)}</strong> pays <strong>${esc(String(lever.slip_days))} days late</strong>, the 90-day cash trough drops by <strong>${fmt(lever.amount)}</strong>.</div>
+          </div>
+          ${driver.customer ? `<div class="glance-sub" style="margin-top:8px">${esc(driver.customer)} is driving the downside concentration risk in the P10 scenario.</div>` : ''}
+        `;
+      } else {
+        $('ar-trough-body').innerHTML = `<div style="color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px">No single AR concentration driver identified.</div>`;
+      }
+    } else {
+      $('ar-trough-body').innerHTML = `<div class="err-note">Trough connection data unavailable</div>`;
+    }
+  }
+
+  window.toggleArCustomer = function(idx) {
+    const row = document.getElementById('ar-cust-detail-' + idx);
+    if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+  };
+
+  // ── Activity tab ─────────────────────────────────────────────────────
+  async function loadActivityTab() {
+    const [queueResult, glResult] = await Promise.allSettled([
+      api('/finance/cfo/review-queue?limit=50'),
+      api('/finance/gl/recent-entries?limit=60'),
+    ]);
+
+    // Categorization queue — READ-ONLY. No action buttons.
+    if (queueResult.status === 'fulfilled') {
+      const q = queueResult.value;
+      const counts = q.counts ?? {};
+      const uncategorized = q.uncategorized ?? [];
+      const lowConf = q.low_confidence ?? [];
+
+      const countChips = [
+        { label: 'Uncategorized', n: counts.uncategorized ?? uncategorized.length, cls: 'amber' },
+        { label: 'Low confidence', n: counts.low_confidence ?? lowConf.length, cls: '' },
+        { label: 'Rejected', n: counts.rejected ?? 0, cls: '' },
+      ].map(c => `<span class="glance-chip ${c.cls}" style="margin-right:6px">${esc(c.label)}: ${c.n}</span>`).join('');
+
+      const rows = [...uncategorized.slice(0,15), ...lowConf.slice(0,10)].map(item => `<tr>
+        <td>${esc(item.txn_date?.slice(5) ?? '—')}</td>
+        <td>${esc(item.counterparty_name ?? item.description ?? '—')}</td>
+        <td class="num ${item.amount < 0 ? 'neg' : ''}">${fmt(item.amount)}</td>
+        <td>${item.proposed_account_name ? `<span class="src-chip">${esc(item.proposed_account_name)}</span>` : '—'}</td>
+        <td style="color:var(--text-dim)">${item.proposed_confidence != null ? Math.round(item.proposed_confidence * 100) + '%' : '—'}</td>
+      </tr>`).join('');
+
+      $('queue-body').innerHTML = `
+        <div style="margin-bottom:14px">${countChips}</div>
+        ${rows.length ? `<table class="data-table">
+          <thead><tr><th>Date</th><th>Counterparty</th><th>Amount</th><th>Proposed account</th><th>Confidence</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : `<div style="color:var(--sage);font-family:'DM Mono',monospace;font-size:12px">No items pending categorization</div>`}
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-faint);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-dim)">
+          These items are in your accountant's review pipeline. Actions are managed by Drew.
+        </div>
+      `;
+    } else {
+      $('queue-body').innerHTML = `<div class="err-note">Queue data unavailable</div>`;
+    }
+
+    // GL transaction log — filterable
+    buildGlControls();
+    renderGlEntries(glResult);
+  }
+
+  // GL period/filter controls
+  let glPeriod = null; // null = current month
+  let glAccountFilter = '';
+
+  function buildGlControls() {
+    const now = new Date();
+    const months = [];
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1);
+      const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+      months.push(m);
+    }
+    $('gl-controls').innerHTML = months.map((m, i) => `
+      <button class="pnl-tab ${i===0?'active':''}" data-glperiod="${m}"
+        onclick="switchGlPeriod('${jss(m)}', this)">${fmtMonth(m)}</button>
+    `).join('') + `
+      <input type="text" class="pnl-picker" id="gl-account-filter" placeholder="Filter account…"
+        style="width:140px" oninput="glFilterAccount(this.value)">
+    `;
+  }
+
+  window.switchGlPeriod = async function(period, btn) {
+    glPeriod = period;
+    document.querySelectorAll('[data-glperiod]').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    $('gl-body').innerHTML = `<div class="skel" style="width:100%;height:80px;border-radius:6px"></div>`;
+    try {
+      const params = new URLSearchParams({ period, limit: '80' });
+      if (glAccountFilter) params.set('account', glAccountFilter);
+      const data = await api('/finance/gl/recent-entries?' + params);
+      renderGlEntries({ status: 'fulfilled', value: data });
+    } catch(e) {
+      $('gl-body').innerHTML = `<div class="err-note">GL load failed: ${esc(e.message)}</div>`;
+    }
+  };
+
+  window.glFilterAccount = function(val) {
+    glAccountFilter = val;
+  };
+
+  function renderGlEntries(result) {
+    if (result.status !== 'fulfilled') {
+      $('gl-body').innerHTML = `<div class="err-note">GL entries unavailable</div>`;
+      return;
+    }
+    const data = result.value ?? result;
+    const entries = data.entries ?? [];
+    if (!entries.length) {
+      $('gl-body').innerHTML = `<div style="color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px;padding:12px 0">No posted entries for this period.</div>`;
+      return;
+    }
+    const rows = entries.slice(0, 80).map(e => {
+      const isReversal = e.is_reversal;
+      const srcChip = `<span class="src-chip ${isReversal ? 'reversal' : ''}">${esc((e.source_type ?? '').replace(/_/g,' '))}</span>`;
+      const mainLine = e.lines?.[0] ?? {};
+      const amount = mainLine.debit > 0 ? mainLine.debit : -(mainLine.credit ?? 0);
+      return `
+        <tr>
+          <td style="white-space:nowrap">${esc(e.entry_date)}</td>
+          <td>${esc(e.description)}</td>
+          <td>${esc(mainLine.account_name ?? '—')}</td>
+          <td style="color:var(--text-dim);font-size:10px">${esc(mainLine.channel ?? '—')}</td>
+          <td class="num ${amount < 0 ? 'neg' : ''}">${fmt(amount)}</td>
+          <td>${srcChip}</td>
+        </tr>
+        ${e.lines?.length > 1 ? e.lines.slice(1).map(l => {
+          const a = l.debit > 0 ? l.debit : -(l.credit ?? 0);
+          return `<tr style="opacity:0.5">
+            <td></td><td style="padding-left:14px;font-size:10px;color:var(--text-dim)">${esc(l.memo || l.account_name)}</td>
+            <td style="font-size:10px;color:var(--text-dim)">${esc(l.account_name)}</td>
+            <td></td>
+            <td class="num" style="font-size:10px">${fmt(a)}</td>
+            <td></td>
+          </tr>`;
+        }).join('') : ''}
+      `;
+    }).join('');
+
+    $('gl-body').innerHTML = `
+      <div class="glance-sub" style="margin-bottom:10px">${esc(String(entries.length))} entries · ${esc(data.period ?? '')}</div>
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Description</th><th>Account</th><th>Channel</th><th>Amount</th><th>Source</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
   // ── Render: cash ─────────────────────────────────────────────────
   function renderCash(cash) {
     const total = cash.total ?? 0;
@@ -1179,22 +2607,96 @@
 
   // ── Data load ─────────────────────────────────────────────────────
   async function init() {
-    const [beResult, quadResult, cashResult, liqResult] = await Promise.allSettled([
-      api('/finance/forecasting/breakeven-tracker'),
-      api('/finance/monthly-pl/quad'),
-      api('/finance/canonical/cash-on-hand'),
-      api('/finance/forecasting/liquidity?horizon=90'),
-    ]);
+    const [beResult, quadResult, cashResult, liqResult, arResult, pnlResult] =
+      await Promise.allSettled([
+        api('/finance/forecasting/breakeven-tracker'),
+        api('/finance/monthly-pl/quad'),
+        api('/finance/canonical/cash-on-hand'),
+        api('/finance/forecasting/liquidity?horizon=90'),
+        api('/finance/ar-aging'),
+        api('/finance/pnl/live?period=mtd'),
+      ]);
 
-    // Break-even
+    // ── Glance row ──────────────────────────────────────────────────
     if (beResult.status === 'fulfilled') {
-      renderBreakeven(beResult.value);
+      const be     = beResult.value;
+      const mtdRev = be.mtd?.operating ?? be.mtd?.total_gl ?? 0;
+      const target = be.breakeven?.cash?.center ?? 0;
+      const elapsed = be.as_of?.elapsed_pct ?? 50;
+      const runRate = elapsed > 0 ? mtdRev / (elapsed / 100) : 0;
+      const gap     = runRate - target;
+      const gEl = $('g-rev');
+      gEl.className = 'glance-num fade';
+      gEl.textContent = fmt(mtdRev);
+      $('g-rev-sub').textContent = `${fmtMonth(be.as_of?.current_month)} · day ${be.as_of?.day_of_month ?? '?'}`;
+
+      const gapEl = $('g-gap');
+      gapEl.className = `glance-num fade ${gap >= 0 ? 'pos' : 'neg'}`;
+      gapEl.textContent = `${gap >= 0 ? '+' : '−'}${fmt(Math.abs(gap))}`;
+      $('g-gap-sub').textContent = `run-rate vs ${fmt(target)} target`;
+
+      // Store for breakeven tab
+      window._beData = be;
+      window._beGap  = gap;
     } else {
-      $('be-num').className = '';
-      $('be-num').innerHTML = `<div class="err-note">Break-even unavailable: ${beResult.reason?.message ?? 'error'}</div>`;
+      $('g-rev').className = 'glance-num'; $('g-rev').textContent = '—';
+      $('g-gap').className = 'glance-num'; $('g-gap').textContent = '—';
     }
 
-    // Quad P&L
+    if (cashResult.status === 'fulfilled') {
+      const cash = cashResult.value;
+      const cEl = $('g-cash');
+      cEl.className = 'glance-num fade';
+      cEl.textContent = fmt(cash.total ?? 0);
+      $('g-cash-sub').textContent = `Updated ${timeSince(cash.as_of)}`;
+      window._cashData = cash;
+    } else {
+      $('g-cash').className = 'glance-num'; $('g-cash').textContent = '—';
+    }
+
+    // Cash trough signals for P10 red chip
+    if (liqResult.status === 'fulfilled') {
+      const liq = liqResult.value;
+      const t10 = liq.trough?.p10 ?? {};
+      const cashCard = $('g-cash').closest('.glance-card');
+      if (cashCard) cashCard.querySelectorAll('.glance-chip').forEach(c => c.remove());
+      if (t10.goes_negative) {
+        if (cashCard) {
+          const chip = document.createElement('div');
+          chip.className = 'glance-chip red';
+          chip.textContent = 'Cash risk';
+          cashCard.appendChild(chip);
+        }
+      } else if (liq.trough?.p50?.below_floor) {
+        if (cashCard) {
+          const chip = document.createElement('div');
+          chip.className = 'glance-chip amber';
+          chip.textContent = 'Near floor';
+          cashCard.appendChild(chip);
+        }
+      }
+      window._liqData = liq;
+    }
+
+    // ── Adaptive interpretation ─────────────────────────────────────
+    const ni = pnlResult.status === 'fulfilled'
+      ? (pnlResult.value.current?.net_income ?? pnlResult.value.net_income ?? null) : null;
+    const trough   = liqResult.status === 'fulfilled' ? liqResult.value.trough : null;
+    const arData   = arResult.status === 'fulfilled' ? arResult.value : null;
+    const overdueAr = arData
+      ? ((arData.buckets?.days_61_90?.total ?? 0) + (arData.buckets?.days_90_plus?.total ?? 0)) : 0;
+
+    const signals = {
+      gap:          window._beGap ?? 0,
+      ni,
+      troughDate:   trough?.p50?.date ?? null,
+      troughBal:    trough?.p50?.balance ?? null,
+      troughGoesNeg: trough?.p10?.goes_negative ?? false,
+      overdueAr,
+    };
+    await loadInterpretation(signals);
+
+    // ── This Month tab ──────────────────────────────────────────────
     if (quadResult.status === 'fulfilled') {
       quadData = quadResult.value;
       buildPnlTabs(quadData.months);
@@ -1203,21 +2705,10 @@
       $('pnl-tabs').innerHTML = '';
       $('pnl-body').innerHTML = `<div class="err-note">P&L unavailable: ${quadResult.reason?.message ?? 'error'}</div>`;
     }
+    loadThisMonthExtras();
 
-    // Cash
-    if (cashResult.status === 'fulfilled') {
-      renderCash(cashResult.value);
-    } else {
-      $('cash-big').textContent = '—';
-      $('cash-sub').innerHTML = `<span class="err-note">Cash data unavailable</span>`;
-    }
-
-    // Liquidity
-    if (liqResult.status === 'fulfilled') {
-      renderLiquidity(liqResult.value);
-    } else {
-      $('liq-body').innerHTML = `<div class="err-note">Liquidity data unavailable</div>`;
-    }
+    // Auto-refresh glance row every 5 minutes
+    setTimeout(init, 5 * 60 * 1000);
   }
 
   // ── Bootstrap ────────────────────────────────────────────────────
