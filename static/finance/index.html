@@ -1219,6 +1219,49 @@
     </div>
   </div>
 
+  <!-- ── Cost Engine (Distributor Pricing Floor) ───────────────────── -->
+  <section id="cost-engine-section" style="margin-top:48px;border-top:1px solid var(--border);padding-top:32px">
+    <div class="s-head">Pretzel Unit Cost — Distributor Pricing Floor</div>
+    <p style="color:var(--text-dim);font-size:13px;margin:4px 0 20px">
+      Derives variable cost per pretzel from GL + Square POS.
+      Use the <strong>conservative minimum</strong> as your cost floor in distributor negotiations.
+    </p>
+    <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px">
+      <label style="font-size:13px;color:var(--text-dim)">
+        Avg wholesale price / pretzel ($)
+        <input type="number" id="ce-price" value="4.50" min="1" max="20" step="0.25"
+          style="display:block;margin-top:4px;padding:6px 10px;background:var(--surface-hi);
+                 border:1px solid var(--border);border-radius:4px;color:var(--text);
+                 font-size:14px;width:110px">
+      </label>
+      <label style="font-size:13px;color:var(--text-dim)">
+        Pretzels per wholesale bag
+        <div id="ce-ppb-btns" style="display:flex;gap:6px;margin-top:4px">
+          <button class="pnl-tab" onclick="setCePpb(2,this)">2</button>
+          <button class="pnl-tab active" onclick="setCePpb(3,this)">3</button>
+          <button class="pnl-tab" onclick="setCePpb(4,this)">4</button>
+        </div>
+      </label>
+      <button id="ce-run-btn" onclick="runCostEngine()"
+        style="padding:8px 20px;background:var(--gold);color:#000;border:none;
+               border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;
+               align-self:flex-end">
+        Run Analysis
+      </button>
+    </div>
+    <div id="ce-error" style="color:var(--terra);font-size:13px;margin-bottom:12px;display:none"></div>
+    <div id="ce-output" style="display:none">
+      <div id="ce-validation" style="margin-bottom:16px"></div>
+      <div id="ce-floor-callout" style="margin-bottom:20px"></div>
+      <div class="card" id="ce-table-wrap" style="overflow-x:auto;margin-bottom:12px"></div>
+      <div id="ce-sensitivity" style="font-size:12px;color:var(--text-dim);margin-bottom:16px"></div>
+      <details style="font-size:12px;color:var(--text-dim)">
+        <summary style="cursor:pointer;padding:4px 0">Caveats &amp; methodology</summary>
+        <div id="ce-caveats" style="padding:8px 0 0 12px;line-height:1.8"></div>
+      </details>
+    </div>
+  </section>
+
 </main>
 
 <script>
@@ -2724,6 +2767,124 @@
       showAuth();
     }
   })();
+
+  // ── Cost Engine ──────────────────────────────────────────────────────
+  let cePpb = 3;
+
+  window.setCePpb = function(n, btn) {
+    cePpb = n;
+    document.querySelectorAll('#ce-ppb-btns .pnl-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+
+  window.runCostEngine = async function() {
+    const price = parseFloat($('ce-price').value);
+    if (isNaN(price) || price < 1 || price > 20) {
+      $('ce-error').textContent = 'Enter a valid price (1.00 – 20.00).';
+      $('ce-error').style.display = '';
+      return;
+    }
+    $('ce-error').style.display = 'none';
+    $('ce-output').style.display = 'none';
+    const btn = $('ce-run-btn');
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+
+    let data;
+    try {
+      data = await api(`/finance/cost-engine/pretzel-unit-cost?wholesale_price=${price}&pretzels_per_bag=${cePpb}`);
+    } catch (e) {
+      $('ce-error').textContent = 'Analysis failed: ' + esc(e.message || 'unknown error');
+      $('ce-error').style.display = '';
+      btn.disabled = false;
+      btn.textContent = 'Run Analysis';
+      return;
+    }
+
+    // ── HL validation chip ──
+    const hl = data.hl_validation ?? {};
+    let hlHtml;
+    if (hl.skipped) {
+      hlHtml = `<span style="background:var(--surface-hi);color:var(--text-dim);padding:4px 12px;border-radius:12px;font-size:12px">
+        HL validation skipped — ${esc(hl.reason ?? 'insufficient data')}
+      </span>`;
+    } else if (hl.passed === true) {
+      hlHtml = `<span style="background:#0d2b0d;color:var(--sage);padding:4px 12px;border-radius:12px;font-size:12px">
+        ✓ HL gate passed — slope $${esc(String(hl.hl_slope_per_unit ?? ''))} vs component $${esc(String(hl.component_ing_pkg_mid ?? ''))} (${esc(String(hl.agreement_pct ?? ''))}% diff)
+      </span>`;
+    } else {
+      hlHtml = `<span style="background:#2b0d0d;color:var(--terra);padding:4px 12px;border-radius:12px;font-size:12px">
+        ✗ HL gate failed — slope $${esc(String(hl.hl_slope_per_unit ?? ''))} vs component $${esc(String(hl.component_ing_pkg_mid ?? ''))} (${esc(String(hl.agreement_pct ?? ''))}% diff) — verify before using
+      </span>`;
+    }
+    $('ce-validation').innerHTML = hlHtml;
+
+    // ── Conservative floor callout ──
+    const s = data.summary ?? {};
+    $('ce-floor-callout').innerHTML = `
+      <div style="background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;
+                  padding:16px 20px;display:inline-block;min-width:300px">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;
+                    letter-spacing:.6px;margin-bottom:4px">Conservative Minimum — use in negotiations</div>
+        <div style="font-size:36px;font-weight:700;color:var(--gold)">$${esc(String(s.conservative_minimum ?? '—'))}
+          <span style="font-size:16px;color:var(--text-dim);font-weight:400"> / pretzel</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:8px">
+          Target floor: $${esc(String(s.target_floor ?? '—'))} &nbsp;·&nbsp;
+          Soft minimum: $${esc(String(s.soft_minimum ?? '—'))} &nbsp;·&nbsp;
+          Monthly variance: ${esc(String(s.monthly_variance_pct ?? '—'))}%
+        </div>
+      </div>`;
+
+    // ── Monthly breakdown table ──
+    const monthly = data.monthly ?? [];
+    const tableRows = monthly.map(m => `
+      <tr>
+        <td>${esc(String(m.month ?? '').slice(0, 7))}</td>
+        <td class="num">${esc(String(m.retail_units ?? 0))}</td>
+        <td class="num">${esc(String(m.wholesale_units_mid ?? 0))}</td>
+        <td class="num">$${esc(String(m.ingredient_per_pretzel ?? 0))}</td>
+        <td class="num">$${esc(String(m.packaging_per_pretzel ?? 0))}</td>
+        <td class="num" style="color:var(--text-dim)">
+          $${esc(String(m.labor_per_pretzel_low ?? 0))} – $${esc(String(m.labor_per_pretzel_high ?? 0))}
+        </td>
+        <td class="num" style="font-weight:600">
+          $${esc(String(m.variable_cost_low ?? 0))} – $${esc(String(m.variable_cost_high ?? 0))}
+        </td>
+      </tr>`).join('');
+    $('ce-table-wrap').innerHTML = `
+      <table class="data-table">
+        <thead><tr>
+          <th>Month</th>
+          <th>Retail units</th>
+          <th>Wholesale units</th>
+          <th>Ingredient/u</th>
+          <th>Packaging/u</th>
+          <th>Labor range/u</th>
+          <th>Total range/u</th>
+        </tr></thead>
+        <tbody>${tableRows || '<tr><td colspan="7" style="text-align:center;color:var(--text-dim)">No monthly data</td></tr>'}</tbody>
+      </table>`;
+
+    // ── Price sensitivity ──
+    const ps = s.price_sensitivity ?? {};
+    $('ce-sensitivity').innerHTML =
+      `Price sensitivity: if avg price is $1 lower → floor ≈ $${esc(String(ps.price_minus_1_floor ?? '—'))} &nbsp;|&nbsp; ` +
+      `if $1 higher → floor ≈ $${esc(String(ps.price_plus_1_floor ?? '—'))}`;
+
+    // ── Caveats ──
+    const cv = data.caveats ?? {};
+    $('ce-caveats').innerHTML = [
+      cv.packaging_note          ? `<div>${esc(cv.packaging_note)}</div>` : '',
+      cv.labor_note              ? `<div>${esc(cv.labor_note)}</div>` : '',
+      cv.wholesale_units_note    ? `<div>${esc(cv.wholesale_units_note)}</div>` : '',
+      cv.capacity_note           ? `<div>${esc(cv.capacity_note)}</div>` : '',
+    ].join('');
+
+    $('ce-output').style.display = '';
+    btn.disabled = false;
+    btn.textContent = 'Run Analysis';
+  };
 </script>
 </body>
 </html>
