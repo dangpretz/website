@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["http-server", "./v2", "-p", "8080", "-c-1"],
       "port": 8080
+    },
+    {
+      "name": "finance-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "./static/finance", "-p", "8081", "-c-1"],
+      "port": 8081
     }
   ]
 }

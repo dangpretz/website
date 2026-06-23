@@ -1129,6 +1129,91 @@
     .cal-amt.in  { color: var(--sage); }
     .cal-amt.out { color: var(--terra); }
 
+    /* ── What We Owe panel ───────────────────────────────── */
+    .owe-position {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .owe-pos-cell {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .owe-pos-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    .owe-pos-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .owe-pos-val.cash  { color: var(--sage); }
+    .owe-pos-val.near  { color: var(--terra); }
+    .owe-pos-val.lt    { color: var(--amber); }
+    .owe-sect-head {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+      padding: 8px 0 4px;
+      border-bottom: 1px solid var(--border-faint);
+      margin-bottom: 4px;
+    }
+    .owe-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border-faint);
+      gap: 8px;
+    }
+    .owe-row:last-child { border-bottom: none; }
+    .owe-name {
+      font-size: 12px;
+      color: var(--text-mid);
+      flex: 1;
+      min-width: 0;
+    }
+    .owe-sub-name {
+      font-size: 11px;
+      color: var(--text-dim);
+      flex: 1;
+      padding-left: 12px;
+    }
+    .owe-amt {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .owe-amt.anomalous { color: var(--terra); }
+    .owe-flag {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(217,122,82,0.12);
+      color: var(--terra);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .owe-note {
+      margin-top: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
     /* ── Meter bar (probability) ─────────────────────────── */
     .meter-wrap { margin: 8px 0; }
     .meter-track {
@@ -1286,6 +1371,11 @@
         <div class="card-label">90-day trough</div>
         <div id="cr-trough-body"><div class="skel" style="width:100%;height:60px;border-radius:6px"></div></div>
       </div>
+    </div>
+
+    <div class="s-gap s-head">What We Owe</div>
+    <div class="card" id="what-we-owe-body">
+      <div class="skel" style="height:100px;border-radius:6px"></div>
     </div>
 
     <div class="s-gap s-head">Daily Balance Forecast (P10 / P50 / P90)</div>
@@ -2341,11 +2431,12 @@
 
   // ── Cash & Runway tab ────────────────────────────────────────────────
   async function loadCashRunwayTab() {
-    const [liqResult, scoreResult, mcResult] = await Promise.allSettled([
+    const [liqResult, scoreResult, mcResult, bsResult] = await Promise.allSettled([
       // Reuse cached _liqData if available
       window._liqData ? Promise.resolve(window._liqData) : api('/finance/forecasting/liquidity?horizon=90'),
       api('/finance/scorecard'),
       api('/finance/projection/montecarlo'),
+      api('/finance/statements/balance-sheet'),
     ]);
 
     // Cash card (reuse from _cashData if available)
@@ -2468,6 +2559,121 @@
       `;
     } else {
       $('montecarlo-body').innerHTML = `<div class="err-note">Monte Carlo unavailable</div>`;
+    }
+
+    // What We Owe — liability panel (balance sheet, GET-only, view-layer)
+    if (bsResult.status === 'fulfilled') {
+      const bs = bsResult.value;
+      const liabSections = bs.sections?.liabilities?.subsections ?? [];
+      const currentSect  = liabSections.find(s => s.subtype === 'current_liability');
+      const ltSect       = liabSections.find(s => s.subtype === 'long_term_liability');
+      const cash = window._cashData?.total ?? null;
+
+      const SALES_TAX_ACCT = 'Sales tax to pay';
+      const currentItems = currentSect?.items ?? [];
+
+      const payrollItems = currentItems.filter(a => a.account_name.startsWith('Payroll'));
+      const payrollTotal = payrollItems.reduce((s, a) => s + (a.balance || 0), 0);
+      const nonPayroll   = currentItems.filter(a => !a.account_name.startsWith('Payroll'));
+
+      const nearTermTotal = currentItems
+        .filter(a => a.balance > 0 && a.account_name !== SALES_TAX_ACCT)
+        .reduce((s, a) => s + a.balance, 0);
+
+      const ltItems   = ltSect?.items ?? [];
+      const leafItems = ltItems.filter(a => a.account_name.startsWith('N/P LEAF'));
+      const leafTotal = leafItems.reduce((s, a) => s + (a.balance || 0), 0);
+      const otherLT   = ltItems.filter(a => !a.account_name.startsWith('N/P LEAF'));
+      const ltTotal   = ltSect?.total ?? 0;
+
+      function oweName(n) {
+        return n
+          .replace(/^Payroll Liabilities:/, '')
+          .replace(/^N\/P LEAF [Ff]unding /, '')
+          .replace(/^N\/P LEAF /, '');
+      }
+
+      const posHtml = `
+        <div class="owe-position">
+          <div class="owe-pos-cell">
+            <div class="owe-pos-label">Cash on hand</div>
+            <div class="owe-pos-val cash">${cash !== null ? fmt(cash) : '—'}</div>
+          </div>
+          <div class="owe-pos-cell">
+            <div class="owe-pos-label">Near-term owed</div>
+            <div class="owe-pos-val near">${fmt(nearTermTotal)}</div>
+          </div>
+          <div class="owe-pos-cell">
+            <div class="owe-pos-label">Long-term debt</div>
+            <div class="owe-pos-val lt">${fmt(ltTotal)}</div>
+          </div>
+        </div>`;
+
+      const nearRows = [];
+      for (const a of nonPayroll) {
+        const isSalesTax = a.account_name === SALES_TAX_ACCT;
+        const isNeg = a.balance < 0 && !isSalesTax;
+        nearRows.push(`
+          <div class="owe-row">
+            <span class="owe-name">${esc(oweName(a.account_name))}</span>
+            ${isSalesTax ? `<span class="owe-flag">⚠ anomalous</span>` : (isNeg ? `<span class="owe-flag">⚠ credit bal</span>` : '')}
+            <span class="owe-amt${isSalesTax || isNeg ? ' anomalous' : ''}">${fmt(a.balance)}</span>
+          </div>`);
+      }
+      if (payrollItems.length) {
+        nearRows.push(`
+          <div class="owe-row">
+            <span class="owe-name">Payroll liabilities</span>
+            <span class="owe-amt">${fmt(payrollTotal)}</span>
+          </div>
+          ${payrollItems.map(a => `
+            <div class="owe-row" style="padding-left:12px">
+              <span class="owe-sub-name">${esc(oweName(a.account_name))}</span>
+              <span class="owe-amt" style="color:var(--text-dim)">${fmt(a.balance)}</span>
+            </div>`).join('')}`);
+      }
+
+      const ltRows = [];
+      if (leafItems.length) {
+        ltRows.push(`
+          <div class="owe-row">
+            <span class="owe-name">LEAF equipment loans</span>
+            <span class="owe-amt">${fmt(leafTotal)}</span>
+          </div>
+          ${leafItems.sort((a, b) => b.balance - a.balance).map(a => `
+            <div class="owe-row" style="padding-left:12px">
+              <span class="owe-sub-name">${esc(oweName(a.account_name))}</span>
+              <span class="owe-amt" style="color:var(--text-dim)">${fmt(a.balance)}</span>
+            </div>`).join('')}`);
+      }
+      for (const a of otherLT) {
+        ltRows.push(`
+          <div class="owe-row">
+            <span class="owe-name">${esc(oweName(a.account_name))}</span>
+            <span class="owe-amt">${fmt(a.balance)}</span>
+          </div>`);
+      }
+
+      const salesTaxItem = currentItems.find(a => a.account_name === SALES_TAX_ACCT);
+      const salesTaxNote = salesTaxItem?.balance < 0
+        ? `<div class="interp-watch attention" style="margin-top:12px">
+            <div class="interp-watch-label">⚠ Sales tax anomaly (#185)</div>
+            <div style="font-size:11px">Balance is ${fmt(salesTaxItem.balance)} — negative liability suggests over-remittance or a classification issue. Excluded from near-term total pending investigation.</div>
+          </div>`
+        : '';
+
+      $('what-we-owe-body').innerHTML = `
+        <div class="fade">
+          ${posHtml}
+          <div class="owe-sect-head">Near-term · due in coming weeks</div>
+          ${nearRows.join('')}
+          <div class="owe-sect-head" style="margin-top:8px">Long-term · amortizing monthly</div>
+          ${ltRows.join('')}
+          ${salesTaxNote}
+          <div class="owe-note">LEAF payments ($3,473/mo) and card payoffs appear in the Scheduled Out calendar below. Long-term balances are remaining principal — only the monthly payment is a near-term cash event.</div>
+        </div>`;
+    } else {
+      $('what-we-owe-body').innerHTML = `<div class="err-note">Liability data unavailable</div>`;
     }
   }
 
