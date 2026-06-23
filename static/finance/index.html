@@ -560,6 +560,54 @@
       line-height: 1.6;
     }
 
+    /* ── P&L two-level drill ─────────────────────────── */
+    .fs-line.drill-able { cursor: pointer; user-select: none; }
+    .fs-line.drill-able:hover { background: var(--surface-hi); border-radius: 4px; margin: 0 -4px; padding: 4px 4px; }
+    .fs-line.drill-open { background: var(--surface-hi); border-radius: 4px 4px 0 0; margin: 0 -4px; padding: 4px 4px; }
+    .fs-caret { font-size: 9px; color: var(--text-dim); margin-right: 5px; display: inline-block; width: 10px; text-align: center; }
+    .fs-drill-L1 {
+      background: var(--surface-hi);
+      border: 1px solid var(--border-faint);
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      margin: 0 -4px 4px -4px;
+      overflow: hidden;
+    }
+    .fs-drill-acct {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 8px 5px 20px;
+      border-bottom: 1px solid var(--border-faint);
+      cursor: pointer;
+      user-select: none;
+    }
+    .fs-drill-acct:hover { background: var(--surface2); }
+    .fs-drill-acct.drill-open { background: var(--surface2); }
+    .fs-drill-acct-name { font-size: 11px; color: var(--text-mid); }
+    .fs-drill-acct-meta { font-size: 10px; color: var(--text-dim); font-family: 'DM Mono', monospace; margin-left: 6px; }
+    .fs-drill-acct-amt { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); flex-shrink: 0; margin-left: 8px; }
+    .fs-drill-tie { font-size: 10px; font-family: 'DM Mono', monospace; padding: 4px 8px 4px 20px; color: var(--text-dim); }
+    .fs-drill-tie.mismatch { color: var(--terra); font-weight: 600; }
+    .fs-drill-L2 {
+      background: var(--surface2);
+      border-top: 1px solid var(--border-faint);
+      padding: 4px 8px 4px 36px;
+    }
+    .fs-drill-txn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .fs-drill-txn:last-of-type { border-bottom: none; }
+    .fs-drill-txn-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
+    .fs-drill-txn-desc { flex: 1; font-size: 11px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .fs-drill-txn-amt { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text); flex-shrink: 0; }
+    .fs-drill-l2-tie { font-size: 10px; font-family: 'DM Mono', monospace; padding: 3px 0; margin-top: 3px; border-top: 1px solid var(--border-faint); color: var(--text-dim); }
+    .fs-drill-l2-tie.mismatch { color: var(--terra); font-weight: 600; }
+
     /* ── Cash + Liquidity ────────────────────────────── */
     .cash-grid {
       display: grid;
@@ -1842,16 +1890,22 @@
         .filter(([, v]) => v > 0)
         .sort(([, a], [, b]) => b - a)
         .map(([ch, amt]) => `
-          <div class="fs-line">
-            <span class="fs-line-name">${esc(CH_LABEL[ch] ?? ch)}</span>
+          <div class="fs-line drill-able"
+               data-section="revenue" data-channel="${esc(ch)}" data-category=""
+               data-period="${period}" data-amt="${amt}"
+               onclick="expandFsLine(this)">
+            <span class="fs-line-name"><span class="fs-caret">▶</span>${esc(CH_LABEL[ch] ?? ch)}</span>
             <span class="fs-line-amt">${fmt(amt)}</span>
           </div>`).join('');
 
       const cogsRows = Object.entries(byCogs)
         .filter(([, v]) => v > 0)
         .map(([cat, amt]) => `
-          <div class="fs-line">
-            <span class="fs-line-name">${esc(cat)}</span>
+          <div class="fs-line drill-able"
+               data-section="cogs" data-channel="" data-category="${esc(cat)}"
+               data-period="${period}" data-amt="${amt}"
+               onclick="expandFsLine(this)">
+            <span class="fs-line-name"><span class="fs-caret">▶</span>${esc(cat)}</span>
             <span class="fs-line-amt">${fmt(amt)}</span>
           </div>`).join('');
 
@@ -1859,8 +1913,11 @@
         .filter(([, v]) => v > 0)
         .sort(([, a], [, b]) => b - a)
         .map(([cat, amt]) => `
-          <div class="fs-line">
-            <span class="fs-line-name">${esc(cat)}</span>
+          <div class="fs-line drill-able"
+               data-section="opex" data-channel="" data-category="${esc(cat)}"
+               data-period="${period}" data-amt="${amt}"
+               onclick="expandFsLine(this)">
+            <span class="fs-line-name"><span class="fs-caret">▶</span>${esc(cat)}</span>
             <span class="fs-line-amt">${fmt(amt)}</span>
           </div>`).join('');
 
@@ -2135,6 +2192,150 @@
         : `<div style="color:var(--text-dim);font-size:11px;font-family:'DM Mono',monospace">No detail lines found</div>`;
     } catch(e) {
       drillEl.innerHTML = `<div class="err-note">Drill failed: ${e.message}</div>`;
+    }
+  };
+
+  // ── P&L two-level drill (full P&L statement view) ────────────────────
+  // Level 1: P&L line → accounts that compose it
+  window.expandFsLine = async function(lineEl) {
+    const { section, channel, category, period } = lineEl.dataset;
+    const parentAmt = parseFloat(lineEl.dataset.amt || '0');
+    const slug = (channel || category || 'all').replace(/\W/g, '_');
+    const drillId = `fsdl-${section}-${slug}-${period.replace(/-/g, '')}`;
+
+    const existing = document.getElementById(drillId);
+    if (existing) {
+      existing.remove();
+      lineEl.classList.remove('drill-open');
+      const caret = lineEl.querySelector('.fs-caret');
+      if (caret) caret.textContent = '▶';
+      return;
+    }
+    lineEl.classList.add('drill-open');
+    const caret = lineEl.querySelector('.fs-caret');
+    if (caret) caret.textContent = '▼';
+
+    const drillEl = document.createElement('div');
+    drillEl.id = drillId;
+    drillEl.className = 'fs-drill-L1';
+    drillEl.innerHTML = `<div class="skel" style="margin:6px;height:30px;border-radius:4px;width:calc(100% - 12px)"></div>`;
+    lineEl.insertAdjacentElement('afterend', drillEl);
+
+    try {
+      const params = new URLSearchParams({ section, period: `month:${period}`, limit: '50' });
+      if (channel)  params.set('channel', channel);
+      if (category) params.set('category', category);
+      const data = await api('/finance/pnl/account-lines?' + params);
+      const lines = data.lines ?? [];
+
+      if (!lines.length) {
+        drillEl.innerHTML = `<div style="padding:8px 20px;font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace">No account detail found</div>`;
+        return;
+      }
+
+      const drillSum = Math.round(lines.reduce((s, l) => s + (Number(l.amount) || 0), 0) * 100) / 100;
+      const tied = Math.abs(drillSum - parentAmt) < 0.02;
+
+      drillEl.innerHTML =
+        lines.map((l, i) => `
+          <div class="fs-drill-acct" id="${drillId}-a${i}"
+               data-account="${esc(l.account)}"
+               data-accounttype="${l.account_type ?? ''}"
+               data-period="${period}"
+               data-amt="${l.amount ?? 0}"
+               onclick="expandFsAccount(this)">
+            <span style="display:flex;align-items:center;min-width:0;overflow:hidden">
+              <span class="fs-caret">▶</span>
+              <span class="fs-drill-acct-name">${esc(l.account)}</span>
+              <span class="fs-drill-acct-meta">${l.je_line_count} JE${l.je_line_count !== 1 ? 's' : ''} · ${l.first_entry_date?.slice(5) ?? ''}–${l.last_entry_date?.slice(5) ?? ''}</span>
+            </span>
+            <span class="fs-drill-acct-amt">${fmt(l.amount ?? 0)}</span>
+          </div>`).join('') +
+        `<div class="fs-drill-tie ${tied ? '' : 'mismatch'}">
+          ${tied
+            ? `✓ ${lines.length} account${lines.length !== 1 ? 's' : ''} · sum ties to P&L line`
+            : `⚠ Account sum ${fmt(drillSum)} ≠ P&L line ${fmt(parentAmt)} — tie break`}
+        </div>`;
+    } catch(e) {
+      drillEl.innerHTML = `<div class="err-note" style="margin:6px">Drill failed: ${esc(e.message)}</div>`;
+      lineEl.classList.remove('drill-open');
+      if (caret) caret.textContent = '▶';
+    }
+  };
+
+  // Level 2: account → transactions in that account
+  window.expandFsAccount = async function(acctEl) {
+    const { account: accountName, accounttype, period } = acctEl.dataset;
+    const parentAmt = parseFloat(acctEl.dataset.amt || '0');
+    const l2Id = acctEl.id + '-l2';
+
+    const existing = document.getElementById(l2Id);
+    if (existing) {
+      existing.remove();
+      acctEl.classList.remove('drill-open');
+      const caret = acctEl.querySelector('.fs-caret');
+      if (caret) caret.textContent = '▶';
+      return;
+    }
+    acctEl.classList.add('drill-open');
+    const caret = acctEl.querySelector('.fs-caret');
+    if (caret) caret.textContent = '▼';
+
+    const l2El = document.createElement('div');
+    l2El.id = l2Id;
+    l2El.className = 'fs-drill-L2';
+    l2El.innerHTML = `<div class="skel" style="height:22px;border-radius:4px;width:100%"></div>`;
+    acctEl.insertAdjacentElement('afterend', l2El);
+
+    try {
+      const data = await api(`/finance/gl/recent-entries?period=${encodeURIComponent(period)}&account=${encodeURIComponent(accountName)}&limit=200`);
+      const entries = data.entries ?? [];
+      const isRevenue = ['revenue', 'other_income'].includes(accounttype);
+      const capped = entries.length === 200;
+
+      // Exact-match lines for this account, compute net impact
+      const txns = [];
+      for (const e of entries) {
+        for (const l of (e.lines ?? [])) {
+          if (l.account_name === accountName) {
+            const amt = isRevenue
+              ? ((l.credit ?? 0) - (l.debit ?? 0))
+              : ((l.debit ?? 0) - (l.credit ?? 0));
+            if (Math.abs(amt) > 0.001) {
+              txns.push({ date: e.entry_date, desc: e.description, source: e.source_type, isRev: e.is_reversal, amt });
+            }
+          }
+        }
+      }
+      txns.sort((a, b) => b.date.localeCompare(a.date));
+
+      if (!txns.length) {
+        l2El.innerHTML = `<div style="font-size:10px;color:var(--text-dim);font-family:'DM Mono',monospace;padding:2px 0">No transactions found${capped ? ' (limit 200)' : ''}</div>`;
+        return;
+      }
+
+      const txnSum = Math.round(txns.reduce((s, t) => s + t.amt, 0) * 100) / 100;
+      const tied = !capped && Math.abs(txnSum - parentAmt) < 0.02;
+
+      l2El.innerHTML =
+        txns.map(t => `
+          <div class="fs-drill-txn">
+            <span class="fs-drill-txn-date">${t.date.slice(5)}</span>
+            <span class="fs-drill-txn-desc">${esc(t.desc)}</span>
+            <span class="src-chip ${t.isRev ? 'reversal' : ''}" style="font-size:9px;padding:1px 4px;flex-shrink:0">${esc((t.source ?? '').replace(/_/g, ' '))}</span>
+            <span class="fs-drill-txn-amt">${fmt(t.amt)}</span>
+          </div>`).join('') +
+        `<div class="fs-drill-l2-tie ${(!tied && !capped) ? 'mismatch' : ''}">
+          ${capped
+            ? `⚠ Capped at 200 entries — partial sum ${fmt(txnSum)}`
+            : tied
+              ? `✓ ${txns.length} txn${txns.length !== 1 ? 's' : ''} · sum ties to account`
+              : `⚠ Txn sum ${fmt(txnSum)} ≠ account ${fmt(parentAmt)}`}
+        </div>`;
+    } catch(e) {
+      l2El.innerHTML = `<div style="font-size:10px;color:var(--terra);font-family:'DM Mono',monospace">Failed: ${esc(e.message)}</div>`;
+      acctEl.classList.remove('drill-open');
+      if (caret) caret.textContent = '▶';
     }
   };
 
