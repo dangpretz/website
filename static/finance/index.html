@@ -459,6 +459,107 @@
       color: var(--text);
     }
 
+    /* ── Full P&L financial statement ───────────────── */
+    .fs-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 28px;
+    }
+    .fs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .fs-month-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .fs-ni { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; }
+    .fs-ni.positive { color: var(--amber); }
+    .fs-ni.negative { color: var(--terra); }
+    .fs-section-head {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin: 20px 0 6px;
+    }
+    .fs-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .fs-line:last-of-type { border-bottom: none; }
+    .fs-line-name { font-size: 13px; color: var(--text-mid); padding-left: 8px; }
+    .fs-line-amt { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text); }
+    .fs-subtotal {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 9px 0 6px;
+      border-top: 1px solid var(--border);
+      margin-top: 2px;
+    }
+    .fs-subtotal-label { font-size: 12px; color: var(--text); font-weight: 500; }
+    .fs-subtotal-amt { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: var(--text); }
+    .fs-margin { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-mid); margin-left: 8px; }
+    .fs-gp-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 12px 0 10px;
+      margin: 8px 0 0;
+      border-top: 2px solid var(--border);
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .fs-gp-label { font-size: 13px; color: var(--text); font-weight: 500; }
+    .fs-gp-amt { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; color: var(--text); }
+    .fs-da-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      opacity: 0.65;
+      border-bottom: 1px solid var(--border-faint);
+    }
+    .fs-da-name { font-size: 12px; color: var(--text-mid); font-style: italic; }
+    .fs-da-amt { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-mid); }
+    .fs-ni-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 14px 0 6px;
+      border-top: 2px solid var(--border);
+      margin-top: 10px;
+    }
+    .fs-ni-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .fs-ni-val { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+    .fs-ni-val.positive { color: var(--amber); }
+    .fs-ni-val.negative { color: var(--terra); }
+    .fs-footnote {
+      margin-top: 14px;
+      font-size: 11px;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border-faint);
+      padding-top: 10px;
+      line-height: 1.6;
+    }
+
     /* ── Cash + Liquidity ────────────────────────────── */
     .cash-grid {
       display: grid;
@@ -1672,10 +1773,13 @@
           const ni = m.net_income;
           const niClass = ni >= 0 ? 'positive' : 'negative';
           const isCurr  = m.is_current;
-          const src     = m.source === 'live' ? 'MTD' : 'closed';
+          const da      = m.depreciation_amort ?? 0;
           return `
             <div class="pnl-col ${isCurr ? 'current' : ''}">
-              <div class="pnl-col-month">${fmtMonth(m.period)}</div>
+              <div class="pnl-col-month">
+                ${fmtMonth(m.period)}
+                ${isCurr ? '<div style="font-size:9px;color:var(--text-dim);margin-top:2px;font-weight:400;line-height:1.3">full month · incl. accruals</div>' : ''}
+              </div>
               <div class="pnl-col-row">
                 <span class="pnl-col-key">Revenue</span>
                 <span class="pnl-col-val">${fmt(m.revenue)}</span>
@@ -1688,13 +1792,20 @@
                 <span class="pnl-col-key">Expenses</span>
                 <span class="pnl-col-val">${fmt(m.expense)}</span>
               </div>
+              ${da > 0 ? `
+              <div class="pnl-col-row" style="opacity:0.6">
+                <span class="pnl-col-key" style="font-size:10px;padding-left:8px">D&amp;A (non-cash)</span>
+                <span class="pnl-col-val" style="font-size:10px">${fmt(da)}</span>
+              </div>
+              ` : ''}
               <div class="pnl-col-row">
                 <span class="pnl-col-key">Margin</span>
                 <span class="pnl-col-val label">${fmtPct(m.gross_margin_pct)}</span>
               </div>
               <div class="pnl-col-ni">
-                <div class="pnl-col-ni-label">Net income${isCurr ? ' (' + src + ')' : ''}</div>
+                <div class="pnl-col-ni-label">Net income${isCurr ? ' (full month)' : ''}</div>
                 <div class="pnl-col-ni-val ${niClass}">${fmt(ni)}</div>
+                ${isCurr && da > 0 ? `<div style="font-size:9px;color:var(--text-dim);margin-top:4px">D&amp;A is non-cash — reduces NI, not cash</div>` : ''}
               </div>
             </div>
           `;
@@ -1704,75 +1815,123 @@
   }
 
   async function loadMonthDetail(period) {
-    $('pnl-body').innerHTML = `<div class="skel" style="width:100%;height:160px;border-radius:10px"></div>`;
+    const now = new Date();
+    const curPeriod = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+    const isCurr = period === curPeriod;
+    $('pnl-body').innerHTML = `<div class="skel" style="width:100%;height:420px;border-radius:10px"></div>`;
     try {
       const pnl = await api(`/finance/pnl/live?period=month:${period}`);
-      const cur  = pnl.current ?? pnl;
+      const cur = pnl.current ?? pnl;
       const byChannel = cur.revenue?.by_channel ?? {};
-      const gross     = cur.revenue?.gross ?? cur.revenue?.total ?? 0;
-      const ni        = cur.net_income ?? (pnl.net_income ?? null);
-      const niClass   = (ni ?? 0) >= 0 ? 'positive' : 'negative';
+      const byCogs    = cur.cogs?.by_category ?? {};
+      const byOpex    = cur.opex?.by_category ?? {};
+      const revTotal  = cur.revenue?.total ?? cur.revenue?.gross ?? 0;
+      const cogsTotal = cur.cogs?.total ?? 0;
+      const grossPft  = cur.gross_profit ?? (revTotal - cogsTotal);
+      const grossPct  = cur.gross_margin_pct ?? (revTotal > 0 ? (grossPft / revTotal * 100) : 0);
+      const opexTotal = cur.opex?.total ?? 0;
+      const da        = cur.other_expense ?? 0;
+      const ni        = cur.net_income ?? 0;
+      const niClass   = ni >= 0 ? 'positive' : 'negative';
 
-      const chRows = Object.entries(byChannel)
+      const revRows = Object.entries(byChannel)
         .filter(([, v]) => v > 0)
-        .sort(([,a],[,b]) => b - a)
-        .map(([ch, amt]) => {
-          const label = CH_LABEL[ch] ?? ch;
-          const color = CH_COLOR[ch] ?? '#4A4A44';
-          return `
-            <div class="pnl-detail-ch-row expandable" onclick="drillChannel(event,'revenue','${jss(ch)}','${period}','${jss(label)}')" title="Click to see account breakdown">
-              <div class="ch-dot" style="background:${color};flex-shrink:0"></div>
-              <div class="pnl-detail-ch-name">${label} <span style="color:var(--text-dim);font-size:10px">↓</span></div>
-              <div class="pnl-detail-ch-amt">${fmt(amt)}</div>
-            </div>
-          `;
-        }).join('');
+        .sort(([, a], [, b]) => b - a)
+        .map(([ch, amt]) => `
+          <div class="fs-line">
+            <span class="fs-line-name">${esc(CH_LABEL[ch] ?? ch)}</span>
+            <span class="fs-line-amt">${fmt(amt)}</span>
+          </div>`).join('');
+
+      const cogsRows = Object.entries(byCogs)
+        .filter(([, v]) => v > 0)
+        .map(([cat, amt]) => `
+          <div class="fs-line">
+            <span class="fs-line-name">${esc(cat)}</span>
+            <span class="fs-line-amt">${fmt(amt)}</span>
+          </div>`).join('');
+
+      const opexRows = Object.entries(byOpex)
+        .filter(([, v]) => v > 0)
+        .sort(([, a], [, b]) => b - a)
+        .map(([cat, amt]) => `
+          <div class="fs-line">
+            <span class="fs-line-name">${esc(cat)}</span>
+            <span class="fs-line-amt">${fmt(amt)}</span>
+          </div>`).join('');
 
       $('pnl-body').innerHTML = `
-        <div class="pnl-detail fade">
-          <div class="pnl-detail-header">
-            <div class="pnl-detail-month">${fmtMonth(period)}</div>
-            ${ni != null
-              ? `<div class="pnl-detail-ni ${niClass}">NI ${fmt(ni)}</div>`
-              : ''}
+        <div class="fs-wrap fade">
+          <div class="fs-header">
+            <div class="fs-month-label">${fmtMonth(period)}${isCurr ? '<span style="font-size:10px;color:var(--text-dim);margin-left:8px;font-weight:400">full month · incl. accruals</span>' : ''}</div>
+            <div class="fs-ni ${niClass}">${ni >= 0 ? '+' : ''}${fmt(ni)}</div>
           </div>
-          <div class="pnl-detail-channels">${chRows || '<div class="err-note">No channel breakdown available</div>'}</div>
-          <div class="pnl-detail-total-row">
-            <span class="pnl-detail-total-label">Total Revenue</span>
-            <span class="pnl-detail-total-amt">${fmt(gross)}</span>
+
+          <div class="fs-section-head">Revenue</div>
+          ${revRows || '<div class="fs-line"><span class="fs-line-name">No revenue recorded</span><span class="fs-line-amt">—</span></div>'}
+          <div class="fs-subtotal">
+            <span class="fs-subtotal-label">Total Revenue</span>
+            <span class="fs-subtotal-amt">${fmt(revTotal)}</span>
           </div>
+
+          <div class="fs-section-head">Cost of Goods Sold</div>
+          ${cogsRows || '<div class="fs-line"><span class="fs-line-name">No COGS</span><span class="fs-line-amt">—</span></div>'}
+          <div class="fs-subtotal">
+            <span class="fs-subtotal-label">Total COGS</span>
+            <span class="fs-subtotal-amt">${fmt(cogsTotal)}</span>
+          </div>
+
+          <div class="fs-gp-row">
+            <span class="fs-gp-label">Gross Profit <span class="fs-margin">${fmtPct(grossPct)} margin</span></span>
+            <span class="fs-gp-amt">${fmt(grossPft)}</span>
+          </div>
+
+          <div class="fs-section-head" style="margin-top:16px">Operating Expenses</div>
+          ${opexRows || '<div class="fs-line"><span class="fs-line-name">No operating expenses</span><span class="fs-line-amt">—</span></div>'}
+          <div class="fs-subtotal">
+            <span class="fs-subtotal-label">Total OpEx</span>
+            <span class="fs-subtotal-amt">${fmt(opexTotal)}</span>
+          </div>
+
+          ${da > 0 ? `
+          <div class="fs-da-line">
+            <span class="fs-da-name">D&amp;A (non-cash) — depreciation &amp; amortization</span>
+            <span class="fs-da-amt">(${fmt(da)})</span>
+          </div>` : ''}
+
+          <div class="fs-ni-row">
+            <span class="fs-ni-label">Net Income</span>
+            <span class="fs-ni-val ${niClass}">${ni >= 0 ? '+' : ''}${fmt(ni)}</span>
+          </div>
+
+          ${da > 0 ? `<div class="fs-footnote">D&amp;A is a non-cash charge — it reduces net income but not cash.${isCurr ? ' Current month includes committed month-end accruals (scheduled depreciation).' : ''}</div>` : ''}
         </div>
       `;
     } catch(e) {
-      $('pnl-body').innerHTML = `<div class="err-note">Could not load ${fmtMonth(period)}: ${e.message}</div>`;
+      $('pnl-body').innerHTML = `<div class="err-note">Could not load ${fmtMonth(period)}: ${esc(e.message)}</div>`;
     }
   }
 
   function buildPnlTabs(months) {
     const tabsEl = $('pnl-tabs');
-    // One tab per quad month (newest → oldest from right to left)
-    const sorted = [...months].reverse(); // most recent first
+    const currentPeriod = months.find(m => m.is_current)?.period ?? '';
+    // Fixed Jan–Jun 2026, newest first
+    const all2026 = ['2026-06','2026-05','2026-04','2026-03','2026-02','2026-01'];
     let html = `
       <button class="pnl-tab active" data-period="quad" onclick="switchPnl('quad',this)">
         All months
       </button>
     `;
-    sorted.forEach(m => {
-      const isCurr = m.is_current;
+    all2026.forEach(p => {
+      const isCurr = p === currentPeriod;
       html += `
         <button class="pnl-tab ${isCurr ? 'current-month' : ''}"
-                data-period="${m.period}"
-                onclick="switchPnl('${m.period}',this)">
-          ${fmtMonth(m.period)}${isCurr ? ' ·' : ''}
+                data-period="${p}"
+                onclick="switchPnl('${p}',this)">
+          ${fmtMonth(p)}${isCurr ? ' ·' : ''}
         </button>
       `;
     });
-    html += `
-      <input type="month" class="pnl-picker" id="pnl-picker"
-             title="Pick any month"
-             onchange="switchPnl(this.value, null)"
-             max="${sorted[0]?.period ?? ''}" min="2025-01">
-    `;
     tabsEl.innerHTML = html;
   }
 
@@ -2457,9 +2616,10 @@
 
   // ── Activity tab ─────────────────────────────────────────────────────
   async function loadActivityTab() {
-    const [queueResult, glResult] = await Promise.allSettled([
+    const now = new Date();
+    const curMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+    const [queueResult] = await Promise.allSettled([
       api('/finance/cfo/review-queue?limit=50'),
-      api('/finance/gl/recent-entries?limit=60'),
     ]);
 
     // Categorization queue — READ-ONLY. No action buttons.
@@ -2499,40 +2659,74 @@
 
     // GL transaction log — filterable
     buildGlControls();
-    renderGlEntries(glResult);
+    await switchGlPeriod(curMonth, document.querySelector(`[data-glperiod="${curMonth}"]`));
   }
 
   // GL period/filter controls
-  let glPeriod = null; // null = current month
+  let glPeriod = null;
   let glAccountFilter = '';
+  let glChannelFilter = '';
+  let glLoadedEntries = []; // full unfiltered set for client-side channel filter
 
   function buildGlControls() {
     const now = new Date();
-    const months = [];
-    for (let i = 0; i < 4; i++) {
-      const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1);
-      const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
-      months.push(m);
-    }
-    $('gl-controls').innerHTML = months.map((m, i) => `
-      <button class="pnl-tab ${i===0?'active':''}" data-glperiod="${m}"
-        onclick="switchGlPeriod('${jss(m)}', this)">${fmtMonth(m)}</button>
-    `).join('') + `
+    const curMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+    const months2026 = ['2026-06','2026-05','2026-04','2026-03','2026-02','2026-01'];
+    $('gl-controls').innerHTML = `
+      <button class="pnl-tab" data-glperiod="all" onclick="switchGlPeriod('all',this)">All 2026</button>
+      ${months2026.map(m => `
+        <button class="pnl-tab ${m === curMonth ? 'active current-month' : ''}" data-glperiod="${m}"
+          onclick="switchGlPeriod('${m}',this)">${fmtMonth(m)}${m === curMonth ? ' ·' : ''}</button>
+      `).join('')}
       <input type="text" class="pnl-picker" id="gl-account-filter" placeholder="Filter account…"
         style="width:140px" oninput="glFilterAccount(this.value)">
+      <select class="pnl-picker" id="gl-channel-filter" onchange="glFilterChannel(this.value)"
+        style="min-width:120px;cursor:pointer">
+        <option value="">All channels</option>
+      </select>
     `;
+  }
+
+  function populateChannelSelect(entries) {
+    const sel = $('gl-channel-filter');
+    if (!sel) return;
+    const channels = new Set();
+    entries.forEach(e => e.lines?.forEach(l => { if (l.channel) channels.add(l.channel); }));
+    sel.innerHTML = '<option value="">All channels</option>' +
+      [...channels].sort().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    sel.value = glChannelFilter; // sync select to JS state ('' when period switched)
   }
 
   window.switchGlPeriod = async function(period, btn) {
     glPeriod = period;
+    glChannelFilter = '';
     document.querySelectorAll('[data-glperiod]').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
-    $('gl-body').innerHTML = `<div class="skel" style="width:100%;height:80px;border-radius:6px"></div>`;
+    $('gl-body').innerHTML = `<div class="skel" style="width:100%;height:120px;border-radius:6px"></div>`;
     try {
-      const params = new URLSearchParams({ period, limit: '80' });
-      if (glAccountFilter) params.set('account', glAccountFilter);
-      const data = await api('/finance/gl/recent-entries?' + params);
-      renderGlEntries({ status: 'fulfilled', value: data });
+      let allEntries = [];
+      let periodLabel = '';
+      if (period === 'all') {
+        // Load all 6 months in parallel (correct YYYY-MM format)
+        const months = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
+        const results = await Promise.allSettled(
+          months.map(m => api(`/finance/gl/recent-entries?period=${m}&limit=200`))
+        );
+        results.forEach(r => {
+          if (r.status === 'fulfilled') allEntries.push(...(r.value.entries ?? []));
+        });
+        allEntries.sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+        periodLabel = 'All 2026';
+      } else {
+        const params = new URLSearchParams({ period, limit: '200' });
+        if (glAccountFilter) params.set('account', glAccountFilter);
+        const data = await api('/finance/gl/recent-entries?' + params);
+        allEntries = data.entries ?? [];
+        periodLabel = fmtMonth(period);
+      }
+      glLoadedEntries = allEntries;
+      populateChannelSelect(allEntries);
+      applyGlFilters(periodLabel);
     } catch(e) {
       $('gl-body').innerHTML = `<div class="err-note">GL load failed: ${esc(e.message)}</div>`;
     }
@@ -2542,18 +2736,26 @@
     glAccountFilter = val;
   };
 
-  function renderGlEntries(result) {
-    if (result.status !== 'fulfilled') {
-      $('gl-body').innerHTML = `<div class="err-note">GL entries unavailable</div>`;
-      return;
+  window.glFilterChannel = function(val) {
+    glChannelFilter = val;
+    const periodLabel = glPeriod === 'all' ? 'All 2026' : fmtMonth(glPeriod ?? '');
+    applyGlFilters(periodLabel);
+  };
+
+  function applyGlFilters(periodLabel) {
+    let entries = glLoadedEntries;
+    if (glChannelFilter) {
+      entries = entries.filter(e => e.lines?.some(l => l.channel === glChannelFilter));
     }
-    const data = result.value ?? result;
-    const entries = data.entries ?? [];
-    if (!entries.length) {
+    renderGlEntries(entries, periodLabel);
+  }
+
+  function renderGlEntries(entries, periodLabel) {
+    if (!entries || !entries.length) {
       $('gl-body').innerHTML = `<div style="color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px;padding:12px 0">No posted entries for this period.</div>`;
       return;
     }
-    const rows = entries.slice(0, 80).map(e => {
+    const rows = entries.map(e => {
       const isReversal = e.is_reversal;
       const srcChip = `<span class="src-chip ${isReversal ? 'reversal' : ''}">${esc((e.source_type ?? '').replace(/_/g,' '))}</span>`;
       const mainLine = e.lines?.[0] ?? {};
@@ -2581,7 +2783,7 @@
     }).join('');
 
     $('gl-body').innerHTML = `
-      <div class="glance-sub" style="margin-bottom:10px">${esc(String(entries.length))} entries · ${esc(data.period ?? '')}</div>
+      <div class="glance-sub" style="margin-bottom:10px">${esc(String(entries.length))} entries · ${esc(periodLabel ?? '')}</div>
       <table class="data-table">
         <thead><tr><th>Date</th><th>Description</th><th>Account</th><th>Channel</th><th>Amount</th><th>Source</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -2653,7 +2855,7 @@
     const [beResult, quadResult, cashResult, liqResult, arResult, pnlResult] =
       await Promise.allSettled([
         api('/finance/forecasting/breakeven-tracker'),
-        api('/finance/monthly-pl/quad'),
+        api('/finance/pnl/live/quad'),
         api('/finance/canonical/cash-on-hand'),
         api('/finance/forecasting/liquidity?horizon=90'),
         api('/finance/ar-aging'),
