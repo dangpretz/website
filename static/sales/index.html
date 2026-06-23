@@ -255,19 +255,48 @@ textarea{resize:vertical;min-height:70px}
 #toast.show{opacity:1;transform:none}
 
 /* ── Responsive ── */
+/* ── Mobile nav header ── */
+.mobile-header{display:none;padding:12px 16px;background:var(--dark);align-items:center;gap:12px;position:sticky;top:0;z-index:100;flex-shrink:0}
+.mobile-menu-btn{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px}
+.mobile-header-title{font-size:15px;font-weight:700;color:#fff;flex:1}
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199}
+.sidebar-backdrop.open{display:block}
+
 @media(max-width:768px){
   .stat-grid{grid-template-columns:1fr 1fr}
-  .kanban-col{width:200px}
+  .kanban-col{width:210px}
   .view{padding:16px}
-  #sidebar{width:180px}
-  :root{--sidebar-w:180px}
   .two-col,.form-row{grid-template-columns:1fr}
   .info-grid{grid-template-columns:1fr}
   .metrics-row{grid-template-columns:1fr 1fr}
 }
 @media(max-width:560px){
   .stat-grid{grid-template-columns:1fr}
-  #sidebar{display:none}
+  .metrics-row{grid-template-columns:1fr 1fr}
+  .mobile-header{display:flex}
+  /* Sidebar becomes a fixed slide-in drawer */
+  #sidebar{
+    position:fixed;left:0;top:0;height:100vh;
+    z-index:200;width:260px;
+    transform:translateX(-100%);
+    transition:transform .25s ease;
+    box-shadow:none;
+  }
+  #sidebar.open{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,.35)}
+  /* Modals become bottom sheets */
+  .modal-backdrop{align-items:flex-end;padding:0}
+  .modal{max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;margin:0}
+  /* Ensure #app fills screen without sidebar taking layout space */
+  #app{display:block}
+  #main{display:flex;flex-direction:column;min-height:100vh}
+  .view{padding:14px}
+  /* Better touch scrolling on kanban */
+  .kanban{-webkit-overflow-scrolling:touch;padding-bottom:16px}
+  /* Table horizontal scroll */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* Detail action buttons wrap */
+  #detail-content .view-header,
+  #detail-content>div:first-of-type+div{flex-wrap:wrap}
 }
 </style>
 </head>
@@ -304,8 +333,17 @@ textarea{resize:vertical;min-height:70px}
     </div>
   </nav>
 
+  <!-- Mobile sidebar backdrop -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
   <!-- Main -->
   <div id="main">
+
+    <!-- Mobile header (hidden on desktop) -->
+    <div class="mobile-header" id="mobile-header">
+      <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+      <span class="mobile-header-title" id="mobile-header-title">Dashboard</span>
+    </div>
 
     <!-- Dashboard -->
     <div id="view-dashboard" class="view active">
@@ -831,15 +869,30 @@ function getActiveDeal(accountId) {
   return active[0] || deals.sort((a,b) => (b.timeStamp||'').localeCompare(a.timeStamp||''))[0];
 }
 
+// ── Mobile sidebar ────────────────────────────────────────────────────────────
+function openMobileSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-backdrop').classList.add('open');
+}
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+}
+
 // ── Navigation ────────────────────────────────────────────────────────────────
+const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', reports:'Reports', settings:'Settings' };
+
 function navigate(view, params = {}) {
   currentView = view;
+  closeMobileSidebar();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.sidebar-nav li').forEach(li => li.classList.remove('active'));
   const viewEl = document.getElementById(`view-${view}`);
   if (viewEl) viewEl.classList.add('active');
   const navItem = document.querySelector(`.sidebar-nav li[data-view="${view === 'account-detail' ? 'accounts' : view}"]`);
   if (navItem) navItem.classList.add('active');
+  const titleEl = document.getElementById('mobile-header-title');
+  if (titleEl) titleEl.textContent = VIEW_TITLES[view] || '';
   if (view === 'dashboard') renderDashboard();
   else if (view === 'accounts') renderAccounts();
   else if (view === 'account-detail') { currentAccountId = params.id; renderAccountDetail(params.id); }
@@ -978,14 +1031,14 @@ function renderAccounts() {
   }).join('');
 
   document.getElementById('accounts-table-wrap').innerHTML = `
-    <div class="card" style="overflow:hidden">
+    <div class="card" style="overflow:hidden"><div class="tbl-wrap">
       <table class="tbl">
         <thead><tr>
           <th>Account</th><th>Segment</th><th>Status</th><th>Last Contact</th><th>Next Follow-up</th><th>Actions</th>
         </tr></thead>
         <tbody>${rows || '<tr><td colspan="6" class="empty">No accounts match your filters.</td></tr>'}</tbody>
       </table>
-    </div>`;
+    </div></div>`;
 
   document.querySelectorAll('.clickable[data-account-id]').forEach(row => {
     row.addEventListener('click', e => {
@@ -1110,7 +1163,7 @@ function renderDetailTab(tab, id, a, m, deal) {
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-red btn-sm" data-log-order="${id}">Log Order</button>
       </div>
-      ${orders.length ? `<div class="card" style="overflow:hidden">
+      ${orders.length ? `<div class="card" style="overflow:hidden"><div class="tbl-wrap">
         <table class="tbl">
           <thead><tr><th>Date</th><th>Items</th><th>Volume</th><th>Value</th></tr></thead>
           <tbody>
@@ -1118,7 +1171,7 @@ function renderDetailTab(tab, id, a, m, deal) {
             <tr class="totals"><td colspan="3">Total</td><td>${fmt$(total)}</td></tr>
           </tbody>
         </table>
-      </div>` : '<div class="empty"><div class="empty-icon">📦</div>No orders logged yet.</div>'}`;
+      </div></div>` : '<div class="empty"><div class="empty-icon">📦</div>No orders logged yet.</div>'}`;
   }
   if (tab === 'tasks') {
     const tasks = [...STATE.tasks.values()].filter(t => t.accountId === id).sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
@@ -1145,7 +1198,7 @@ function renderDetailTab(tab, id, a, m, deal) {
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-red btn-sm" data-log-sample="${id}">Log Sample</button>
       </div>
-      ${samples.length ? `<div class="card" style="overflow:hidden">
+      ${samples.length ? `<div class="card" style="overflow:hidden"><div class="tbl-wrap">
         <table class="tbl">
           <thead><tr><th>Product</th><th>Qty</th><th>Date Sent</th><th>Outcome</th></tr></thead>
           <tbody>${samples.map(s => `<tr>
@@ -1154,7 +1207,7 @@ function renderDetailTab(tab, id, a, m, deal) {
             <td>${badge(capitalize(s.outcome), s.outcome)}</td>
           </tr>`).join('')}</tbody>
         </table>
-      </div>` : '<div class="empty"><div class="empty-icon">📦</div>No samples logged yet.</div>'}`;
+      </div></div>` : '<div class="empty"><div class="empty-icon">📦</div>No samples logged yet.</div>'}`;
   }
   return '';
 }
@@ -1381,7 +1434,7 @@ function renderRevenueReport() {
           <div class="bar-val">${fmt$(segRevenue[s])}</div>
         </div>`).join('')}
     </div>
-    <div class="card" style="overflow:hidden">
+    <div class="card" style="overflow:hidden"><div class="tbl-wrap">
       <table class="tbl">
         <thead><tr><th>Account</th><th>Segment</th><th># Orders</th><th>Total Revenue</th><th>Avg Order Value</th></tr></thead>
         <tbody>
@@ -1394,7 +1447,7 @@ function renderRevenueReport() {
           </tr>`).join('') : '<tr><td colspan="5" class="empty">No orders in this date range.</td></tr>'}
         </tbody>
       </table>
-    </div>`;
+    </div></div>`;
 
   document.getElementById('rev-filter-btn')?.addEventListener('click', renderCurrentReport);
   document.getElementById('rev-from')?.addEventListener('change', renderCurrentReport);
@@ -1433,7 +1486,7 @@ function renderReorderReport() {
       </label>
       <button class="btn btn-outline btn-sm" id="reorder-export-btn" style="margin-left:auto">↓ Export CSV</button>
     </div>
-    <div class="card" style="overflow:hidden">
+    <div class="card" style="overflow:hidden"><div class="tbl-wrap">
       <table class="tbl">
         <thead><tr><th>Account</th><th>Segment</th><th>Last Order</th><th>Days Since</th><th>Avg Freq (days)</th><th>Status</th></tr></thead>
         <tbody>
@@ -1459,7 +1512,7 @@ function renderReorderReport() {
           }).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div></div>`;
 
   document.getElementById('reorder-threshold')?.addEventListener('change', renderCurrentReport);
   document.getElementById('reorder-export-btn')?.addEventListener('click', () => {
@@ -1850,6 +1903,10 @@ function bindAll() {
 
   // Logout
   document.getElementById('logout-btn').addEventListener('click', logout);
+
+  // Mobile menu
+  document.getElementById('mobile-menu-btn').addEventListener('click', openMobileSidebar);
+  document.getElementById('sidebar-backdrop').addEventListener('click', closeMobileSidebar);
 
   // Sidebar nav
   document.getElementById('sidebar-nav').addEventListener('click', e => {
