@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales CRM · Dangerous Pretzel Co.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C41E1E;--red-dk:#8B0000;--dark:#1A1A1A;
+  --amber:#f0ad4e;--green:#2a7a2a;--blue:#2563eb;
+  --gray-1:#f5f5f5;--gray-2:#e8e8e8;--gray-3:#999;--gray-4:#666;
+  --sidebar-w:220px;--sidebar-bg:#1A1A1A;--sidebar-border:#333;
+  --bg:#f0f0f0;--card:#fff;--border:#e0e0e0;--text:#1A1A1A;--text2:#555;
+  --radius:6px;--shadow:0 1px 4px rgba(0,0,0,.08);
+}
+body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+
+/* ── Login ── */
+#login-overlay{position:fixed;inset:0;background:var(--dark);display:flex;align-items:center;justify-content:center;z-index:9999}
+#login-overlay[hidden]{display:none}
+.login-box{background:#fff;border-radius:10px;padding:48px 40px;width:340px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.login-logo{font-size:36px;margin-bottom:8px}
+.login-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.login-sub{color:var(--gray-3);font-size:13px;margin-bottom:28px}
+.login-input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);font:600 15px 'Manrope',sans-serif;margin-bottom:12px;outline:none}
+.login-input:focus{border-color:var(--red);box-shadow:0 0 0 2px rgba(196,30,30,.15)}
+.login-btn{width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:var(--radius);font:700 15px 'Manrope',sans-serif;cursor:pointer}
+.login-btn:hover{background:var(--red-dk)}
+.login-err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+
+/* ── App shell ── */
+#app{display:flex;min-height:100vh}
+#app[hidden]{display:none}
+
+/* ── Sidebar ── */
+#sidebar{width:var(--sidebar-w);background:var(--sidebar-bg);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:20px 20px 16px;font-size:15px;font-weight:800;color:#fff;border-bottom:1px solid var(--sidebar-border);letter-spacing:.3px}
+.sidebar-nav{list-style:none;padding:10px 0;flex:1}
+.sidebar-nav li{padding:10px 20px;color:#a0a0a8;font-weight:600;font-size:13px;cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.sidebar-nav li:hover{color:#fff;background:rgba(255,255,255,.05)}
+.sidebar-nav li.active{color:#fff;border-left-color:var(--red);background:rgba(255,255,255,.07)}
+.sidebar-footer{padding:16px 20px;border-top:1px solid var(--sidebar-border)}
+#logout-btn{width:100%;padding:8px;background:transparent;border:1px solid #444;border-radius:var(--radius);color:#888;font:600 12px 'Manrope',sans-serif;cursor:pointer}
+#logout-btn:hover{border-color:#666;color:#ccc}
+
+/* ── Main content ── */
+#main{flex:1;overflow:auto;min-width:0}
+.view{display:none;padding:28px 32px;min-height:100vh}
+.view.active{display:block}
+.view-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.view-title{font-size:22px;font-weight:800}
+.breadcrumb{font-size:13px;color:var(--gray-3);margin-bottom:16px;cursor:pointer}
+.breadcrumb:hover{color:var(--red)}
+
+/* ── Stat cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.stat-card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray-3);margin-bottom:6px}
+.stat-card-value{font-size:28px;font-weight:800}
+.stat-card-value.red{color:var(--red)}
+.stat-card-value.amber{color:var(--amber)}
+
+/* ── Cards / panels ── */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+.card-body{padding:16px 20px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);font:600 13px 'Manrope',sans-serif;cursor:pointer;border:none;transition:background .15s}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:var(--red-dk)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{background:var(--gray-1)}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-ghost{background:transparent;border:none;color:var(--red);font:600 13px 'Manrope',sans-serif;cursor:pointer;padding:0}
+.btn-ghost:hover{text-decoration:underline}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.badge-restaurant{background:#fde8e8;color:#b91c1c}
+.badge-institution{background:#dbeafe;color:#1d4ed8}
+.badge-distributor{background:#d1fae5;color:#065f46}
+.badge-active{background:#d1fae5;color:#065f46}
+.badge-inactive{background:var(--gray-2);color:var(--gray-4)}
+.badge-prospect{background:#fff7ed;color:#c2410c}
+.badge-won{background:#d1fae5;color:#065f46}
+.badge-lost{background:#fee2e2;color:#b91c1c}
+.badge-quoted{background:#dbeafe;color:#1d4ed8}
+.badge-follow-up,.badge-follow_up{background:#fef9c3;color:#854d0e}
+.badge-lead{background:var(--gray-2);color:var(--gray-4)}
+.badge-high{background:#fee2e2;color:#b91c1c}
+.badge-medium{background:#fef9c3;color:#854d0e}
+.badge-low{background:var(--gray-2);color:var(--gray-4)}
+.badge-pending{background:#fff7ed;color:#c2410c}
+.badge-liked{background:#d1fae5;color:#065f46}
+.badge-disliked{background:#fee2e2;color:#b91c1c}
+.badge-converted{background:#dbeafe;color:#1d4ed8}
+.badge-call{background:#f3e8ff;color:#6b21a8}
+.badge-email{background:#dbeafe;color:#1d4ed8}
+.badge-in-person,.badge-in_person{background:#d1fae5;color:#065f46}
+.badge-text{background:#fef9c3;color:#854d0e}
+
+/* ── Tables ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-3);border-bottom:2px solid var(--border);white-space:nowrap}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#fafafa}
+.tbl tr.clickable{cursor:pointer}
+.tbl .totals td{font-weight:700;background:var(--gray-1);border-top:2px solid var(--border)}
+
+/* ── Forms / inputs ── */
+.form-group{margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:5px}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font:500 13px 'Manrope',sans-serif;outline:none;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{border-color:var(--red);box-shadow:0 0 0 2px rgba(196,30,30,.12)}
+textarea{resize:vertical;min-height:70px}
+.form-hint{font-size:11px;color:var(--gray-3);margin-top:3px}
+
+/* ── Search bar ── */
+.search-row{display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.search-input{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font:500 13px 'Manrope',sans-serif;outline:none}
+.search-input:focus{border-color:var(--red)}
+.filter-select{padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font:500 13px 'Manrope',sans-serif;background:#fff;cursor:pointer;outline:none}
+
+/* ── Pipeline / Kanban ── */
+.kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.kanban-col{flex-shrink:0;width:230px;background:var(--gray-1);border-radius:var(--radius);overflow:hidden}
+.kanban-col-header{padding:12px 14px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
+.kanban-col-header .col-meta{font-size:11px;font-weight:500;color:var(--gray-3);text-transform:none;letter-spacing:0}
+.kanban-body{padding:8px;min-height:120px;transition:background .15s}
+.kanban-body.drag-over{background:#e8e8e8}
+.kcard{background:#fff;border-radius:var(--radius);padding:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:grab;border-left:3px solid transparent}
+.kcard:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.kcard.dragging{opacity:.4;cursor:grabbing}
+.kcard-name{font-weight:700;font-size:13px;margin-bottom:5px}
+.kcard-meta{font-size:11px;color:var(--gray-3);display:flex;flex-direction:column;gap:2px}
+.kcard-value{font-size:12px;font-weight:700;color:var(--green);margin-top:6px}
+.kcard-stage-select{width:100%;margin-top:8px;padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:#f9f9f9}
+.col-lead .kanban-col-header{background:#e9e9e9;color:#555}
+.col-quoted .kanban-col-header{background:#dbeafe;color:#1d4ed8}
+.col-follow-up .kanban-col-header{background:#fef9c3;color:#854d0e}
+.col-won .kanban-col-header{background:#d1fae5;color:#065f46}
+.col-lost .kanban-col-header{background:#fee2e2;color:#b91c1c}
+.loss-reason-form{background:#fff8f8;border:1px solid #fca5a5;border-radius:var(--radius);padding:10px;margin-top:8px;font-size:12px}
+.loss-reason-form input{margin:6px 0;font-size:12px}
+.loss-reason-form .loss-actions{display:flex;gap:6px;margin-top:6px}
+
+/* ── Tasks ── */
+.task-section{margin-bottom:20px}
+.task-section-header{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:6px 0;margin-bottom:8px;border-bottom:2px solid}
+.task-section-header.overdue{color:var(--red);border-color:var(--red)}
+.task-section-header.today{color:#b45309;border-color:var(--amber)}
+.task-section-header.upcoming{color:#1d4ed8;border-color:#93c5fd}
+.task-section-header.later{color:var(--gray-4);border-color:var(--gray-2)}
+.task-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.task-row:last-child{border-bottom:none}
+.task-check{width:18px;height:18px;border:2px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.task-check:hover{border-color:var(--green)}
+.task-check.done{background:var(--green);border-color:var(--green)}
+.task-body{flex:1;min-width:0}
+.task-desc{font-weight:600;font-size:13px}
+.task-desc.done{text-decoration:line-through;color:var(--gray-3)}
+.task-meta{font-size:11px;color:var(--gray-3);margin-top:2px}
+.task-due{font-size:12px;color:var(--gray-4);white-space:nowrap}
+.task-due.overdue{color:var(--red);font-weight:700}
+
+/* ── Reports ── */
+.report-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)}
+.report-tab{padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--gray-3)}
+.report-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.report-controls{display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.bar-chart-wrap{margin-bottom:24px}
+.bar-chart-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-3);margin-bottom:12px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-label{font-size:12px;font-weight:600;width:120px;flex-shrink:0}
+.bar-track{flex:1;background:var(--gray-2);border-radius:4px;height:22px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;min-width:2px}
+.bar-fill.restaurant{background:#b91c1c}
+.bar-fill.institution{background:#1d4ed8}
+.bar-fill.distributor{background:#065f46}
+.bar-val{font-size:12px;font-weight:700;width:80px;text-align:right;flex-shrink:0}
+
+/* ── Account detail tabs ── */
+.detail-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)}
+.detail-tab{padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--gray-3)}
+.detail-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.detail-tab-content{display:none}
+.detail-tab-content.active{display:block}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.info-item label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-3);margin-bottom:3px}
+.info-item .val{font-size:13px;font-weight:500}
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.metric-box{background:var(--gray-1);border-radius:var(--radius);padding:14px;text-align:center}
+.metric-box .mv{font-size:20px;font-weight:800;margin-bottom:2px}
+.metric-box .ml{font-size:11px;color:var(--gray-3);font-weight:600}
+.comm-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.comm-row:last-child{border-bottom:none}
+.comm-type{flex-shrink:0}
+.comm-body .comm-date{font-size:11px;color:var(--gray-3);margin-bottom:2px}
+.comm-body .comm-summary{font-size:13px}
+
+/* ── Activity feed ── */
+.activity-list{font-size:13px}
+.activity-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.activity-icon{font-size:16px;flex-shrink:0;width:24px;text-align:center}
+.activity-body{flex:1;min-width:0}
+.activity-account{font-weight:700}
+.activity-sub{color:var(--gray-3);font-size:12px}
+.activity-date{font-size:11px;color:var(--gray-3);white-space:nowrap;margin-left:auto}
+
+/* ── At-risk list ── */
+.at-risk-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.at-risk-row:last-child{border-bottom:none}
+.at-risk-name{font-weight:600;flex:1}
+.at-risk-days{font-size:12px;font-weight:700;color:var(--red)}
+
+/* ── Pipeline snapshot ── */
+.pipeline-snap{display:flex;gap:8px;flex-wrap:wrap}
+.snap-pill{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.snap-pill .sp-count{font-size:16px;font-weight:800}
+.snap-lead{background:#e9e9e9;color:#555}
+.snap-quoted{background:#dbeafe;color:#1d4ed8}
+.snap-follow-up{background:#fef9c3;color:#854d0e}
+.snap-won{background:#d1fae5;color:#065f46}
+.snap-lost{background:#fee2e2;color:#b91c1c}
+
+/* ── Empty state ── */
+.empty{padding:40px;text-align:center;color:var(--gray-3);font-size:13px}
+.empty-icon{font-size:32px;margin-bottom:8px}
+
+/* ── Modals ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.open{display:flex}
+.modal{background:#fff;border-radius:10px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:800}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-3);line-height:1;padding:2px 6px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.modal-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px}
+
+/* ── Settings ── */
+.settings-section{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:16px}
+.settings-section h2{font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--dark);color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+
+/* ── Responsive ── */
+/* ── Mobile nav header ── */
+.mobile-header{display:none;padding:12px 16px;background:var(--dark);align-items:center;gap:12px;position:sticky;top:0;z-index:100;flex-shrink:0}
+.mobile-menu-btn{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;padding:2px 6px}
+.mobile-header-title{font-size:15px;font-weight:700;color:#fff;flex:1}
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199}
+.sidebar-backdrop.open{display:block}
+
+@media(max-width:768px){
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .kanban-col{width:210px}
+  .view{padding:16px}
+  .two-col,.form-row{grid-template-columns:1fr}
+  .info-grid{grid-template-columns:1fr}
+  .metrics-row{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .stat-grid{grid-template-columns:1fr}
+  .metrics-row{grid-template-columns:1fr 1fr}
+  .mobile-header{display:flex}
+  /* Sidebar becomes a fixed slide-in drawer */
+  #sidebar{
+    position:fixed;left:0;top:0;height:100vh;
+    z-index:200;width:260px;
+    transform:translateX(-100%);
+    transition:transform .25s ease;
+    box-shadow:none;
+  }
+  #sidebar.open{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,.35)}
+  /* Modals become bottom sheets */
+  .modal-backdrop{align-items:flex-end;padding:0}
+  .modal{max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;margin:0}
+  .view{padding:14px}
+  /* Better touch scrolling on kanban */
+  .kanban{-webkit-overflow-scrolling:touch;padding-bottom:16px}
+  /* Table horizontal scroll */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* Detail action buttons wrap */
+  #detail-content .view-header,
+  #detail-content>div:first-of-type+div{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">🥨</div>
+    <div class="login-title">DPC Sales CRM</div>
+    <div class="login-sub">Dangerous Pretzel Co. — Internal Tool</div>
+    <input type="password" id="pwd-input" class="login-input" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="login-btn">Sign In</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="app" hidden>
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">🥨 DPC Sales</div>
+    <ul class="sidebar-nav" id="sidebar-nav">
+      <li class="active" data-view="dashboard">📊 Dashboard</li>
+      <li data-view="accounts">🏢 Accounts</li>
+      <li data-view="pipeline">📋 Pipeline</li>
+      <li data-view="tasks">✅ Tasks</li>
+      <li data-view="reports">📈 Reports</li>
+      <li data-view="settings">⚙️ Settings</li>
+    </ul>
+    <div class="sidebar-footer">
+      <button id="logout-btn">Log Out</button>
+    </div>
+  </nav>
+
+  <!-- Mobile sidebar backdrop -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <!-- Main -->
+  <div id="main">
+
+    <!-- Mobile header (hidden on desktop) -->
+    <div class="mobile-header" id="mobile-header">
+      <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+      <span class="mobile-header-title" id="mobile-header-title">Dashboard</span>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="view-dashboard" class="view active">
+      <div class="view-header">
+        <div class="view-title">Dashboard</div>
+        <button class="btn btn-outline btn-sm" id="dash-refresh">↻ Refresh</button>
+      </div>
+      <div id="dash-content"></div>
+    </div>
+
+    <!-- Accounts list -->
+    <div id="view-accounts" class="view">
+      <div class="view-header">
+        <div class="view-title">Accounts</div>
+        <button class="btn btn-red btn-sm" id="new-account-btn">+ New Account</button>
+      </div>
+      <div class="search-row">
+        <input type="search" class="search-input" id="acct-search" placeholder="Search accounts…">
+        <select class="filter-select" id="acct-seg-filter">
+          <option value="">All Segments</option>
+          <option value="restaurant">Restaurant</option>
+          <option value="institution">Institution</option>
+          <option value="distributor">Distributor</option>
+        </select>
+        <select class="filter-select" id="acct-status-filter">
+          <option value="">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="prospect">Prospect</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div id="accounts-table-wrap"></div>
+    </div>
+
+    <!-- Account detail -->
+    <div id="view-account-detail" class="view">
+      <div id="detail-content"></div>
+    </div>
+
+    <!-- Pipeline -->
+    <div id="view-pipeline" class="view">
+      <div class="view-header">
+        <div class="view-title">Pipeline</div>
+        <button class="btn btn-red btn-sm" id="new-lead-btn">+ New Lead</button>
+      </div>
+      <div class="search-row">
+        <select class="filter-select" id="pipe-seg-filter">
+          <option value="">All Segments</option>
+          <option value="restaurant">Restaurant</option>
+          <option value="institution">Institution</option>
+          <option value="distributor">Distributor</option>
+        </select>
+        <select class="filter-select" id="pipe-status-filter">
+          <option value="">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="prospect">Prospect</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="kanban" id="kanban-board"></div>
+    </div>
+
+    <!-- Tasks -->
+    <div id="view-tasks" class="view">
+      <div class="view-header">
+        <div class="view-title">Tasks</div>
+        <button class="btn btn-red btn-sm" id="new-task-btn">+ New Task</button>
+      </div>
+      <div id="tasks-content"></div>
+    </div>
+
+    <!-- Reports -->
+    <div id="view-reports" class="view">
+      <div class="view-title" style="margin-bottom:20px">Reports</div>
+      <div class="report-tabs">
+        <div class="report-tab active" data-report="revenue">Revenue by Segment</div>
+        <div class="report-tab" data-report="reorder">Reorder Frequency</div>
+      </div>
+      <div id="report-content"></div>
+    </div>
+
+    <!-- Settings -->
+    <div id="view-settings" class="view">
+      <div class="view-title" style="margin-bottom:20px">Settings</div>
+      <div id="settings-content"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ── Modals ── -->
+<div class="modal-backdrop" id="modal-account">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-account-title">New Account</div>
+      <button class="modal-close" data-close="modal-account">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="acct-id">
+      <div class="form-row">
+        <div class="form-group"><label>Business Name *</label><input id="acct-name" placeholder="The Rustic Fork"></div>
+        <div class="form-group"><label>Segment *</label>
+          <select id="acct-segment">
+            <option value="">Select…</option>
+            <option value="restaurant">Restaurant / Food Service</option>
+            <option value="institution">Institution</option>
+            <option value="distributor">Distributor / Reseller</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Contact Name</label><input id="acct-contact-name" placeholder="Jane Smith"></div>
+        <div class="form-group"><label>Title</label><input id="acct-contact-title" placeholder="Purchasing Manager"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Phone</label><input id="acct-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label>Email</label><input id="acct-email" type="email" placeholder="jane@example.com"></div>
+      </div>
+      <div class="form-group"><label>Address</label><input id="acct-address" placeholder="123 Main St, City, ST 00000"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Status *</label>
+          <select id="acct-status">
+            <option value="prospect">Prospect</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Next Follow-up</label><input id="acct-followup" type="date"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="acct-notes" placeholder="Account notes…"></textarea></div>
+      <div class="modal-err" id="acct-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-account">Cancel</button>
+      <button class="btn btn-red" id="acct-save-btn">Save Account</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-deal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-deal-title">Deal</div>
+      <button class="modal-close" data-close="modal-deal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="deal-id">
+      <input type="hidden" id="deal-account-id">
+      <div class="form-row">
+        <div class="form-group"><label>Stage *</label>
+          <select id="deal-stage">
+            <option value="lead">Lead</option>
+            <option value="quoted">Quoted</option>
+            <option value="follow-up">Follow-up</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Deal Value ($)</label><input id="deal-value" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      </div>
+      <div class="form-group" id="deal-loss-group" style="display:none">
+        <label>Loss Reason</label><input id="deal-loss-reason" placeholder="Price, timing, competitor…">
+      </div>
+      <div class="modal-err" id="deal-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-deal">Cancel</button>
+      <button class="btn btn-red" id="deal-save-btn">Save Deal</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-task">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">New Task</div>
+      <button class="modal-close" data-close="modal-task">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="task-id">
+      <input type="hidden" id="task-account-id">
+      <div class="form-group"><label>Description *</label><input id="task-desc" placeholder="Call to follow up on proposal…"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Due Date *</label><input id="task-due" type="date"></div>
+        <div class="form-group"><label>Priority *</label>
+          <select id="task-priority">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="task-acct-group">
+        <label>Account</label>
+        <select id="task-account-select"><option value="">— Not linked —</option></select>
+      </div>
+      <div class="modal-err" id="task-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-task">Cancel</button>
+      <button class="btn btn-red" id="task-save-btn">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-comm">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-comm-title">Log Communication</div>
+      <button class="modal-close" data-close="modal-comm">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="comm-account-id">
+      <div class="form-row">
+        <div class="form-group"><label>Type *</label>
+          <select id="comm-type">
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="in-person">In-person</option>
+            <option value="text">Text</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Date *</label><input id="comm-date" type="date"></div>
+      </div>
+      <div class="form-group"><label>Summary *</label><textarea id="comm-summary" placeholder="Brief summary of the conversation…"></textarea></div>
+      <div class="modal-err" id="comm-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-comm">Cancel</button>
+      <button class="btn btn-red" id="comm-save-btn">Log Communication</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-order">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-order-title">Log Order</div>
+      <button class="modal-close" data-close="modal-order">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="order-account-id">
+      <div class="form-group"><label>Items / Products *</label><textarea id="order-items" placeholder="6.5oz Plain ×24, 10oz BBK ×12…"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Volume (units)</label><input id="order-volume" type="number" min="0" placeholder="36"></div>
+        <div class="form-group"><label>Value ($) *</label><input id="order-value" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      </div>
+      <div class="form-group"><label>Order Date *</label><input id="order-date" type="date"></div>
+      <div class="modal-err" id="order-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-order">Cancel</button>
+      <button class="btn btn-red" id="order-save-btn">Log Order</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-sample">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-sample-title">Log Sample Request</div>
+      <button class="modal-close" data-close="modal-sample">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sample-account-id">
+      <div class="form-row">
+        <div class="form-group"><label>Product *</label><input id="sample-product" placeholder="10oz Plain Pretzel"></div>
+        <div class="form-group"><label>Quantity *</label><input id="sample-qty" type="number" min="1" placeholder="2"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Date Sent *</label><input id="sample-date" type="date"></div>
+        <div class="form-group"><label>Outcome</label>
+          <select id="sample-outcome">
+            <option value="pending">Pending</option>
+            <option value="liked">Liked</option>
+            <option value="disliked">Disliked</option>
+            <option value="converted">Converted</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-err" id="sample-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-sample">Cancel</button>
+      <button class="btn btn-red" id="sample-save-btn">Log Sample</button>
+    </div>
+  </div>
+</div>
+
+
+<script type="module">
+import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+
+// ── Config ──────────────────────────────────────────────────────────────────
+const LOG_PATH = '/dangpretz/sales-crm';
+const DEFAULT_HASH = '9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2';
+const SESSION_KEY = 'crm-auth';
+const PWD_KEY = 'crm-pwd-hash';
+const RISK_KEY = 'crm-risk-days';
+
+// ── State ────────────────────────────────────────────────────────────────────
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [] };
+let currentView = 'dashboard';
+let currentAccountId = null;
+let currentDetailTab = 'overview';
+let currentReportTab = 'revenue';
+let pendingDragDeal = null; // { dealId, targetStage } waiting for loss reason
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+const genId = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt$ = n => '$' + Number(n||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtDate = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
+const today = () => new Date().toISOString().split('T')[0];
+const daysAgo = s => { if (!s) return Infinity; const ms = new Date(today()) - new Date(s); return Math.floor(ms / 86400000); };
+const daysUntil = s => { if (!s) return Infinity; const ms = new Date(s) - new Date(today()); return Math.floor(ms / 86400000); };
+const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+const badge = (val, cls) => `<span class="badge badge-${esc(cls||val)}">${esc(val)}</span>`;
+const segBadge = s => badge(capitalize(s), s);
+const stageBadge = s => badge(capitalize(s?.replace('-',' ')), s);
+const statusBadge = s => badge(capitalize(s), s);
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function toast(msg, ms = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function verifyPassword(pwd) {
+  const hash = await sha256(pwd);
+  const stored = localStorage.getItem(PWD_KEY) || DEFAULT_HASH;
+  return hash === stored;
+}
+
+async function login() {
+  const pwd = document.getElementById('pwd-input').value;
+  const errEl = document.getElementById('login-err');
+  errEl.textContent = '';
+  if (!pwd) { errEl.textContent = 'Enter your password.'; return; }
+  const ok = await verifyPassword(pwd);
+  if (!ok) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
+  const hash = await sha256(pwd);
+  sessionStorage.setItem(SESSION_KEY, hash);
+  showApp();
+}
+
+function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  document.getElementById('app').hidden = true;
+  document.getElementById('login-overlay').removeAttribute('hidden');
+  document.getElementById('pwd-input').value = '';
+  document.getElementById('login-err').textContent = '';
+}
+
+async function checkAuth() {
+  const token = sessionStorage.getItem(SESSION_KEY);
+  if (!token) return false;
+  const stored = localStorage.getItem(PWD_KEY) || DEFAULT_HASH;
+  return token === stored;
+}
+
+async function showApp() {
+  document.getElementById('login-overlay').hidden = true;
+  document.getElementById('app').removeAttribute('hidden');
+  await loadData();
+  navigate('dashboard');
+}
+
+// ── Seed Data ─────────────────────────────────────────────────────────────────
+const SEED = {
+  accounts: [
+    {id:'a01',name:'The Rustic Fork',segment:'restaurant',contactName:'Maria Gonzalez',contactTitle:'Owner',contactPhone:'(312) 555-0142',contactEmail:'maria@rusticfork.com',address:'847 N Milwaukee Ave, Chicago, IL 60642',status:'active',notes:'Great relationship. Reorders monthly. Prefers 10oz classic line.',nextFollowUp:'2026-07-10'},
+    {id:'a02',name:'Riverside Unified School District',segment:'institution',contactName:'Tom Hendricks',contactTitle:'Food Service Director',contactPhone:'(847) 555-0287',contactEmail:'thendricks@rusd.edu',address:'1200 Oak Park Rd, Riverside, IL 60546',status:'active',notes:'Quarterly procurement cycles. Needs formal PO. Lead time 3 weeks.',nextFollowUp:'2026-08-01'},
+    {id:'a03',name:'Metro Food Distributors',segment:'distributor',contactName:'Sandra Kim',contactTitle:'Purchasing Manager',contactPhone:'(773) 555-0394',contactEmail:'skim@metrofood.com',address:'4500 W Diversey Ave, Chicago, IL 60639',status:'active',notes:'Distributes to 40+ restaurant accounts. Wants monthly stock levels.',nextFollowUp:'2026-07-05'},
+    {id:'a04',name:'Casa Bella Bistro',segment:'restaurant',contactName:'Anthony Russo',contactTitle:'General Manager',contactPhone:'(312) 555-0511',contactEmail:'arusso@casabella.com',address:'220 N Clark St, Chicago, IL 60601',status:'active',notes:'Interested in full spicy line. Waiting on proposal from last meeting.',nextFollowUp:'2026-06-25'},
+    {id:'a05',name:'Downtown Catering Co.',segment:'restaurant',contactName:'Lisa Park',contactTitle:'Operations Lead',contactPhone:'(312) 555-0628',contactEmail:'lpark@dtcatering.com',address:'333 S Wacker Dr, Chicago, IL 60606',status:'prospect',notes:'High volume catering events. Sent pricing on 6/18. Awaiting decision.',nextFollowUp:'2026-06-24'},
+    {id:'a06',name:'City General Hospital',segment:'institution',contactName:'Robert Marsh',contactTitle:'Cafeteria Manager',contactPhone:'(312) 555-0745',contactEmail:'rmarsh@cgh.org',address:'1800 W Harrison St, Chicago, IL 60612',status:'active',notes:'Pre-packaged only. Needs allergen sheets with each order.',nextFollowUp:'2026-07-15'},
+    {id:'a07',name:'Fresh Market Supply Co.',segment:'distributor',contactName:'Derek Walsh',contactTitle:'Sales Rep',contactPhone:'(630) 555-0812',contactEmail:'dwalsh@freshmarket.com',address:'2200 E Ogden Ave, Lisle, IL 60532',status:'prospect',notes:'Cold intro via LinkedIn. Has suburban restaurant network.',nextFollowUp:'2026-07-02'},
+    {id:'a08',name:'The Craft Kitchen',segment:'restaurant',contactName:'Emily Torres',contactTitle:'Head Chef',contactPhone:'(773) 555-0937',contactEmail:'emily@craftkitchen.com',address:'1450 N Damen Ave, Chicago, IL 60622',status:'prospect',notes:'Sample sent — loved the plain. Follow up on conversion.',nextFollowUp:'2026-06-27'},
+    {id:'a09',name:'Northside Elementary School',segment:'institution',contactName:'Karen Bell',contactTitle:'Principal',contactPhone:'(773) 555-1024',contactEmail:'kbell@nside.edu',address:'5550 N Ravenswood Ave, Chicago, IL 60640',status:'active',notes:'Monthly lunch program. Small orders but consistent.',nextFollowUp:'2026-07-20'},
+    {id:'a10',name:'Gourmet Express Distribution',segment:'distributor',contactName:'James Okonkwo',contactTitle:'Account Director',contactPhone:'(312) 555-1118',contactEmail:'jokonkwo@gexpress.com',address:'6100 W 73rd St, Bedford Park, IL 60638',status:'active',notes:'Covers western suburbs. Growing fast. Potential for large volume.',nextFollowUp:'2026-07-08'},
+    {id:'a11',name:'Harbor View Restaurant',segment:'restaurant',contactName:'Chris Novak',contactTitle:'Owner',contactPhone:'(847) 555-1237',contactEmail:'chris@harborview.com',address:'800 Lake St, Evanston, IL 60201',status:'prospect',notes:'Cold outreach. Great location near tourist area. High foot traffic.',nextFollowUp:'2026-06-30'},
+    {id:'a12',name:'Lakewood Community College',segment:'institution',contactName:'Patricia Young',contactTitle:'Dining Services Coord.',contactPhone:'(708) 555-1345',contactEmail:'pyoung@lakewood.edu',address:'1100 W College Dr, Palos Hills, IL 60465',status:'prospect',notes:'Responded to flyer. RFP process expected in fall semester.',nextFollowUp:'2026-09-01'},
+  ],
+  deals: [
+    {id:'d01',accountId:'a01',stage:'won',value:'38000',lostReason:''},
+    {id:'d02',accountId:'a02',stage:'won',value:'24000',lostReason:''},
+    {id:'d03',accountId:'a03',stage:'won',value:'52000',lostReason:''},
+    {id:'d04',accountId:'a04',stage:'follow-up',value:'18000',lostReason:''},
+    {id:'d05',accountId:'a05',stage:'quoted',value:'11500',lostReason:''},
+    {id:'d06',accountId:'a06',stage:'won',value:'16000',lostReason:''},
+    {id:'d07',accountId:'a07',stage:'lead',value:'',lostReason:''},
+    {id:'d08',accountId:'a08',stage:'follow-up',value:'6000',lostReason:''},
+    {id:'d09',accountId:'a09',stage:'won',value:'9600',lostReason:''},
+    {id:'d10',accountId:'a10',stage:'quoted',value:'28000',lostReason:''},
+    {id:'d11',accountId:'a11',stage:'lead',value:'',lostReason:''},
+    {id:'d12',accountId:'a12',stage:'lead',value:'',lostReason:''},
+  ],
+  tasks: [
+    {id:'t01',accountId:'a04',description:'Follow up with Casa Bella re: proposal',dueDate:'2026-06-21',priority:'high',done:'false'},
+    {id:'t02',accountId:'a05',description:'Send pricing sheet to Downtown Catering',dueDate:'2026-06-22',priority:'high',done:'false'},
+    {id:'t03',accountId:'a03',description:'Check in with Metro Food on next order',dueDate:'2026-06-23',priority:'medium',done:'false'},
+    {id:'t04',accountId:'a02',description:'Quarterly review call with Riverside USD',dueDate:'2026-06-26',priority:'medium',done:'false'},
+    {id:'t05',accountId:'a11',description:'Qualify Harbor View Restaurant',dueDate:'2026-06-30',priority:'low',done:'false'},
+  ],
+  comms: [
+    {id:'c01',accountId:'a01',type:'call',date:'2026-06-20',summary:'Discussed July order — confirmed 3 cases 10oz plain, 2 cases BBK.'},
+    {id:'c02',accountId:'a02',type:'email',date:'2026-06-15',summary:'Sent Q3 proposal with updated pricing. Tom to review with superintendent.'},
+    {id:'c03',accountId:'a03',type:'in-person',date:'2026-06-18',summary:'Site visit to Metro warehouse. Reviewed inventory and confirmed reorder schedule.'},
+    {id:'c04',accountId:'a04',type:'call',date:'2026-06-17',summary:'Anthony interested in spicy bee and hot ranch. Requested written proposal.'},
+    {id:'c05',accountId:'a05',type:'email',date:'2026-06-18',summary:'Sent pricing sheet for catering event pretzels. Lisa confirmed receipt.'},
+    {id:'c06',accountId:'a06',type:'call',date:'2026-06-10',summary:'Robert confirmed allergen documentation received. Order placed for July.'},
+    {id:'c07',accountId:'a08',type:'in-person',date:'2026-06-12',summary:'Dropped off plain 10oz samples. Emily very positive, wants to try BBK next.'},
+    {id:'c08',accountId:'a01',type:'email',date:'2026-05-28',summary:'Sent updated SKU list and current pricing. Maria confirmed prices are competitive.'},
+    {id:'c09',accountId:'a03',type:'call',date:'2026-05-22',summary:'Monthly check-in. Metro planning larger May order based on restaurant demand.'},
+    {id:'c10',accountId:'a02',type:'email',date:'2026-05-10',summary:'Followed up on Q2 order. Tom confirmed delivery was on time and quality was excellent.'},
+    {id:'c11',accountId:'a06',type:'email',date:'2026-05-05',summary:'Sent quarterly allergen sheet update as requested.'},
+    {id:'c12',accountId:'a09',type:'call',date:'2026-05-15',summary:'Karen confirmed May lunch program dates. Adjusted delivery accordingly.'},
+  ],
+  orders: [
+    {id:'o01',accountId:'a01',date:'2026-06-05',items:'10oz Plain ×24, 10oz BBK ×12',volume:'36',value:'1980'},
+    {id:'o02',accountId:'a01',date:'2026-05-01',items:'10oz Plain ×48',volume:'48',value:'2160'},
+    {id:'o03',accountId:'a01',date:'2026-03-15',items:'10oz Plain ×24, 6.5oz Plain ×24',volume:'48',value:'1920'},
+    {id:'o04',accountId:'a02',date:'2026-06-01',items:'6.5oz Plain ×120, 6.5oz BBK ×60',volume:'180',value:'4320'},
+    {id:'o05',accountId:'a02',date:'2026-03-01',items:'6.5oz Plain ×120',volume:'120',value:'2400'},
+    {id:'o06',accountId:'a02',date:'2026-01-10',items:'6.5oz Plain ×96, 6.5oz BBK ×48',volume:'144',value:'3312'},
+    {id:'o07',accountId:'a03',date:'2026-06-10',items:'10oz Plain ×200, 10oz BBK ×100, 10oz Spicy Bee ×50',volume:'350',value:'11200'},
+    {id:'o08',accountId:'a03',date:'2026-04-15',items:'10oz Plain ×150, 10oz BBK ×75',volume:'225',value:'6750'},
+    {id:'o09',accountId:'a03',date:'2026-02-20',items:'10oz Plain ×100, 6.5oz Plain ×100',volume:'200',value:'5600'},
+    {id:'o10',accountId:'a03',date:'2026-01-05',items:'10oz Plain ×100',volume:'100',value:'2800'},
+    {id:'o11',accountId:'a04',date:'2026-05-20',items:'10oz Spicy Bee ×24, 6.5oz Spicy Bee ×24',volume:'48',value:'1980'},
+    {id:'o12',accountId:'a04',date:'2026-04-01',items:'10oz Plain ×24',volume:'24',value:'840'},
+    {id:'o13',accountId:'a05',date:'2026-06-01',items:'6.5oz Plain ×48 (trial)',volume:'48',value:'960'},
+    {id:'o14',accountId:'a06',date:'2026-06-08',items:'6.5oz Plain ×96, 6.5oz BBK ×48',volume:'144',value:'3024'},
+    {id:'o15',accountId:'a06',date:'2026-03-08',items:'6.5oz Plain ×120',volume:'120',value:'2400'},
+    {id:'o16',accountId:'a06',date:'2026-01-15',items:'6.5oz Plain ×96',volume:'96',value:'1728'},
+    {id:'o17',accountId:'a09',date:'2026-05-10',items:'6.5oz Plain ×60',volume:'60',value:'900'},
+    {id:'o18',accountId:'a09',date:'2026-02-10',items:'6.5oz Plain ×48',volume:'48',value:'720'},
+    {id:'o19',accountId:'a10',date:'2026-06-12',items:'10oz Plain ×300, 10oz BBK ×150',volume:'450',value:'13500'},
+    {id:'o20',accountId:'a10',date:'2026-04-10',items:'10oz Plain ×200, 10oz BBK ×100',volume:'300',value:'8400'},
+    {id:'o21',accountId:'a10',date:'2026-02-01',items:'10oz Plain ×150',volume:'150',value:'4200'},
+  ],
+  samples: [
+    {id:'s01',accountId:'a05',product:'Baseball Bats 10oz',quantity:'2',dateSent:'2026-06-10',outcome:'pending'},
+    {id:'s02',accountId:'a08',product:'10oz Plain Pretzel',quantity:'3',dateSent:'2026-06-12',outcome:'liked'},
+    {id:'s03',accountId:'a11',product:'6.5oz Plain Pretzel',quantity:'2',dateSent:'2026-06-05',outcome:'pending'},
+    {id:'s04',accountId:'a04',product:'10oz Spicy Bee',quantity:'2',dateSent:'2026-05-15',outcome:'converted'},
+  ],
+};
+
+function initSeedData() {
+  SEED.accounts.forEach(a => STATE.accounts.set(a.id, { ...a, action:'create_account' }));
+  SEED.deals.forEach(d => STATE.deals.set(d.id, { ...d, action:'create_deal' }));
+  SEED.tasks.forEach(t => STATE.tasks.set(t.id, { ...t, action:'create_task' }));
+  STATE.comms = SEED.comms.map(c => ({ ...c, action:'log_comm' }));
+  STATE.orders = SEED.orders.map(o => ({ ...o, action:'log_order' }));
+  STATE.samples = SEED.samples.map(s => ({ ...s, action:'log_sample' }));
+}
+
+function applyLogs(logs) {
+  for (const row of logs) {
+    const { action } = row;
+    if (action === 'create_account' || action === 'update_account') {
+      STATE.accounts.set(row.id, { ...(STATE.accounts.get(row.id) || {}), ...row });
+    } else if (action === 'create_deal' || action === 'update_deal') {
+      STATE.deals.set(row.id, { ...(STATE.deals.get(row.id) || {}), ...row });
+    } else if (action === 'create_task' || action === 'update_task') {
+      STATE.tasks.set(row.id, { ...(STATE.tasks.get(row.id) || {}), ...row });
+    } else if (action === 'log_comm') {
+      if (!STATE.comms.find(c => c.id === row.id)) STATE.comms.push(row);
+    } else if (action === 'log_order') {
+      if (!STATE.orders.find(o => o.id === row.id)) STATE.orders.push(row);
+    } else if (action === 'log_sample') {
+      if (!STATE.samples.find(s => s.id === row.id)) STATE.samples.push(row);
+    }
+  }
+}
+
+async function loadData() {
+  initSeedData();
+  try {
+    const logs = await fetchLog(LOG_PATH);
+    if (Array.isArray(logs)) applyLogs(logs);
+  } catch (_) { /* network issue — seed data still available */ }
+}
+
+// ── Computed metrics ──────────────────────────────────────────────────────────
+function getAccountMetrics(accountId) {
+  const orders = STATE.orders.filter(o => o.accountId === accountId).sort((a,b) => b.date.localeCompare(a.date));
+  const comms = STATE.comms.filter(c => c.accountId === accountId).sort((a,b) => b.date.localeCompare(a.date));
+  const totalRevenue = orders.reduce((s,o) => s + Number(o.value||0), 0);
+  const orderCount = orders.length;
+  const avgOrderValue = orderCount ? totalRevenue / orderCount : 0;
+  const lastOrderDate = orders[0]?.date || null;
+  const lastContactDate = comms[0]?.date || null;
+  let avgOrderFreq = null;
+  if (orders.length >= 2) {
+    const sorted = [...orders].sort((a,b) => a.date.localeCompare(b.date));
+    const gaps = [];
+    for (let i = 1; i < sorted.length; i++) {
+      gaps.push((new Date(sorted[i].date) - new Date(sorted[i-1].date)) / 86400000);
+    }
+    avgOrderFreq = Math.round(gaps.reduce((s,g) => s+g, 0) / gaps.length);
+  }
+  return { totalRevenue, orderCount, avgOrderValue, lastOrderDate, lastContactDate, avgOrderFreq };
+}
+
+function getActiveDeal(accountId) {
+  const deals = [...STATE.deals.values()].filter(d => d.accountId === accountId);
+  if (!deals.length) return null;
+  const active = deals.filter(d => !['won','lost'].includes(d.stage));
+  return active[0] || deals.sort((a,b) => (b.timeStamp||'').localeCompare(a.timeStamp||''))[0];
+}
+
+// ── Mobile sidebar ────────────────────────────────────────────────────────────
+function openMobileSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-backdrop').classList.add('open');
+}
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', reports:'Reports', settings:'Settings' };
+
+function navigate(view, params = {}) {
+  currentView = view;
+  closeMobileSidebar();
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav li').forEach(li => li.classList.remove('active'));
+  const viewEl = document.getElementById(`view-${view}`);
+  if (viewEl) viewEl.classList.add('active');
+  const navItem = document.querySelector(`.sidebar-nav li[data-view="${view === 'account-detail' ? 'accounts' : view}"]`);
+  if (navItem) navItem.classList.add('active');
+  const titleEl = document.getElementById('mobile-header-title');
+  if (titleEl) titleEl.textContent = VIEW_TITLES[view] || '';
+  if (view === 'dashboard') renderDashboard();
+  else if (view === 'accounts') renderAccounts();
+  else if (view === 'account-detail') { currentAccountId = params.id; renderAccountDetail(params.id); }
+  else if (view === 'pipeline') renderPipeline();
+  else if (view === 'tasks') renderTasks();
+  else if (view === 'reports') { renderReport(); }
+  else if (view === 'settings') renderSettings();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const tasks = [...STATE.tasks.values()];
+  const overdueTasks = tasks.filter(t => t.done !== 'true' && daysUntil(t.dueDate) < 0);
+  const pipelineDeals = [...STATE.deals.values()].filter(d => ['quoted','follow-up'].includes(d.stage));
+  const pipelineValue = pipelineDeals.reduce((s,d) => s + Number(d.value||0), 0);
+  const openDeals = [...STATE.deals.values()].filter(d => !['won','lost'].includes(d.stage)).length;
+  const riskDays = Number(localStorage.getItem(RISK_KEY) || 30);
+  const atRisk = [...STATE.accounts.values()].filter(a => {
+    const m = getAccountMetrics(a.id);
+    return a.status === 'active' && daysAgo(m.lastContactDate) >= riskDays;
+  });
+
+  const stageCounts = {};
+  ['lead','quoted','follow-up','won','lost'].forEach(s => stageCounts[s] = 0);
+  [...STATE.deals.values()].forEach(d => { if (d.stage) stageCounts[d.stage] = (stageCounts[d.stage]||0) + 1; });
+
+  const recentComms = [...STATE.comms].sort((a,b) => b.date.localeCompare(a.date)).slice(0,5);
+  const typeEmoji = {call:'📞',email:'✉️','in-person':'🤝',text:'💬'};
+
+  document.getElementById('dash-content').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-card-label">Overdue Tasks</div><div class="stat-card-value ${overdueTasks.length ? 'red' : ''}">${overdueTasks.length}</div></div>
+      <div class="stat-card"><div class="stat-card-label">Pipeline Value</div><div class="stat-card-value">${fmt$(pipelineValue)}</div></div>
+      <div class="stat-card"><div class="stat-card-label">Open Deals</div><div class="stat-card-value">${openDeals}</div></div>
+      <div class="stat-card"><div class="stat-card-label">At-Risk Accounts</div><div class="stat-card-value ${atRisk.length ? 'amber' : ''}">${atRisk.length}</div></div>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <div class="card-header">Pipeline Snapshot</div>
+          <div class="card-body">
+            <div class="pipeline-snap">
+              <div class="snap-pill snap-lead"><span class="sp-count">${stageCounts.lead}</span> Lead</div>
+              <div class="snap-pill snap-quoted"><span class="sp-count">${stageCounts.quoted}</span> Quoted</div>
+              <div class="snap-pill snap-follow-up"><span class="sp-count">${stageCounts['follow-up']}</span> Follow-up</div>
+              <div class="snap-pill snap-won"><span class="sp-count">${stageCounts.won}</span> Won</div>
+              <div class="snap-pill snap-lost"><span class="sp-count">${stageCounts.lost}</span> Lost</div>
+            </div>
+          </div>
+        </div>
+        ${overdueTasks.length ? `
+        <div class="card">
+          <div class="card-header">Overdue Tasks</div>
+          <div class="card-body" style="padding:8px 20px">
+            ${overdueTasks.map(t => {
+              const acct = STATE.accounts.get(t.accountId);
+              return `<div class="task-row">
+                <div class="task-body">
+                  <div class="task-desc" style="color:var(--red)">${esc(t.description)}</div>
+                  <div class="task-meta">${acct ? esc(acct.name) : ''} · Due ${fmtDate(t.dueDate)}</div>
+                </div>
+                ${badge(capitalize(t.priority),'high')}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header">Recent Activity</div>
+          <div class="card-body" style="padding:8px 20px">
+            ${recentComms.length ? `<div class="activity-list">${recentComms.map(c => {
+              const acct = STATE.accounts.get(c.accountId);
+              return `<div class="activity-item">
+                <div class="activity-icon">${typeEmoji[c.type]||'💬'}</div>
+                <div class="activity-body">
+                  <div class="activity-account">${esc(acct?.name||'Unknown')}</div>
+                  <div class="activity-sub">${esc(c.summary)}</div>
+                </div>
+                <div class="activity-date">${fmtDate(c.date)}</div>
+              </div>`;
+            }).join('')}</div>` : '<div class="empty">No activity logged yet.</div>'}
+          </div>
+        </div>
+        ${atRisk.length ? `
+        <div class="card">
+          <div class="card-header">At-Risk Accounts <span style="font-size:11px;font-weight:500;color:var(--gray-3)">(no contact ${riskDays}+ days)</span></div>
+          <div class="card-body" style="padding:8px 20px">
+            ${atRisk.map(a => {
+              const m = getAccountMetrics(a.id);
+              const days = daysAgo(m.lastContactDate);
+              return `<div class="at-risk-row">
+                <div class="at-risk-name" style="cursor:pointer;color:var(--red)" data-nav-account="${a.id}">${esc(a.name)}</div>
+                ${segBadge(a.segment)}
+                <div class="at-risk-days">${days === Infinity ? 'Never contacted' : days + 'd ago'}</div>
+                <button class="btn btn-outline btn-sm" data-log-comm="${a.id}">Log Contact</button>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+    </div>`;
+
+  document.querySelectorAll('[data-nav-account]').forEach(el => {
+    el.addEventListener('click', () => navigate('account-detail', { id: el.dataset.navAccount }));
+  });
+  document.querySelectorAll('[data-log-comm]').forEach(el => {
+    el.addEventListener('click', () => openCommModal(el.dataset.logComm));
+  });
+}
+
+// ── Accounts list ─────────────────────────────────────────────────────────────
+function renderAccounts() {
+  const search = document.getElementById('acct-search').value.toLowerCase();
+  const seg = document.getElementById('acct-seg-filter').value;
+  const status = document.getElementById('acct-status-filter').value;
+  let accounts = [...STATE.accounts.values()];
+  if (search) accounts = accounts.filter(a => a.name?.toLowerCase().includes(search) || a.contactName?.toLowerCase().includes(search));
+  if (seg) accounts = accounts.filter(a => a.segment === seg);
+  if (status) accounts = accounts.filter(a => a.status === status);
+  accounts.sort((a,b) => a.name.localeCompare(b.name));
+
+  const rows = accounts.map(a => {
+    const m = getAccountMetrics(a.id);
+    return `<tr class="clickable" data-account-id="${a.id}">
+      <td><strong>${esc(a.name)}</strong></td>
+      <td>${segBadge(a.segment)}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td>${fmtDate(m.lastContactDate)}</td>
+      <td>${fmtDate(a.nextFollowUp)}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" data-edit-acct="${a.id}" style="margin-right:4px">Edit</button>
+        <button class="btn btn-ghost btn-sm" data-log-comm="${a.id}">Log Contact</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('accounts-table-wrap').innerHTML = `
+    <div class="card" style="overflow:hidden"><div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Account</th><th>Segment</th><th>Status</th><th>Last Contact</th><th>Next Follow-up</th><th>Actions</th>
+        </tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" class="empty">No accounts match your filters.</td></tr>'}</tbody>
+      </table>
+    </div></div>`;
+
+  document.querySelectorAll('.clickable[data-account-id]').forEach(row => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      navigate('account-detail', { id: row.dataset.accountId });
+    });
+  });
+  document.querySelectorAll('[data-edit-acct]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openAccountModal(btn.dataset.editAcct); });
+  });
+  document.querySelectorAll('[data-log-comm]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openCommModal(btn.dataset.logComm); });
+  });
+}
+
+// ── Account Detail ────────────────────────────────────────────────────────────
+function renderAccountDetail(id) {
+  const a = STATE.accounts.get(id);
+  if (!a) { navigate('accounts'); return; }
+  const m = getAccountMetrics(id);
+  const deal = getActiveDeal(id);
+  const tabs = ['overview','communications','orders','tasks','samples'];
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="breadcrumb" id="back-to-accounts">← Accounts</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div>
+        <h1 style="font-size:24px;font-weight:800;margin-bottom:6px">${esc(a.name)}</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${segBadge(a.segment)} ${statusBadge(a.status)} ${deal ? stageBadge(deal.stage) : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" id="det-edit-btn">Edit</button>
+        <button class="btn btn-outline btn-sm" id="det-comm-btn">Log Contact</button>
+        <button class="btn btn-red btn-sm" id="det-order-btn">+ Order</button>
+        <button class="btn btn-outline btn-sm" id="det-sample-btn">+ Sample</button>
+      </div>
+    </div>
+    <div class="detail-tabs">
+      ${tabs.map(t => `<div class="detail-tab${t===currentDetailTab?' active':''}" data-tab="${t}">${capitalize(t)}</div>`).join('')}
+    </div>
+    <div id="detail-tab-content">${renderDetailTab(currentDetailTab, id, a, m, deal)}</div>`;
+
+  document.getElementById('back-to-accounts').addEventListener('click', () => navigate('accounts'));
+  document.getElementById('det-edit-btn').addEventListener('click', () => openAccountModal(id));
+  document.getElementById('det-comm-btn').addEventListener('click', () => openCommModal(id));
+  document.getElementById('det-order-btn').addEventListener('click', () => openOrderModal(id));
+  document.getElementById('det-sample-btn').addEventListener('click', () => openSampleModal(id));
+  document.querySelectorAll('.detail-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentDetailTab = tab.dataset.tab;
+      document.querySelectorAll('.detail-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === currentDetailTab));
+      document.getElementById('detail-tab-content').innerHTML = renderDetailTab(currentDetailTab, id, a, m, deal);
+      bindDetailTabActions(id);
+    });
+  });
+  bindDetailTabActions(id);
+}
+
+function renderDetailTab(tab, id, a, m, deal) {
+  if (tab === 'overview') {
+    return `
+      <div class="metrics-row">
+        <div class="metric-box"><div class="mv">${fmt$(m.totalRevenue)}</div><div class="ml">Lifetime Value</div></div>
+        <div class="metric-box"><div class="mv">${m.orderCount}</div><div class="ml">Total Orders</div></div>
+        <div class="metric-box"><div class="mv">${m.avgOrderFreq ? m.avgOrderFreq + 'd' : '—'}</div><div class="ml">Avg Reorder Freq.</div></div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">Contact Information</div>
+          <div class="card-body">
+            <div class="info-grid">
+              <div class="info-item"><label>Contact</label><div class="val">${esc(a.contactName||'—')}</div></div>
+              <div class="info-item"><label>Title</label><div class="val">${esc(a.contactTitle||'—')}</div></div>
+              <div class="info-item"><label>Phone</label><div class="val">${esc(a.contactPhone||'—')}</div></div>
+              <div class="info-item"><label>Email</label><div class="val">${a.contactEmail ? `<a href="mailto:${esc(a.contactEmail)}" style="color:var(--red)">${esc(a.contactEmail)}</a>` : '—'}</div></div>
+              <div class="info-item" style="grid-column:1/-1"><label>Address</label><div class="val">${esc(a.address||'—')}</div></div>
+              <div class="info-item"><label>Last Contact</label><div class="val">${fmtDate(m.lastContactDate)}</div></div>
+              <div class="info-item"><label>Next Follow-up</label><div class="val">${fmtDate(a.nextFollowUp)}</div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          ${deal ? `<div class="card" style="margin-bottom:16px">
+            <div class="card-header">Current Deal ${stageBadge(deal.stage)}</div>
+            <div class="card-body">
+              ${deal.value ? `<div style="font-size:20px;font-weight:800;color:var(--green);margin-bottom:4px">${fmt$(deal.value)}</div>` : ''}
+              ${deal.lostReason ? `<div style="font-size:12px;color:var(--gray-3)">Lost: ${esc(deal.lostReason)}</div>` : ''}
+              <button class="btn btn-outline btn-sm" style="margin-top:10px" data-edit-deal="${deal.id}">Update Deal</button>
+            </div>
+          </div>` : `<div class="card" style="margin-bottom:16px">
+            <div class="card-header">Deal</div>
+            <div class="card-body"><button class="btn btn-red btn-sm" data-new-deal="${id}">+ Create Deal</button></div>
+          </div>`}
+          ${a.notes ? `<div class="card">
+            <div class="card-header">Notes</div>
+            <div class="card-body" style="font-size:13px;line-height:1.5;white-space:pre-wrap">${esc(a.notes)}</div>
+          </div>` : ''}
+        </div>
+      </div>`;
+  }
+  if (tab === 'communications') {
+    const comms = STATE.comms.filter(c => c.accountId === id).sort((a,b) => b.date.localeCompare(a.date));
+    const typeEmoji = {call:'📞',email:'✉️','in-person':'🤝',text:'💬'};
+    return `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn btn-red btn-sm" data-log-comm="${id}">Log Communication</button>
+      </div>
+      ${comms.length ? comms.map(c => `
+        <div class="comm-row">
+          <div class="comm-type">${badge(capitalize(c.type),'badge-'+c.type)}</div>
+          <div class="comm-body" style="flex:1">
+            <div class="comm-date">${fmtDate(c.date)}</div>
+            <div class="comm-summary">${esc(c.summary)}</div>
+          </div>
+          <div style="font-size:18px;flex-shrink:0">${typeEmoji[c.type]||'💬'}</div>
+        </div>`).join('') : '<div class="empty"><div class="empty-icon">💬</div>No communications logged yet.</div>'}`;
+  }
+  if (tab === 'orders') {
+    const orders = STATE.orders.filter(o => o.accountId === id).sort((a,b) => b.date.localeCompare(a.date));
+    const total = orders.reduce((s,o) => s + Number(o.value||0), 0);
+    return `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn btn-red btn-sm" data-log-order="${id}">Log Order</button>
+      </div>
+      ${orders.length ? `<div class="card" style="overflow:hidden"><div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Items</th><th>Volume</th><th>Value</th></tr></thead>
+          <tbody>
+            ${orders.map(o => `<tr><td>${fmtDate(o.date)}</td><td>${esc(o.items)}</td><td>${esc(o.volume)||'—'}</td><td>${fmt$(o.value)}</td></tr>`).join('')}
+            <tr class="totals"><td colspan="3">Total</td><td>${fmt$(total)}</td></tr>
+          </tbody>
+        </table>
+      </div></div>` : '<div class="empty"><div class="empty-icon">📦</div>No orders logged yet.</div>'}`;
+  }
+  if (tab === 'tasks') {
+    const tasks = [...STATE.tasks.values()].filter(t => t.accountId === id).sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
+    return `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn btn-red btn-sm" data-new-task="${id}">New Task</button>
+      </div>
+      ${tasks.length ? tasks.map(t => {
+        const due = daysUntil(t.dueDate);
+        const isOverdue = due < 0 && t.done !== 'true';
+        return `<div class="task-row">
+          <div class="task-check${t.done==='true'?' done':''}" data-complete-task="${t.id}">${t.done==='true'?'✓':''}</div>
+          <div class="task-body">
+            <div class="task-desc${t.done==='true'?' done':''}">${esc(t.description)}</div>
+          </div>
+          ${badge(capitalize(t.priority), t.priority)}
+          <div class="task-due${isOverdue?' overdue':''}">${fmtDate(t.dueDate)}</div>
+        </div>`;
+      }).join('') : '<div class="empty"><div class="empty-icon">✅</div>No tasks for this account.</div>'}`;
+  }
+  if (tab === 'samples') {
+    const samples = STATE.samples.filter(s => s.accountId === id).sort((a,b) => b.dateSent?.localeCompare(a.dateSent));
+    return `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn btn-red btn-sm" data-log-sample="${id}">Log Sample</button>
+      </div>
+      ${samples.length ? `<div class="card" style="overflow:hidden"><div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Product</th><th>Qty</th><th>Date Sent</th><th>Outcome</th></tr></thead>
+          <tbody>${samples.map(s => `<tr>
+            <td>${esc(s.product)}</td><td>${esc(s.quantity)}</td>
+            <td>${fmtDate(s.dateSent)}</td>
+            <td>${badge(capitalize(s.outcome), s.outcome)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div></div>` : '<div class="empty"><div class="empty-icon">📦</div>No samples logged yet.</div>'}`;
+  }
+  return '';
+}
+
+function bindDetailTabActions(id) {
+  document.querySelectorAll('[data-log-comm]').forEach(btn => btn.addEventListener('click', () => openCommModal(btn.dataset.logComm)));
+  document.querySelectorAll('[data-log-order]').forEach(btn => btn.addEventListener('click', () => openOrderModal(btn.dataset.logOrder)));
+  document.querySelectorAll('[data-log-sample]').forEach(btn => btn.addEventListener('click', () => openSampleModal(btn.dataset.logSample)));
+  document.querySelectorAll('[data-new-task]').forEach(btn => btn.addEventListener('click', () => openTaskModal(btn.dataset.newTask)));
+  document.querySelectorAll('[data-complete-task]').forEach(el => el.addEventListener('click', () => completeTask(el.dataset.completeTask)));
+  document.querySelectorAll('[data-edit-deal]').forEach(btn => btn.addEventListener('click', () => openDealModal(btn.dataset.editDeal, null)));
+  document.querySelectorAll('[data-new-deal]').forEach(btn => btn.addEventListener('click', () => openDealModal(null, btn.dataset.newDeal)));
+}
+
+
+// ── Pipeline ──────────────────────────────────────────────────────────────────
+function renderPipeline() {
+  const segF = document.getElementById('pipe-seg-filter').value;
+  const statusF = document.getElementById('pipe-status-filter').value;
+  const stages = ['lead','quoted','follow-up','won','lost'];
+  const stageLabel = {lead:'Lead',quoted:'Quoted','follow-up':'Follow-up',won:'Won',lost:'Lost'};
+
+  const dealsByStage = {};
+  stages.forEach(s => dealsByStage[s] = []);
+  [...STATE.deals.values()].forEach(d => {
+    const acct = STATE.accounts.get(d.accountId);
+    if (!acct) return;
+    if (segF && acct.segment !== segF) return;
+    if (statusF && acct.status !== statusF) return;
+    if (dealsByStage[d.stage]) dealsByStage[d.stage].push({ deal: d, acct });
+  });
+
+  const board = document.getElementById('kanban-board');
+  board.innerHTML = stages.map(s => {
+    const items = dealsByStage[s];
+    const totalVal = items.reduce((sum, {deal}) => sum + Number(deal.value||0), 0);
+    const metaHtml = (s === 'quoted' || s === 'follow-up') && totalVal > 0
+      ? `<span class="col-meta">${fmt$(totalVal)}</span>` : `<span class="col-meta">${items.length}</span>`;
+    return `<div class="kanban-col col-${s}" data-stage="${s}">
+      <div class="kanban-col-header">${stageLabel[s]} ${metaHtml}</div>
+      <div class="kanban-body" data-stage="${s}">
+        ${items.map(({deal, acct}) => {
+          const m = getAccountMetrics(acct.id);
+          const borderColor = {lead:'#ccc',quoted:'#3b82f6','follow-up':'#d97706',won:'#16a34a',lost:'#dc2626'}[s];
+          return `<div class="kcard" draggable="true" data-deal-id="${deal.id}" data-account-id="${acct.id}" style="border-left-color:${borderColor}">
+            <div class="kcard-name" style="cursor:pointer" data-nav-account="${acct.id}">${esc(acct.name)}</div>
+            <div class="kcard-meta">
+              ${segBadge(acct.segment)}
+              <span>${m.lastContactDate ? 'Last: '+fmtDate(m.lastContactDate) : 'No contact yet'}</span>
+            </div>
+            ${deal.value ? `<div class="kcard-value">${fmt$(deal.value)}</div>` : ''}
+            ${deal.lostReason ? `<div style="font-size:11px;color:var(--gray-3);margin-top:4px">Lost: ${esc(deal.lostReason)}</div>` : ''}
+            <div id="loss-form-${deal.id}" style="display:none" class="loss-reason-form">
+              <strong style="font-size:11px">Loss reason</strong>
+              <input type="text" placeholder="Price, timing, competitor…" id="loss-input-${deal.id}">
+              <div class="loss-actions">
+                <button class="btn btn-sm" style="background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font:600 11px Manrope;padding:4px 10px" data-confirm-loss="${deal.id}">Confirm Lost</button>
+                <button class="btn btn-sm btn-outline" data-cancel-loss="${deal.id}">Cancel</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  bindPipelineDragDrop();
+  board.querySelectorAll('[data-nav-account]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); navigate('account-detail', { id: el.dataset.navAccount }); });
+  });
+  board.querySelectorAll('[data-confirm-loss]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const dealId = btn.dataset.confirmLoss;
+      const reason = document.getElementById(`loss-input-${dealId}`)?.value || '';
+      const deal = STATE.deals.get(dealId);
+      if (!deal) return;
+      await saveDeal({ ...deal, stage: 'lost', lostReason: reason });
+      renderPipeline();
+    });
+  });
+  board.querySelectorAll('[data-cancel-loss]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById(`loss-form-${btn.dataset.cancelLoss}`)?.style.setProperty('display','none');
+    });
+  });
+}
+
+function bindPipelineDragDrop() {
+  const board = document.getElementById('kanban-board');
+  board.querySelectorAll('.kcard').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', card.dataset.dealId);
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  });
+  board.querySelectorAll('.kanban-body').forEach(col => {
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const dealId = e.dataTransfer.getData('text/plain');
+      const targetStage = col.dataset.stage;
+      const deal = STATE.deals.get(dealId);
+      if (!deal || deal.stage === targetStage) return;
+      if (targetStage === 'lost') {
+        const lossForm = document.getElementById(`loss-form-${dealId}`);
+        if (lossForm) { lossForm.style.display = 'block'; lossForm.querySelector('input')?.focus(); }
+        return;
+      }
+      await saveDeal({ ...deal, stage: targetStage });
+      renderPipeline();
+    });
+  });
+}
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+function renderTasks() {
+  const allTasks = [...STATE.tasks.values()].sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
+  const open = allTasks.filter(t => t.done !== 'true');
+  const done = allTasks.filter(t => t.done === 'true').slice(0,5);
+
+  const groups = [
+    { key:'overdue', label:'Overdue', cls:'overdue', items: open.filter(t => daysUntil(t.dueDate) < 0) },
+    { key:'today',   label:'Due Today', cls:'today', items: open.filter(t => daysUntil(t.dueDate) === 0) },
+    { key:'upcoming',label:'Upcoming (7 days)', cls:'upcoming', items: open.filter(t => { const d = daysUntil(t.dueDate); return d > 0 && d <= 7; }) },
+    { key:'later',   label:'Later', cls:'later', items: open.filter(t => daysUntil(t.dueDate) > 7) },
+  ];
+
+  document.getElementById('tasks-content').innerHTML = groups.filter(g => g.items.length).map(g => `
+    <div class="task-section">
+      <div class="task-section-header ${g.cls}">${g.label} (${g.items.length})</div>
+      ${g.items.map(t => renderTaskRow(t, g.cls === 'overdue')).join('')}
+    </div>`).join('') +
+    (done.length ? `<div class="task-section">
+      <div class="task-section-header later">Recently Completed</div>
+      ${done.map(t => renderTaskRow(t, false)).join('')}
+    </div>` : '') +
+    (!open.length ? '<div class="empty"><div class="empty-icon">✅</div>All caught up! No open tasks.</div>' : '');
+
+  document.querySelectorAll('[data-complete-task]').forEach(el => {
+    el.addEventListener('click', () => completeTask(el.dataset.completeTask));
+  });
+  document.querySelectorAll('[data-task-account]').forEach(el => {
+    el.addEventListener('click', () => navigate('account-detail', { id: el.dataset.taskAccount }));
+  });
+}
+
+function renderTaskRow(t, isOverdue) {
+  const acct = STATE.accounts.get(t.accountId);
+  const isDone = t.done === 'true';
+  return `<div class="task-row">
+    <div class="task-check${isDone?' done':''}" data-complete-task="${t.id}">${isDone?'✓':''}</div>
+    <div class="task-body">
+      <div class="task-desc${isDone?' done':''}">${esc(t.description)}</div>
+      ${acct ? `<div class="task-meta"><span data-task-account="${acct.id}" style="cursor:pointer;color:var(--red)">${esc(acct.name)}</span></div>` : ''}
+    </div>
+    ${badge(capitalize(t.priority), t.priority)}
+    <div class="task-due${isOverdue&&!isDone?' overdue':''}">${fmtDate(t.dueDate)}</div>
+  </div>`;
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+function renderReport() {
+  const tabs = document.querySelectorAll('.report-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentReportTab = tab.dataset.report;
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.report === currentReportTab));
+      renderCurrentReport();
+    });
+  });
+  renderCurrentReport();
+}
+
+function renderCurrentReport() {
+  if (currentReportTab === 'revenue') renderRevenueReport();
+  else renderReorderReport();
+}
+
+function renderRevenueReport() {
+  const dfrom = document.getElementById('rev-from')?.value || new Date(Date.now() - 90*86400000).toISOString().split('T')[0];
+  const dto = document.getElementById('rev-to')?.value || today();
+  const segF = document.getElementById('rev-seg')?.value || '';
+
+  const filtered = STATE.orders.filter(o => o.date >= dfrom && o.date <= dto);
+  const accountMap = new Map();
+  filtered.forEach(o => {
+    const acct = STATE.accounts.get(o.accountId);
+    if (!acct) return;
+    if (segF && acct.segment !== segF) return;
+    if (!accountMap.has(o.accountId)) accountMap.set(o.accountId, { acct, orders:[], revenue:0, count:0 });
+    const entry = accountMap.get(o.accountId);
+    entry.orders.push(o);
+    entry.revenue += Number(o.value||0);
+    entry.count++;
+  });
+  const rows = [...accountMap.values()].sort((a,b) => b.revenue - a.revenue);
+
+  const segRevenue = {restaurant:0, institution:0, distributor:0};
+  rows.forEach(r => { if (segRevenue[r.acct.segment] !== undefined) segRevenue[r.acct.segment] += r.revenue; });
+  const maxSeg = Math.max(...Object.values(segRevenue), 1);
+
+  document.getElementById('report-content').innerHTML = `
+    <div class="report-controls">
+      <label style="text-transform:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">From <input type="date" id="rev-from" value="${dfrom}" style="width:auto;padding:6px 10px"></label>
+      <label style="text-transform:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">To <input type="date" id="rev-to" value="${dto}" style="width:auto;padding:6px 10px"></label>
+      <select class="filter-select" id="rev-seg" style="padding:7px 12px">
+        <option value="">All Segments</option>
+        <option value="restaurant">Restaurant</option>
+        <option value="institution">Institution</option>
+        <option value="distributor">Distributor</option>
+      </select>
+      <button class="btn btn-red btn-sm" id="rev-filter-btn">Apply</button>
+      <button class="btn btn-outline btn-sm" id="rev-export-btn" style="margin-left:auto">↓ Export CSV</button>
+    </div>
+    <div class="bar-chart-wrap">
+      <div class="bar-chart-title">Revenue by Segment</div>
+      ${['restaurant','institution','distributor'].map(s => `
+        <div class="bar-row">
+          <div class="bar-label">${capitalize(s)}</div>
+          <div class="bar-track"><div class="bar-fill ${s}" style="width:${(segRevenue[s]/maxSeg*100).toFixed(1)}%">${segRevenue[s] > 0 ? fmt$(segRevenue[s]) : ''}</div></div>
+          <div class="bar-val">${fmt$(segRevenue[s])}</div>
+        </div>`).join('')}
+    </div>
+    <div class="card" style="overflow:hidden"><div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Account</th><th>Segment</th><th># Orders</th><th>Total Revenue</th><th>Avg Order Value</th></tr></thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `<tr>
+            <td><strong>${esc(r.acct.name)}</strong></td>
+            <td>${segBadge(r.acct.segment)}</td>
+            <td>${r.count}</td>
+            <td>${fmt$(r.revenue)}</td>
+            <td>${fmt$(r.revenue/r.count)}</td>
+          </tr>`).join('') : '<tr><td colspan="5" class="empty">No orders in this date range.</td></tr>'}
+        </tbody>
+      </table>
+    </div></div>`;
+
+  document.getElementById('rev-filter-btn')?.addEventListener('click', renderCurrentReport);
+  document.getElementById('rev-from')?.addEventListener('change', renderCurrentReport);
+  document.getElementById('rev-to')?.addEventListener('change', renderCurrentReport);
+  document.getElementById('rev-seg')?.addEventListener('change', renderCurrentReport);
+  document.getElementById('rev-export-btn')?.addEventListener('click', () => {
+    exportCSV(
+      [['Account','Segment','Orders','Total Revenue','Avg Order Value'],
+       ...rows.map(r => [r.acct.name, r.acct.segment, r.count, r.revenue.toFixed(2), (r.revenue/r.count).toFixed(2)])],
+      `revenue-by-segment-${today()}.csv`
+    );
+  });
+}
+
+function renderReorderReport() {
+  const threshold = Number(document.getElementById('reorder-threshold')?.value || 30);
+
+  const acctData = [...STATE.accounts.values()]
+    .filter(a => a.status === 'active')
+    .map(a => {
+      const m = getAccountMetrics(a.id);
+      const daysSince = daysAgo(m.lastOrderDate);
+      return { acct: a, m, daysSince };
+    })
+    .sort((a,b) => b.daysSince - a.daysSince);
+
+  document.getElementById('report-content').innerHTML = `
+    <div class="report-controls">
+      <label style="text-transform:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+        Threshold
+        <select class="filter-select" id="reorder-threshold" style="width:auto;padding:6px 10px">
+          <option value="30"${threshold===30?' selected':''}>30 days</option>
+          <option value="60"${threshold===60?' selected':''}>60 days</option>
+          <option value="90"${threshold===90?' selected':''}>90 days</option>
+        </select>
+      </label>
+      <button class="btn btn-outline btn-sm" id="reorder-export-btn" style="margin-left:auto">↓ Export CSV</button>
+    </div>
+    <div class="card" style="overflow:hidden"><div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Account</th><th>Segment</th><th>Last Order</th><th>Days Since</th><th>Avg Freq (days)</th><th>Status</th></tr></thead>
+        <tbody>
+          ${acctData.map(({acct, m, daysSince}) => {
+            const isOverdue = daysSince >= threshold;
+            const isApproach = !isOverdue && daysSince >= threshold * 0.75;
+            const statusHtml = m.lastOrderDate === null
+              ? '<span class="badge badge-inactive">No orders</span>'
+              : isOverdue
+                ? '<span class="badge badge-lost">Overdue</span>'
+                : isApproach
+                  ? '<span class="badge badge-follow-up">Approaching</span>'
+                  : '<span class="badge badge-active">OK</span>';
+            const rowBg = isOverdue ? 'background:#fff8f8' : isApproach ? 'background:#fffbeb' : '';
+            return `<tr style="${rowBg}">
+              <td><strong style="cursor:pointer;color:var(--red)" data-nav-account="${acct.id}">${esc(acct.name)}</strong></td>
+              <td>${segBadge(acct.segment)}</td>
+              <td>${fmtDate(m.lastOrderDate)}</td>
+              <td>${daysSince === Infinity ? '—' : daysSince}</td>
+              <td>${m.avgOrderFreq ? m.avgOrderFreq : '—'}</td>
+              <td>${statusHtml}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div></div>`;
+
+  document.getElementById('reorder-threshold')?.addEventListener('change', renderCurrentReport);
+  document.getElementById('reorder-export-btn')?.addEventListener('click', () => {
+    exportCSV(
+      [['Account','Segment','Last Order Date','Days Since Last Order','Avg Order Frequency (days)'],
+       ...acctData.map(({acct,m,daysSince}) => [acct.name, acct.segment, m.lastOrderDate||'', daysSince===Infinity?'':daysSince, m.avgOrderFreq||''])],
+      `reorder-frequency-${today()}.csv`
+    );
+  });
+  document.querySelectorAll('[data-nav-account]').forEach(el => {
+    el.addEventListener('click', () => navigate('account-detail', { id: el.dataset.navAccount }));
+  });
+}
+
+function exportCSV(rows, filename) {
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function renderSettings() {
+  const riskDays = localStorage.getItem(RISK_KEY) || '30';
+  document.getElementById('settings-content').innerHTML = `
+    <div class="settings-section">
+      <h2>At-Risk Threshold</h2>
+      <div class="form-group" style="max-width:200px">
+        <label>Days without contact</label>
+        <input type="number" id="risk-days-input" value="${riskDays}" min="1" max="365">
+        <div class="form-hint">Accounts inactive longer than this appear as at-risk.</div>
+      </div>
+      <button class="btn btn-red btn-sm" id="save-risk-btn">Save</button>
+    </div>
+    <div class="settings-section">
+      <h2>Change Password</h2>
+      <div class="form-group" style="max-width:300px">
+        <label>Current Password</label><input type="password" id="cur-pwd">
+      </div>
+      <div class="form-group" style="max-width:300px">
+        <label>New Password</label><input type="password" id="new-pwd">
+      </div>
+      <div class="form-group" style="max-width:300px">
+        <label>Confirm New Password</label><input type="password" id="conf-pwd">
+      </div>
+      <div class="modal-err" id="pwd-change-err"></div>
+      <button class="btn btn-red btn-sm" id="change-pwd-btn">Change Password</button>
+    </div>
+    <div class="settings-section">
+      <h2>About</h2>
+      <div style="font-size:13px;color:var(--text2);line-height:1.8">
+        <div>DPC Sales CRM · v1.0</div>
+        <div>Data log: <code>${LOG_PATH}</code></div>
+        <div>Dangerous Pretzel Co. internal tool.</div>
+      </div>
+    </div>`;
+
+  document.getElementById('save-risk-btn').addEventListener('click', () => {
+    const v = document.getElementById('risk-days-input').value;
+    if (v && Number(v) > 0) { localStorage.setItem(RISK_KEY, v); toast('At-risk threshold saved.'); }
+  });
+  document.getElementById('change-pwd-btn').addEventListener('click', async () => {
+    const cur = document.getElementById('cur-pwd').value;
+    const nw = document.getElementById('new-pwd').value;
+    const cf = document.getElementById('conf-pwd').value;
+    const err = document.getElementById('pwd-change-err');
+    err.textContent = '';
+    if (!cur || !nw || !cf) { err.textContent = 'All fields required.'; return; }
+    if (nw !== cf) { err.textContent = 'New passwords do not match.'; return; }
+    if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+    const ok = await verifyPassword(cur);
+    if (!ok) { err.textContent = 'Current password is incorrect.'; return; }
+    const hash = await sha256(nw);
+    localStorage.setItem(PWD_KEY, hash);
+    sessionStorage.setItem(SESSION_KEY, hash);
+    document.getElementById('cur-pwd').value = '';
+    document.getElementById('new-pwd').value = '';
+    document.getElementById('conf-pwd').value = '';
+    toast('Password changed successfully.');
+  });
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openAccountModal(id = null) {
+  const isEdit = !!id;
+  document.getElementById('modal-account-title').textContent = isEdit ? 'Edit Account' : 'New Account';
+  document.getElementById('acct-id').value = id || '';
+  document.getElementById('acct-err').textContent = '';
+  if (isEdit) {
+    const a = STATE.accounts.get(id);
+    if (!a) return;
+    document.getElementById('acct-name').value = a.name||'';
+    document.getElementById('acct-segment').value = a.segment||'';
+    document.getElementById('acct-contact-name').value = a.contactName||'';
+    document.getElementById('acct-contact-title').value = a.contactTitle||'';
+    document.getElementById('acct-phone').value = a.contactPhone||'';
+    document.getElementById('acct-email').value = a.contactEmail||'';
+    document.getElementById('acct-address').value = a.address||'';
+    document.getElementById('acct-status').value = a.status||'prospect';
+    document.getElementById('acct-followup').value = a.nextFollowUp||'';
+    document.getElementById('acct-notes').value = a.notes||'';
+  } else {
+    document.getElementById('modal-account').querySelectorAll('input,select,textarea').forEach(el => { if (el.id !== 'acct-id') el.value = ''; });
+    document.getElementById('acct-status').value = 'prospect';
+  }
+  openModal('modal-account');
+}
+
+function openDealModal(dealId = null, accountId = null) {
+  const deal = dealId ? STATE.deals.get(dealId) : null;
+  document.getElementById('modal-deal-title').textContent = deal ? 'Update Deal' : 'New Deal';
+  document.getElementById('deal-id').value = dealId || '';
+  document.getElementById('deal-account-id').value = accountId || deal?.accountId || '';
+  document.getElementById('deal-stage').value = deal?.stage || 'lead';
+  document.getElementById('deal-value').value = deal?.value || '';
+  document.getElementById('deal-loss-reason').value = deal?.lostReason || '';
+  document.getElementById('deal-loss-group').style.display = (deal?.stage === 'lost') ? 'block' : 'none';
+  document.getElementById('deal-err').textContent = '';
+  openModal('modal-deal');
+}
+
+function openTaskModal(accountId = null, taskId = null) {
+  const task = taskId ? STATE.tasks.get(taskId) : null;
+  document.getElementById('task-id').value = taskId || '';
+  document.getElementById('task-account-id').value = accountId || task?.accountId || '';
+  document.getElementById('task-desc').value = task?.description || '';
+  document.getElementById('task-due').value = task?.dueDate || '';
+  document.getElementById('task-priority').value = task?.priority || 'medium';
+  document.getElementById('task-err').textContent = '';
+  const sel = document.getElementById('task-account-select');
+  sel.innerHTML = '<option value="">— Not linked —</option>' +
+    [...STATE.accounts.values()].sort((a,b) => a.name.localeCompare(b.name))
+      .map(a => `<option value="${a.id}"${(accountId||task?.accountId)===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
+  openModal('modal-task');
+}
+
+function openCommModal(accountId) {
+  const acct = STATE.accounts.get(accountId);
+  document.getElementById('modal-comm-title').textContent = `Log Communication — ${acct?.name||''}`;
+  document.getElementById('comm-account-id').value = accountId;
+  document.getElementById('comm-type').value = 'call';
+  document.getElementById('comm-date').value = today();
+  document.getElementById('comm-summary').value = '';
+  document.getElementById('comm-err').textContent = '';
+  openModal('modal-comm');
+}
+
+function openOrderModal(accountId) {
+  const acct = STATE.accounts.get(accountId);
+  document.getElementById('modal-order-title').textContent = `Log Order — ${acct?.name||''}`;
+  document.getElementById('order-account-id').value = accountId;
+  document.getElementById('order-items').value = '';
+  document.getElementById('order-volume').value = '';
+  document.getElementById('order-value').value = '';
+  document.getElementById('order-date').value = today();
+  document.getElementById('order-err').textContent = '';
+  openModal('modal-order');
+}
+
+function openSampleModal(accountId) {
+  const acct = STATE.accounts.get(accountId);
+  document.getElementById('modal-sample-title').textContent = `Log Sample — ${acct?.name||''}`;
+  document.getElementById('sample-account-id').value = accountId;
+  document.getElementById('sample-product').value = '';
+  document.getElementById('sample-qty').value = '';
+  document.getElementById('sample-date').value = today();
+  document.getElementById('sample-outcome').value = 'pending';
+  document.getElementById('sample-err').textContent = '';
+  openModal('modal-sample');
+}
+
+// ── Data mutations ────────────────────────────────────────────────────────────
+async function saveAccount(data) {
+  const isNew = !data.id || data.id.startsWith('s'); // new or seed — create fresh
+  const id = (data.id && !['a01','a02','a03','a04','a05','a06','a07','a08','a09','a10','a11','a12'].includes(data.id))
+    ? data.id : genId();
+  const action = STATE.accounts.has(data.id) && !['a01','a02','a03','a04','a05','a06','a07','a08','a09','a10','a11','a12'].includes(data.id)
+    ? 'update_account' : 'create_account';
+  const entry = { action, id, name:data.name, segment:data.segment, contactName:data.contactName||'',
+    contactTitle:data.contactTitle||'', contactPhone:data.contactPhone||'', contactEmail:data.contactEmail||'',
+    address:data.address||'', status:data.status, notes:data.notes||'', nextFollowUp:data.nextFollowUp||'',
+    timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  STATE.accounts.set(id, { ...STATE.accounts.get(id), ...entry });
+  return id;
+}
+
+async function saveDeal(data) {
+  const id = data.id || genId();
+  const action = data.id ? 'update_deal' : 'create_deal';
+  const entry = { action, id, accountId:data.accountId, stage:data.stage, value:String(data.value||''),
+    lostReason:data.lostReason||'', timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  STATE.deals.set(id, { ...(STATE.deals.get(id)||{}), ...entry });
+  return id;
+}
+
+async function saveTask(data) {
+  const id = data.id || genId();
+  const entry = { action:'create_task', id, accountId:data.accountId||'', description:data.description,
+    dueDate:data.dueDate, priority:data.priority, done:'false', timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  STATE.tasks.set(id, entry);
+}
+
+async function completeTask(id) {
+  const task = STATE.tasks.get(id);
+  if (!task) return;
+  const entry = { ...task, action:'update_task', done: task.done === 'true' ? 'false' : 'true', timeStamp: new Date().toISOString() };
+  try { await appendLog(LOG_PATH, entry); } catch (_) {}
+  STATE.tasks.set(id, entry);
+  if (currentView === 'tasks') renderTasks();
+  else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+}
+
+async function logComm(data) {
+  const id = genId();
+  const entry = { action:'log_comm', id, accountId:data.accountId, type:data.type,
+    date:data.date, summary:data.summary, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  STATE.comms.push(entry);
+}
+
+async function logOrder(data) {
+  const id = genId();
+  const entry = { action:'log_order', id, accountId:data.accountId, date:data.date,
+    items:data.items, volume:String(data.volume||''), value:String(data.value||''),
+    timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  STATE.orders.push(entry);
+}
+
+async function logSample(data) {
+  const id = genId();
+  const entry = { action:'log_sample', id, accountId:data.accountId, product:data.product,
+    quantity:String(data.quantity||''), dateSent:data.dateSent, outcome:data.outcome,
+    timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  STATE.samples.push(entry);
+}
+
+// ── Form submissions ──────────────────────────────────────────────────────────
+async function submitAccountForm() {
+  const name = document.getElementById('acct-name').value.trim();
+  const segment = document.getElementById('acct-segment').value;
+  const status = document.getElementById('acct-status').value;
+  const err = document.getElementById('acct-err');
+  if (!name) { err.textContent = 'Business name is required.'; return; }
+  if (!segment) { err.textContent = 'Segment is required.'; return; }
+  const btn = document.getElementById('acct-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const id = await saveAccount({
+      id: document.getElementById('acct-id').value || null,
+      name, segment, status,
+      contactName: document.getElementById('acct-contact-name').value.trim(),
+      contactTitle: document.getElementById('acct-contact-title').value.trim(),
+      contactPhone: document.getElementById('acct-phone').value.trim(),
+      contactEmail: document.getElementById('acct-email').value.trim(),
+      address: document.getElementById('acct-address').value.trim(),
+      nextFollowUp: document.getElementById('acct-followup').value,
+      notes: document.getElementById('acct-notes').value.trim(),
+    });
+    closeModal('modal-account');
+    toast('Account saved.');
+    if (!document.getElementById('acct-id').value) openDealModal(null, id);
+    else if (currentView === 'accounts') renderAccounts();
+    else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch (e) { err.textContent = 'Failed to save: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Account'; }
+}
+
+async function submitDealForm() {
+  const stage = document.getElementById('deal-stage').value;
+  const accountId = document.getElementById('deal-account-id').value;
+  const err = document.getElementById('deal-err');
+  if (!stage) { err.textContent = 'Stage is required.'; return; }
+  if (!accountId) { err.textContent = 'Account is required.'; return; }
+  const btn = document.getElementById('deal-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const dealId = document.getElementById('deal-id').value;
+    await saveDeal({
+      id: dealId || null, accountId, stage,
+      value: document.getElementById('deal-value').value || '',
+      lostReason: document.getElementById('deal-loss-reason').value.trim(),
+    });
+    closeModal('modal-deal');
+    toast('Deal saved.');
+    if (currentView === 'pipeline') renderPipeline();
+    else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+    else if (currentView === 'accounts') renderAccounts();
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Deal'; }
+}
+
+async function submitTaskForm() {
+  const desc = document.getElementById('task-desc').value.trim();
+  const due = document.getElementById('task-due').value;
+  const priority = document.getElementById('task-priority').value;
+  const err = document.getElementById('task-err');
+  if (!desc) { err.textContent = 'Description is required.'; return; }
+  if (!due) { err.textContent = 'Due date is required.'; return; }
+  const accountId = document.getElementById('task-account-id').value || document.getElementById('task-account-select').value || '';
+  const btn = document.getElementById('task-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await saveTask({ description:desc, dueDate:due, priority, accountId });
+    closeModal('modal-task');
+    toast('Task created.');
+    if (currentView === 'tasks') renderTasks();
+    else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Task'; }
+}
+
+async function submitCommForm() {
+  const accountId = document.getElementById('comm-account-id').value;
+  const type = document.getElementById('comm-type').value;
+  const date = document.getElementById('comm-date').value;
+  const summary = document.getElementById('comm-summary').value.trim();
+  const err = document.getElementById('comm-err');
+  if (!summary) { err.textContent = 'Summary is required.'; return; }
+  if (!date) { err.textContent = 'Date is required.'; return; }
+  const btn = document.getElementById('comm-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await logComm({ accountId, type, date, summary });
+    closeModal('modal-comm');
+    toast('Communication logged.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+    else if (currentView === 'dashboard') renderDashboard();
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Log Communication'; }
+}
+
+async function submitOrderForm() {
+  const accountId = document.getElementById('order-account-id').value;
+  const items = document.getElementById('order-items').value.trim();
+  const value = document.getElementById('order-value').value;
+  const date = document.getElementById('order-date').value;
+  const err = document.getElementById('order-err');
+  if (!items) { err.textContent = 'Items are required.'; return; }
+  if (!value || Number(value) <= 0) { err.textContent = 'Value is required.'; return; }
+  if (!date) { err.textContent = 'Date is required.'; return; }
+  const btn = document.getElementById('order-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await logOrder({ accountId, items, volume:document.getElementById('order-volume').value, value, date });
+    closeModal('modal-order');
+    toast('Order logged.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Log Order'; }
+}
+
+async function submitSampleForm() {
+  const accountId = document.getElementById('sample-account-id').value;
+  const product = document.getElementById('sample-product').value.trim();
+  const qty = document.getElementById('sample-qty').value;
+  const date = document.getElementById('sample-date').value;
+  const outcome = document.getElementById('sample-outcome').value;
+  const err = document.getElementById('sample-err');
+  if (!product) { err.textContent = 'Product is required.'; return; }
+  if (!qty || Number(qty) < 1) { err.textContent = 'Quantity is required.'; return; }
+  if (!date) { err.textContent = 'Date is required.'; return; }
+  const btn = document.getElementById('sample-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await logSample({ accountId, product, quantity:qty, dateSent:date, outcome });
+    closeModal('modal-sample');
+    toast('Sample logged.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Log Sample'; }
+}
+
+// ── Event bindings ────────────────────────────────────────────────────────────
+function bindAll() {
+  // Login
+  document.getElementById('login-btn').addEventListener('click', login);
+  document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+  // Logout
+  document.getElementById('logout-btn').addEventListener('click', logout);
+
+  // Mobile menu
+  document.getElementById('mobile-menu-btn').addEventListener('click', openMobileSidebar);
+  document.getElementById('sidebar-backdrop').addEventListener('click', closeMobileSidebar);
+
+  // Sidebar nav
+  document.getElementById('sidebar-nav').addEventListener('click', e => {
+    const li = e.target.closest('li[data-view]');
+    if (li) navigate(li.dataset.view);
+  });
+
+  // Dashboard refresh
+  document.getElementById('dash-refresh').addEventListener('click', async () => {
+    await loadData(); renderDashboard(); toast('Refreshed.');
+  });
+
+  // New account
+  document.getElementById('new-account-btn').addEventListener('click', () => openAccountModal());
+  document.getElementById('new-lead-btn').addEventListener('click', () => openAccountModal());
+  document.getElementById('new-task-btn').addEventListener('click', () => openTaskModal());
+
+  // Account search/filters
+  document.getElementById('acct-search').addEventListener('input', renderAccounts);
+  document.getElementById('acct-seg-filter').addEventListener('change', renderAccounts);
+  document.getElementById('acct-status-filter').addEventListener('change', renderAccounts);
+
+  // Pipeline filters
+  document.getElementById('pipe-seg-filter').addEventListener('change', renderPipeline);
+  document.getElementById('pipe-status-filter').addEventListener('change', renderPipeline);
+
+  // Modal close buttons
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  });
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(backdrop.id); });
+  });
+
+  // Modal saves
+  document.getElementById('acct-save-btn').addEventListener('click', submitAccountForm);
+  document.getElementById('deal-save-btn').addEventListener('click', submitDealForm);
+  document.getElementById('task-save-btn').addEventListener('click', submitTaskForm);
+  document.getElementById('comm-save-btn').addEventListener('click', submitCommForm);
+  document.getElementById('order-save-btn').addEventListener('click', submitOrderForm);
+  document.getElementById('sample-save-btn').addEventListener('click', submitSampleForm);
+
+  // Deal stage toggle for loss reason
+  document.getElementById('deal-stage').addEventListener('change', e => {
+    document.getElementById('deal-loss-group').style.display = e.target.value === 'lost' ? 'block' : 'none';
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  bindAll();
+  const authed = await checkAuth();
+  if (authed) {
+    showApp();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
