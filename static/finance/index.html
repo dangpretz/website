@@ -1149,9 +1149,10 @@
       <div class="glance-sub" id="g-rev-sub"></div>
     </div>
     <div class="glance-card">
-      <div class="glance-label">Break-even gap</div>
+      <div class="glance-label">Revenue still needed</div>
       <div class="glance-num skel" style="width:100px;height:28px" id="g-gap">&nbsp;</div>
       <div class="glance-sub" id="g-gap-sub"></div>
+      <div class="glance-sub" id="g-gap-pl" style="margin-top:2px"></div>
     </div>
     <div class="glance-card">
       <div class="glance-label">Cash on hand</div>
@@ -1768,6 +1769,9 @@
 
   function renderQuad(months) {
     return `
+      <div style="margin-bottom:10px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:0.06em">
+        4-month comparison — click a month above for full P&amp;L statement
+      </div>
       <div class="pnl-quad fade">
         ${months.map(m => {
           const ni = m.net_income;
@@ -1778,7 +1782,7 @@
             <div class="pnl-col ${isCurr ? 'current' : ''}">
               <div class="pnl-col-month">
                 ${fmtMonth(m.period)}
-                ${isCurr ? '<div style="font-size:9px;color:var(--text-dim);margin-top:2px;font-weight:400;line-height:1.3">full month · incl. accruals</div>' : ''}
+                ${isCurr ? '<div style="font-size:11px;color:var(--amber);opacity:0.8;margin-top:3px;font-weight:400;line-height:1.3">full mo. · incl. accruals</div>' : ''}
               </div>
               <div class="pnl-col-row">
                 <span class="pnl-col-key">Revenue</span>
@@ -1793,9 +1797,9 @@
                 <span class="pnl-col-val">${fmt(m.expense)}</span>
               </div>
               ${da > 0 ? `
-              <div class="pnl-col-row" style="opacity:0.6">
-                <span class="pnl-col-key" style="font-size:10px;padding-left:8px">D&amp;A (non-cash)</span>
-                <span class="pnl-col-val" style="font-size:10px">${fmt(da)}</span>
+              <div class="pnl-col-row" style="opacity:0.75">
+                <span class="pnl-col-key" style="padding-left:8px">D&amp;A (non-cash)</span>
+                <span class="pnl-col-val" style="color:var(--text-mid)">${fmt(da)}</span>
               </div>
               ` : ''}
               <div class="pnl-col-row">
@@ -1803,9 +1807,9 @@
                 <span class="pnl-col-val label">${fmtPct(m.gross_margin_pct)}</span>
               </div>
               <div class="pnl-col-ni">
-                <div class="pnl-col-ni-label">Net income${isCurr ? ' (full month)' : ''}</div>
+                <div class="pnl-col-ni-label">Net income${isCurr ? ' · full month' : ''}</div>
                 <div class="pnl-col-ni-val ${niClass}">${fmt(ni)}</div>
-                ${isCurr && da > 0 ? `<div style="font-size:9px;color:var(--text-dim);margin-top:4px">D&amp;A is non-cash — reduces NI, not cash</div>` : ''}
+                ${isCurr && da > 0 ? `<div style="font-size:11px;color:var(--text-dim);margin-top:5px">D&amp;A non-cash — reduces NI, not cash</div>` : ''}
               </div>
             </div>
           `;
@@ -1915,20 +1919,21 @@
   function buildPnlTabs(months) {
     const tabsEl = $('pnl-tabs');
     const currentPeriod = months.find(m => m.is_current)?.period ?? '';
-    // Fixed Jan–Jun 2026, newest first
     const all2026 = ['2026-06','2026-05','2026-04','2026-03','2026-02','2026-01'];
+    // "Compare" tab is NOT active by default — current month is
     let html = `
-      <button class="pnl-tab active" data-period="quad" onclick="switchPnl('quad',this)">
-        All months
+      <button class="pnl-tab" data-period="quad" onclick="switchPnl('quad',this)"
+              title="Side-by-side 4-month summary view">
+        Compare
       </button>
     `;
     all2026.forEach(p => {
       const isCurr = p === currentPeriod;
       html += `
-        <button class="pnl-tab ${isCurr ? 'current-month' : ''}"
+        <button class="pnl-tab ${isCurr ? 'current-month active' : ''}"
                 data-period="${p}"
                 onclick="switchPnl('${p}',this)">
-          ${fmtMonth(p)}${isCurr ? ' ·' : ''}
+          ${fmtMonth(p)}${isCurr ? ' ◆' : ''}
         </button>
       `;
     });
@@ -1950,9 +1955,8 @@
 
   // ── This Month tab: extras ──────────────────────────────────────────
   async function loadThisMonthExtras() {
-    const [vendorsResult, beResult, trendsResult] = await Promise.allSettled([
+    const [vendorsResult, trendsResult] = await Promise.allSettled([
       api('/finance/pnl/top-vendors?period=mtd&limit=10'),
-      api('/finance/breakeven'),
       api('/finance/trends?months=6'),
     ]);
 
@@ -2014,30 +2018,64 @@
       $('top-vendors-body').innerHTML = `<div class="err-note">Vendor data unavailable</div>`;
     }
 
-    // Break-even path levers
-    if (beResult.status === 'fulfilled') {
-      const be = beResult.value;
-      const paths = be.paths_to_close ?? [];
-      if (paths.length) {
-        const levers = paths.map(p => {
-          let label = '', val = '';
-          if (p.type === 'add_wholesale_revenue') { label = 'Add wholesale revenue'; val = fmt(p.amount) + '/mo'; }
-          else if (p.type === 'reduce_payroll')   { label = 'Reduce payroll'; val = fmt(p.amount) + '/mo'; }
-          else if (p.type === 'improve_cogs')     { label = 'Improve COGS'; val = `${p.amount?.toFixed(1) ?? '?'} pp`; }
-          else { label = p.type; val = ''; }
-          return `<div class="num-row"><span class="num-row-key">${label}</span><span class="num-row-val">${val}</span></div>`;
-        }).join('');
-        $('be-path-body').innerHTML = `
-          <div class="card">
-            <div class="card-label">To close the break-even gap, you'd need one of:</div>
-            ${levers}
-          </div>
-        `;
-      } else {
-        $('be-path-body').innerHTML = `<div class="card"><div style="color:var(--sage);font-family:'DM Mono',monospace;font-size:13px">Already at or above break-even — no gap to close.</div></div>`;
+    // Break-even status (uses window._beData set in init from breakeven-tracker)
+    const be = window._beData;
+    if (be) {
+      const mtdRev     = be.mtd?.operating ?? be.mtd?.total_gl ?? 0;
+      const cashTarget = be.breakeven?.cash?.center ?? 0;
+      const plTarget   = be.breakeven?.pl?.center ?? 0;
+      const cashGap    = cashTarget - mtdRev;
+      const plGap      = plTarget - mtdRev;
+      const dayOfMonth = be.as_of?.day_of_month ?? 0;
+      const daysInMonth = be.as_of?.days_in_month ?? 30;
+      const daysLeft   = Math.max(0, daysInMonth - dayOfMonth);
+      const wsStatus   = be.wholesale_status;
+      const wsLanded   = wsStatus?.status === 'largely_landed';
+
+      let bodyHtml = `<div class="card">
+        <div class="num-row">
+          <span class="num-row-key">Revenue MTD (day ${dayOfMonth})</span>
+          <span class="num-row-val">${fmt(mtdRev)}</span>
+        </div>
+        <div class="num-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+          <span class="num-row-key">Cash break-even target</span>
+          <span class="num-row-val">${fmt(cashTarget)}</span>
+        </div>
+        <div class="num-row">
+          <span class="num-row-key" style="font-weight:600">Cash gap (still needed)</span>
+          <span class="num-row-val ${cashGap <= 0 ? 'pos' : 'neg'}">${cashGap <= 0 ? 'Covered' : fmt(cashGap)}</span>
+        </div>
+        <div class="num-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+          <span class="num-row-key">P&amp;L break-even target</span>
+          <span class="num-row-val">${fmt(plTarget)}</span>
+        </div>
+        <div class="num-row">
+          <span class="num-row-key" style="font-weight:600">P&amp;L gap (to profitable)</span>
+          <span class="num-row-val ${plGap <= 0 ? 'pos' : ''}" style="${plGap > 0 ? 'color:var(--text-mid)' : ''}">${plGap <= 0 ? 'Covered' : fmt(plGap)}</span>
+        </div>`;
+
+      if (wsLanded) {
+        const landedPct = (wsStatus?.share_landed_pct ?? 0).toFixed(0);
+        bodyHtml += `
+        <div style="margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;
+                    font-size:11px;color:var(--text-dim);line-height:1.5;font-family:'DM Mono',monospace">
+          Wholesale ${landedPct}% of avg landed by day ${dayOfMonth} —
+          remaining revenue is retail, delivery &amp; catering.
+        </div>`;
       }
+
+      if (daysLeft > 0) {
+        bodyHtml += `
+        <div style="margin-top:8px;font-size:11px;color:var(--text-dim);text-align:right;
+                    font-family:'DM Mono',monospace">
+          ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining in month
+        </div>`;
+      }
+
+      bodyHtml += `</div>`;
+      $('be-path-body').innerHTML = bodyHtml;
     } else {
-      $('be-path-body').innerHTML = `<div class="err-note">Break-even path unavailable</div>`;
+      $('be-path-body').innerHTML = `<div class="err-note">Break-even data unavailable</div>`;
     }
 
     // Payroll % trend (6 months)
@@ -2864,25 +2902,42 @@
 
     // ── Glance row ──────────────────────────────────────────────────
     if (beResult.status === 'fulfilled') {
-      const be     = beResult.value;
-      const mtdRev = be.mtd?.operating ?? be.mtd?.total_gl ?? 0;
-      const target = be.breakeven?.cash?.center ?? 0;
-      const elapsed = be.as_of?.elapsed_pct ?? 50;
-      const runRate = elapsed > 0 ? mtdRev / (elapsed / 100) : 0;
-      const gap     = runRate - target;
+      const be         = beResult.value;
+      const mtdRev     = be.mtd?.operating ?? be.mtd?.total_gl ?? 0;
+      const cashTarget = be.breakeven?.cash?.center ?? 0;
+      const plTarget   = be.breakeven?.pl?.center ?? 0;
+      const cashGap    = cashTarget - mtdRev; // positive = still needed
+      const plGap      = plTarget - mtdRev;
+
       const gEl = $('g-rev');
       gEl.className = 'glance-num fade';
       gEl.textContent = fmt(mtdRev);
       $('g-rev-sub').textContent = `${fmtMonth(be.as_of?.current_month)} · day ${be.as_of?.day_of_month ?? '?'}`;
 
       const gapEl = $('g-gap');
-      gapEl.className = `glance-num fade ${gap >= 0 ? 'pos' : 'neg'}`;
-      gapEl.textContent = `${gap >= 0 ? '+' : '−'}${fmt(Math.abs(gap))}`;
-      $('g-gap-sub').textContent = `run-rate vs ${fmt(target)} target`;
+      if (cashGap <= 0) {
+        gapEl.className = 'glance-num fade pos';
+        gapEl.textContent = 'Covered';
+        $('g-gap-sub').textContent = `cash break-even met · target ${fmt(cashTarget)}`;
+      } else {
+        gapEl.className = 'glance-num fade neg';
+        gapEl.textContent = fmt(cashGap);
+        $('g-gap-sub').textContent = `to cover cash costs · target ${fmt(cashTarget)}`;
+      }
+      const gapPlEl = $('g-gap-pl');
+      if (gapPlEl) {
+        if (plGap <= 0) {
+          gapPlEl.textContent = 'P&L break-even also covered';
+          gapPlEl.style.color = 'var(--sage)';
+        } else {
+          gapPlEl.textContent = `+${fmt(plGap)} more to reach P&L break-even`;
+          gapPlEl.style.color = 'var(--text-dim)';
+        }
+      }
 
-      // Store for breakeven tab
+      // Store for interpretation engine (positive = above cash target)
       window._beData = be;
-      window._beGap  = gap;
+      window._beGap  = mtdRev - cashTarget;
     } else {
       $('g-rev').className = 'glance-num'; $('g-rev').textContent = '—';
       $('g-gap').className = 'glance-num'; $('g-gap').textContent = '—';
@@ -2945,7 +3000,15 @@
     if (quadResult.status === 'fulfilled') {
       quadData = quadResult.value;
       buildPnlTabs(quadData.months);
-      $('pnl-body').innerHTML = renderQuad(quadData.months);
+      // Default to current month full P&L; fall back to quad if no current month found
+      const defaultPeriod = quadData.months.find(m => m.is_current)?.period;
+      if (defaultPeriod) {
+        activePeriod = defaultPeriod;
+        loadMonthDetail(defaultPeriod);
+      } else {
+        activePeriod = 'quad';
+        $('pnl-body').innerHTML = renderQuad(quadData.months);
+      }
     } else {
       $('pnl-tabs').innerHTML = '';
       $('pnl-body').innerHTML = `<div class="err-note">P&L unavailable: ${quadResult.reason?.message ?? 'error'}</div>`;
