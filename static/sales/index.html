@@ -314,6 +314,7 @@ textarea{resize:vertical;min-height:70px}
     <div class="login-logo">🥨</div>
     <div class="login-title">DPC Sales CRM</div>
     <div class="login-sub">Dangerous Pretzel Co. — Internal Tool</div>
+    <input type="email" id="email-input" class="login-input" placeholder="Email address" autocomplete="email">
     <input type="password" id="pwd-input" class="login-input" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" id="login-btn">Sign In</button>
     <div class="login-err" id="login-err"></div>
@@ -664,9 +665,9 @@ const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
 // Pre-computed SHA-256 of default passwords (rep1sales2026 / rep2sales2026 / dpcsales2026)
 const IDENTITIES = {
-  rep1:  { pwdKey:'crm-pwd-hash-rep1',  labelKey:'crm-rep1-label', defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
-  rep2:  { pwdKey:'crm-pwd-hash-rep2',  labelKey:'crm-rep2-label', defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
-  admin: { pwdKey:'crm-pwd-hash-admin', labelKey:null,              defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' },
+  rep1:  { pwdKey:'crm-pwd-hash-rep1',  labelKey:'crm-rep1-label', emailKey:'crm-email-rep1',  defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
+  rep2:  { pwdKey:'crm-pwd-hash-rep2',  labelKey:'crm-rep2-label', emailKey:'crm-email-rep2',  defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
+  admin: { pwdKey:'crm-pwd-hash-admin', labelKey:null,              emailKey:'crm-email-admin', defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' },
 };
 
 function getRepLabel(repId) {
@@ -721,17 +722,31 @@ function ensureHashes() {
 }
 
 async function login() {
+  const email = document.getElementById('email-input').value.trim().toLowerCase();
   const pwd = document.getElementById('pwd-input').value;
   const errEl = document.getElementById('login-err');
   errEl.textContent = '';
   if (!pwd) { errEl.textContent = 'Enter your password.'; return; }
   const hash = await sha256(pwd);
   let matched = null;
-  for (const [repId, id] of Object.entries(IDENTITIES)) {
-    const stored = localStorage.getItem(id.pwdKey) || id.defaultHash;
-    if (hash === stored) { matched = repId; break; }
+  if (email) {
+    // Email provided — find identity by email, then verify password
+    for (const [repId, id] of Object.entries(IDENTITIES)) {
+      const stored = localStorage.getItem(id.emailKey);
+      if (stored && stored.toLowerCase() === email) { matched = repId; break; }
+    }
+    if (!matched) { errEl.textContent = 'Email not recognised. Contact your manager.'; return; }
+    const id = IDENTITIES[matched];
+    const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
+    if (hash !== storedHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
+  } else {
+    // No email — fall back to matching by password hash (admin setup flow)
+    for (const [repId, id] of Object.entries(IDENTITIES)) {
+      const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
+      if (hash === storedHash) { matched = repId; break; }
+    }
+    if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   }
-  if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: matched, hash }));
   currentRepId = matched;
   showApp();
@@ -1544,6 +1559,19 @@ function renderSettings() {
   const rep1Label = getRepLabel('rep1');
   const rep2Label = getRepLabel('rep2');
 
+  const emailSection = (targetRepId, sectionTitle) => {
+    const stored = localStorage.getItem(IDENTITIES[targetRepId].emailKey) || '';
+    return `<div class="settings-section">
+      <h2>${esc(sectionTitle)}</h2>
+      <div class="form-group" style="max-width:300px">
+        <label>Email Address</label>
+        <input type="email" id="email-field-${targetRepId}" value="${esc(stored)}" placeholder="name@example.com">
+        <div class="form-hint">Used to identify this person at login.</div>
+      </div>
+      <button class="btn btn-red btn-sm" data-save-email="${targetRepId}">Save Email</button>
+    </div>`;
+  };
+
   const pwdSection = (targetRepId, sectionTitle) => `
     <div class="settings-section">
       <h2>${esc(sectionTitle)}</h2>
@@ -1581,8 +1609,9 @@ function renderSettings() {
       </div>
       <button class="btn btn-red btn-sm" id="save-risk-btn">Save</button>
     </div>
+    ${emailSection(currentRepId, 'My Email Address')}
     ${pwdSection(currentRepId, 'Change My Password')}
-    ${isAdmin ? pwdSection('rep1', `Change ${rep1Label} Password`) + pwdSection('rep2', `Change ${rep2Label} Password`) : ''}
+    ${isAdmin ? emailSection('rep1', `${rep1Label} Email Address`) + emailSection('rep2', `${rep2Label} Email Address`) + pwdSection('rep1', `Change ${rep1Label} Password`) + pwdSection('rep2', `Change ${rep2Label} Password`) : ''}
     <div class="settings-section">
       <h2>About</h2>
       <div style="font-size:13px;color:var(--text2);line-height:1.8">
@@ -1606,6 +1635,16 @@ function renderSettings() {
       document.getElementById('identity-badge').textContent = val;
       toast('Name saved.');
     }
+  });
+
+  document.querySelectorAll('[data-save-email]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.saveEmail;
+      const val = document.getElementById(`email-field-${t}`)?.value.trim().toLowerCase();
+      if (!val) { toast('Enter a valid email address.'); return; }
+      localStorage.setItem(IDENTITIES[t].emailKey, val);
+      toast('Email saved.');
+    });
   });
 
   document.querySelectorAll('[data-change-pwd]').forEach(btn => {
@@ -1939,6 +1978,7 @@ async function submitSampleForm() {
 function bindAll() {
   // Login
   document.getElementById('login-btn').addEventListener('click', login);
+  document.getElementById('email-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pwd-input').focus(); });
   document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
   // Logout
