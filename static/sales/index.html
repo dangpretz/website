@@ -250,6 +250,15 @@ textarea{resize:vertical;min-height:70px}
 .settings-section{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:16px}
 .settings-section h2{font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
 
+/* ── Identity ── */
+.identity-badge{font-size:11px;font-weight:700;color:#bbb;padding-bottom:10px;letter-spacing:.3px;text-align:center}
+.badge-rep1{background:#f3e8ff;color:#7e22ce}
+.badge-rep2{background:#fce7f3;color:#9d174d}
+.badge-admin{background:#fef3c7;color:#92400e}
+.rep-own-card{border-left-width:4px!important}
+.rep-own-card .kcard-rep{font-size:10px;font-weight:700;color:var(--red);margin-top:4px}
+.kcard-rep{font-size:10px;font-weight:600;color:var(--gray-3);margin-top:4px}
+
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;right:24px;background:var(--dark);color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
 #toast.show{opacity:1;transform:none}
@@ -326,6 +335,7 @@ textarea{resize:vertical;min-height:70px}
       <li data-view="settings">⚙️ Settings</li>
     </ul>
     <div class="sidebar-footer">
+      <div class="identity-badge" id="identity-badge"></div>
       <button id="logout-btn">Log Out</button>
     </div>
   </nav>
@@ -354,7 +364,13 @@ textarea{resize:vertical;min-height:70px}
     <!-- Accounts list -->
     <div id="view-accounts" class="view">
       <div class="view-header">
-        <div class="view-title">Accounts</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div class="view-title">Accounts</div>
+          <div id="acct-view-toggle" style="display:none;gap:4px">
+            <button class="btn btn-red btn-sm" id="acct-mine-btn">My Accounts</button>
+            <button class="btn btn-outline btn-sm" id="acct-all-btn">All Accounts</button>
+          </div>
+        </div>
         <button class="btn btn-red btn-sm" id="new-account-btn">+ New Account</button>
       </div>
       <div class="search-row">
@@ -398,6 +414,11 @@ textarea{resize:vertical;min-height:70px}
           <option value="active">Active</option>
           <option value="prospect">Prospect</option>
           <option value="inactive">Inactive</option>
+        </select>
+        <select class="filter-select" id="pipe-rep-filter" style="display:none">
+          <option value="">All Reps</option>
+          <option value="rep1">Rep 1</option>
+          <option value="rep2">Rep 2</option>
         </select>
       </div>
       <div class="kanban" id="kanban-board"></div>
@@ -639,10 +660,21 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const LOG_PATH = '/dangpretz/sales-crm';
-const DEFAULT_HASH = '9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2';
 const SESSION_KEY = 'crm-auth';
-const PWD_KEY = 'crm-pwd-hash';
 const RISK_KEY = 'crm-risk-days';
+// Pre-computed SHA-256 of default passwords (rep1sales2026 / rep2sales2026 / dpcsales2026)
+const IDENTITIES = {
+  rep1:  { pwdKey:'crm-pwd-hash-rep1',  labelKey:'crm-rep1-label', defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
+  rep2:  { pwdKey:'crm-pwd-hash-rep2',  labelKey:'crm-rep2-label', defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
+  admin: { pwdKey:'crm-pwd-hash-admin', labelKey:null,              defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' },
+};
+
+function getRepLabel(repId) {
+  const id = IDENTITIES[repId];
+  if (!id) return repId || '';
+  if (id.labelKey) return localStorage.getItem(id.labelKey) || (repId === 'rep1' ? 'Rep 1' : 'Rep 2');
+  return 'Manager';
+}
 
 // ── State ────────────────────────────────────────────────────────────────────
 let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [] };
@@ -650,7 +682,9 @@ let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
 let currentReportTab = 'revenue';
-let pendingDragDeal = null; // { dealId, targetStage } waiting for loss reason
+let currentRepId = null; // 'rep1' | 'rep2' | 'admin'
+let acctViewMode = 'mine'; // 'mine' | 'all'
+let pendingDragDeal = null;
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const genId = () => Math.random().toString(36).slice(2, 10);
@@ -680,10 +714,10 @@ function toast(msg, ms = 2500) {
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-async function verifyPassword(pwd) {
-  const hash = await sha256(pwd);
-  const stored = localStorage.getItem(PWD_KEY) || DEFAULT_HASH;
-  return hash === stored;
+function ensureHashes() {
+  for (const [, id] of Object.entries(IDENTITIES)) {
+    if (!localStorage.getItem(id.pwdKey)) localStorage.setItem(id.pwdKey, id.defaultHash);
+  }
 }
 
 async function login() {
@@ -691,15 +725,21 @@ async function login() {
   const errEl = document.getElementById('login-err');
   errEl.textContent = '';
   if (!pwd) { errEl.textContent = 'Enter your password.'; return; }
-  const ok = await verifyPassword(pwd);
-  if (!ok) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   const hash = await sha256(pwd);
-  sessionStorage.setItem(SESSION_KEY, hash);
+  let matched = null;
+  for (const [repId, id] of Object.entries(IDENTITIES)) {
+    const stored = localStorage.getItem(id.pwdKey) || id.defaultHash;
+    if (hash === stored) { matched = repId; break; }
+  }
+  if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: matched, hash }));
+  currentRepId = matched;
   showApp();
 }
 
 function logout() {
   sessionStorage.removeItem(SESSION_KEY);
+  currentRepId = null;
   document.getElementById('app').hidden = true;
   document.getElementById('login-overlay').removeAttribute('hidden');
   document.getElementById('pwd-input').value = '';
@@ -707,15 +747,28 @@ function logout() {
 }
 
 async function checkAuth() {
-  const token = sessionStorage.getItem(SESSION_KEY);
-  if (!token) return false;
-  const stored = localStorage.getItem(PWD_KEY) || DEFAULT_HASH;
-  return token === stored;
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try {
+    const { repId, hash } = JSON.parse(raw);
+    const id = IDENTITIES[repId];
+    if (!id) return null;
+    const stored = localStorage.getItem(id.pwdKey) || id.defaultHash;
+    return hash === stored ? { repId } : null;
+  } catch { return null; }
 }
 
 async function showApp() {
   document.getElementById('login-overlay').hidden = true;
   document.getElementById('app').removeAttribute('hidden');
+  document.getElementById('identity-badge').textContent = getRepLabel(currentRepId);
+  acctViewMode = currentRepId === 'admin' ? 'all' : 'mine';
+  // Show rep filter on pipeline for admin
+  document.getElementById('pipe-rep-filter').style.display = currentRepId === 'admin' ? '' : 'none';
+  // Update pipe-rep-filter option labels with custom names
+  const prf = document.getElementById('pipe-rep-filter');
+  prf.options[1].text = getRepLabel('rep1');
+  prf.options[2].text = getRepLabel('rep2');
   await loadData();
   navigate('dashboard');
 }
@@ -726,8 +779,11 @@ function initSeedData() {}
 function applyLogs(logs) {
   for (const row of logs) {
     const { action } = row;
-    if (action === 'create_account' || action === 'update_account') {
-      STATE.accounts.set(row.id, { ...(STATE.accounts.get(row.id) || {}), ...row });
+    if (action === 'create_account') {
+      STATE.accounts.set(row.id, { ...row, repId: row.repId || 'admin' });
+    } else if (action === 'update_account') {
+      const existing = STATE.accounts.get(row.id) || {};
+      STATE.accounts.set(row.id, { ...existing, ...row, repId: existing.repId || row.repId || 'admin' });
     } else if (action === 'create_deal' || action === 'update_deal') {
       STATE.deals.set(row.id, { ...(STATE.deals.get(row.id) || {}), ...row });
     } else if (action === 'create_task' || action === 'update_task') {
@@ -813,20 +869,25 @@ function navigate(view, params = {}) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function renderDashboard() {
-  const tasks = [...STATE.tasks.values()];
-  const overdueTasks = tasks.filter(t => t.done !== 'true' && daysUntil(t.dueDate) < 0);
-  const pipelineDeals = [...STATE.deals.values()].filter(d => ['quoted','follow-up'].includes(d.stage));
+  const isAdmin = currentRepId === 'admin';
+  const myAccounts = isAdmin ? [...STATE.accounts.values()] : [...STATE.accounts.values()].filter(a => a.repId === currentRepId);
+  const myAccountIds = new Set(myAccounts.map(a => a.id));
+  const myTasks = isAdmin ? [...STATE.tasks.values()] : [...STATE.tasks.values()].filter(t => t.repId === currentRepId || !t.repId);
+  const myDeals = isAdmin ? [...STATE.deals.values()] : [...STATE.deals.values()].filter(d => myAccountIds.has(d.accountId));
+
+  const overdueTasks = myTasks.filter(t => t.done !== 'true' && daysUntil(t.dueDate) < 0);
+  const pipelineDeals = myDeals.filter(d => ['quoted','follow-up'].includes(d.stage));
   const pipelineValue = pipelineDeals.reduce((s,d) => s + Number(d.value||0), 0);
-  const openDeals = [...STATE.deals.values()].filter(d => !['won','lost'].includes(d.stage)).length;
+  const openDeals = myDeals.filter(d => !['won','lost'].includes(d.stage)).length;
   const riskDays = Number(localStorage.getItem(RISK_KEY) || 30);
-  const atRisk = [...STATE.accounts.values()].filter(a => {
+  const atRisk = myAccounts.filter(a => {
     const m = getAccountMetrics(a.id);
     return a.status === 'active' && daysAgo(m.lastContactDate) >= riskDays;
   });
 
   const stageCounts = {};
   ['lead','quoted','follow-up','won','lost'].forEach(s => stageCounts[s] = 0);
-  [...STATE.deals.values()].forEach(d => { if (d.stage) stageCounts[d.stage] = (stageCounts[d.stage]||0) + 1; });
+  myDeals.forEach(d => { if (d.stage) stageCounts[d.stage] = (stageCounts[d.stage]||0) + 1; });
 
   const recentComms = [...STATE.comms].sort((a,b) => b.date.localeCompare(a.date)).slice(0,5);
   const typeEmoji = {call:'📞',email:'✉️','in-person':'🤝',text:'💬'};
@@ -915,25 +976,40 @@ function renderDashboard() {
 
 // ── Accounts list ─────────────────────────────────────────────────────────────
 function renderAccounts() {
+  const isAdmin = currentRepId === 'admin';
+  const showAll = isAdmin || acctViewMode === 'all';
+
+  // Toggle visibility & active state
+  const toggleEl = document.getElementById('acct-view-toggle');
+  if (toggleEl) toggleEl.style.display = isAdmin ? 'none' : 'flex';
+  document.getElementById('acct-mine-btn')?.classList.toggle('btn-red', acctViewMode === 'mine');
+  document.getElementById('acct-mine-btn')?.classList.toggle('btn-outline', acctViewMode !== 'mine');
+  document.getElementById('acct-all-btn')?.classList.toggle('btn-red', acctViewMode === 'all');
+  document.getElementById('acct-all-btn')?.classList.toggle('btn-outline', acctViewMode !== 'all');
+
   const search = document.getElementById('acct-search').value.toLowerCase();
   const seg = document.getElementById('acct-seg-filter').value;
   const status = document.getElementById('acct-status-filter').value;
   let accounts = [...STATE.accounts.values()];
+  if (!showAll) accounts = accounts.filter(a => a.repId === currentRepId);
   if (search) accounts = accounts.filter(a => a.name?.toLowerCase().includes(search) || a.contactName?.toLowerCase().includes(search));
   if (seg) accounts = accounts.filter(a => a.segment === seg);
   if (status) accounts = accounts.filter(a => a.status === status);
   accounts.sort((a,b) => a.name.localeCompare(b.name));
 
+  const colCount = showAll ? 7 : 6;
   const rows = accounts.map(a => {
     const m = getAccountMetrics(a.id);
+    const canEdit = isAdmin || a.repId === currentRepId || !a.repId;
     return `<tr class="clickable" data-account-id="${a.id}">
       <td><strong>${esc(a.name)}</strong></td>
       <td>${segBadge(a.segment)}</td>
       <td>${statusBadge(a.status)}</td>
+      ${showAll ? `<td><span class="badge badge-${esc(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span></td>` : ''}
       <td>${fmtDate(m.lastContactDate)}</td>
       <td>${fmtDate(a.nextFollowUp)}</td>
       <td>
-        <button class="btn btn-outline btn-sm" data-edit-acct="${a.id}" style="margin-right:4px">Edit</button>
+        ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-acct="${a.id}" style="margin-right:4px">Edit</button>` : ''}
         <button class="btn btn-ghost btn-sm" data-log-comm="${a.id}">Log Contact</button>
       </td>
     </tr>`;
@@ -943,9 +1019,11 @@ function renderAccounts() {
     <div class="card" style="overflow:hidden"><div class="tbl-wrap">
       <table class="tbl">
         <thead><tr>
-          <th>Account</th><th>Segment</th><th>Status</th><th>Last Contact</th><th>Next Follow-up</th><th>Actions</th>
+          <th>Account</th><th>Segment</th><th>Status</th>
+          ${showAll ? '<th>Rep</th>' : ''}
+          <th>Last Contact</th><th>Next Follow-up</th><th>Actions</th>
         </tr></thead>
-        <tbody>${rows || '<tr><td colspan="6" class="empty">No accounts match your filters.</td></tr>'}</tbody>
+        <tbody>${rows || `<tr><td colspan="${colCount}" class="empty">No accounts match your filters.</td></tr>`}</tbody>
       </table>
     </div></div>`;
 
@@ -967,6 +1045,9 @@ function renderAccounts() {
 function renderAccountDetail(id) {
   const a = STATE.accounts.get(id);
   if (!a) { navigate('accounts'); return; }
+  const isAdmin = currentRepId === 'admin';
+  const canEdit = isAdmin || a.repId === currentRepId || !a.repId;
+  const repLabel = getRepLabel(a.repId);
   const m = getAccountMetrics(id);
   const deal = getActiveDeal(id);
   const tabs = ['overview','communications','orders','tasks','samples'];
@@ -976,10 +1057,13 @@ function renderAccountDetail(id) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
       <div>
         <h1 style="font-size:24px;font-weight:800;margin-bottom:6px">${esc(a.name)}</h1>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${segBadge(a.segment)} ${statusBadge(a.status)} ${deal ? stageBadge(deal.stage) : ''}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          ${segBadge(a.segment)} ${statusBadge(a.status)} ${deal ? stageBadge(deal.stage) : ''}
+          ${repLabel ? `<span style="font-size:12px;color:var(--gray-3);font-weight:600">· ${esc(repLabel)}</span>` : ''}
+        </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" id="det-edit-btn">Edit</button>
+        ${canEdit ? `<button class="btn btn-outline btn-sm" id="det-edit-btn">Edit</button>` : ''}
         <button class="btn btn-outline btn-sm" id="det-comm-btn">Log Contact</button>
         <button class="btn btn-red btn-sm" id="det-order-btn">+ Order</button>
         <button class="btn btn-outline btn-sm" id="det-sample-btn">+ Sample</button>
@@ -991,7 +1075,7 @@ function renderAccountDetail(id) {
     <div id="detail-tab-content">${renderDetailTab(currentDetailTab, id, a, m, deal)}</div>`;
 
   document.getElementById('back-to-accounts').addEventListener('click', () => navigate('accounts'));
-  document.getElementById('det-edit-btn').addEventListener('click', () => openAccountModal(id));
+  if (canEdit) document.getElementById('det-edit-btn')?.addEventListener('click', () => openAccountModal(id));
   document.getElementById('det-comm-btn').addEventListener('click', () => openCommModal(id));
   document.getElementById('det-order-btn').addEventListener('click', () => openOrderModal(id));
   document.getElementById('det-sample-btn').addEventListener('click', () => openSampleModal(id));
@@ -1134,8 +1218,10 @@ function bindDetailTabActions(id) {
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 function renderPipeline() {
+  const isAdmin = currentRepId === 'admin';
   const segF = document.getElementById('pipe-seg-filter').value;
   const statusF = document.getElementById('pipe-status-filter').value;
+  const repF = isAdmin ? (document.getElementById('pipe-rep-filter').value) : '';
   const stages = ['lead','quoted','follow-up','won','lost'];
   const stageLabel = {lead:'Lead',quoted:'Quoted','follow-up':'Follow-up',won:'Won',lost:'Lost'};
 
@@ -1146,6 +1232,7 @@ function renderPipeline() {
     if (!acct) return;
     if (segF && acct.segment !== segF) return;
     if (statusF && acct.status !== statusF) return;
+    if (repF && acct.repId !== repF) return;
     if (dealsByStage[d.stage]) dealsByStage[d.stage].push({ deal: d, acct });
   });
 
@@ -1161,7 +1248,8 @@ function renderPipeline() {
         ${items.map(({deal, acct}) => {
           const m = getAccountMetrics(acct.id);
           const borderColor = {lead:'#ccc',quoted:'#3b82f6','follow-up':'#d97706',won:'#16a34a',lost:'#dc2626'}[s];
-          return `<div class="kcard" draggable="true" data-deal-id="${deal.id}" data-account-id="${acct.id}" style="border-left-color:${borderColor}">
+          const isOwn = acct.repId === currentRepId;
+          return `<div class="kcard${isOwn ? ' rep-own-card' : ''}" draggable="true" data-deal-id="${deal.id}" data-account-id="${acct.id}" style="border-left-color:${borderColor}">
             <div class="kcard-name" style="cursor:pointer" data-nav-account="${acct.id}">${esc(acct.name)}</div>
             <div class="kcard-meta">
               ${segBadge(acct.segment)}
@@ -1169,6 +1257,7 @@ function renderPipeline() {
             </div>
             ${deal.value ? `<div class="kcard-value">${fmt$(deal.value)}</div>` : ''}
             ${deal.lostReason ? `<div style="font-size:11px;color:var(--gray-3);margin-top:4px">Lost: ${esc(deal.lostReason)}</div>` : ''}
+            <div class="kcard-rep${isOwn ? ' rep-own' : ''}">${esc(getRepLabel(acct.repId))}</div>
             <div id="loss-form-${deal.id}" style="display:none" class="loss-reason-form">
               <strong style="font-size:11px">Loss reason</strong>
               <input type="text" placeholder="Price, timing, competitor…" id="loss-input-${deal.id}">
@@ -1236,7 +1325,10 @@ function bindPipelineDragDrop() {
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 function renderTasks() {
-  const allTasks = [...STATE.tasks.values()].sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
+  const isAdmin = currentRepId === 'admin';
+  const allTasks = [...STATE.tasks.values()]
+    .filter(t => isAdmin || t.repId === currentRepId || !t.repId)
+    .sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
   const open = allTasks.filter(t => t.done !== 'true');
   const done = allTasks.filter(t => t.done === 'true').slice(0,5);
 
@@ -1447,8 +1539,39 @@ function exportCSV(rows, filename) {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 function renderSettings() {
+  const isAdmin = currentRepId === 'admin';
   const riskDays = localStorage.getItem(RISK_KEY) || '30';
+  const rep1Label = getRepLabel('rep1');
+  const rep2Label = getRepLabel('rep2');
+
+  const pwdSection = (targetRepId, sectionTitle) => `
+    <div class="settings-section">
+      <h2>${esc(sectionTitle)}</h2>
+      <div class="form-group" style="max-width:300px">
+        <label>Current Password</label><input type="password" id="cur-pwd-${targetRepId}">
+      </div>
+      <div class="form-group" style="max-width:300px">
+        <label>New Password</label><input type="password" id="new-pwd-${targetRepId}">
+      </div>
+      <div class="form-group" style="max-width:300px">
+        <label>Confirm New Password</label><input type="password" id="conf-pwd-${targetRepId}">
+      </div>
+      <div class="modal-err" id="pwd-err-${targetRepId}"></div>
+      <button class="btn btn-red btn-sm" data-change-pwd="${targetRepId}">Change Password</button>
+    </div>`;
+
   document.getElementById('settings-content').innerHTML = `
+    <div class="settings-section">
+      <h2>Your Identity</h2>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Logged in as <strong>${esc(getRepLabel(currentRepId))}</strong></div>
+      ${!isAdmin ? `
+      <div class="form-group" style="max-width:300px">
+        <label>Display Name</label>
+        <input type="text" id="rep-label-input" value="${esc(getRepLabel(currentRepId))}" placeholder="Rep 1">
+        <div class="form-hint">Your name shown on accounts and cards.</div>
+      </div>
+      <button class="btn btn-red btn-sm" id="save-label-btn">Save Name</button>` : ''}
+    </div>
     <div class="settings-section">
       <h2>At-Risk Threshold</h2>
       <div class="form-group" style="max-width:200px">
@@ -1458,24 +1581,12 @@ function renderSettings() {
       </div>
       <button class="btn btn-red btn-sm" id="save-risk-btn">Save</button>
     </div>
-    <div class="settings-section">
-      <h2>Change Password</h2>
-      <div class="form-group" style="max-width:300px">
-        <label>Current Password</label><input type="password" id="cur-pwd">
-      </div>
-      <div class="form-group" style="max-width:300px">
-        <label>New Password</label><input type="password" id="new-pwd">
-      </div>
-      <div class="form-group" style="max-width:300px">
-        <label>Confirm New Password</label><input type="password" id="conf-pwd">
-      </div>
-      <div class="modal-err" id="pwd-change-err"></div>
-      <button class="btn btn-red btn-sm" id="change-pwd-btn">Change Password</button>
-    </div>
+    ${pwdSection(currentRepId, 'Change My Password')}
+    ${isAdmin ? pwdSection('rep1', `Change ${rep1Label} Password`) + pwdSection('rep2', `Change ${rep2Label} Password`) : ''}
     <div class="settings-section">
       <h2>About</h2>
       <div style="font-size:13px;color:var(--text2);line-height:1.8">
-        <div>DPC Sales CRM · v1.0</div>
+        <div>DPC Sales CRM · v1.1</div>
         <div>Data log: <code>${LOG_PATH}</code></div>
         <div>Dangerous Pretzel Co. internal tool.</div>
       </div>
@@ -1485,24 +1596,43 @@ function renderSettings() {
     const v = document.getElementById('risk-days-input').value;
     if (v && Number(v) > 0) { localStorage.setItem(RISK_KEY, v); toast('At-risk threshold saved.'); }
   });
-  document.getElementById('change-pwd-btn').addEventListener('click', async () => {
-    const cur = document.getElementById('cur-pwd').value;
-    const nw = document.getElementById('new-pwd').value;
-    const cf = document.getElementById('conf-pwd').value;
-    const err = document.getElementById('pwd-change-err');
-    err.textContent = '';
-    if (!cur || !nw || !cf) { err.textContent = 'All fields required.'; return; }
-    if (nw !== cf) { err.textContent = 'New passwords do not match.'; return; }
-    if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
-    const ok = await verifyPassword(cur);
-    if (!ok) { err.textContent = 'Current password is incorrect.'; return; }
-    const hash = await sha256(nw);
-    localStorage.setItem(PWD_KEY, hash);
-    sessionStorage.setItem(SESSION_KEY, hash);
-    document.getElementById('cur-pwd').value = '';
-    document.getElementById('new-pwd').value = '';
-    document.getElementById('conf-pwd').value = '';
-    toast('Password changed successfully.');
+
+  document.getElementById('save-label-btn')?.addEventListener('click', () => {
+    const val = document.getElementById('rep-label-input')?.value.trim();
+    if (!val) return;
+    const id = IDENTITIES[currentRepId];
+    if (id?.labelKey) {
+      localStorage.setItem(id.labelKey, val);
+      document.getElementById('identity-badge').textContent = val;
+      toast('Name saved.');
+    }
+  });
+
+  document.querySelectorAll('[data-change-pwd]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const t = btn.dataset.changePwd;
+      const cur = document.getElementById(`cur-pwd-${t}`).value;
+      const nw  = document.getElementById(`new-pwd-${t}`).value;
+      const cf  = document.getElementById(`conf-pwd-${t}`).value;
+      const err = document.getElementById(`pwd-err-${t}`);
+      err.textContent = '';
+      if (!cur || !nw || !cf) { err.textContent = 'All fields required.'; return; }
+      if (nw !== cf) { err.textContent = 'New passwords do not match.'; return; }
+      if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+      // Verify current password against the target identity
+      const targetId = IDENTITIES[t];
+      const curHash = await sha256(cur);
+      const stored = localStorage.getItem(targetId.pwdKey) || targetId.defaultHash;
+      if (curHash !== stored) { err.textContent = 'Current password is incorrect.'; return; }
+      const newHash = await sha256(nw);
+      localStorage.setItem(targetId.pwdKey, newHash);
+      // If changing own password, update session token too
+      if (t === currentRepId) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: currentRepId, hash: newHash }));
+      }
+      [`cur-pwd-${t}`,`new-pwd-${t}`,`conf-pwd-${t}`].forEach(id => { document.getElementById(id).value = ''; });
+      toast('Password changed successfully.');
+    });
   });
 }
 
@@ -1600,25 +1730,25 @@ function openSampleModal(accountId) {
 
 // ── Data mutations ────────────────────────────────────────────────────────────
 async function saveAccount(data) {
-  const isNew = !data.id || data.id.startsWith('s'); // new or seed — create fresh
-  const id = (data.id && !['a01','a02','a03','a04','a05','a06','a07','a08','a09','a10','a11','a12'].includes(data.id))
-    ? data.id : genId();
-  const action = STATE.accounts.has(data.id) && !['a01','a02','a03','a04','a05','a06','a07','a08','a09','a10','a11','a12'].includes(data.id)
-    ? 'update_account' : 'create_account';
+  const id = data.id || genId();
+  const action = (data.id && STATE.accounts.has(data.id)) ? 'update_account' : 'create_account';
+  const existing = STATE.accounts.get(id);
   const entry = { action, id, name:data.name, segment:data.segment, contactName:data.contactName||'',
     contactTitle:data.contactTitle||'', contactPhone:data.contactPhone||'', contactEmail:data.contactEmail||'',
     address:data.address||'', status:data.status, notes:data.notes||'', nextFollowUp:data.nextFollowUp||'',
+    repId: action === 'create_account' ? currentRepId : (existing?.repId || currentRepId),
     timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
-  STATE.accounts.set(id, { ...STATE.accounts.get(id), ...entry });
+  STATE.accounts.set(id, { ...(existing||{}), ...entry });
   return id;
 }
 
 async function saveDeal(data) {
   const id = data.id || genId();
   const action = data.id ? 'update_deal' : 'create_deal';
+  const acct = STATE.accounts.get(data.accountId);
   const entry = { action, id, accountId:data.accountId, stage:data.stage, value:String(data.value||''),
-    lostReason:data.lostReason||'', timeStamp: new Date().toISOString() };
+    lostReason:data.lostReason||'', repId: acct?.repId || currentRepId, timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   STATE.deals.set(id, { ...(STATE.deals.get(id)||{}), ...entry });
   return id;
@@ -1627,7 +1757,8 @@ async function saveDeal(data) {
 async function saveTask(data) {
   const id = data.id || genId();
   const entry = { action:'create_task', id, accountId:data.accountId||'', description:data.description,
-    dueDate:data.dueDate, priority:data.priority, done:'false', timeStamp: new Date().toISOString() };
+    dueDate:data.dueDate, priority:data.priority, done:'false', repId:currentRepId,
+    timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   STATE.tasks.set(id, entry);
 }
@@ -1645,7 +1776,7 @@ async function completeTask(id) {
 async function logComm(data) {
   const id = genId();
   const entry = { action:'log_comm', id, accountId:data.accountId, type:data.type,
-    date:data.date, summary:data.summary, timeStamp: new Date().toISOString() };
+    date:data.date, summary:data.summary, repId:currentRepId, timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   STATE.comms.push(entry);
 }
@@ -1654,7 +1785,7 @@ async function logOrder(data) {
   const id = genId();
   const entry = { action:'log_order', id, accountId:data.accountId, date:data.date,
     items:data.items, volume:String(data.volume||''), value:String(data.value||''),
-    timeStamp: new Date().toISOString() };
+    repId:currentRepId, timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   STATE.orders.push(entry);
 }
@@ -1663,7 +1794,7 @@ async function logSample(data) {
   const id = genId();
   const entry = { action:'log_sample', id, accountId:data.accountId, product:data.product,
     quantity:String(data.quantity||''), dateSent:data.dateSent, outcome:data.outcome,
-    timeStamp: new Date().toISOString() };
+    repId:currentRepId, timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   STATE.samples.push(entry);
 }
@@ -1838,9 +1969,14 @@ function bindAll() {
   document.getElementById('acct-seg-filter').addEventListener('change', renderAccounts);
   document.getElementById('acct-status-filter').addEventListener('change', renderAccounts);
 
+  // Account view toggle
+  document.getElementById('acct-mine-btn').addEventListener('click', () => { acctViewMode = 'mine'; renderAccounts(); });
+  document.getElementById('acct-all-btn').addEventListener('click', () => { acctViewMode = 'all'; renderAccounts(); });
+
   // Pipeline filters
   document.getElementById('pipe-seg-filter').addEventListener('change', renderPipeline);
   document.getElementById('pipe-status-filter').addEventListener('change', renderPipeline);
+  document.getElementById('pipe-rep-filter').addEventListener('change', renderPipeline);
 
   // Modal close buttons
   document.querySelectorAll('[data-close]').forEach(btn => {
@@ -1866,9 +2002,11 @@ function bindAll() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  ensureHashes();
   bindAll();
-  const authed = await checkAuth();
-  if (authed) {
+  const session = await checkAuth();
+  if (session) {
+    currentRepId = session.repId;
     showApp();
   }
 }
