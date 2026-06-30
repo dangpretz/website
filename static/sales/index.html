@@ -312,7 +312,8 @@ textarea{resize:vertical;min-height:70px}
 
 <!-- ── Login ── -->
 <div id="login-overlay">
-  <div class="login-box">
+  <!-- Normal login form -->
+  <div class="login-box" id="login-form">
     <div class="login-logo">🥨</div>
     <div class="login-title">DPC Sales CRM</div>
     <div class="login-sub">Dangerous Pretzel Co. — Internal Tool</div>
@@ -320,6 +321,16 @@ textarea{resize:vertical;min-height:70px}
     <input type="password" id="pwd-input" class="login-input" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" id="login-btn">Sign In</button>
     <div class="login-err" id="login-err"></div>
+  </div>
+  <!-- First-run setup form (shown when no admin password exists) -->
+  <div class="login-box" id="setup-form" style="display:none">
+    <div class="login-logo">🥨</div>
+    <div class="login-title">Welcome to DPC CRM</div>
+    <div class="login-sub" style="margin-bottom:20px">Create a Manager password to get started.</div>
+    <input type="password" id="setup-pwd" class="login-input" placeholder="New Manager password" autocomplete="new-password">
+    <input type="password" id="setup-pwd-confirm" class="login-input" placeholder="Confirm password" autocomplete="new-password">
+    <button class="login-btn" id="setup-btn">Set Password</button>
+    <div class="login-err" id="setup-err"></div>
   </div>
 </div>
 
@@ -777,11 +788,10 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 const LOG_PATH = '/dangpretz/sales-crm';
 const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
-// Pre-computed SHA-256 of default passwords (rep1sales2026 / rep2sales2026 / dpcsales2026)
 const IDENTITIES = {
-  rep1:  { pwdKey:'crm-pwd-hash-rep1',  labelKey:'crm-rep1-label', emailKey:'crm-email-rep1',  defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
-  rep2:  { pwdKey:'crm-pwd-hash-rep2',  labelKey:'crm-rep2-label', emailKey:'crm-email-rep2',  defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
-  admin: { pwdKey:'crm-pwd-hash-admin', labelKey:null,              emailKey:'crm-email-admin', defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' },
+  rep1:  { pwdKey:'crm-pwd-hash-rep1',  labelKey:'crm-rep1-label', emailKey:'crm-email-rep1'  },
+  rep2:  { pwdKey:'crm-pwd-hash-rep2',  labelKey:'crm-rep2-label', emailKey:'crm-email-rep2'  },
+  admin: { pwdKey:'crm-pwd-hash-admin', labelKey:null,              emailKey:'crm-email-admin' },
 };
 
 function getRepLabel(repId) {
@@ -830,10 +840,28 @@ function toast(msg, ms = 2500) {
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-function ensureHashes() {
-  for (const [, id] of Object.entries(IDENTITIES)) {
-    if (!localStorage.getItem(id.pwdKey)) localStorage.setItem(id.pwdKey, id.defaultHash);
-  }
+function isFirstRun() {
+  return !localStorage.getItem(IDENTITIES.admin.pwdKey);
+}
+
+async function submitSetupForm() {
+  const pwd = document.getElementById('setup-pwd').value;
+  const confirm = document.getElementById('setup-pwd-confirm').value;
+  const err = document.getElementById('setup-err');
+  err.textContent = '';
+  if (!pwd) { err.textContent = 'Enter a password.'; return; }
+  if (pwd.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+  if (pwd !== confirm) { err.textContent = 'Passwords do not match.'; return; }
+  const btn = document.getElementById('setup-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const hash = await sha256(pwd);
+  localStorage.setItem(IDENTITIES.admin.pwdKey, hash);
+  // Switch to normal login
+  document.getElementById('setup-form').style.display = 'none';
+  document.getElementById('login-form').style.display = '';
+  btn.disabled = false; btn.textContent = 'Set Password';
+  document.getElementById('setup-pwd').value = '';
+  document.getElementById('setup-pwd-confirm').value = '';
 }
 
 async function login() {
@@ -845,20 +873,17 @@ async function login() {
   const hash = await sha256(pwd);
   let matched = null;
   if (email) {
-    // Email provided — find identity by email, then verify password
     for (const [repId, id] of Object.entries(IDENTITIES)) {
       const stored = localStorage.getItem(id.emailKey);
       if (stored && stored.toLowerCase() === email) { matched = repId; break; }
     }
     if (!matched) { errEl.textContent = 'Email not recognised. Contact your manager.'; return; }
-    const id = IDENTITIES[matched];
-    const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
-    if (hash !== storedHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
+    const storedHash = localStorage.getItem(IDENTITIES[matched].pwdKey);
+    if (!storedHash || hash !== storedHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   } else {
-    // No email — fall back to matching by password hash (admin setup flow)
     for (const [repId, id] of Object.entries(IDENTITIES)) {
-      const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
-      if (hash === storedHash) { matched = repId; break; }
+      const storedHash = localStorage.getItem(id.pwdKey);
+      if (storedHash && hash === storedHash) { matched = repId; break; }
     }
     if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   }
@@ -883,8 +908,8 @@ async function checkAuth() {
     const { repId, hash } = JSON.parse(raw);
     const id = IDENTITIES[repId];
     if (!id) return null;
-    const stored = localStorage.getItem(id.pwdKey) || id.defaultHash;
-    return hash === stored ? { repId } : null;
+    const stored = localStorage.getItem(id.pwdKey);
+    return stored && hash === stored ? { repId } : null;
   } catch { return null; }
 }
 
@@ -2118,8 +2143,8 @@ function renderSettings() {
       // Verify current password against the target identity
       const targetId = IDENTITIES[t];
       const curHash = await sha256(cur);
-      const stored = localStorage.getItem(targetId.pwdKey) || targetId.defaultHash;
-      if (curHash !== stored) { err.textContent = 'Current password is incorrect.'; return; }
+      const stored = localStorage.getItem(targetId.pwdKey);
+      if (!stored || curHash !== stored) { err.textContent = 'Current password is incorrect.'; return; }
       const newHash = await sha256(nw);
       localStorage.setItem(targetId.pwdKey, newHash);
       // If changing own password, update session token too
@@ -2438,6 +2463,10 @@ function bindAll() {
   document.getElementById('email-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pwd-input').focus(); });
   document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
+  // First-run setup
+  document.getElementById('setup-btn').addEventListener('click', submitSetupForm);
+  document.getElementById('setup-pwd-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') submitSetupForm(); });
+
   // Logout
   document.getElementById('logout-btn').addEventListener('click', logout);
 
@@ -2531,8 +2560,12 @@ function bindAll() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  ensureHashes();
   bindAll();
+  if (isFirstRun()) {
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('setup-form').style.display = '';
+    return;
+  }
   const session = await checkAuth();
   if (session) {
     currentRepId = session.repId;
