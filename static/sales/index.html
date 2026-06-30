@@ -944,6 +944,10 @@ function applyLogs(logs) {
     } else if (action === 'update_mileage_status') {
       const m = STATE.mileage.find(m => m.id === row.id);
       if (m) m.status = row.status;
+    } else if (action === 'delete_receipt') {
+      STATE.receipts = STATE.receipts.filter(r => r.id !== row.id);
+    } else if (action === 'delete_mileage') {
+      STATE.mileage = STATE.mileage.filter(m => m.id !== row.id);
     }
   }
 }
@@ -1741,6 +1745,7 @@ function renderReceipts() {
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
                   ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
                   ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-receipt="${esc(r.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
               </tr>`;
             }).join('')}
@@ -1771,6 +1776,9 @@ function renderReceipts() {
     });
     wrap.querySelectorAll('[data-reimb-receipt]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.reimbReceipt, 'reimbursed'));
+    });
+    wrap.querySelectorAll('[data-delete-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => { if (confirm('Delete this receipt? This cannot be undone.')) deleteExpense('receipt', btn.dataset.deleteReceipt); });
     });
 
   } else {
@@ -1810,6 +1818,7 @@ function renderReceipts() {
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-mileage="${esc(m.id)}" style="margin-right:4px">Edit</button>` : ''}
                   ${isAdmin && m.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-mileage="${esc(m.id)}">Approve</button>` : ''}
                   ${isAdmin && m.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-mileage="${esc(m.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-mileage="${esc(m.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
               </tr>`;
             }).join('')}
@@ -1836,6 +1845,9 @@ function renderReceipts() {
     });
     wrap.querySelectorAll('[data-reimb-mileage]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('mileage', btn.dataset.reimbMileage, 'reimbursed'));
+    });
+    wrap.querySelectorAll('[data-delete-mileage]').forEach(btn => {
+      btn.addEventListener('click', () => { if (confirm('Delete this trip? This cannot be undone.')) deleteExpense('mileage', btn.dataset.deleteMileage); });
     });
   }
 }
@@ -1883,7 +1895,7 @@ function openReceiptModal(id = null) {
 
 function openMileageModal(id = null) {
   const m = id ? STATE.mileage.find(m => m.id === id) : null;
-  const rate = localStorage.getItem('crm-mileage-rate') || '0.70';
+  const rate = localStorage.getItem('crm-mileage-rate');
   document.getElementById('modal-mileage-title').textContent = m ? 'Edit Trip' : 'Log Trip';
   document.getElementById('mileage-id').value = id || '';
   document.getElementById('mileage-existing-status').value = m?.status || 'pending';
@@ -1892,7 +1904,7 @@ function openMileageModal(id = null) {
   document.getElementById('mileage-destination').value = m?.destination || '';
   document.getElementById('mileage-miles').value = m?.miles || '';
   document.getElementById('mileage-purpose').value = m?.purpose || '';
-  document.getElementById('mileage-rate-display').textContent = `$${Number(rate).toFixed(3)}/mile`;
+  document.getElementById('mileage-rate-display').textContent = rate ? `$${Number(rate).toFixed(3)}/mile` : 'Not set — ask your Manager to configure in Settings';
   document.getElementById('mileage-reimb-preview').textContent = m ? fmt$(m.reimbursement) : '$0.00';
   document.getElementById('mileage-err').textContent = '';
   openModal('modal-mileage');
@@ -1917,8 +1929,8 @@ async function saveReceipt(data) {
 async function saveMileage(data) {
   const isNew = !data.id;
   const id = data.id || genId();
-  const rate = localStorage.getItem('crm-mileage-rate') || '0.70';
-  const reimbursement = (parseFloat(data.miles) * parseFloat(rate)).toFixed(2);
+  const rate = localStorage.getItem('crm-mileage-rate') || '';
+  const reimbursement = rate ? (parseFloat(data.miles) * parseFloat(rate)).toFixed(2) : '0.00';
   const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
     id, repId: currentRepId, date: data.date, origin: data.origin,
     destination: data.destination, miles: String(data.miles), purpose: data.purpose || '',
@@ -1935,6 +1947,15 @@ async function updateExpenseStatus(type, id, newStatus) {
   applyLogs([entry]);
   renderReceipts();
   toast('Status updated.');
+}
+
+async function deleteExpense(type, id) {
+  const action = type === 'receipt' ? 'delete_receipt' : 'delete_mileage';
+  const entry = { action, id, repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+  renderReceipts();
+  toast('Entry deleted.');
 }
 
 async function submitReceiptForm() {
@@ -2059,8 +2080,8 @@ function renderSettings() {
       <h2>Reimbursements</h2>
       <div class="form-group" style="max-width:240px">
         <label>Mileage Rate ($/mile)</label>
-        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(localStorage.getItem('crm-mileage-rate') || '0.70')}">
-        <div class="form-hint">IRS standard rate for 2025 is $0.70/mile.</div>
+        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(localStorage.getItem('crm-mileage-rate') || '')}">
+        <div class="form-hint">IRS standard rate for 2026 is $0.70/mile.</div>
       </div>
       <button class="btn btn-red btn-sm" id="mileage-rate-save">Save Rate</button>
     </div>` : ''}
@@ -2504,7 +2525,7 @@ function bindAll() {
 
   // Mileage live reimbursement preview
   document.getElementById('mileage-miles').addEventListener('input', e => {
-    const rate = parseFloat(localStorage.getItem('crm-mileage-rate') || '0.70');
+    const rate = parseFloat(localStorage.getItem('crm-mileage-rate') || '0');
     const miles = parseFloat(e.target.value) || 0;
     document.getElementById('mileage-reimb-preview').textContent = fmt$(miles * rate);
   });
