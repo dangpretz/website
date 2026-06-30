@@ -944,6 +944,10 @@ function applyLogs(logs) {
     } else if (action === 'update_mileage_status') {
       const m = STATE.mileage.find(m => m.id === row.id);
       if (m) m.status = row.status;
+    } else if (action === 'delete_receipt') {
+      STATE.receipts = STATE.receipts.filter(r => r.id !== row.id);
+    } else if (action === 'delete_mileage') {
+      STATE.mileage = STATE.mileage.filter(m => m.id !== row.id);
     }
   }
 }
@@ -1741,6 +1745,7 @@ function renderReceipts() {
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
                   ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
                   ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-receipt="${esc(r.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
               </tr>`;
             }).join('')}
@@ -1771,6 +1776,9 @@ function renderReceipts() {
     });
     wrap.querySelectorAll('[data-reimb-receipt]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.reimbReceipt, 'reimbursed'));
+    });
+    wrap.querySelectorAll('[data-delete-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => { if (confirm('Delete this receipt? This cannot be undone.')) deleteExpense('receipt', btn.dataset.deleteReceipt); });
     });
 
   } else {
@@ -1810,6 +1818,7 @@ function renderReceipts() {
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-mileage="${esc(m.id)}" style="margin-right:4px">Edit</button>` : ''}
                   ${isAdmin && m.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-mileage="${esc(m.id)}">Approve</button>` : ''}
                   ${isAdmin && m.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-mileage="${esc(m.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-mileage="${esc(m.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
               </tr>`;
             }).join('')}
@@ -1836,6 +1845,9 @@ function renderReceipts() {
     });
     wrap.querySelectorAll('[data-reimb-mileage]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('mileage', btn.dataset.reimbMileage, 'reimbursed'));
+    });
+    wrap.querySelectorAll('[data-delete-mileage]').forEach(btn => {
+      btn.addEventListener('click', () => { if (confirm('Delete this trip? This cannot be undone.')) deleteExpense('mileage', btn.dataset.deleteMileage); });
     });
   }
 }
@@ -1935,6 +1947,15 @@ async function updateExpenseStatus(type, id, newStatus) {
   applyLogs([entry]);
   renderReceipts();
   toast('Status updated.');
+}
+
+async function deleteExpense(type, id) {
+  const action = type === 'receipt' ? 'delete_receipt' : 'delete_mileage';
+  const entry = { action, id, repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+  renderReceipts();
+  toast('Entry deleted.');
 }
 
 async function submitReceiptForm() {
