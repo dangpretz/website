@@ -697,6 +697,14 @@ textarea{resize:vertical;min-height:70px}
     <div class="modal-body">
       <input type="hidden" id="receipt-id">
       <input type="hidden" id="receipt-existing-status">
+      <div class="form-group" id="receipt-rep-group" style="display:none">
+        <label>Log for</label>
+        <select id="receipt-rep-select">
+          <option value="admin">Manager (myself)</option>
+          <option value="rep1">Rep 1</option>
+          <option value="rep2">Rep 2</option>
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Vendor *</label><input id="receipt-vendor" placeholder="Restaurant, supplier…"></div>
         <div class="form-group"><label>Date *</label><input id="receipt-date" type="date"></div>
@@ -739,6 +747,14 @@ textarea{resize:vertical;min-height:70px}
     <div class="modal-body">
       <input type="hidden" id="mileage-id">
       <input type="hidden" id="mileage-existing-status">
+      <div class="form-group" id="mileage-rep-group" style="display:none">
+        <label>Log for</label>
+        <select id="mileage-rep-select">
+          <option value="admin">Manager (myself)</option>
+          <option value="rep1">Rep 1</option>
+          <option value="rep2">Rep 2</option>
+        </select>
+      </div>
       <div class="form-group"><label>Date *</label><input id="mileage-date" type="date"></div>
       <div class="form-row">
         <div class="form-group"><label>From *</label><input id="mileage-origin" placeholder="Starting location"></div>
@@ -1890,6 +1906,17 @@ function openReceiptModal(id = null) {
   const preview = document.getElementById('receipt-photo-preview');
   const existingPhoto = id ? localStorage.getItem('crm-receipt-photo-' + id) : null;
   preview.innerHTML = existingPhoto ? `<img src="${existingPhoto}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">` : '';
+  const repGroup = document.getElementById('receipt-rep-group');
+  if (currentRepId === 'admin' && !r) {
+    repGroup.style.display = '';
+    const sel = document.getElementById('receipt-rep-select');
+    sel.options[0].text = 'Manager (myself)';
+    sel.options[1].text = getRepLabel('rep1');
+    sel.options[2].text = getRepLabel('rep2');
+    sel.value = 'admin';
+  } else {
+    repGroup.style.display = 'none';
+  }
   openModal('modal-receipt');
 }
 
@@ -1907,6 +1934,17 @@ function openMileageModal(id = null) {
   document.getElementById('mileage-rate-display').textContent = rate ? `$${Number(rate).toFixed(3)}/mile` : 'Not set — ask your Manager to configure in Settings';
   document.getElementById('mileage-reimb-preview').textContent = m ? fmt$(m.reimbursement) : '$0.00';
   document.getElementById('mileage-err').textContent = '';
+  const repGroup = document.getElementById('mileage-rep-group');
+  if (currentRepId === 'admin' && !m) {
+    repGroup.style.display = '';
+    const sel = document.getElementById('mileage-rep-select');
+    sel.options[0].text = 'Manager (myself)';
+    sel.options[1].text = getRepLabel('rep1');
+    sel.options[2].text = getRepLabel('rep2');
+    sel.value = 'admin';
+  } else {
+    repGroup.style.display = 'none';
+  }
   openModal('modal-mileage');
 }
 
@@ -1914,7 +1952,7 @@ async function saveReceipt(data) {
   const isNew = !data.id;
   const id = data.id || genId();
   const entry = { action: isNew ? 'create_receipt' : 'update_receipt',
-    id, repId: currentRepId, vendor: data.vendor, date: data.date,
+    id, repId: data.targetRepId || currentRepId, vendor: data.vendor, date: data.date,
     amount: String(data.amount), category: data.category, description: data.description || '',
     status: data.status || 'pending', hasPhoto: data.hasPhoto || false,
     timeStamp: new Date().toISOString() };
@@ -1932,7 +1970,7 @@ async function saveMileage(data) {
   const rate = localStorage.getItem('crm-mileage-rate') || '';
   const reimbursement = rate ? (parseFloat(data.miles) * parseFloat(rate)).toFixed(2) : '0.00';
   const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
-    id, repId: currentRepId, date: data.date, origin: data.origin,
+    id, repId: data.targetRepId || currentRepId, date: data.date, origin: data.origin,
     destination: data.destination, miles: String(data.miles), purpose: data.purpose || '',
     rate, reimbursement, status: data.status || 'pending',
     timeStamp: new Date().toISOString() };
@@ -1975,10 +2013,13 @@ async function submitReceiptForm() {
     const photoData = photoFile ? await compressPhoto(photoFile) : null;
     const existingId = document.getElementById('receipt-id').value || null;
     const existingStatus = document.getElementById('receipt-existing-status').value || 'pending';
+    const repGroup = document.getElementById('receipt-rep-group');
+    const targetRepId = (currentRepId === 'admin' && !existingId && repGroup.style.display !== 'none')
+      ? document.getElementById('receipt-rep-select').value : null;
     await saveReceipt({
       id: existingId, vendor, date, amount, category,
       description: document.getElementById('receipt-description').value.trim(),
-      status: existingStatus, photoData,
+      status: existingStatus, photoData, targetRepId,
       hasPhoto: !!photoData || (existingId && !!localStorage.getItem('crm-receipt-photo-' + existingId)),
     });
     closeModal('modal-receipt');
@@ -2003,10 +2044,13 @@ async function submitMileageForm() {
   try {
     const existingId = document.getElementById('mileage-id').value || null;
     const existingStatus = document.getElementById('mileage-existing-status').value || 'pending';
+    const mRepGroup = document.getElementById('mileage-rep-group');
+    const targetRepId = (currentRepId === 'admin' && !existingId && mRepGroup.style.display !== 'none')
+      ? document.getElementById('mileage-rep-select').value : null;
     await saveMileage({
       id: existingId, date, origin, destination, miles,
       purpose: document.getElementById('mileage-purpose').value.trim(),
-      status: existingStatus,
+      status: existingStatus, targetRepId,
     });
     closeModal('modal-mileage');
     toast('Trip logged.');
