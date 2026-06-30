@@ -98,6 +98,8 @@ body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text)
 .badge-liked{background:#d1fae5;color:#065f46}
 .badge-disliked{background:#fee2e2;color:#b91c1c}
 .badge-converted{background:#dbeafe;color:#1d4ed8}
+.badge-approved{background:#dbeafe;color:#1d4ed8}
+.badge-reimbursed{background:#d1fae5;color:#065f46}
 .badge-call{background:#f3e8ff;color:#6b21a8}
 .badge-email{background:#dbeafe;color:#1d4ed8}
 .badge-in-person,.badge-in_person{background:#d1fae5;color:#065f46}
@@ -332,6 +334,7 @@ textarea{resize:vertical;min-height:70px}
       <li data-view="accounts">🏢 Accounts</li>
       <li data-view="pipeline">📋 Pipeline</li>
       <li data-view="tasks">✅ Tasks</li>
+      <li data-view="receipts">🧾 Receipts</li>
       <li data-view="reports">📈 Reports</li>
       <li data-view="settings">⚙️ Settings</li>
     </ul>
@@ -432,6 +435,34 @@ textarea{resize:vertical;min-height:70px}
         <button class="btn btn-red btn-sm" id="new-task-btn">+ New Task</button>
       </div>
       <div id="tasks-content"></div>
+    </div>
+
+    <!-- Receipts & Mileage -->
+    <div id="view-receipts" class="view">
+      <div class="view-header">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div class="view-title">Receipts</div>
+          <div class="report-tabs" style="margin-bottom:0;border-bottom:none">
+            <div class="report-tab active" id="rcpt-tab-receipts" data-rcpt-tab="receipts">Receipts</div>
+            <div class="report-tab" id="rcpt-tab-mileage" data-rcpt-tab="mileage">Mileage</div>
+          </div>
+        </div>
+        <button class="btn btn-red btn-sm" id="new-receipt-btn">+ New Receipt</button>
+      </div>
+      <div class="search-row">
+        <select class="filter-select" id="receipt-status-filter">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="reimbursed">Reimbursed</option>
+        </select>
+        <select class="filter-select" id="receipt-rep-filter" style="display:none">
+          <option value="">All Reps</option>
+          <option value="rep1">Rep 1</option>
+          <option value="rep2">Rep 2</option>
+        </select>
+      </div>
+      <div id="receipts-table-wrap"></div>
     </div>
 
     <!-- Reports -->
@@ -656,6 +687,89 @@ textarea{resize:vertical;min-height:70px}
 </div>
 
 
+<!-- Receipt modal -->
+<div class="modal-backdrop" id="modal-receipt">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-receipt-title">New Receipt</div>
+      <button class="modal-close" data-close="modal-receipt">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="receipt-id">
+      <input type="hidden" id="receipt-existing-status">
+      <div class="form-row">
+        <div class="form-group"><label>Vendor *</label><input id="receipt-vendor" placeholder="Restaurant, supplier…"></div>
+        <div class="form-group"><label>Date *</label><input id="receipt-date" type="date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Amount ($) *</label><input id="receipt-amount" type="number" step="0.01" min="0" placeholder="0.00"></div>
+        <div class="form-group"><label>Category *</label>
+          <select id="receipt-category">
+            <option value="">Select…</option>
+            <option value="meals">Meals &amp; Entertainment</option>
+            <option value="travel">Travel</option>
+            <option value="supplies">Supplies &amp; Materials</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="receipt-description" placeholder="Brief note about the expense…"></textarea></div>
+      <div class="form-group">
+        <label>Receipt Photo <span style="font-weight:400;color:var(--gray-3)">(optional)</span></label>
+        <input type="file" id="receipt-photo" accept="image/*" capture="environment" style="font-size:13px">
+        <div class="form-hint">Stored on this device only.</div>
+        <div id="receipt-photo-preview" style="margin-top:8px"></div>
+      </div>
+      <div class="modal-err" id="receipt-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-receipt">Cancel</button>
+      <button class="btn btn-red" id="receipt-save-btn">Save Receipt</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mileage modal -->
+<div class="modal-backdrop" id="modal-mileage">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-mileage-title">Log Trip</div>
+      <button class="modal-close" data-close="modal-mileage">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="mileage-id">
+      <input type="hidden" id="mileage-existing-status">
+      <div class="form-group"><label>Date *</label><input id="mileage-date" type="date"></div>
+      <div class="form-row">
+        <div class="form-group"><label>From *</label><input id="mileage-origin" placeholder="Starting location"></div>
+        <div class="form-group"><label>To *</label><input id="mileage-destination" placeholder="Destination"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Miles *</label><input id="mileage-miles" type="number" step="0.1" min="0" placeholder="0.0"></div>
+        <div class="form-group"><label>Purpose</label><input id="mileage-purpose" placeholder="Client visit, delivery…"></div>
+      </div>
+      <div style="background:var(--gray-1);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px">
+        <span style="color:var(--gray-3);font-weight:600">Rate: </span><span id="mileage-rate-display"></span>
+        &nbsp;&nbsp;
+        <span style="color:var(--gray-3);font-weight:600">Reimbursement: </span><strong id="mileage-reimb-preview">$0.00</strong>
+      </div>
+      <div class="modal-err" id="mileage-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-mileage">Cancel</button>
+      <button class="btn btn-red" id="mileage-save-btn">Save Trip</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo lightbox -->
+<div class="modal-backdrop" id="modal-photo" style="background:rgba(0,0,0,.85)">
+  <div style="position:relative;max-width:90vw;max-height:90vh">
+    <button data-close="modal-photo" style="position:absolute;top:-36px;right:0;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1">✕</button>
+    <img id="photo-lightbox-img" src="" alt="Receipt photo" style="max-width:90vw;max-height:85vh;border-radius:8px;display:block">
+  </div>
+</div>
+
 <script type="module">
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
@@ -678,7 +792,7 @@ function getRepLabel(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [] };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [] };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -686,6 +800,7 @@ let currentReportTab = 'revenue';
 let currentRepId = null; // 'rep1' | 'rep2' | 'admin'
 let acctViewMode = 'mine'; // 'mine' | 'all'
 let pendingDragDeal = null;
+let currentReceiptsTab = 'receipts';
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const genId = () => Math.random().toString(36).slice(2, 10);
@@ -780,10 +895,14 @@ async function showApp() {
   acctViewMode = currentRepId === 'admin' ? 'all' : 'mine';
   // Show rep filter on pipeline for admin
   document.getElementById('pipe-rep-filter').style.display = currentRepId === 'admin' ? '' : 'none';
-  // Update pipe-rep-filter option labels with custom names
+  // Update rep filter option labels with custom names
   const prf = document.getElementById('pipe-rep-filter');
   prf.options[1].text = getRepLabel('rep1');
   prf.options[2].text = getRepLabel('rep2');
+  document.getElementById('receipt-rep-filter').style.display = currentRepId === 'admin' ? '' : 'none';
+  const rrf = document.getElementById('receipt-rep-filter');
+  rrf.options[1].text = getRepLabel('rep1');
+  rrf.options[2].text = getRepLabel('rep2');
   await loadData();
   navigate('dashboard');
 }
@@ -809,6 +928,22 @@ function applyLogs(logs) {
       if (!STATE.orders.find(o => o.id === row.id)) STATE.orders.push(row);
     } else if (action === 'log_sample') {
       if (!STATE.samples.find(s => s.id === row.id)) STATE.samples.push(row);
+    } else if (action === 'create_receipt') {
+      if (!STATE.receipts.find(r => r.id === row.id)) STATE.receipts.push(row);
+    } else if (action === 'update_receipt') {
+      const i = STATE.receipts.findIndex(r => r.id === row.id);
+      if (i >= 0) STATE.receipts[i] = { ...STATE.receipts[i], ...row };
+    } else if (action === 'update_receipt_status') {
+      const r = STATE.receipts.find(r => r.id === row.id);
+      if (r) r.status = row.status;
+    } else if (action === 'create_mileage') {
+      if (!STATE.mileage.find(m => m.id === row.id)) STATE.mileage.push(row);
+    } else if (action === 'update_mileage') {
+      const i = STATE.mileage.findIndex(m => m.id === row.id);
+      if (i >= 0) STATE.mileage[i] = { ...STATE.mileage[i], ...row };
+    } else if (action === 'update_mileage_status') {
+      const m = STATE.mileage.find(m => m.id === row.id);
+      if (m) m.status = row.status;
     }
   }
 }
@@ -860,7 +995,7 @@ function closeMobileSidebar() {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', reports:'Reports', settings:'Settings' };
+const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', receipts:'Receipts', reports:'Reports', settings:'Settings' };
 
 function navigate(view, params = {}) {
   currentView = view;
@@ -878,6 +1013,7 @@ function navigate(view, params = {}) {
   else if (view === 'account-detail') { currentAccountId = params.id; renderAccountDetail(params.id); }
   else if (view === 'pipeline') renderPipeline();
   else if (view === 'tasks') renderTasks();
+  else if (view === 'receipts') renderReceipts();
   else if (view === 'reports') { renderReport(); }
   else if (view === 'settings') renderSettings();
 }
@@ -895,6 +1031,9 @@ function renderDashboard() {
   const pipelineValue = pipelineDeals.reduce((s,d) => s + Number(d.value||0), 0);
   const openDeals = myDeals.filter(d => !['won','lost'].includes(d.stage)).length;
   const riskDays = Number(localStorage.getItem(RISK_KEY) || 30);
+  const pendingReceipts = (isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId)).filter(r => r.status === 'pending').length;
+  const pendingMileage = (isAdmin ? STATE.mileage : STATE.mileage.filter(m => m.repId === currentRepId)).filter(m => m.status === 'pending').length;
+  const pendingExpenses = pendingReceipts + pendingMileage;
   const atRisk = myAccounts.filter(a => {
     const m = getAccountMetrics(a.id);
     return a.status === 'active' && daysAgo(m.lastContactDate) >= riskDays;
@@ -913,6 +1052,7 @@ function renderDashboard() {
       <div class="stat-card"><div class="stat-card-label">Pipeline Value</div><div class="stat-card-value">${fmt$(pipelineValue)}</div></div>
       <div class="stat-card"><div class="stat-card-label">Open Deals</div><div class="stat-card-value">${openDeals}</div></div>
       <div class="stat-card"><div class="stat-card-label">At-Risk Accounts</div><div class="stat-card-value ${atRisk.length ? 'amber' : ''}">${atRisk.length}</div></div>
+      ${pendingExpenses > 0 ? `<div class="stat-card" style="cursor:pointer" data-nav-receipts><div class="stat-card-label">Pending Expenses</div><div class="stat-card-value amber">${pendingExpenses}</div></div>` : ''}
     </div>
     <div class="two-col">
       <div>
@@ -987,6 +1127,7 @@ function renderDashboard() {
   document.querySelectorAll('[data-log-comm]').forEach(el => {
     el.addEventListener('click', () => openCommModal(el.dataset.logComm));
   });
+  document.querySelector('[data-nav-receipts]')?.addEventListener('click', () => navigate('receipts'));
 }
 
 // ── Accounts list ─────────────────────────────────────────────────────────────
@@ -1552,6 +1693,307 @@ function exportCSV(rows, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ── Receipts & Mileage ────────────────────────────────────────────────────────
+function renderReceipts() {
+  const isAdmin = currentRepId === 'admin';
+  const statusFilter = document.getElementById('receipt-status-filter').value;
+  const repFilter = isAdmin ? (document.getElementById('receipt-rep-filter').value) : currentRepId;
+
+  // Sync tab UI
+  document.querySelectorAll('[data-rcpt-tab]').forEach(t => t.classList.toggle('active', t.dataset.rcptTab === currentReceiptsTab));
+  document.getElementById('new-receipt-btn').textContent = currentReceiptsTab === 'receipts' ? '+ New Receipt' : '+ Log Trip';
+
+  const wrap = document.getElementById('receipts-table-wrap');
+
+  if (currentReceiptsTab === 'receipts') {
+    let rows = isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId);
+    if (repFilter && isAdmin) rows = rows.filter(r => r.repId === repFilter);
+    if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
+    rows = [...rows].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+    const pendingTotal  = rows.filter(r => r.status === 'pending').reduce((s,r) => s + Number(r.amount||0), 0);
+    const approvedTotal = rows.filter(r => r.status === 'approved').reduce((s,r) => s + Number(r.amount||0), 0);
+    const reimbTotal    = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
+
+    const catLabel = { meals:'Meals', travel:'Travel', supplies:'Supplies', other:'Other' };
+    wrap.innerHTML = rows.length === 0 ? `<div class="empty"><div class="empty-icon">🧾</div>No receipts yet.</div>` : `
+      <div class="card" style="overflow:hidden"><div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr>
+            <th>Date</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Description</th>
+            ${isAdmin ? '<th>Rep</th>' : ''}
+            <th>Status</th><th>Photo</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r => {
+              const canEdit = (isAdmin || r.repId === currentRepId) && r.status === 'pending';
+              const hasPhoto = !!localStorage.getItem('crm-receipt-photo-' + r.id);
+              return `<tr>
+                <td>${fmtDate(r.date)}</td>
+                <td><strong>${esc(r.vendor)}</strong></td>
+                <td>${esc(catLabel[r.category]||r.category||'—')}</td>
+                <td>${fmt$(r.amount)}</td>
+                <td style="max-width:180px;color:var(--gray-4)">${esc(r.description||'—')}</td>
+                ${isAdmin ? `<td><span class="badge badge-${esc(r.repId||'admin')}">${esc(getRepLabel(r.repId))}</span></td>` : ''}
+                <td><span class="badge badge-${esc(r.status)}">${esc(capitalize(r.status))}</span></td>
+                <td>${hasPhoto ? `<button class="btn-ghost btn-sm" data-view-photo="${esc(r.id)}">📷 View</button>` : '—'}</td>
+                <td style="white-space:nowrap">
+                  ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
+                  ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
+                  ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot><tr class="totals">
+            <td colspan="${isAdmin ? 3 : 2}">Totals</td>
+            <td colspan="2">
+              <span style="color:var(--amber);font-weight:700">Pending: ${fmt$(pendingTotal)}</span> &nbsp;
+              <span style="color:var(--blue);font-weight:700">Approved: ${fmt$(approvedTotal)}</span> &nbsp;
+              <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span>
+            </td>
+            <td colspan="${isAdmin ? 4 : 3}"></td>
+          </tr></tfoot>
+        </table>
+      </div></div>`;
+
+    wrap.querySelectorAll('[data-view-photo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const data = localStorage.getItem('crm-receipt-photo-' + btn.dataset.viewPhoto);
+        if (data) { document.getElementById('photo-lightbox-img').src = data; openModal('modal-photo'); }
+      });
+    });
+    wrap.querySelectorAll('[data-edit-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => openReceiptModal(btn.dataset.editReceipt));
+    });
+    wrap.querySelectorAll('[data-approve-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.approveReceipt, 'approved'));
+    });
+    wrap.querySelectorAll('[data-reimb-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.reimbReceipt, 'reimbursed'));
+    });
+
+  } else {
+    // Mileage sub-tab
+    let rows = isAdmin ? STATE.mileage : STATE.mileage.filter(m => m.repId === currentRepId);
+    if (repFilter && isAdmin) rows = rows.filter(m => m.repId === repFilter);
+    if (statusFilter) rows = rows.filter(m => m.status === statusFilter);
+    rows = [...rows].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+    const pendingMiles  = rows.filter(m => m.status === 'pending').reduce((s,m) => s + Number(m.miles||0), 0);
+    const pendingReimb  = rows.filter(m => m.status === 'pending').reduce((s,m) => s + Number(m.reimbursement||0), 0);
+    const approvedReimb = rows.filter(m => m.status === 'approved').reduce((s,m) => s + Number(m.reimbursement||0), 0);
+    const reimbTotal    = rows.filter(m => m.status === 'reimbursed').reduce((s,m) => s + Number(m.reimbursement||0), 0);
+    const totalMiles    = rows.reduce((s,m) => s + Number(m.miles||0), 0);
+
+    wrap.innerHTML = rows.length === 0 ? `<div class="empty"><div class="empty-icon">🚗</div>No trips logged yet.</div>` : `
+      <div class="card" style="overflow:hidden"><div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr>
+            <th>Date</th><th>Route</th><th>Miles</th><th>Purpose</th><th>Rate</th><th>Reimbursement</th>
+            ${isAdmin ? '<th>Rep</th>' : ''}
+            <th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(m => {
+              const canEdit = (isAdmin || m.repId === currentRepId) && m.status === 'pending';
+              return `<tr>
+                <td>${fmtDate(m.date)}</td>
+                <td style="max-width:200px"><strong>${esc(m.origin)}</strong> → ${esc(m.destination)}</td>
+                <td>${Number(m.miles||0).toFixed(1)}</td>
+                <td style="max-width:140px;color:var(--gray-4)">${esc(m.purpose||'—')}</td>
+                <td>$${Number(m.rate||0).toFixed(3)}/mi</td>
+                <td><strong>${fmt$(m.reimbursement)}</strong></td>
+                ${isAdmin ? `<td><span class="badge badge-${esc(m.repId||'admin')}">${esc(getRepLabel(m.repId))}</span></td>` : ''}
+                <td><span class="badge badge-${esc(m.status)}">${esc(capitalize(m.status))}</span></td>
+                <td style="white-space:nowrap">
+                  ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-mileage="${esc(m.id)}" style="margin-right:4px">Edit</button>` : ''}
+                  ${isAdmin && m.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-mileage="${esc(m.id)}">Approve</button>` : ''}
+                  ${isAdmin && m.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-mileage="${esc(m.id)}">Mark Reimbursed</button>` : ''}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot><tr class="totals">
+            <td colspan="${isAdmin ? 2 : 1}">Totals</td>
+            <td>${totalMiles.toFixed(1)} mi</td>
+            <td colspan="2"></td>
+            <td>
+              <span style="color:var(--amber);font-weight:700">Pending: ${fmt$(pendingReimb)}</span> &nbsp;
+              <span style="color:var(--blue);font-weight:700">Approved: ${fmt$(approvedReimb)}</span> &nbsp;
+              <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span>
+            </td>
+            <td colspan="${isAdmin ? 3 : 2}"></td>
+          </tr></tfoot>
+        </table>
+      </div></div>`;
+
+    wrap.querySelectorAll('[data-edit-mileage]').forEach(btn => {
+      btn.addEventListener('click', () => openMileageModal(btn.dataset.editMileage));
+    });
+    wrap.querySelectorAll('[data-approve-mileage]').forEach(btn => {
+      btn.addEventListener('click', () => updateExpenseStatus('mileage', btn.dataset.approveMileage, 'approved'));
+    });
+    wrap.querySelectorAll('[data-reimb-mileage]').forEach(btn => {
+      btn.addEventListener('click', () => updateExpenseStatus('mileage', btn.dataset.reimbMileage, 'reimbursed'));
+    });
+  }
+}
+
+function compressPhoto(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 800;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function openReceiptModal(id = null) {
+  const r = id ? STATE.receipts.find(r => r.id === id) : null;
+  document.getElementById('modal-receipt-title').textContent = r ? 'Edit Receipt' : 'New Receipt';
+  document.getElementById('receipt-id').value = id || '';
+  document.getElementById('receipt-existing-status').value = r?.status || 'pending';
+  document.getElementById('receipt-vendor').value = r?.vendor || '';
+  document.getElementById('receipt-date').value = r?.date || today();
+  document.getElementById('receipt-amount').value = r?.amount || '';
+  document.getElementById('receipt-category').value = r?.category || '';
+  document.getElementById('receipt-description').value = r?.description || '';
+  document.getElementById('receipt-photo').value = '';
+  document.getElementById('receipt-err').textContent = '';
+  const preview = document.getElementById('receipt-photo-preview');
+  const existingPhoto = id ? localStorage.getItem('crm-receipt-photo-' + id) : null;
+  preview.innerHTML = existingPhoto ? `<img src="${existingPhoto}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">` : '';
+  openModal('modal-receipt');
+}
+
+function openMileageModal(id = null) {
+  const m = id ? STATE.mileage.find(m => m.id === id) : null;
+  const rate = localStorage.getItem('crm-mileage-rate') || '0.70';
+  document.getElementById('modal-mileage-title').textContent = m ? 'Edit Trip' : 'Log Trip';
+  document.getElementById('mileage-id').value = id || '';
+  document.getElementById('mileage-existing-status').value = m?.status || 'pending';
+  document.getElementById('mileage-date').value = m?.date || today();
+  document.getElementById('mileage-origin').value = m?.origin || '';
+  document.getElementById('mileage-destination').value = m?.destination || '';
+  document.getElementById('mileage-miles').value = m?.miles || '';
+  document.getElementById('mileage-purpose').value = m?.purpose || '';
+  document.getElementById('mileage-rate-display').textContent = `$${Number(rate).toFixed(3)}/mile`;
+  document.getElementById('mileage-reimb-preview').textContent = m ? fmt$(m.reimbursement) : '$0.00';
+  document.getElementById('mileage-err').textContent = '';
+  openModal('modal-mileage');
+}
+
+async function saveReceipt(data) {
+  const isNew = !data.id;
+  const id = data.id || genId();
+  const entry = { action: isNew ? 'create_receipt' : 'update_receipt',
+    id, repId: currentRepId, vendor: data.vendor, date: data.date,
+    amount: String(data.amount), category: data.category, description: data.description || '',
+    status: data.status || 'pending', hasPhoto: data.hasPhoto || false,
+    timeStamp: new Date().toISOString() };
+  if (data.photoData) {
+    localStorage.setItem('crm-receipt-photo-' + id, data.photoData);
+    entry.hasPhoto = true;
+  }
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function saveMileage(data) {
+  const isNew = !data.id;
+  const id = data.id || genId();
+  const rate = localStorage.getItem('crm-mileage-rate') || '0.70';
+  const reimbursement = (parseFloat(data.miles) * parseFloat(rate)).toFixed(2);
+  const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
+    id, repId: currentRepId, date: data.date, origin: data.origin,
+    destination: data.destination, miles: String(data.miles), purpose: data.purpose || '',
+    rate, reimbursement, status: data.status || 'pending',
+    timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function updateExpenseStatus(type, id, newStatus) {
+  const action = type === 'receipt' ? 'update_receipt_status' : 'update_mileage_status';
+  const entry = { action, id, status: newStatus, repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+  renderReceipts();
+  toast('Status updated.');
+}
+
+async function submitReceiptForm() {
+  const vendor = document.getElementById('receipt-vendor').value.trim();
+  const date = document.getElementById('receipt-date').value;
+  const amount = document.getElementById('receipt-amount').value;
+  const category = document.getElementById('receipt-category').value;
+  const err = document.getElementById('receipt-err');
+  if (!vendor) { err.textContent = 'Vendor is required.'; return; }
+  if (!date) { err.textContent = 'Date is required.'; return; }
+  if (!amount || Number(amount) <= 0) { err.textContent = 'Amount is required.'; return; }
+  if (!category) { err.textContent = 'Category is required.'; return; }
+  const btn = document.getElementById('receipt-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const photoFile = document.getElementById('receipt-photo').files[0];
+    const photoData = photoFile ? await compressPhoto(photoFile) : null;
+    const existingId = document.getElementById('receipt-id').value || null;
+    const existingStatus = document.getElementById('receipt-existing-status').value || 'pending';
+    await saveReceipt({
+      id: existingId, vendor, date, amount, category,
+      description: document.getElementById('receipt-description').value.trim(),
+      status: existingStatus, photoData,
+      hasPhoto: !!photoData || (existingId && !!localStorage.getItem('crm-receipt-photo-' + existingId)),
+    });
+    closeModal('modal-receipt');
+    toast('Receipt saved.');
+    renderReceipts();
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Receipt'; }
+}
+
+async function submitMileageForm() {
+  const date = document.getElementById('mileage-date').value;
+  const origin = document.getElementById('mileage-origin').value.trim();
+  const destination = document.getElementById('mileage-destination').value.trim();
+  const miles = document.getElementById('mileage-miles').value;
+  const err = document.getElementById('mileage-err');
+  if (!date) { err.textContent = 'Date is required.'; return; }
+  if (!origin) { err.textContent = 'Starting location is required.'; return; }
+  if (!destination) { err.textContent = 'Destination is required.'; return; }
+  if (!miles || Number(miles) <= 0) { err.textContent = 'Miles is required.'; return; }
+  const btn = document.getElementById('mileage-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const existingId = document.getElementById('mileage-id').value || null;
+    const existingStatus = document.getElementById('mileage-existing-status').value || 'pending';
+    await saveMileage({
+      id: existingId, date, origin, destination, miles,
+      purpose: document.getElementById('mileage-purpose').value.trim(),
+      status: existingStatus,
+    });
+    closeModal('modal-mileage');
+    toast('Trip logged.');
+    renderReceipts();
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Trip'; }
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 function renderSettings() {
   const isAdmin = currentRepId === 'admin';
@@ -1612,10 +2054,20 @@ function renderSettings() {
     ${emailSection(currentRepId, 'My Email Address')}
     ${pwdSection(currentRepId, 'Change My Password')}
     ${isAdmin ? emailSection('rep1', `${rep1Label} Email Address`) + emailSection('rep2', `${rep2Label} Email Address`) + pwdSection('rep1', `Change ${rep1Label} Password`) + pwdSection('rep2', `Change ${rep2Label} Password`) : ''}
+    ${isAdmin ? `
+    <div class="settings-section">
+      <h2>Reimbursements</h2>
+      <div class="form-group" style="max-width:240px">
+        <label>Mileage Rate ($/mile)</label>
+        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(localStorage.getItem('crm-mileage-rate') || '0.70')}">
+        <div class="form-hint">IRS standard rate for 2025 is $0.70/mile.</div>
+      </div>
+      <button class="btn btn-red btn-sm" id="mileage-rate-save">Save Rate</button>
+    </div>` : ''}
     <div class="settings-section">
       <h2>About</h2>
       <div style="font-size:13px;color:var(--text2);line-height:1.8">
-        <div>DPC Sales CRM · v1.1</div>
+        <div>DPC Sales CRM · v1.2</div>
         <div>Data log: <code>${LOG_PATH}</code></div>
         <div>Dangerous Pretzel Co. internal tool.</div>
       </div>
@@ -1624,6 +2076,11 @@ function renderSettings() {
   document.getElementById('save-risk-btn').addEventListener('click', () => {
     const v = document.getElementById('risk-days-input').value;
     if (v && Number(v) > 0) { localStorage.setItem(RISK_KEY, v); toast('At-risk threshold saved.'); }
+  });
+
+  document.getElementById('mileage-rate-save')?.addEventListener('click', () => {
+    const v = document.getElementById('mileage-rate-input').value;
+    if (v && Number(v) > 0) { localStorage.setItem('crm-mileage-rate', Number(v).toFixed(3)); toast('Mileage rate saved.'); }
   });
 
   document.getElementById('save-label-btn')?.addEventListener('click', () => {
@@ -2026,6 +2483,36 @@ function bindAll() {
     backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(backdrop.id); });
   });
 
+  // Receipts / Mileage view
+  document.getElementById('new-receipt-btn').addEventListener('click', () => {
+    if (currentReceiptsTab === 'receipts') openReceiptModal();
+    else openMileageModal();
+  });
+  document.getElementById('receipt-status-filter').addEventListener('change', renderReceipts);
+  document.getElementById('receipt-rep-filter').addEventListener('change', renderReceipts);
+  document.querySelectorAll('[data-rcpt-tab]').forEach(tab => {
+    tab.addEventListener('click', () => { currentReceiptsTab = tab.dataset.rcptTab; renderReceipts(); });
+  });
+
+  // Receipt photo live preview
+  document.getElementById('receipt-photo').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const data = await compressPhoto(file);
+    document.getElementById('receipt-photo-preview').innerHTML = `<img src="${data}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">`;
+  });
+
+  // Mileage live reimbursement preview
+  document.getElementById('mileage-miles').addEventListener('input', e => {
+    const rate = parseFloat(localStorage.getItem('crm-mileage-rate') || '0.70');
+    const miles = parseFloat(e.target.value) || 0;
+    document.getElementById('mileage-reimb-preview').textContent = fmt$(miles * rate);
+  });
+
+  // Photo lightbox close
+  document.querySelector('[data-close="modal-photo"]').addEventListener('click', () => closeModal('modal-photo'));
+  document.getElementById('modal-photo').addEventListener('click', e => { if (e.target === document.getElementById('modal-photo')) closeModal('modal-photo'); });
+
   // Modal saves
   document.getElementById('acct-save-btn').addEventListener('click', submitAccountForm);
   document.getElementById('deal-save-btn').addEventListener('click', submitDealForm);
@@ -2033,6 +2520,8 @@ function bindAll() {
   document.getElementById('comm-save-btn').addEventListener('click', submitCommForm);
   document.getElementById('order-save-btn').addEventListener('click', submitOrderForm);
   document.getElementById('sample-save-btn').addEventListener('click', submitSampleForm);
+  document.getElementById('receipt-save-btn').addEventListener('click', submitReceiptForm);
+  document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
 
   // Deal stage toggle for loss reason
   document.getElementById('deal-stage').addEventListener('change', e => {
