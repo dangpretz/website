@@ -141,7 +141,6 @@ textarea{resize:vertical;min-height:70px}
 .kcard.dragging{opacity:.4;cursor:grabbing}
 .kcard-name{font-weight:700;font-size:13px;margin-bottom:5px}
 .kcard-meta{font-size:11px;color:var(--gray-3);display:flex;flex-direction:column;gap:2px}
-.kcard-value{font-size:12px;font-weight:700;color:var(--green);margin-top:6px}
 .kcard-stage-select{width:100%;margin-top:8px;padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:#f9f9f9}
 .col-lead .kanban-col-header{background:#e9e9e9;color:#555}
 .col-quoted .kanban-col-header{background:#dbeafe;color:#1d4ed8}
@@ -555,7 +554,6 @@ textarea{resize:vertical;min-height:70px}
             <option value="lost">Lost</option>
           </select>
         </div>
-        <div class="form-group"><label>Deal Value ($)</label><input id="deal-value" type="number" min="0" step="0.01" placeholder="0.00"></div>
       </div>
       <div class="form-group" id="deal-loss-group" style="display:none">
         <label>Loss Reason</label><input id="deal-loss-reason" placeholder="Price, timing, competitor…">
@@ -697,6 +695,14 @@ textarea{resize:vertical;min-height:70px}
     <div class="modal-body">
       <input type="hidden" id="receipt-id">
       <input type="hidden" id="receipt-existing-status">
+      <div class="form-group" id="receipt-rep-group" style="display:none">
+        <label>Log for</label>
+        <select id="receipt-rep-select">
+          <option value="admin">Manager (myself)</option>
+          <option value="rep1">Rep 1</option>
+          <option value="rep2">Rep 2</option>
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Vendor *</label><input id="receipt-vendor" placeholder="Restaurant, supplier…"></div>
         <div class="form-group"><label>Date *</label><input id="receipt-date" type="date"></div>
@@ -739,6 +745,14 @@ textarea{resize:vertical;min-height:70px}
     <div class="modal-body">
       <input type="hidden" id="mileage-id">
       <input type="hidden" id="mileage-existing-status">
+      <div class="form-group" id="mileage-rep-group" style="display:none">
+        <label>Log for</label>
+        <select id="mileage-rep-select">
+          <option value="admin">Manager (myself)</option>
+          <option value="rep1">Rep 1</option>
+          <option value="rep2">Rep 2</option>
+        </select>
+      </div>
       <div class="form-group"><label>Date *</label><input id="mileage-date" type="date"></div>
       <div class="form-row">
         <div class="form-group"><label>From *</label><input id="mileage-origin" placeholder="Starting location"></div>
@@ -1032,7 +1046,6 @@ function renderDashboard() {
 
   const overdueTasks = myTasks.filter(t => t.done !== 'true' && daysUntil(t.dueDate) < 0);
   const pipelineDeals = myDeals.filter(d => ['quoted','follow-up'].includes(d.stage));
-  const pipelineValue = pipelineDeals.reduce((s,d) => s + Number(d.value||0), 0);
   const openDeals = myDeals.filter(d => !['won','lost'].includes(d.stage)).length;
   const riskDays = Number(localStorage.getItem(RISK_KEY) || 30);
   const pendingReceipts = (isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId)).filter(r => r.status === 'pending').length;
@@ -1053,7 +1066,6 @@ function renderDashboard() {
   document.getElementById('dash-content').innerHTML = `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-card-label">Overdue Tasks</div><div class="stat-card-value ${overdueTasks.length ? 'red' : ''}">${overdueTasks.length}</div></div>
-      <div class="stat-card"><div class="stat-card-label">Pipeline Value</div><div class="stat-card-value">${fmt$(pipelineValue)}</div></div>
       <div class="stat-card"><div class="stat-card-label">Open Deals</div><div class="stat-card-value">${openDeals}</div></div>
       <div class="stat-card"><div class="stat-card-label">At-Risk Accounts</div><div class="stat-card-value ${atRisk.length ? 'amber' : ''}">${atRisk.length}</div></div>
       ${pendingExpenses > 0 ? `<div class="stat-card" style="cursor:pointer" data-nav-receipts><div class="stat-card-label">Pending Expenses</div><div class="stat-card-value amber">${pendingExpenses}</div></div>` : ''}
@@ -1277,7 +1289,6 @@ function renderDetailTab(tab, id, a, m, deal) {
           ${deal ? `<div class="card" style="margin-bottom:16px">
             <div class="card-header">Current Deal ${stageBadge(deal.stage)}</div>
             <div class="card-body">
-              ${deal.value ? `<div style="font-size:20px;font-weight:800;color:var(--green);margin-bottom:4px">${fmt$(deal.value)}</div>` : ''}
               ${deal.lostReason ? `<div style="font-size:12px;color:var(--gray-3)">Lost: ${esc(deal.lostReason)}</div>` : ''}
               <button class="btn btn-outline btn-sm" style="margin-top:10px" data-edit-deal="${deal.id}">Update Deal</button>
             </div>
@@ -1399,9 +1410,7 @@ function renderPipeline() {
   const board = document.getElementById('kanban-board');
   board.innerHTML = stages.map(s => {
     const items = dealsByStage[s];
-    const totalVal = items.reduce((sum, {deal}) => sum + Number(deal.value||0), 0);
-    const metaHtml = (s === 'quoted' || s === 'follow-up') && totalVal > 0
-      ? `<span class="col-meta">${fmt$(totalVal)}</span>` : `<span class="col-meta">${items.length}</span>`;
+    const metaHtml = `<span class="col-meta">${items.length}</span>`;
     return `<div class="kanban-col col-${s}" data-stage="${s}">
       <div class="kanban-col-header">${stageLabel[s]} ${metaHtml}</div>
       <div class="kanban-body" data-stage="${s}">
@@ -1415,7 +1424,6 @@ function renderPipeline() {
               ${segBadge(acct.segment)}
               <span>${m.lastContactDate ? 'Last: '+fmtDate(m.lastContactDate) : 'No contact yet'}</span>
             </div>
-            ${deal.value ? `<div class="kcard-value">${fmt$(deal.value)}</div>` : ''}
             ${deal.lostReason ? `<div style="font-size:11px;color:var(--gray-3);margin-top:4px">Lost: ${esc(deal.lostReason)}</div>` : ''}
             <div class="kcard-rep${isOwn ? ' rep-own' : ''}">${esc(getRepLabel(acct.repId))}</div>
             <div id="loss-form-${deal.id}" style="display:none" class="loss-reason-form">
@@ -1890,6 +1898,17 @@ function openReceiptModal(id = null) {
   const preview = document.getElementById('receipt-photo-preview');
   const existingPhoto = id ? localStorage.getItem('crm-receipt-photo-' + id) : null;
   preview.innerHTML = existingPhoto ? `<img src="${existingPhoto}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">` : '';
+  const repGroup = document.getElementById('receipt-rep-group');
+  if (currentRepId === 'admin' && !r) {
+    repGroup.style.display = '';
+    const sel = document.getElementById('receipt-rep-select');
+    sel.options[0].text = 'Manager (myself)';
+    sel.options[1].text = getRepLabel('rep1');
+    sel.options[2].text = getRepLabel('rep2');
+    sel.value = 'admin';
+  } else {
+    repGroup.style.display = 'none';
+  }
   openModal('modal-receipt');
 }
 
@@ -1907,6 +1926,17 @@ function openMileageModal(id = null) {
   document.getElementById('mileage-rate-display').textContent = rate ? `$${Number(rate).toFixed(3)}/mile` : 'Not set — ask your Manager to configure in Settings';
   document.getElementById('mileage-reimb-preview').textContent = m ? fmt$(m.reimbursement) : '$0.00';
   document.getElementById('mileage-err').textContent = '';
+  const repGroup = document.getElementById('mileage-rep-group');
+  if (currentRepId === 'admin' && !m) {
+    repGroup.style.display = '';
+    const sel = document.getElementById('mileage-rep-select');
+    sel.options[0].text = 'Manager (myself)';
+    sel.options[1].text = getRepLabel('rep1');
+    sel.options[2].text = getRepLabel('rep2');
+    sel.value = 'admin';
+  } else {
+    repGroup.style.display = 'none';
+  }
   openModal('modal-mileage');
 }
 
@@ -1914,7 +1944,7 @@ async function saveReceipt(data) {
   const isNew = !data.id;
   const id = data.id || genId();
   const entry = { action: isNew ? 'create_receipt' : 'update_receipt',
-    id, repId: currentRepId, vendor: data.vendor, date: data.date,
+    id, repId: data.targetRepId || currentRepId, vendor: data.vendor, date: data.date,
     amount: String(data.amount), category: data.category, description: data.description || '',
     status: data.status || 'pending', hasPhoto: data.hasPhoto || false,
     timeStamp: new Date().toISOString() };
@@ -1932,7 +1962,7 @@ async function saveMileage(data) {
   const rate = localStorage.getItem('crm-mileage-rate') || '';
   const reimbursement = rate ? (parseFloat(data.miles) * parseFloat(rate)).toFixed(2) : '0.00';
   const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
-    id, repId: currentRepId, date: data.date, origin: data.origin,
+    id, repId: data.targetRepId || currentRepId, date: data.date, origin: data.origin,
     destination: data.destination, miles: String(data.miles), purpose: data.purpose || '',
     rate, reimbursement, status: data.status || 'pending',
     timeStamp: new Date().toISOString() };
@@ -1975,10 +2005,13 @@ async function submitReceiptForm() {
     const photoData = photoFile ? await compressPhoto(photoFile) : null;
     const existingId = document.getElementById('receipt-id').value || null;
     const existingStatus = document.getElementById('receipt-existing-status').value || 'pending';
+    const repGroup = document.getElementById('receipt-rep-group');
+    const targetRepId = (currentRepId === 'admin' && !existingId && repGroup.style.display !== 'none')
+      ? document.getElementById('receipt-rep-select').value : null;
     await saveReceipt({
       id: existingId, vendor, date, amount, category,
       description: document.getElementById('receipt-description').value.trim(),
-      status: existingStatus, photoData,
+      status: existingStatus, photoData, targetRepId,
       hasPhoto: !!photoData || (existingId && !!localStorage.getItem('crm-receipt-photo-' + existingId)),
     });
     closeModal('modal-receipt');
@@ -2003,10 +2036,13 @@ async function submitMileageForm() {
   try {
     const existingId = document.getElementById('mileage-id').value || null;
     const existingStatus = document.getElementById('mileage-existing-status').value || 'pending';
+    const mRepGroup = document.getElementById('mileage-rep-group');
+    const targetRepId = (currentRepId === 'admin' && !existingId && mRepGroup.style.display !== 'none')
+      ? document.getElementById('mileage-rep-select').value : null;
     await saveMileage({
       id: existingId, date, origin, destination, miles,
       purpose: document.getElementById('mileage-purpose').value.trim(),
-      status: existingStatus,
+      status: existingStatus, targetRepId,
     });
     closeModal('modal-mileage');
     toast('Trip logged.');
@@ -2188,7 +2224,6 @@ function openDealModal(dealId = null, accountId = null) {
   document.getElementById('deal-id').value = dealId || '';
   document.getElementById('deal-account-id').value = accountId || deal?.accountId || '';
   document.getElementById('deal-stage').value = deal?.stage || 'lead';
-  document.getElementById('deal-value').value = deal?.value || '';
   document.getElementById('deal-loss-reason').value = deal?.lostReason || '';
   document.getElementById('deal-loss-group').style.display = (deal?.stage === 'lost') ? 'block' : 'none';
   document.getElementById('deal-err').textContent = '';
@@ -2359,7 +2394,6 @@ async function submitDealForm() {
     const dealId = document.getElementById('deal-id').value;
     await saveDeal({
       id: dealId || null, accountId, stage,
-      value: document.getElementById('deal-value').value || '',
       lostReason: document.getElementById('deal-loss-reason').value.trim(),
     });
     closeModal('modal-deal');
