@@ -420,8 +420,6 @@ textarea{resize:vertical;min-height:70px}
         </select>
         <select class="filter-select" id="pipe-rep-filter" style="display:none">
           <option value="">All Reps</option>
-          <option value="rep1">Rep 1</option>
-          <option value="rep2">Rep 2</option>
         </select>
       </div>
       <div class="kanban" id="kanban-board"></div>
@@ -457,8 +455,6 @@ textarea{resize:vertical;min-height:70px}
         </select>
         <select class="filter-select" id="receipt-rep-filter" style="display:none">
           <option value="">All Reps</option>
-          <option value="rep1">Rep 1</option>
-          <option value="rep2">Rep 2</option>
         </select>
       </div>
       <div id="receipts-table-wrap"></div>
@@ -699,8 +695,6 @@ textarea{resize:vertical;min-height:70px}
         <label>Log for</label>
         <select id="receipt-rep-select">
           <option value="admin">Manager (myself)</option>
-          <option value="rep1">Rep 1</option>
-          <option value="rep2">Rep 2</option>
         </select>
       </div>
       <div class="form-row">
@@ -749,8 +743,6 @@ textarea{resize:vertical;min-height:70px}
         <label>Log for</label>
         <select id="mileage-rep-select">
           <option value="admin">Manager (myself)</option>
-          <option value="rep1">Rep 1</option>
-          <option value="rep2">Rep 2</option>
         </select>
       </div>
       <div class="form-group"><label>Date *</label><input id="mileage-date" type="date"></div>
@@ -791,18 +783,41 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 const LOG_PATH = '/dangpretz/sales-crm';
 const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
-// Pre-computed SHA-256 of default passwords (rep1sales2026 / rep2sales2026 / dpcsales2026)
-const IDENTITIES = {
-  rep1:  { pwdKey:'crm-pwd-hash-rep1',  labelKey:'crm-rep1-label', emailKey:'crm-email-rep1',  defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
-  rep2:  { pwdKey:'crm-pwd-hash-rep2',  labelKey:'crm-rep2-label', emailKey:'crm-email-rep2',  defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
-  admin: { pwdKey:'crm-pwd-hash-admin', labelKey:null,              emailKey:'crm-email-admin', defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' },
+const REP_REGISTRY_KEY = 'crm-rep-registry';
+// Pre-computed SHA-256 of default admin password (dpcsales2026)
+const ADMIN_ID = { pwdKey:'crm-pwd-hash-admin', emailKey:'crm-email-admin', defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' };
+// Legacy defaults for rep1/rep2 in case they were created before the registry
+const LEGACY_DEFAULTS = {
+  rep1: { defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
+  rep2: { defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
 };
+const REP_COLORS = [
+  { bg:'#f3e8ff', color:'#7e22ce' },
+  { bg:'#fce7f3', color:'#9d174d' },
+  { bg:'#e0f2fe', color:'#075985' },
+  { bg:'#dcfce7', color:'#166534' },
+  { bg:'#fef3c7', color:'#92400e' },
+  { bg:'#fee2e2', color:'#991b1b' },
+];
+
+function getReps() {
+  try { return JSON.parse(localStorage.getItem(REP_REGISTRY_KEY)) || [{ id:'rep1', label:'Rep 1' }, { id:'rep2', label:'Rep 2' }]; }
+  catch(_) { return [{ id:'rep1', label:'Rep 1' }, { id:'rep2', label:'Rep 2' }]; }
+}
+function saveReps(reps) { localStorage.setItem(REP_REGISTRY_KEY, JSON.stringify(reps)); }
 
 function getRepLabel(repId) {
-  const id = IDENTITIES[repId];
-  if (!id) return repId || '';
-  if (id.labelKey) return localStorage.getItem(id.labelKey) || (repId === 'rep1' ? 'Rep 1' : 'Rep 2');
-  return 'Manager';
+  if (repId === 'admin') return 'Manager';
+  const rep = getReps().find(r => r.id === repId);
+  if (!rep) return repId || '';
+  return localStorage.getItem(`crm-${repId}-label`) || rep.label || repId;
+}
+
+function repBadgeStyle(repId) {
+  const idx = getReps().findIndex(r => r.id === repId);
+  if (idx < 0) return '';
+  const c = REP_COLORS[idx % REP_COLORS.length];
+  return `background:${c.bg};color:${c.color}`;
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -844,9 +859,21 @@ function toast(msg, ms = 2500) {
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
+function getRepPwdKey(repId)     { return `crm-pwd-hash-${repId}`; }
+function getRepEmailKey(repId)   { return `crm-email-${repId}`; }
+function getRepDefaultHash(repId) {
+  if (LEGACY_DEFAULTS[repId]) return LEGACY_DEFAULTS[repId].defaultHash;
+  return null;
+}
+
 function ensureHashes() {
-  for (const [, id] of Object.entries(IDENTITIES)) {
-    if (!localStorage.getItem(id.pwdKey)) localStorage.setItem(id.pwdKey, id.defaultHash);
+  if (!localStorage.getItem(ADMIN_ID.pwdKey)) localStorage.setItem(ADMIN_ID.pwdKey, ADMIN_ID.defaultHash);
+  for (const rep of getReps()) {
+    const key = getRepPwdKey(rep.id);
+    if (!localStorage.getItem(key)) {
+      const def = getRepDefaultHash(rep.id);
+      if (def) localStorage.setItem(key, def);
+    }
   }
 }
 
@@ -858,21 +885,26 @@ async function login() {
   if (!pwd) { errEl.textContent = 'Enter your password.'; return; }
   const hash = await sha256(pwd);
   let matched = null;
+
+  // Build a lookup of all identities: admin + all reps
+  const allIds = [
+    { repId: 'admin', pwdKey: ADMIN_ID.pwdKey, emailKey: ADMIN_ID.emailKey, defaultHash: ADMIN_ID.defaultHash },
+    ...getReps().map(r => ({ repId: r.id, pwdKey: getRepPwdKey(r.id), emailKey: getRepEmailKey(r.id), defaultHash: getRepDefaultHash(r.id) })),
+  ];
+
   if (email) {
-    // Email provided — find identity by email, then verify password
-    for (const [repId, id] of Object.entries(IDENTITIES)) {
+    for (const id of allIds) {
       const stored = localStorage.getItem(id.emailKey);
-      if (stored && stored.toLowerCase() === email) { matched = repId; break; }
+      if (stored && stored.toLowerCase() === email) { matched = id; break; }
     }
     if (!matched) { errEl.textContent = 'Email not recognised. Contact your manager.'; return; }
-    const id = IDENTITIES[matched];
-    const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
+    const storedHash = localStorage.getItem(matched.pwdKey) || matched.defaultHash;
     if (hash !== storedHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
+    matched = matched.repId;
   } else {
-    // No email — fall back to matching by password hash (admin setup flow)
-    for (const [repId, id] of Object.entries(IDENTITIES)) {
+    for (const id of allIds) {
       const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
-      if (hash === storedHash) { matched = repId; break; }
+      if (storedHash && hash === storedHash) { matched = id.repId; break; }
     }
     if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   }
@@ -895,11 +927,40 @@ async function checkAuth() {
   if (!raw) return null;
   try {
     const { repId, hash } = JSON.parse(raw);
-    const id = IDENTITIES[repId];
-    if (!id) return null;
-    const stored = localStorage.getItem(id.pwdKey) || id.defaultHash;
-    return hash === stored ? { repId } : null;
+    let pwdKey, defaultHash;
+    if (repId === 'admin') {
+      pwdKey = ADMIN_ID.pwdKey; defaultHash = ADMIN_ID.defaultHash;
+    } else {
+      const rep = getReps().find(r => r.id === repId);
+      if (!rep) return null;
+      pwdKey = getRepPwdKey(repId); defaultHash = getRepDefaultHash(repId);
+    }
+    const stored = localStorage.getItem(pwdKey) || defaultHash;
+    return (stored && hash === stored) ? { repId } : null;
   } catch { return null; }
+}
+
+function populateLogForDropdown(selectEl) {
+  while (selectEl.options.length > 1) selectEl.remove(1);
+  for (const rep of getReps()) {
+    const opt = document.createElement('option');
+    opt.value = rep.id;
+    opt.text = getRepLabel(rep.id);
+    selectEl.add(opt);
+  }
+  selectEl.value = 'admin';
+}
+
+function populateRepFilterDropdown(selectEl) {
+  const cur = selectEl.value;
+  while (selectEl.options.length > 1) selectEl.remove(1);
+  for (const rep of getReps()) {
+    const opt = document.createElement('option');
+    opt.value = rep.id;
+    opt.text = getRepLabel(rep.id);
+    selectEl.add(opt);
+  }
+  selectEl.value = cur;
 }
 
 async function showApp() {
@@ -907,16 +968,13 @@ async function showApp() {
   document.getElementById('app').removeAttribute('hidden');
   document.getElementById('identity-badge').textContent = getRepLabel(currentRepId);
   acctViewMode = currentRepId === 'admin' ? 'all' : 'mine';
-  // Show rep filter on pipeline for admin
-  document.getElementById('pipe-rep-filter').style.display = currentRepId === 'admin' ? '' : 'none';
-  // Update rep filter option labels with custom names
-  const prf = document.getElementById('pipe-rep-filter');
-  prf.options[1].text = getRepLabel('rep1');
-  prf.options[2].text = getRepLabel('rep2');
-  document.getElementById('receipt-rep-filter').style.display = currentRepId === 'admin' ? '' : 'none';
-  const rrf = document.getElementById('receipt-rep-filter');
-  rrf.options[1].text = getRepLabel('rep1');
-  rrf.options[2].text = getRepLabel('rep2');
+  const isAdmin = currentRepId === 'admin';
+  document.getElementById('pipe-rep-filter').style.display = isAdmin ? '' : 'none';
+  document.getElementById('receipt-rep-filter').style.display = isAdmin ? '' : 'none';
+  if (isAdmin) {
+    populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
+    populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
+  }
   await loadData();
   navigate('dashboard');
 }
@@ -1177,7 +1235,7 @@ function renderAccounts() {
       <td><strong>${esc(a.name)}</strong></td>
       <td>${segBadge(a.segment)}</td>
       <td>${statusBadge(a.status)}</td>
-      ${showAll ? `<td><span class="badge badge-${esc(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span></td>` : ''}
+      ${showAll ? `<td><span class="badge" style="${repBadgeStyle(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span></td>` : ''}
       <td>${fmtDate(m.lastContactDate)}</td>
       <td>${fmtDate(a.nextFollowUp)}</td>
       <td>
@@ -1746,7 +1804,7 @@ function renderReceipts() {
                 <td>${esc(catLabel[r.category]||r.category||'—')}</td>
                 <td>${fmt$(r.amount)}</td>
                 <td style="max-width:180px;color:var(--gray-4)">${esc(r.description||'—')}</td>
-                ${isAdmin ? `<td><span class="badge badge-${esc(r.repId||'admin')}">${esc(getRepLabel(r.repId))}</span></td>` : ''}
+                ${isAdmin ? `<td><span class="badge" style="${repBadgeStyle(r.repId||'admin')}">${esc(getRepLabel(r.repId))}</span></td>` : ''}
                 <td><span class="badge badge-${esc(r.status)}">${esc(capitalize(r.status))}</span></td>
                 <td>${hasPhoto ? `<button class="btn-ghost btn-sm" data-view-photo="${esc(r.id)}">📷 View</button>` : '—'}</td>
                 <td style="white-space:nowrap">
@@ -1820,7 +1878,7 @@ function renderReceipts() {
                 <td style="max-width:140px;color:var(--gray-4)">${esc(m.purpose||'—')}</td>
                 <td>$${Number(m.rate||0).toFixed(3)}/mi</td>
                 <td><strong>${fmt$(m.reimbursement)}</strong></td>
-                ${isAdmin ? `<td><span class="badge badge-${esc(m.repId||'admin')}">${esc(getRepLabel(m.repId))}</span></td>` : ''}
+                ${isAdmin ? `<td><span class="badge" style="${repBadgeStyle(m.repId||'admin')}">${esc(getRepLabel(m.repId))}</span></td>` : ''}
                 <td><span class="badge badge-${esc(m.status)}">${esc(capitalize(m.status))}</span></td>
                 <td style="white-space:nowrap">
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-mileage="${esc(m.id)}" style="margin-right:4px">Edit</button>` : ''}
@@ -1901,11 +1959,7 @@ function openReceiptModal(id = null) {
   const repGroup = document.getElementById('receipt-rep-group');
   if (currentRepId === 'admin' && !r) {
     repGroup.style.display = '';
-    const sel = document.getElementById('receipt-rep-select');
-    sel.options[0].text = 'Manager (myself)';
-    sel.options[1].text = getRepLabel('rep1');
-    sel.options[2].text = getRepLabel('rep2');
-    sel.value = 'admin';
+    populateLogForDropdown(document.getElementById('receipt-rep-select'));
   } else {
     repGroup.style.display = 'none';
   }
@@ -1929,11 +1983,7 @@ function openMileageModal(id = null) {
   const repGroup = document.getElementById('mileage-rep-group');
   if (currentRepId === 'admin' && !m) {
     repGroup.style.display = '';
-    const sel = document.getElementById('mileage-rep-select');
-    sel.options[0].text = 'Manager (myself)';
-    sel.options[1].text = getRepLabel('rep1');
-    sel.options[2].text = getRepLabel('rep2');
-    sel.value = 'admin';
+    populateLogForDropdown(document.getElementById('mileage-rep-select'));
   } else {
     repGroup.style.display = 'none';
   }
@@ -2055,21 +2105,10 @@ async function submitMileageForm() {
 function renderSettings() {
   const isAdmin = currentRepId === 'admin';
   const riskDays = localStorage.getItem(RISK_KEY) || '30';
-  const rep1Label = getRepLabel('rep1');
-  const rep2Label = getRepLabel('rep2');
+  const reps = getReps();
 
-  const emailSection = (targetRepId, sectionTitle) => {
-    const stored = localStorage.getItem(IDENTITIES[targetRepId].emailKey) || '';
-    return `<div class="settings-section">
-      <h2>${esc(sectionTitle)}</h2>
-      <div class="form-group" style="max-width:300px">
-        <label>Email Address</label>
-        <input type="email" id="email-field-${targetRepId}" value="${esc(stored)}" placeholder="name@example.com">
-        <div class="form-hint">Used to identify this person at login.</div>
-      </div>
-      <button class="btn btn-red btn-sm" data-save-email="${targetRepId}">Save Email</button>
-    </div>`;
-  };
+  const myEmailKey = isAdmin ? ADMIN_ID.emailKey : getRepEmailKey(currentRepId);
+  const myEmail = localStorage.getItem(myEmailKey) || '';
 
   const pwdSection = (targetRepId, sectionTitle) => `
     <div class="settings-section">
@@ -2086,6 +2125,62 @@ function renderSettings() {
       <div class="modal-err" id="pwd-err-${targetRepId}"></div>
       <button class="btn btn-red btn-sm" data-change-pwd="${targetRepId}">Change Password</button>
     </div>`;
+
+  const teamSection = () => {
+    const repRows = reps.map(rep => {
+      const label = getRepLabel(rep.id);
+      const email = localStorage.getItem(getRepEmailKey(rep.id)) || '';
+      return `<div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
+        <div class="form-row" style="margin-bottom:8px">
+          <div class="form-group" style="flex:1">
+            <label>Name</label>
+            <input type="text" class="rep-name-input" data-rep-id="${rep.id}" value="${esc(label)}" placeholder="Rep Name">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Email</label>
+            <input type="email" class="rep-email-input" data-rep-id="${rep.id}" value="${esc(email)}" placeholder="email@example.com">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-red btn-sm" data-save-rep="${rep.id}">Save</button>
+          <button class="btn btn-outline btn-sm" data-toggle-reset="${rep.id}">Reset Password</button>
+          <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#dc2626" data-remove-rep="${rep.id}">Remove Rep</button>
+        </div>
+        <div id="reset-form-${rep.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>New Password</label><input type="password" id="rep-new-pwd-${rep.id}"></div>
+            <div class="form-group" style="flex:1"><label>Confirm</label><input type="password" id="rep-conf-pwd-${rep.id}"></div>
+          </div>
+          <div class="modal-err" id="reset-pwd-err-${rep.id}"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-red btn-sm" data-confirm-reset="${rep.id}">Set Password</button>
+            <button class="btn btn-outline btn-sm" data-cancel-reset="${rep.id}">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="settings-section">
+      <h2>Sales Team</h2>
+      <div id="team-rep-list">${repRows}</div>
+      <button class="btn btn-red btn-sm" id="add-rep-btn">+ Add Rep</button>
+      <div id="add-rep-form" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>Name *</label><input type="text" id="new-rep-name" placeholder="Rep Name"></div>
+          <div class="form-group" style="flex:1"><label>Email</label><input type="email" id="new-rep-email" placeholder="email@example.com"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>Password *</label><input type="password" id="new-rep-pwd"></div>
+          <div class="form-group" style="flex:1"><label>Confirm Password *</label><input type="password" id="new-rep-conf-pwd"></div>
+        </div>
+        <div class="modal-err" id="new-rep-err"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-red btn-sm" id="confirm-add-rep">Add Rep</button>
+          <button class="btn btn-outline btn-sm" id="cancel-add-rep">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  };
 
   document.getElementById('settings-content').innerHTML = `
     <div class="settings-section">
@@ -2108,9 +2203,17 @@ function renderSettings() {
       </div>
       <button class="btn btn-red btn-sm" id="save-risk-btn">Save</button>
     </div>
-    ${emailSection(currentRepId, 'My Email Address')}
+    <div class="settings-section">
+      <h2>My Email Address</h2>
+      <div class="form-group" style="max-width:300px">
+        <label>Email Address</label>
+        <input type="email" id="my-email-field" value="${esc(myEmail)}" placeholder="name@example.com">
+        <div class="form-hint">Used to identify you at login.</div>
+      </div>
+      <button class="btn btn-red btn-sm" id="save-my-email-btn">Save Email</button>
+    </div>
     ${pwdSection(currentRepId, 'Change My Password')}
-    ${isAdmin ? emailSection('rep1', `${rep1Label} Email Address`) + emailSection('rep2', `${rep2Label} Email Address`) + pwdSection('rep1', `Change ${rep1Label} Password`) + pwdSection('rep2', `Change ${rep2Label} Password`) : ''}
+    ${isAdmin ? teamSection() : ''}
     ${isAdmin ? `
     <div class="settings-section">
       <h2>Reimbursements</h2>
@@ -2135,6 +2238,13 @@ function renderSettings() {
     if (v && Number(v) > 0) { localStorage.setItem(RISK_KEY, v); toast('At-risk threshold saved.'); }
   });
 
+  document.getElementById('save-my-email-btn').addEventListener('click', () => {
+    const val = document.getElementById('my-email-field').value.trim().toLowerCase();
+    if (!val) { toast('Enter a valid email address.'); return; }
+    localStorage.setItem(myEmailKey, val);
+    toast('Email saved.');
+  });
+
   document.getElementById('mileage-rate-save')?.addEventListener('click', () => {
     const v = document.getElementById('mileage-rate-input').value;
     if (v && Number(v) > 0) { localStorage.setItem('crm-mileage-rate', Number(v).toFixed(3)); toast('Mileage rate saved.'); }
@@ -2143,22 +2253,9 @@ function renderSettings() {
   document.getElementById('save-label-btn')?.addEventListener('click', () => {
     const val = document.getElementById('rep-label-input')?.value.trim();
     if (!val) return;
-    const id = IDENTITIES[currentRepId];
-    if (id?.labelKey) {
-      localStorage.setItem(id.labelKey, val);
-      document.getElementById('identity-badge').textContent = val;
-      toast('Name saved.');
-    }
-  });
-
-  document.querySelectorAll('[data-save-email]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const t = btn.dataset.saveEmail;
-      const val = document.getElementById(`email-field-${t}`)?.value.trim().toLowerCase();
-      if (!val) { toast('Enter a valid email address.'); return; }
-      localStorage.setItem(IDENTITIES[t].emailKey, val);
-      toast('Email saved.');
-    });
+    localStorage.setItem(`crm-${currentRepId}-label`, val);
+    document.getElementById('identity-badge').textContent = val;
+    toast('Name saved.');
   });
 
   document.querySelectorAll('[data-change-pwd]').forEach(btn => {
@@ -2172,14 +2269,13 @@ function renderSettings() {
       if (!cur || !nw || !cf) { err.textContent = 'All fields required.'; return; }
       if (nw !== cf) { err.textContent = 'New passwords do not match.'; return; }
       if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
-      // Verify current password against the target identity
-      const targetId = IDENTITIES[t];
+      const pwdKey = t === 'admin' ? ADMIN_ID.pwdKey : getRepPwdKey(t);
+      const defaultHash = t === 'admin' ? ADMIN_ID.defaultHash : getRepDefaultHash(t);
       const curHash = await sha256(cur);
-      const stored = localStorage.getItem(targetId.pwdKey) || targetId.defaultHash;
+      const stored = localStorage.getItem(pwdKey) || defaultHash;
       if (curHash !== stored) { err.textContent = 'Current password is incorrect.'; return; }
       const newHash = await sha256(nw);
-      localStorage.setItem(targetId.pwdKey, newHash);
-      // If changing own password, update session token too
+      localStorage.setItem(pwdKey, newHash);
       if (t === currentRepId) {
         sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: currentRepId, hash: newHash }));
       }
@@ -2187,6 +2283,114 @@ function renderSettings() {
       toast('Password changed successfully.');
     });
   });
+
+  // Team management (admin only)
+  if (isAdmin) {
+    document.querySelectorAll('[data-save-rep]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.saveRep;
+        const name = btn.closest('div').parentElement.querySelector(`.rep-name-input[data-rep-id="${id}"]`)?.value.trim();
+        const email = btn.closest('div').parentElement.querySelector(`.rep-email-input[data-rep-id="${id}"]`)?.value.trim().toLowerCase();
+        if (!name) { toast('Rep name is required.'); return; }
+        const reps = getReps();
+        const rep = reps.find(r => r.id === id);
+        if (rep) { rep.label = name; saveReps(reps); }
+        localStorage.setItem(`crm-${id}-label`, name);
+        if (email) localStorage.setItem(getRepEmailKey(id), email);
+        toast('Rep saved.');
+      });
+    });
+
+    document.querySelectorAll('[data-toggle-reset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.toggleReset;
+        const form = document.getElementById(`reset-form-${id}`);
+        form.style.display = form.style.display === 'none' ? '' : 'none';
+      });
+    });
+
+    document.querySelectorAll('[data-cancel-reset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.cancelReset;
+        document.getElementById(`reset-form-${id}`).style.display = 'none';
+        document.getElementById(`rep-new-pwd-${id}`).value = '';
+        document.getElementById(`rep-conf-pwd-${id}`).value = '';
+        document.getElementById(`reset-pwd-err-${id}`).textContent = '';
+      });
+    });
+
+    document.querySelectorAll('[data-confirm-reset]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.confirmReset;
+        const nw = document.getElementById(`rep-new-pwd-${id}`).value;
+        const cf = document.getElementById(`rep-conf-pwd-${id}`).value;
+        const err = document.getElementById(`reset-pwd-err-${id}`);
+        err.textContent = '';
+        if (!nw || !cf) { err.textContent = 'Both fields required.'; return; }
+        if (nw !== cf) { err.textContent = 'Passwords do not match.'; return; }
+        if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+        const newHash = await sha256(nw);
+        localStorage.setItem(getRepPwdKey(id), newHash);
+        document.getElementById(`reset-form-${id}`).style.display = 'none';
+        document.getElementById(`rep-new-pwd-${id}`).value = '';
+        document.getElementById(`rep-conf-pwd-${id}`).value = '';
+        toast(`Password reset for ${getRepLabel(id)}.`);
+      });
+    });
+
+    document.querySelectorAll('[data-remove-rep]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.removeRep;
+        const label = getRepLabel(id);
+        if (!confirm(`Remove ${label}? They will no longer be able to log in. Their historical data is preserved.`)) return;
+        const reps = getReps().filter(r => r.id !== id);
+        saveReps(reps);
+        toast(`${label} removed.`);
+        renderSettings();
+        populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
+        populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
+      });
+    });
+
+    document.getElementById('add-rep-btn').addEventListener('click', () => {
+      document.getElementById('add-rep-form').style.display = '';
+      document.getElementById('add-rep-btn').style.display = 'none';
+    });
+
+    document.getElementById('cancel-add-rep').addEventListener('click', () => {
+      document.getElementById('add-rep-form').style.display = 'none';
+      document.getElementById('add-rep-btn').style.display = '';
+      ['new-rep-name','new-rep-email','new-rep-pwd','new-rep-conf-pwd'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('new-rep-err').textContent = '';
+    });
+
+    document.getElementById('confirm-add-rep').addEventListener('click', async () => {
+      const name = document.getElementById('new-rep-name').value.trim();
+      const email = document.getElementById('new-rep-email').value.trim().toLowerCase();
+      const pwd = document.getElementById('new-rep-pwd').value;
+      const conf = document.getElementById('new-rep-conf-pwd').value;
+      const err = document.getElementById('new-rep-err');
+      err.textContent = '';
+      if (!name) { err.textContent = 'Name is required.'; return; }
+      if (!pwd) { err.textContent = 'Password is required.'; return; }
+      if (pwd !== conf) { err.textContent = 'Passwords do not match.'; return; }
+      if (pwd.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+      const reps = getReps();
+      // Generate next rep ID
+      const maxNum = reps.reduce((m, r) => { const n = parseInt(r.id.replace('rep',''),10); return isNaN(n) ? m : Math.max(m,n); }, 0);
+      const newId = `rep${maxNum + 1}`;
+      const newHash = await sha256(pwd);
+      localStorage.setItem(getRepPwdKey(newId), newHash);
+      localStorage.setItem(`crm-${newId}-label`, name);
+      if (email) localStorage.setItem(getRepEmailKey(newId), email);
+      reps.push({ id: newId, label: name });
+      saveReps(reps);
+      toast(`${name} added.`);
+      renderSettings();
+      populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
+      populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
+    });
+  }
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
