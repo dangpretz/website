@@ -801,17 +801,12 @@ const REP_COLORS = [
   { bg:'#fee2e2', color:'#991b1b' },
 ];
 
-function getReps() {
-  try { return JSON.parse(localStorage.getItem(REP_REGISTRY_KEY)) || [{ id:'rep1', label:'Rep 1' }, { id:'rep2', label:'Rep 2' }]; }
-  catch(_) { return [{ id:'rep1', label:'Rep 1' }, { id:'rep2', label:'Rep 2' }]; }
-}
-function saveReps(reps) { localStorage.setItem(REP_REGISTRY_KEY, JSON.stringify(reps)); }
+function getReps() { return STATE.repRegistry; }
 
 function getRepLabel(repId) {
   if (repId === 'admin') return 'Manager';
-  const rep = getReps().find(r => r.id === repId);
-  if (!rep) return repId || '';
-  return localStorage.getItem(`crm-${repId}-label`) || rep.label || repId;
+  const rep = STATE.repRegistry.find(r => r.id === repId);
+  return rep?.label || repId || '';
 }
 
 function repBadgeStyle(repId) {
@@ -822,7 +817,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [] };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], repRegistry: [] };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -868,14 +863,8 @@ function getRepDefaultHash(repId) {
 }
 
 function ensureHashes() {
+  // Rep credentials are stored in the log (STATE.repRegistry); only admin uses localStorage
   if (!localStorage.getItem(ADMIN_ID.pwdKey)) localStorage.setItem(ADMIN_ID.pwdKey, ADMIN_ID.defaultHash);
-  for (const rep of getReps()) {
-    const key = getRepPwdKey(rep.id);
-    if (!localStorage.getItem(key)) {
-      const def = getRepDefaultHash(rep.id);
-      if (def) localStorage.setItem(key, def);
-    }
-  }
 }
 
 async function login() {
@@ -887,25 +876,24 @@ async function login() {
   const hash = await sha256(pwd);
   let matched = null;
 
-  // Build a lookup of all identities: admin + all reps
+  // Build credential lookup: admin (localStorage) + all reps (from log-backed STATE)
+  const adminHash = localStorage.getItem(ADMIN_ID.pwdKey) || ADMIN_ID.defaultHash;
+  const adminEmail = (localStorage.getItem(ADMIN_ID.emailKey) || '').toLowerCase();
   const allIds = [
-    { repId: 'admin', pwdKey: ADMIN_ID.pwdKey, emailKey: ADMIN_ID.emailKey, defaultHash: ADMIN_ID.defaultHash },
-    ...getReps().map(r => ({ repId: r.id, pwdKey: getRepPwdKey(r.id), emailKey: getRepEmailKey(r.id), defaultHash: getRepDefaultHash(r.id) })),
+    { repId: 'admin', email: adminEmail, pwdHash: adminHash },
+    ...STATE.repRegistry.map(r => ({ repId: r.id, email: (r.email || '').toLowerCase(), pwdHash: r.pwdHash })),
   ];
 
   if (email) {
     for (const id of allIds) {
-      const stored = localStorage.getItem(id.emailKey);
-      if (stored && stored.toLowerCase() === email) { matched = id; break; }
+      if (id.email && id.email === email) { matched = id; break; }
     }
     if (!matched) { errEl.textContent = 'Email not recognised. Contact your manager.'; return; }
-    const storedHash = localStorage.getItem(matched.pwdKey) || matched.defaultHash;
-    if (hash !== storedHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
+    if (hash !== matched.pwdHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
     matched = matched.repId;
   } else {
     for (const id of allIds) {
-      const storedHash = localStorage.getItem(id.pwdKey) || id.defaultHash;
-      if (storedHash && hash === storedHash) { matched = id.repId; break; }
+      if (id.pwdHash && hash === id.pwdHash) { matched = id.repId; break; }
     }
     if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
   }
@@ -928,16 +916,15 @@ async function checkAuth() {
   if (!raw) return null;
   try {
     const { repId, hash } = JSON.parse(raw);
-    let pwdKey, defaultHash;
+    let storedHash;
     if (repId === 'admin') {
-      pwdKey = ADMIN_ID.pwdKey; defaultHash = ADMIN_ID.defaultHash;
+      storedHash = localStorage.getItem(ADMIN_ID.pwdKey) || ADMIN_ID.defaultHash;
     } else {
-      const rep = getReps().find(r => r.id === repId);
+      const rep = STATE.repRegistry.find(r => r.id === repId);
       if (!rep) return null;
-      pwdKey = getRepPwdKey(repId); defaultHash = getRepDefaultHash(repId);
+      storedHash = rep.pwdHash;
     }
-    const stored = localStorage.getItem(pwdKey) || defaultHash;
-    return (stored && hash === stored) ? { repId } : null;
+    return (storedHash && hash === storedHash) ? { repId } : null;
   } catch { return null; }
 }
 
@@ -981,7 +968,13 @@ async function showApp() {
 }
 
 // ── Seed Data ─────────────────────────────────────────────────────────────────
-function initSeedData() {}
+function initSeedData() {
+  // Seed rep registry from localStorage migration values; log entries override these
+  STATE.repRegistry = [
+    { id:'rep1', label: localStorage.getItem('crm-rep1-label') || 'Rep 1', email: localStorage.getItem('crm-email-rep1') || '', pwdHash: localStorage.getItem('crm-pwd-hash-rep1') || LEGACY_DEFAULTS.rep1.defaultHash },
+    { id:'rep2', label: localStorage.getItem('crm-rep2-label') || 'Rep 2', email: localStorage.getItem('crm-email-rep2') || '', pwdHash: localStorage.getItem('crm-pwd-hash-rep2') || LEGACY_DEFAULTS.rep2.defaultHash },
+  ];
+}
 
 function applyLogs(logs) {
   for (const row of logs) {
@@ -1021,6 +1014,13 @@ function applyLogs(logs) {
       STATE.receipts = STATE.receipts.filter(r => r.id !== row.id);
     } else if (action === 'delete_mileage') {
       STATE.mileage = STATE.mileage.filter(m => m.id !== row.id);
+    } else if (action === 'set_rep') {
+      const idx = STATE.repRegistry.findIndex(r => r.id === row.id);
+      const rec = { id: row.id, label: row.label || row.id, email: row.email || '', pwdHash: row.pwdHash || '' };
+      if (idx >= 0) STATE.repRegistry[idx] = rec;
+      else STATE.repRegistry.push(rec);
+    } else if (action === 'remove_rep') {
+      STATE.repRegistry = STATE.repRegistry.filter(r => r.id !== row.id);
     }
   }
 }
@@ -2108,8 +2108,9 @@ function renderSettings() {
   const riskDays = localStorage.getItem(RISK_KEY) || '30';
   const reps = getReps();
 
-  const myEmailKey = isAdmin ? ADMIN_ID.emailKey : getRepEmailKey(currentRepId);
-  const myEmail = localStorage.getItem(myEmailKey) || '';
+  const myEmail = isAdmin
+    ? (localStorage.getItem(ADMIN_ID.emailKey) || '')
+    : (STATE.repRegistry.find(r => r.id === currentRepId)?.email || '');
 
   const pwdSection = (targetRepId, sectionTitle) => `
     <div class="settings-section">
@@ -2130,7 +2131,7 @@ function renderSettings() {
   const teamSection = () => {
     const repRows = reps.map(rep => {
       const label = getRepLabel(rep.id);
-      const email = localStorage.getItem(getRepEmailKey(rep.id)) || '';
+      const email = rep.email || '';
       return `<div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
         <div class="form-row" style="margin-bottom:8px">
           <div class="form-group" style="flex:1">
@@ -2239,11 +2240,19 @@ function renderSettings() {
     if (v && Number(v) > 0) { localStorage.setItem(RISK_KEY, v); toast('At-risk threshold saved.'); }
   });
 
-  document.getElementById('save-my-email-btn').addEventListener('click', () => {
+  document.getElementById('save-my-email-btn').addEventListener('click', async () => {
     const val = document.getElementById('my-email-field').value.trim().toLowerCase();
     if (!val) { toast('Enter a valid email address.'); return; }
-    localStorage.setItem(myEmailKey, val);
-    toast('Email saved.');
+    if (currentRepId === 'admin') {
+      localStorage.setItem(ADMIN_ID.emailKey, val);
+      toast('Email saved.');
+    } else {
+      const rep = STATE.repRegistry.find(r => r.id === currentRepId);
+      const entry = { action: 'set_rep', id: currentRepId, label: rep?.label || currentRepId, email: val, pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
+      await appendLog(LOG_PATH, entry);
+      applyLogs([entry]);
+      toast('Email saved.');
+    }
   });
 
   document.getElementById('mileage-rate-save')?.addEventListener('click', () => {
@@ -2251,10 +2260,13 @@ function renderSettings() {
     if (v && Number(v) > 0) { localStorage.setItem('crm-mileage-rate', Number(v).toFixed(3)); toast('Mileage rate saved.'); }
   });
 
-  document.getElementById('save-label-btn')?.addEventListener('click', () => {
+  document.getElementById('save-label-btn')?.addEventListener('click', async () => {
     const val = document.getElementById('rep-label-input')?.value.trim();
     if (!val) return;
-    localStorage.setItem(`crm-${currentRepId}-label`, val);
+    const rep = STATE.repRegistry.find(r => r.id === currentRepId);
+    const entry = { action: 'set_rep', id: currentRepId, label: val, email: rep?.email || '', pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
     document.getElementById('identity-badge').textContent = val;
     toast('Name saved.');
   });
@@ -2270,15 +2282,21 @@ function renderSettings() {
       if (!cur || !nw || !cf) { err.textContent = 'All fields required.'; return; }
       if (nw !== cf) { err.textContent = 'New passwords do not match.'; return; }
       if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
-      const pwdKey = t === 'admin' ? ADMIN_ID.pwdKey : getRepPwdKey(t);
-      const defaultHash = t === 'admin' ? ADMIN_ID.defaultHash : getRepDefaultHash(t);
       const curHash = await sha256(cur);
-      const stored = localStorage.getItem(pwdKey) || defaultHash;
-      if (curHash !== stored) { err.textContent = 'Current password is incorrect.'; return; }
-      const newHash = await sha256(nw);
-      localStorage.setItem(pwdKey, newHash);
-      if (t === currentRepId) {
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: currentRepId, hash: newHash }));
+      if (t === 'admin') {
+        const stored = localStorage.getItem(ADMIN_ID.pwdKey) || ADMIN_ID.defaultHash;
+        if (curHash !== stored) { err.textContent = 'Current password is incorrect.'; return; }
+        const newHash = await sha256(nw);
+        localStorage.setItem(ADMIN_ID.pwdKey, newHash);
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: 'admin', hash: newHash }));
+      } else {
+        const rep = STATE.repRegistry.find(r => r.id === t);
+        if (!rep || curHash !== rep.pwdHash) { err.textContent = 'Current password is incorrect.'; return; }
+        const newHash = await sha256(nw);
+        const entry = { action: 'set_rep', id: t, label: rep.label, email: rep.email || '', pwdHash: newHash, timeStamp: new Date().toISOString() };
+        await appendLog(LOG_PATH, entry);
+        applyLogs([entry]);
+        if (t === currentRepId) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: t, hash: newHash }));
       }
       [`cur-pwd-${t}`,`new-pwd-${t}`,`conf-pwd-${t}`].forEach(id => { document.getElementById(id).value = ''; });
       toast('Password changed successfully.');
@@ -2288,16 +2306,18 @@ function renderSettings() {
   // Team management (admin only)
   if (isAdmin) {
     document.querySelectorAll('[data-save-rep]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.dataset.saveRep;
-        const name = btn.closest('div').parentElement.querySelector(`.rep-name-input[data-rep-id="${id}"]`)?.value.trim();
-        const email = btn.closest('div').parentElement.querySelector(`.rep-email-input[data-rep-id="${id}"]`)?.value.trim().toLowerCase();
+        const card = btn.closest('[style*="border"]');
+        const name = card?.querySelector(`.rep-name-input[data-rep-id="${id}"]`)?.value.trim();
+        const email = card?.querySelector(`.rep-email-input[data-rep-id="${id}"]`)?.value.trim().toLowerCase() || '';
         if (!name) { toast('Rep name is required.'); return; }
-        const reps = getReps();
-        const rep = reps.find(r => r.id === id);
-        if (rep) { rep.label = name; saveReps(reps); }
-        localStorage.setItem(`crm-${id}-label`, name);
-        if (email) localStorage.setItem(getRepEmailKey(id), email);
+        const rep = STATE.repRegistry.find(r => r.id === id);
+        const entry = { action: 'set_rep', id, label: name, email, pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
+        await appendLog(LOG_PATH, entry);
+        applyLogs([entry]);
+        populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
+        populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
         toast('Rep saved.');
       });
     });
@@ -2331,7 +2351,10 @@ function renderSettings() {
         if (nw !== cf) { err.textContent = 'Passwords do not match.'; return; }
         if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
         const newHash = await sha256(nw);
-        localStorage.setItem(getRepPwdKey(id), newHash);
+        const rep = STATE.repRegistry.find(r => r.id === id);
+        const entry = { action: 'set_rep', id, label: rep?.label || id, email: rep?.email || '', pwdHash: newHash, timeStamp: new Date().toISOString() };
+        await appendLog(LOG_PATH, entry);
+        applyLogs([entry]);
         document.getElementById(`reset-form-${id}`).style.display = 'none';
         document.getElementById(`rep-new-pwd-${id}`).value = '';
         document.getElementById(`rep-conf-pwd-${id}`).value = '';
@@ -2340,12 +2363,13 @@ function renderSettings() {
     });
 
     document.querySelectorAll('[data-remove-rep]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.dataset.removeRep;
         const label = getRepLabel(id);
         if (!confirm(`Remove ${label}? They will no longer be able to log in. Their historical data is preserved.`)) return;
-        const reps = getReps().filter(r => r.id !== id);
-        saveReps(reps);
+        const entry = { action: 'remove_rep', id, timeStamp: new Date().toISOString() };
+        await appendLog(LOG_PATH, entry);
+        applyLogs([entry]);
         toast(`${label} removed.`);
         renderSettings();
         populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
@@ -2377,15 +2401,12 @@ function renderSettings() {
       if (pwd !== conf) { err.textContent = 'Passwords do not match.'; return; }
       if (pwd.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
       const reps = getReps();
-      // Generate next rep ID
       const maxNum = reps.reduce((m, r) => { const n = parseInt(r.id.replace('rep',''),10); return isNaN(n) ? m : Math.max(m,n); }, 0);
       const newId = `rep${maxNum + 1}`;
       const newHash = await sha256(pwd);
-      localStorage.setItem(getRepPwdKey(newId), newHash);
-      localStorage.setItem(`crm-${newId}-label`, name);
-      if (email) localStorage.setItem(getRepEmailKey(newId), email);
-      reps.push({ id: newId, label: name });
-      saveReps(reps);
+      const entry = { action: 'set_rep', id: newId, label: name, email: email || '', pwdHash: newHash, timeStamp: new Date().toISOString() };
+      await appendLog(LOG_PATH, entry);
+      applyLogs([entry]);
       toast(`${name} added.`);
       renderSettings();
       populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
@@ -2793,6 +2814,8 @@ function bindAll() {
 async function init() {
   ensureHashes();
   bindAll();
+  // Pre-load log so STATE.repRegistry is populated before login credentials are checked
+  await loadData();
   const session = await checkAuth();
   if (session) {
     currentRepId = session.repId;
