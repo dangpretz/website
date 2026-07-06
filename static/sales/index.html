@@ -2308,9 +2308,8 @@ function renderSettings() {
     document.querySelectorAll('[data-save-rep]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.saveRep;
-        const card = btn.closest('[style*="border"]');
-        const name = card?.querySelector(`.rep-name-input[data-rep-id="${id}"]`)?.value.trim();
-        const email = card?.querySelector(`.rep-email-input[data-rep-id="${id}"]`)?.value.trim().toLowerCase() || '';
+        const name = document.querySelector(`.rep-name-input[data-rep-id="${id}"]`)?.value.trim();
+        const email = document.querySelector(`.rep-email-input[data-rep-id="${id}"]`)?.value.trim().toLowerCase() || '';
         if (!name) { toast('Rep name is required.'); return; }
         const rep = STATE.repRegistry.find(r => r.id === id);
         const entry = { action: 'set_rep', id, label: name, email, pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
