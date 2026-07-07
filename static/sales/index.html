@@ -142,11 +142,9 @@ textarea{resize:vertical;min-height:70px}
 .kcard-name{font-weight:700;font-size:13px;margin-bottom:5px}
 .kcard-meta{font-size:11px;color:var(--gray-3);display:flex;flex-direction:column;gap:2px}
 .kcard-stage-select{width:100%;margin-top:8px;padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:#f9f9f9}
-.col-lead .kanban-col-header{background:#e9e9e9;color:#555}
-.col-quoted .kanban-col-header{background:#dbeafe;color:#1d4ed8}
-.col-follow-up .kanban-col-header{background:#fef9c3;color:#854d0e}
-.col-won .kanban-col-header{background:#d1fae5;color:#065f46}
-.col-lost .kanban-col-header{background:#fee2e2;color:#b91c1c}
+.col-prospect .kanban-col-header{background:#e9e9e9;color:#555}
+.col-active .kanban-col-header{background:#d1fae5;color:#065f46}
+.col-inactive .kanban-col-header{background:#fee2e2;color:#b91c1c}
 .loss-reason-form{background:#fff8f8;border:1px solid #fca5a5;border-radius:var(--radius);padding:10px;margin-top:8px;font-size:12px}
 .loss-reason-form input{margin:6px 0;font-size:12px}
 .loss-reason-form .loss-actions{display:flex;gap:6px;margin-top:6px}
@@ -225,11 +223,9 @@ textarea{resize:vertical;min-height:70px}
 .pipeline-snap{display:flex;gap:8px;flex-wrap:wrap}
 .snap-pill{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
 .snap-pill .sp-count{font-size:16px;font-weight:800}
-.snap-lead{background:#e9e9e9;color:#555}
-.snap-quoted{background:#dbeafe;color:#1d4ed8}
-.snap-follow-up{background:#fef9c3;color:#854d0e}
-.snap-won{background:#d1fae5;color:#065f46}
-.snap-lost{background:#fee2e2;color:#b91c1c}
+.snap-prospect{background:#e9e9e9;color:#555}
+.snap-active{background:#d1fae5;color:#065f46}
+.snap-inactive{background:#fee2e2;color:#b91c1c}
 
 /* ── Empty state ── */
 .empty{padding:40px;text-align:center;color:var(--gray-3);font-size:13px}
@@ -413,12 +409,6 @@ textarea{resize:vertical;min-height:70px}
           <option value="institution">Institution</option>
           <option value="distributor">Distributor</option>
         </select>
-        <select class="filter-select" id="pipe-status-filter">
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="prospect">Prospect</option>
-          <option value="inactive">Inactive</option>
-        </select>
         <select class="filter-select" id="pipe-rep-filter" style="display:none">
           <option value="">All Reps</option>
         </select>
@@ -541,20 +531,6 @@ textarea{resize:vertical;min-height:70px}
     <div class="modal-body">
       <input type="hidden" id="deal-id">
       <input type="hidden" id="deal-account-id">
-      <div class="form-row">
-        <div class="form-group"><label>Stage *</label>
-          <select id="deal-stage">
-            <option value="lead">Lead</option>
-            <option value="quoted">Quoted</option>
-            <option value="follow-up">Follow-up</option>
-            <option value="won">Won</option>
-            <option value="lost">Lost</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group" id="deal-loss-group" style="display:none">
-        <label>Loss Reason</label><input id="deal-loss-reason" placeholder="Price, timing, competitor…">
-      </div>
       <div class="modal-err" id="deal-err"></div>
     </div>
     <div class="modal-footer">
@@ -1115,9 +1091,8 @@ function renderDashboard() {
     return a.status === 'active' && daysAgo(m.lastContactDate) >= riskDays;
   });
 
-  const stageCounts = {};
-  ['lead','quoted','follow-up','won','lost'].forEach(s => stageCounts[s] = 0);
-  myDeals.forEach(d => { if (d.stage) stageCounts[d.stage] = (stageCounts[d.stage]||0) + 1; });
+  const stageCounts = {prospect:0,active:0,inactive:0};
+  myAccounts.forEach(a => { const s = a.status || 'prospect'; if (stageCounts[s] !== undefined) stageCounts[s]++; });
 
   const recentComms = [...STATE.comms].sort((a,b) => b.date.localeCompare(a.date)).slice(0,5);
   const typeEmoji = {call:'📞',email:'✉️','in-person':'🤝',text:'💬'};
@@ -1135,11 +1110,9 @@ function renderDashboard() {
           <div class="card-header">Pipeline Snapshot</div>
           <div class="card-body">
             <div class="pipeline-snap">
-              <div class="snap-pill snap-lead"><span class="sp-count">${stageCounts.lead}</span> Lead</div>
-              <div class="snap-pill snap-quoted"><span class="sp-count">${stageCounts.quoted}</span> Quoted</div>
-              <div class="snap-pill snap-follow-up"><span class="sp-count">${stageCounts['follow-up']}</span> Follow-up</div>
-              <div class="snap-pill snap-won"><span class="sp-count">${stageCounts.won}</span> Won</div>
-              <div class="snap-pill snap-lost"><span class="sp-count">${stageCounts.lost}</span> Lost</div>
+              <div class="snap-pill snap-prospect"><span class="sp-count">${stageCounts.prospect}</span> Prospect</div>
+              <div class="snap-pill snap-active"><span class="sp-count">${stageCounts.active}</span> Active</div>
+              <div class="snap-pill snap-inactive"><span class="sp-count">${stageCounts.inactive}</span> Inactive</div>
             </div>
           </div>
         </div>
@@ -1289,7 +1262,7 @@ function renderAccountDetail(id) {
       <div>
         <h1 style="font-size:24px;font-weight:800;margin-bottom:6px">${esc(a.name)}</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          ${segBadge(a.segment)} ${statusBadge(a.status)} ${deal ? stageBadge(deal.stage) : ''}
+          ${segBadge(a.segment)} ${statusBadge(a.status)}
           ${repLabel ? `<span style="font-size:12px;color:var(--gray-3);font-weight:600">· ${esc(repLabel)}</span>` : ''}
         </div>
       </div>
@@ -1346,10 +1319,9 @@ function renderDetailTab(tab, id, a, m, deal) {
         </div>
         <div>
           ${deal ? `<div class="card" style="margin-bottom:16px">
-            <div class="card-header">Current Deal ${stageBadge(deal.stage)}</div>
+            <div class="card-header">Current Deal</div>
             <div class="card-body">
-              ${deal.lostReason ? `<div style="font-size:12px;color:var(--gray-3)">Lost: ${esc(deal.lostReason)}</div>` : ''}
-              <button class="btn btn-outline btn-sm" style="margin-top:10px" data-edit-deal="${deal.id}">Update Deal</button>
+              <button class="btn btn-outline btn-sm" data-edit-deal="${deal.id}">Update Deal</button>
             </div>
           </div>` : `<div class="card" style="margin-bottom:16px">
             <div class="card-header">Deal</div>
@@ -1450,49 +1422,38 @@ function bindDetailTabActions(id) {
 function renderPipeline() {
   const isAdmin = currentRepId === 'admin';
   const segF = document.getElementById('pipe-seg-filter').value;
-  const statusF = document.getElementById('pipe-status-filter').value;
   const repF = isAdmin ? (document.getElementById('pipe-rep-filter').value) : '';
-  const stages = ['lead','quoted','follow-up','won','lost'];
-  const stageLabel = {lead:'Lead',quoted:'Quoted','follow-up':'Follow-up',won:'Won',lost:'Lost'};
+  const statuses = ['prospect','active','inactive'];
+  const statusLabel = {prospect:'Prospect',active:'Active',inactive:'Inactive'};
+  const borderColor = {prospect:'#aaa',active:'#16a34a',inactive:'#dc2626'};
 
-  const dealsByStage = {};
-  stages.forEach(s => dealsByStage[s] = []);
-  [...STATE.deals.values()].forEach(d => {
-    const acct = STATE.accounts.get(d.accountId);
-    if (!acct) return;
+  const acctsByStatus = {};
+  statuses.forEach(s => acctsByStatus[s] = []);
+  [...STATE.accounts.values()].forEach(acct => {
+    if (!isAdmin && acct.repId !== currentRepId) return;
     if (segF && acct.segment !== segF) return;
-    if (statusF && acct.status !== statusF) return;
     if (repF && acct.repId !== repF) return;
-    if (dealsByStage[d.stage]) dealsByStage[d.stage].push({ deal: d, acct });
+    const col = acct.status || 'prospect';
+    if (acctsByStatus[col]) acctsByStatus[col].push(acct);
+    else acctsByStatus['prospect'].push(acct);
   });
 
   const board = document.getElementById('kanban-board');
-  board.innerHTML = stages.map(s => {
-    const items = dealsByStage[s];
-    const metaHtml = `<span class="col-meta">${items.length}</span>`;
+  board.innerHTML = statuses.map(s => {
+    const items = acctsByStatus[s];
     return `<div class="kanban-col col-${s}" data-stage="${s}">
-      <div class="kanban-col-header">${stageLabel[s]} ${metaHtml}</div>
+      <div class="kanban-col-header">${statusLabel[s]} <span class="col-meta">${items.length}</span></div>
       <div class="kanban-body" data-stage="${s}">
-        ${items.map(({deal, acct}) => {
+        ${items.map(acct => {
           const m = getAccountMetrics(acct.id);
-          const borderColor = {lead:'#ccc',quoted:'#3b82f6','follow-up':'#d97706',won:'#16a34a',lost:'#dc2626'}[s];
           const isOwn = acct.repId === currentRepId;
-          return `<div class="kcard${isOwn ? ' rep-own-card' : ''}" draggable="true" data-deal-id="${deal.id}" data-account-id="${acct.id}" style="border-left-color:${borderColor}">
+          return `<div class="kcard${isOwn ? ' rep-own-card' : ''}" draggable="true" data-account-id="${acct.id}" style="border-left-color:${borderColor[s]}">
             <div class="kcard-name" style="cursor:pointer" data-nav-account="${acct.id}">${esc(acct.name)}</div>
             <div class="kcard-meta">
               ${segBadge(acct.segment)}
               <span>${m.lastContactDate ? 'Last: '+fmtDate(m.lastContactDate) : 'No contact yet'}</span>
             </div>
-            ${deal.lostReason ? `<div style="font-size:11px;color:var(--gray-3);margin-top:4px">Lost: ${esc(deal.lostReason)}</div>` : ''}
             <div class="kcard-rep${isOwn ? ' rep-own' : ''}">${esc(getRepLabel(acct.repId))}</div>
-            <div id="loss-form-${deal.id}" style="display:none" class="loss-reason-form">
-              <strong style="font-size:11px">Loss reason</strong>
-              <input type="text" placeholder="Price, timing, competitor…" id="loss-input-${deal.id}">
-              <div class="loss-actions">
-                <button class="btn btn-sm" style="background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font:600 11px Manrope;padding:4px 10px" data-confirm-loss="${deal.id}">Confirm Lost</button>
-                <button class="btn btn-sm btn-outline" data-cancel-loss="${deal.id}">Cancel</button>
-              </div>
-            </div>
           </div>`;
         }).join('')}
       </div>
@@ -1503,28 +1464,13 @@ function renderPipeline() {
   board.querySelectorAll('[data-nav-account]').forEach(el => {
     el.addEventListener('click', e => { e.stopPropagation(); navigate('account-detail', { id: el.dataset.navAccount }); });
   });
-  board.querySelectorAll('[data-confirm-loss]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const dealId = btn.dataset.confirmLoss;
-      const reason = document.getElementById(`loss-input-${dealId}`)?.value || '';
-      const deal = STATE.deals.get(dealId);
-      if (!deal) return;
-      await saveDeal({ ...deal, stage: 'lost', lostReason: reason });
-      renderPipeline();
-    });
-  });
-  board.querySelectorAll('[data-cancel-loss]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.getElementById(`loss-form-${btn.dataset.cancelLoss}`)?.style.setProperty('display','none');
-    });
-  });
 }
 
 function bindPipelineDragDrop() {
   const board = document.getElementById('kanban-board');
   board.querySelectorAll('.kcard').forEach(card => {
     card.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', card.dataset.dealId);
+      e.dataTransfer.setData('text/plain', card.dataset.accountId);
       setTimeout(() => card.classList.add('dragging'), 0);
     });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
@@ -1535,16 +1481,11 @@ function bindPipelineDragDrop() {
     col.addEventListener('drop', async e => {
       e.preventDefault();
       col.classList.remove('drag-over');
-      const dealId = e.dataTransfer.getData('text/plain');
-      const targetStage = col.dataset.stage;
-      const deal = STATE.deals.get(dealId);
-      if (!deal || deal.stage === targetStage) return;
-      if (targetStage === 'lost') {
-        const lossForm = document.getElementById(`loss-form-${dealId}`);
-        if (lossForm) { lossForm.style.display = 'block'; lossForm.querySelector('input')?.focus(); }
-        return;
-      }
-      await saveDeal({ ...deal, stage: targetStage });
+      const accountId = e.dataTransfer.getData('text/plain');
+      const targetStatus = col.dataset.stage;
+      const acct = STATE.accounts.get(accountId);
+      if (!acct || acct.status === targetStatus) return;
+      await saveAccount({ ...acct, status: targetStatus });
       renderPipeline();
     });
   });
@@ -2448,9 +2389,6 @@ function openDealModal(dealId = null, accountId = null) {
   document.getElementById('modal-deal-title').textContent = deal ? 'Update Deal' : 'New Deal';
   document.getElementById('deal-id').value = dealId || '';
   document.getElementById('deal-account-id').value = accountId || deal?.accountId || '';
-  document.getElementById('deal-stage').value = deal?.stage || 'lead';
-  document.getElementById('deal-loss-reason').value = deal?.lostReason || '';
-  document.getElementById('deal-loss-group').style.display = (deal?.stage === 'lost') ? 'block' : 'none';
   document.getElementById('deal-err').textContent = '';
   openModal('modal-deal');
 }
@@ -2600,26 +2538,22 @@ async function submitAccountForm() {
     });
     closeModal('modal-account');
     toast('Account saved.');
-    if (!document.getElementById('acct-id').value) openDealModal(null, id);
-    else if (currentView === 'accounts') renderAccounts();
+    if (currentView === 'accounts') renderAccounts();
     else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
   } catch (e) { err.textContent = 'Failed to save: ' + e.message; }
   finally { btn.disabled = false; btn.textContent = 'Save Account'; }
 }
 
 async function submitDealForm() {
-  const stage = document.getElementById('deal-stage').value;
   const accountId = document.getElementById('deal-account-id').value;
   const err = document.getElementById('deal-err');
-  if (!stage) { err.textContent = 'Stage is required.'; return; }
   if (!accountId) { err.textContent = 'Account is required.'; return; }
   const btn = document.getElementById('deal-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const dealId = document.getElementById('deal-id').value;
     await saveDeal({
-      id: dealId || null, accountId, stage,
-      lostReason: document.getElementById('deal-loss-reason').value.trim(),
+      id: dealId || null, accountId,
     });
     closeModal('modal-deal');
     toast('Deal saved.');
@@ -2752,7 +2686,6 @@ function bindAll() {
 
   // Pipeline filters
   document.getElementById('pipe-seg-filter').addEventListener('change', renderPipeline);
-  document.getElementById('pipe-status-filter').addEventListener('change', renderPipeline);
   document.getElementById('pipe-rep-filter').addEventListener('change', renderPipeline);
 
   // Modal close buttons
@@ -2803,10 +2736,6 @@ function bindAll() {
   document.getElementById('receipt-save-btn').addEventListener('click', submitReceiptForm);
   document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
 
-  // Deal stage toggle for loss reason
-  document.getElementById('deal-stage').addEventListener('change', e => {
-    document.getElementById('deal-loss-group').style.display = e.target.value === 'lost' ? 'block' : 'none';
-  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
