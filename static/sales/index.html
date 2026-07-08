@@ -1008,6 +1008,9 @@ function applyLogs(logs) {
       STATE.receipts = STATE.receipts.filter(r => r.id !== row.id);
     } else if (action === 'delete_mileage') {
       STATE.mileage = STATE.mileage.filter(m => m.id !== row.id);
+    } else if (action === 'reassign_account') {
+      const existing = STATE.accounts.get(row.id);
+      if (existing) existing.repId = row.repId;
     } else if (action === 'create_note') {
       if (!STATE.notes.find(n => n.id === row.id)) STATE.notes.push(row);
     } else if (action === 'update_note') {
@@ -1234,7 +1237,13 @@ function renderAccounts() {
       <td><strong>${esc(a.name)}</strong></td>
       <td>${segBadge(a.segment)}</td>
       <td>${statusBadge(a.status)}</td>
-      ${showAll ? `<td><span class="badge" style="${repBadgeStyle(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span></td>` : ''}
+      ${showAll ? `<td>${isAdmin
+        ? `<select class="rep-inline-select" data-reassign-acct="${a.id}" style="font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(a.repId||'admin')}">
+            <option value="admin"${(a.repId||'admin')==='admin'?' selected':''}>Manager</option>
+            ${getReps().map(r => `<option value="${r.id}"${a.repId===r.id?' selected':''}>${esc(r.label)}</option>`).join('')}
+          </select>`
+        : `<span class="badge" style="${repBadgeStyle(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span>`
+      }</td>` : ''}
       <td>${fmtDate(m.lastContactDate)}</td>
       <td>${fmtDate(a.nextFollowUp)}</td>
       <td>
@@ -1267,6 +1276,21 @@ function renderAccounts() {
   });
   document.querySelectorAll('[data-log-comm]').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openCommModal(btn.dataset.logComm); });
+  });
+  document.querySelectorAll('[data-reassign-acct]').forEach(sel => {
+    sel.addEventListener('change', async e => {
+      e.stopPropagation();
+      const newRepId = sel.value;
+      const acctId = sel.dataset.reassignAcct;
+      sel.disabled = true;
+      try {
+        await reassignAccount(acctId, newRepId);
+        // Update select styling to match new rep
+        sel.style.cssText = `font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(newRepId)}`;
+        toast('Rep updated.');
+      } catch(e) { toast('Failed to save.'); }
+      finally { sel.disabled = false; }
+    });
   });
 }
 
@@ -2516,6 +2540,12 @@ async function saveAccount(data) {
   await appendLog(LOG_PATH, entry);
   STATE.accounts.set(id, { ...(existing||{}), ...entry });
   return id;
+}
+
+async function reassignAccount(accountId, newRepId) {
+  const entry = { action: 'reassign_account', id: accountId, repId: newRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
 }
 
 async function saveDeal(data) {
