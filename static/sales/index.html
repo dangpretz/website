@@ -512,7 +512,6 @@ textarea{resize:vertical;min-height:70px}
         </div>
         <div class="form-group"><label>Next Follow-up</label><input id="acct-followup" type="date"></div>
       </div>
-      <div class="form-group"><label>Notes</label><textarea id="acct-notes" placeholder="Account notes…"></textarea></div>
       <div class="modal-err" id="acct-err"></div>
     </div>
     <div class="modal-footer">
@@ -598,6 +597,24 @@ textarea{resize:vertical;min-height:70px}
     <div class="modal-footer">
       <button class="btn btn-outline" data-close="modal-comm">Cancel</button>
       <button class="btn btn-red" id="comm-save-btn">Log Communication</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-note">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Note</div>
+      <button class="modal-close" data-close="modal-note">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="note-account-id">
+      <div class="form-group"><label>Note *</label><textarea id="note-text" placeholder="Enter note…" rows="4"></textarea></div>
+      <div class="modal-err" id="note-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-note">Cancel</button>
+      <button class="btn btn-red" id="note-save-btn">Save Note</button>
     </div>
   </div>
 </div>
@@ -793,7 +810,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], repRegistry: [] };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], repRegistry: [] };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -990,6 +1007,10 @@ function applyLogs(logs) {
       STATE.receipts = STATE.receipts.filter(r => r.id !== row.id);
     } else if (action === 'delete_mileage') {
       STATE.mileage = STATE.mileage.filter(m => m.id !== row.id);
+    } else if (action === 'create_note') {
+      if (!STATE.notes.find(n => n.id === row.id)) STATE.notes.push(row);
+    } else if (action === 'delete_note') {
+      STATE.notes = STATE.notes.filter(n => n.id !== row.id);
     } else if (action === 'set_rep') {
       const idx = STATE.repRegistry.findIndex(r => r.id === row.id);
       const rec = { id: row.id, label: row.label || row.id, email: row.email || '', pwdHash: row.pwdHash || '' };
@@ -1327,12 +1348,31 @@ function renderDetailTab(tab, id, a, m, deal) {
             <div class="card-header">Deal</div>
             <div class="card-body"><button class="btn btn-red btn-sm" data-new-deal="${id}">+ Create Deal</button></div>
           </div>`}
-          ${a.notes ? `<div class="card">
-            <div class="card-header">Notes</div>
-            <div class="card-body" style="font-size:13px;line-height:1.5;white-space:pre-wrap">${esc(a.notes)}</div>
-          </div>` : ''}
         </div>
-      </div>`;
+      </div>
+      ${(() => {
+        const acctNotes = STATE.notes.filter(n => n.accountId === id).sort((a,b) => b.timeStamp.localeCompare(a.timeStamp));
+        const isAdmin = currentRepId === 'admin';
+        const legacyNote = a.notes ? `<div class="comm-row"><div class="comm-body" style="flex:1"><div class="comm-date" style="color:var(--gray-3);font-style:italic">Legacy note</div><div class="comm-summary" style="white-space:pre-wrap">${esc(a.notes)}</div></div></div>` : '';
+        const noteRows = acctNotes.map(n => `
+          <div class="comm-row">
+            <div class="comm-body" style="flex:1">
+              <div class="comm-date">${fmtDate(n.timeStamp?.slice(0,10))} · ${esc(getRepLabel(n.repId))}</div>
+              <div class="comm-summary" style="white-space:pre-wrap">${esc(n.text)}</div>
+            </div>
+            ${(isAdmin || n.repId === currentRepId) ? `<button class="btn btn-outline btn-sm" style="flex-shrink:0;color:var(--red)" data-delete-note="${n.id}">✕</button>` : ''}
+          </div>`).join('');
+        return `<div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            Notes
+            <button class="btn btn-red btn-sm" data-add-note="${id}">+ Add Note</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            ${noteRows || legacyNote || '<div class="empty" style="padding:20px">No notes yet.</div>'}
+          </div>
+        </div>`;
+      })()}
+      `;
   }
   if (tab === 'communications') {
     const comms = STATE.comms.filter(c => c.accountId === id).sort((a,b) => b.date.localeCompare(a.date));
@@ -1415,6 +1455,13 @@ function bindDetailTabActions(id) {
   document.querySelectorAll('[data-complete-task]').forEach(el => el.addEventListener('click', () => completeTask(el.dataset.completeTask)));
   document.querySelectorAll('[data-edit-deal]').forEach(btn => btn.addEventListener('click', () => openDealModal(btn.dataset.editDeal, null)));
   document.querySelectorAll('[data-new-deal]').forEach(btn => btn.addEventListener('click', () => openDealModal(null, btn.dataset.newDeal)));
+  document.querySelectorAll('[data-add-note]').forEach(btn => btn.addEventListener('click', () => openNoteModal(btn.dataset.addNote)));
+  document.querySelectorAll('[data-delete-note]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this note?')) return;
+    await deleteNote(btn.dataset.deleteNote);
+    toast('Note deleted.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  }));
 }
 
 
@@ -2376,7 +2423,6 @@ function openAccountModal(id = null) {
     document.getElementById('acct-address').value = a.address||'';
     document.getElementById('acct-status').value = a.status||'prospect';
     document.getElementById('acct-followup').value = a.nextFollowUp||'';
-    document.getElementById('acct-notes').value = a.notes||'';
   } else {
     document.getElementById('modal-account').querySelectorAll('input,select,textarea').forEach(el => { if (el.id !== 'acct-id') el.value = ''; });
     document.getElementById('acct-status').value = 'prospect';
@@ -2534,7 +2580,6 @@ async function submitAccountForm() {
       contactEmail: document.getElementById('acct-email').value.trim(),
       address: document.getElementById('acct-address').value.trim(),
       nextFollowUp: document.getElementById('acct-followup').value,
-      notes: document.getElementById('acct-notes').value.trim(),
     });
     closeModal('modal-account');
     toast('Account saved.');
@@ -2582,6 +2627,42 @@ async function submitTaskForm() {
     else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
   } catch(e) { err.textContent = 'Failed: ' + e.message; }
   finally { btn.disabled = false; btn.textContent = 'Save Task'; }
+}
+
+function openNoteModal(accountId) {
+  document.getElementById('note-account-id').value = accountId;
+  document.getElementById('note-text').value = '';
+  document.getElementById('note-err').textContent = '';
+  openModal('modal-note');
+}
+
+async function saveNote(data) {
+  const entry = { action: 'create_note', id: genId(), accountId: data.accountId,
+    repId: currentRepId, text: data.text, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function deleteNote(id) {
+  const entry = { action: 'delete_note', id, repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function submitNoteForm() {
+  const accountId = document.getElementById('note-account-id').value;
+  const text = document.getElementById('note-text').value.trim();
+  const err = document.getElementById('note-err');
+  if (!text) { err.textContent = 'Note text is required.'; return; }
+  const btn = document.getElementById('note-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await saveNote({ accountId, text });
+    closeModal('modal-note');
+    toast('Note saved.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Note'; }
 }
 
 async function submitCommForm() {
@@ -2735,6 +2816,7 @@ function bindAll() {
   document.getElementById('sample-save-btn').addEventListener('click', submitSampleForm);
   document.getElementById('receipt-save-btn').addEventListener('click', submitReceiptForm);
   document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
+  document.getElementById('note-save-btn').addEventListener('click', submitNoteForm);
 
 }
 
