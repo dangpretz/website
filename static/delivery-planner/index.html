@@ -637,6 +637,18 @@
       display: inline-flex; align-items: center; gap: 4px;
     }
     .scan-btn:hover { background: #f0ad4e; color: #1A1A1A; }
+    .note-btn {
+      padding: 4px 10px; font: 700 10px 'Manrope', sans-serif; color: #6366f1;
+      background: none; border: 1px solid #6366f1; border-radius: 3px; cursor: pointer;
+      transition: background 0.2s, color 0.2s; min-height: 44px; min-width: 44px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .note-btn:hover { background: #6366f1; color: #fff; }
+    .delivery-note-display {
+      font: 400 12px 'Manrope', sans-serif; color: #4338ca;
+      background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 4px;
+      padding: 6px 10px; margin: 4px 0;
+    }
     .scan-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
     .barcode-details { margin: 4px 0; }
     .barcode-details summary {
@@ -936,6 +948,20 @@
     </div>
   </div>
 
+  <!-- Pre-delivery note modal -->
+  <div class="confirm-overlay" id="note-overlay">
+    <div class="confirm-modal" id="note-modal">
+      <h2>Order Note</h2>
+      <p class="confirm-sub">Note any additional supplies or instructions for this delivery.</p>
+      <label for="delivery-note-input">Note</label>
+      <textarea id="delivery-note-input" placeholder="e.g. Bring extra cups, check on cooler bags…" style="width:100%;padding:12px;font:400 15px Manrope,sans-serif;border:1px solid #ddd;border-radius:4px;min-height:100px;resize:vertical;box-sizing:border-box;margin-bottom:16px"></textarea>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-secondary" id="note-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-red" id="note-modal-save">Save Note</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Barcode scanning modal -->
   <div class="confirm-overlay" id="barcode-overlay">
     <div class="confirm-modal" id="barcode-modal">
@@ -1215,6 +1241,10 @@
         }
         if (row.action === 'barcodes') {
           try { latestBarcodes[id] = JSON.parse(row.barcodes || '[]'); } catch (_) { latestBarcodes[id] = []; }
+          return;
+        }
+        if (row.action === 'note') {
+          if (byId[id]) byId[id].deliveryNote = row.deliveryNote || '';
           return;
         }
         if (row.action === 'confirm') {
@@ -1831,6 +1861,10 @@
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
+      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">📝${row.deliveryNote ? ' Note' : ''}</button>`;
+      const deliveryNoteHtml = row.deliveryNote
+        ? `<div class="delivery-note-display">📝 ${escapeHtml(row.deliveryNote)}</div>`
+        : '';
       return `
         <div class="delivery-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="card-customer">
@@ -1848,7 +1882,9 @@
           ${pillsHtml}
           ${contactHtml}
           ${barcodeHtml}
+          ${deliveryNoteHtml}
           <div class="card-actions-row">
+            ${noteBtnHtml}
             ${scanBtnHtml}
             ${confirmBtnHtml}
             ${sigBtnHtml}
@@ -1878,6 +1914,8 @@
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
+      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">📝${row.deliveryNote ? ' Note' : ''}</button>`;
+      const deliveryNoteHtml = row.deliveryNote ? `<div class="delivery-note-display">📝 ${escapeHtml(row.deliveryNote)}</div>` : '';
       const contactHtml = renderContactLine(row);
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
@@ -1889,9 +1927,11 @@
             ${pillsHtml}
             ${contactHtml}
             ${barcodeHtml}
+            ${deliveryNoteHtml}
             ${confirmedHtml}
           </div>
           <div class="daily-actions">
+            ${noteBtnHtml}
             ${scanBtnHtml}
             ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm'}</button>` : ''}
             ${sigBtnHtml}
@@ -2001,6 +2041,9 @@
       });
       container.querySelectorAll('[data-action="view-signature"]').forEach((btn) => {
         btn.addEventListener('click', () => openSignatureView(btn.dataset.deliveryId));
+      });
+      container.querySelectorAll('[data-action="note"]').forEach((btn) => {
+        btn.addEventListener('click', () => openNoteModal(btn.dataset.deliveryId));
       });
     }
 
@@ -2198,6 +2241,46 @@
 
     let sigPad = null;
     let confirmDeliveryId = null;
+    let noteDeliveryId = null;
+
+    function openNoteModal(deliveryId) {
+      const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
+      if (!row) return;
+      noteDeliveryId = deliveryId;
+      document.getElementById('delivery-note-input').value = row.deliveryNote || '';
+      document.getElementById('note-overlay').classList.add('open');
+    }
+
+    document.getElementById('note-modal-cancel').addEventListener('click', () => {
+      document.getElementById('note-overlay').classList.remove('open');
+      noteDeliveryId = null;
+    });
+
+    document.getElementById('note-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'note-overlay') {
+        document.getElementById('note-overlay').classList.remove('open');
+        noteDeliveryId = null;
+      }
+    });
+
+    document.getElementById('note-modal-save').addEventListener('click', async () => {
+      if (!noteDeliveryId) return;
+      const note = document.getElementById('delivery-note-input').value.trim();
+      const btn = document.getElementById('note-modal-save');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        await appendLog(LOG_PATH, { action: 'note', deliveryId: noteDeliveryId, deliveryNote: note, timeStamp: new Date().toISOString() });
+        const delivery = currentDeliveries.find((d) => d.deliveryId === noteDeliveryId);
+        if (delivery) delivery.deliveryNote = note;
+        document.getElementById('note-overlay').classList.remove('open');
+        noteDeliveryId = null;
+        renderSchedule();
+      } catch (err) {
+        alert('Failed to save note: ' + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Note';
+      }
+    });
 
     function openConfirmModal(deliveryId) {
       const row = currentDeliveries.find((d) => d.deliveryId === deliveryId);
@@ -2207,7 +2290,7 @@
       const customer = row.customer || row.location || '—';
       let itemsHtml = '';
       try { const items = JSON.parse(row.lineItems || '[]'); itemsHtml = items.map((it) => `${escapeHtml(it.sku)} x${it.quantity}`).join(', '); } catch (_) { itemsHtml = '—'; }
-      summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>`;
+      summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>${row.deliveryNote ? `<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:13px;color:#92400e">📝 ${escapeHtml(row.deliveryNote)}</div>` : ''}`;
       document.getElementById('confirm-receiver').value = row.customer || row.location || '';
       document.getElementById('confirm-note').value = '';
       document.getElementById('confirm-error').hidden = true;
