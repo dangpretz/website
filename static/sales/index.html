@@ -937,7 +937,7 @@ async function checkAuth() {
   } catch { return null; }
 }
 
-function populateLogForDropdown(selectEl) {
+function populateLogForDropdown(selectEl, preselect = 'admin') {
   while (selectEl.options.length > 1) selectEl.remove(1);
   for (const rep of getReps()) {
     const opt = document.createElement('option');
@@ -945,7 +945,7 @@ function populateLogForDropdown(selectEl) {
     opt.text = getRepLabel(rep.id);
     selectEl.add(opt);
   }
-  selectEl.value = 'admin';
+  selectEl.value = preselect || 'admin';
 }
 
 function populateRepFilterDropdown(selectEl) {
@@ -2051,9 +2051,9 @@ function openReceiptModal(id = null) {
   const existingPhoto = id ? localStorage.getItem('crm-receipt-photo-' + id) : null;
   preview.innerHTML = existingPhoto ? `<img src="${existingPhoto}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">` : '';
   const repGroup = document.getElementById('receipt-rep-group');
-  if (currentRepId === 'admin' && !r) {
+  if (currentRepId === 'admin') {
     repGroup.style.display = '';
-    populateLogForDropdown(document.getElementById('receipt-rep-select'));
+    populateLogForDropdown(document.getElementById('receipt-rep-select'), r?.repId || '');
   } else {
     repGroup.style.display = 'none';
   }
@@ -2075,9 +2075,9 @@ function openMileageModal(id = null) {
   document.getElementById('mileage-reimb-preview').textContent = m ? fmt$(m.reimbursement) : '$0.00';
   document.getElementById('mileage-err').textContent = '';
   const repGroup = document.getElementById('mileage-rep-group');
-  if (currentRepId === 'admin' && !m) {
+  if (currentRepId === 'admin') {
     repGroup.style.display = '';
-    populateLogForDropdown(document.getElementById('mileage-rep-select'));
+    populateLogForDropdown(document.getElementById('mileage-rep-select'), m?.repId || '');
   } else {
     repGroup.style.display = 'none';
   }
@@ -2152,7 +2152,7 @@ async function submitReceiptForm() {
     const existingId = document.getElementById('receipt-id').value || null;
     const existingStatus = document.getElementById('receipt-existing-status').value || 'pending';
     const repGroup = document.getElementById('receipt-rep-group');
-    const targetRepId = (currentRepId === 'admin' && !existingId && repGroup.style.display !== 'none')
+    const targetRepId = (currentRepId === 'admin' && repGroup.style.display !== 'none')
       ? document.getElementById('receipt-rep-select').value : null;
     await saveReceipt({
       id: existingId, vendor, date, amount, category,
@@ -2183,7 +2183,7 @@ async function submitMileageForm() {
     const existingId = document.getElementById('mileage-id').value || null;
     const existingStatus = document.getElementById('mileage-existing-status').value || 'pending';
     const mRepGroup = document.getElementById('mileage-rep-group');
-    const targetRepId = (currentRepId === 'admin' && !existingId && mRepGroup.style.display !== 'none')
+    const targetRepId = (currentRepId === 'admin' && mRepGroup.style.display !== 'none')
       ? document.getElementById('mileage-rep-select').value : null;
     await saveMileage({
       id: existingId, date, origin, destination, miles,
