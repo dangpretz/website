@@ -609,6 +609,7 @@ textarea{resize:vertical;min-height:70px}
     </div>
     <div class="modal-body">
       <input type="hidden" id="note-account-id">
+      <input type="hidden" id="note-id">
       <div class="form-group"><label>Note *</label><textarea id="note-text" placeholder="Enter note…" rows="4"></textarea></div>
       <div class="modal-err" id="note-err"></div>
     </div>
@@ -1007,8 +1008,14 @@ function applyLogs(logs) {
       STATE.receipts = STATE.receipts.filter(r => r.id !== row.id);
     } else if (action === 'delete_mileage') {
       STATE.mileage = STATE.mileage.filter(m => m.id !== row.id);
+    } else if (action === 'reassign_account') {
+      const existing = STATE.accounts.get(row.id);
+      if (existing) existing.repId = row.repId;
     } else if (action === 'create_note') {
       if (!STATE.notes.find(n => n.id === row.id)) STATE.notes.push(row);
+    } else if (action === 'update_note') {
+      const i = STATE.notes.findIndex(n => n.id === row.id);
+      if (i >= 0) STATE.notes[i] = { ...STATE.notes[i], ...row };
     } else if (action === 'delete_note') {
       STATE.notes = STATE.notes.filter(n => n.id !== row.id);
     } else if (action === 'set_rep') {
@@ -1230,7 +1237,13 @@ function renderAccounts() {
       <td><strong>${esc(a.name)}</strong></td>
       <td>${segBadge(a.segment)}</td>
       <td>${statusBadge(a.status)}</td>
-      ${showAll ? `<td><span class="badge" style="${repBadgeStyle(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span></td>` : ''}
+      ${showAll ? `<td>${isAdmin
+        ? `<select class="rep-inline-select" data-reassign-acct="${a.id}" style="font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(a.repId||'admin')}">
+            <option value="admin"${(a.repId||'admin')==='admin'?' selected':''}>Manager</option>
+            ${getReps().map(r => `<option value="${r.id}"${a.repId===r.id?' selected':''}>${esc(r.label)}</option>`).join('')}
+          </select>`
+        : `<span class="badge" style="${repBadgeStyle(a.repId||'admin')}">${esc(getRepLabel(a.repId))}</span>`
+      }</td>` : ''}
       <td>${fmtDate(m.lastContactDate)}</td>
       <td>${fmtDate(a.nextFollowUp)}</td>
       <td>
@@ -1263,6 +1276,21 @@ function renderAccounts() {
   });
   document.querySelectorAll('[data-log-comm]').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openCommModal(btn.dataset.logComm); });
+  });
+  document.querySelectorAll('[data-reassign-acct]').forEach(sel => {
+    sel.addEventListener('change', async e => {
+      e.stopPropagation();
+      const newRepId = sel.value;
+      const acctId = sel.dataset.reassignAcct;
+      sel.disabled = true;
+      try {
+        await reassignAccount(acctId, newRepId);
+        // Update select styling to match new rep
+        sel.style.cssText = `font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(newRepId)}`;
+        toast('Rep updated.');
+      } catch(e) { toast('Failed to save.'); }
+      finally { sel.disabled = false; }
+    });
   });
 }
 
@@ -1360,7 +1388,10 @@ function renderDetailTab(tab, id, a, m, deal) {
               <div class="comm-date">${fmtDate(n.timeStamp?.slice(0,10))} · ${esc(getRepLabel(n.repId))}</div>
               <div class="comm-summary" style="white-space:pre-wrap">${esc(n.text)}</div>
             </div>
-            ${(isAdmin || n.repId === currentRepId) ? `<button class="btn btn-outline btn-sm" style="flex-shrink:0;color:var(--red)" data-delete-note="${n.id}">✕</button>` : ''}
+            ${(isAdmin || n.repId === currentRepId) ? `<div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn btn-outline btn-sm" data-edit-note="${n.id}" data-edit-note-account="${id}">Edit</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red)" data-delete-note="${n.id}">✕</button>
+            </div>` : ''}
           </div>`).join('');
         return `<div class="card" style="margin-top:16px">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
@@ -1424,6 +1455,7 @@ function renderDetailTab(tab, id, a, m, deal) {
           </div>
           ${badge(capitalize(t.priority), t.priority)}
           <div class="task-due${isOverdue?' overdue':''}">${fmtDate(t.dueDate)}</div>
+          <button class="btn btn-outline btn-sm" data-edit-task="${t.id}">Edit</button>
         </div>`;
       }).join('') : '<div class="empty"><div class="empty-icon">✅</div>No tasks for this account.</div>'}`;
   }
@@ -1453,9 +1485,11 @@ function bindDetailTabActions(id) {
   document.querySelectorAll('[data-log-sample]').forEach(btn => btn.addEventListener('click', () => openSampleModal(btn.dataset.logSample)));
   document.querySelectorAll('[data-new-task]').forEach(btn => btn.addEventListener('click', () => openTaskModal(btn.dataset.newTask)));
   document.querySelectorAll('[data-complete-task]').forEach(el => el.addEventListener('click', () => completeTask(el.dataset.completeTask)));
+  document.querySelectorAll('[data-edit-task]').forEach(btn => btn.addEventListener('click', () => openTaskModal(null, btn.dataset.editTask)));
   document.querySelectorAll('[data-edit-deal]').forEach(btn => btn.addEventListener('click', () => openDealModal(btn.dataset.editDeal, null)));
   document.querySelectorAll('[data-new-deal]').forEach(btn => btn.addEventListener('click', () => openDealModal(null, btn.dataset.newDeal)));
   document.querySelectorAll('[data-add-note]').forEach(btn => btn.addEventListener('click', () => openNoteModal(btn.dataset.addNote)));
+  document.querySelectorAll('[data-edit-note]').forEach(btn => btn.addEventListener('click', () => openNoteModal(btn.dataset.editNoteAccount, btn.dataset.editNote)));
   document.querySelectorAll('[data-delete-note]').forEach(btn => btn.addEventListener('click', async () => {
     if (!confirm('Delete this note?')) return;
     await deleteNote(btn.dataset.deleteNote);
@@ -1571,6 +1605,9 @@ function renderTasks() {
   document.querySelectorAll('[data-task-account]').forEach(el => {
     el.addEventListener('click', () => navigate('account-detail', { id: el.dataset.taskAccount }));
   });
+  document.querySelectorAll('[data-edit-task]').forEach(btn => {
+    btn.addEventListener('click', () => openTaskModal(null, btn.dataset.editTask));
+  });
 }
 
 function renderTaskRow(t, isOverdue) {
@@ -1584,6 +1621,7 @@ function renderTaskRow(t, isOverdue) {
     </div>
     ${badge(capitalize(t.priority), t.priority)}
     <div class="task-due${isOverdue&&!isDone?' overdue':''}">${fmtDate(t.dueDate)}</div>
+    <button class="btn btn-outline btn-sm" data-edit-task="${t.id}">Edit</button>
   </div>`;
 }
 
@@ -2504,6 +2542,12 @@ async function saveAccount(data) {
   return id;
 }
 
+async function reassignAccount(accountId, newRepId) {
+  const entry = { action: 'reassign_account', id: accountId, repId: newRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
 async function saveDeal(data) {
   const id = data.id || genId();
   const action = data.id ? 'update_deal' : 'create_deal';
@@ -2629,15 +2673,20 @@ async function submitTaskForm() {
   finally { btn.disabled = false; btn.textContent = 'Save Task'; }
 }
 
-function openNoteModal(accountId) {
+function openNoteModal(accountId, noteId = null) {
+  const note = noteId ? STATE.notes.find(n => n.id === noteId) : null;
   document.getElementById('note-account-id').value = accountId;
-  document.getElementById('note-text').value = '';
+  document.getElementById('note-id').value = noteId || '';
+  document.getElementById('note-text').value = note?.text || '';
   document.getElementById('note-err').textContent = '';
+  document.querySelector('#modal-note .modal-title').textContent = noteId ? 'Edit Note' : 'Add Note';
   openModal('modal-note');
 }
 
 async function saveNote(data) {
-  const entry = { action: 'create_note', id: genId(), accountId: data.accountId,
+  const isNew = !data.id;
+  const entry = { action: isNew ? 'create_note' : 'update_note',
+    id: data.id || genId(), accountId: data.accountId,
     repId: currentRepId, text: data.text, timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   applyLogs([entry]);
@@ -2651,13 +2700,14 @@ async function deleteNote(id) {
 
 async function submitNoteForm() {
   const accountId = document.getElementById('note-account-id').value;
+  const noteId = document.getElementById('note-id').value;
   const text = document.getElementById('note-text').value.trim();
   const err = document.getElementById('note-err');
   if (!text) { err.textContent = 'Note text is required.'; return; }
   const btn = document.getElementById('note-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await saveNote({ accountId, text });
+    await saveNote({ id: noteId || null, accountId, text });
     closeModal('modal-note');
     toast('Note saved.');
     if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
