@@ -3068,15 +3068,15 @@
       // to commit, so misclicks are easy to recover from.
       const rightInput = isLifecycleless
         ? `<div style="display:flex;flex-direction:column;gap:2px;align-items:stretch">
-             <input class="stock-input" type="number" min="0" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" placeholder="0" title="On hand">
+             <input class="stock-input" type="number" min="0" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" data-initial-value="${onHandDisplay}" placeholder="0" title="On hand">
              <button type="button" data-stock-zero data-zero-sku="${esc(sku)}" style="background:none;border:none;font:500 10px 'Manrope',sans-serif;color:var(--gray-3);cursor:pointer;padding:0;line-height:1.2" title="${appLang === 'es' ? 'Poner en cero (no guarda)' : 'Set to zero (does not save)'}">↺ ${appLang === 'es' ? 'cero' : 'zero'}</button>
            </div>`
-        : `<input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" placeholder="0">`;
+        : `<input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" data-initial-value="${frozenDisplay}" placeholder="0">`;
       return `<div class="stock-row">
         <div><span class="stock-sku">${esc(skuDisplayName(sku))}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
         ${(isFohSku || isLifecycleless)
           ? `<span class="stock-na">—</span>`
-          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" placeholder="0">`}
+          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" data-initial-value="${doughDisplay}" placeholder="0">`}
         ${rightInput}
       </div>`;
     }).join('');
@@ -4943,7 +4943,8 @@
   // fires and rebuilds the dough section back to 0.
   const _isInputBusy = () =>
     document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit, [data-foh-transfer-sheets]')
-    || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null);
+    || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null)
+    || [...document.querySelectorAll('[data-stock-section][data-initial-value]')].some(inp => inp.value !== inp.dataset.initialValue);
 
   // Track when the current worker session started so we don't toast diffs
   // accumulated before they sat down (first refresh after page load is a
