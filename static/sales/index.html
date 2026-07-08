@@ -628,6 +628,31 @@ textarea{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<div class="modal-backdrop" id="modal-contact">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-contact-title">Add Contact</div>
+      <button class="modal-close" data-close="modal-contact">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="contact-account-id">
+      <div class="form-row">
+        <div class="form-group"><label>Name *</label><input id="contact-name" placeholder="Jane Smith"></div>
+        <div class="form-group"><label>Title</label><input id="contact-title" placeholder="Purchasing Manager"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Phone</label><input id="contact-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label>Email</label><input id="contact-email" type="email" placeholder="jane@example.com"></div>
+      </div>
+      <div class="modal-err" id="contact-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-contact">Cancel</button>
+      <button class="btn btn-red" id="contact-save-btn">Save Contact</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-order">
   <div class="modal">
     <div class="modal-header">
@@ -819,7 +844,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '' };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '' };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -831,6 +856,7 @@ let currentReceiptsTab = 'receipts';
 let currentNoteId = null;
 let currentTaskId = null;
 let currentLocationId = null;
+let currentContactId = null;
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const genId = () => Math.random().toString(36).slice(2, 10);
@@ -1035,6 +1061,13 @@ function applyLogs(logs) {
       if (i >= 0) STATE.notes[i] = { ...STATE.notes[i], ...row };
     } else if (action === 'delete_note') {
       STATE.notes = STATE.notes.filter(n => n.id !== row.id);
+    } else if (action === 'create_contact') {
+      if (!STATE.contacts.find(c => c.id === row.id)) STATE.contacts.push(row);
+    } else if (action === 'update_contact') {
+      const i = STATE.contacts.findIndex(c => c.id === row.id);
+      if (i >= 0) STATE.contacts[i] = { ...STATE.contacts[i], ...row };
+    } else if (action === 'delete_contact') {
+      STATE.contacts = STATE.contacts.filter(c => c.id !== row.id);
     } else if (action === 'create_location') {
       if (!STATE.locations.find(l => l.id === row.id)) STATE.locations.push(row);
     } else if (action === 'update_location') {
@@ -1416,6 +1449,36 @@ function renderDetailTab(tab, id, a, m, deal) {
         </div>
       </div>
       ${(() => {
+        const acctContacts = STATE.contacts.filter(c => c.accountId === id).sort((a,b) => a.timeStamp.localeCompare(b.timeStamp));
+        const canEdit = currentRepId === 'admin' || (STATE.accounts.get(id)?.repId || 'admin') === currentRepId;
+        const contactRows = acctContacts.map(c => `
+          <div class="comm-row">
+            <div class="comm-body" style="flex:1">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-weight:700;color:var(--text1)">${esc(c.name)}</span>
+                ${c.title ? `<span style="font-size:12px;color:var(--gray-3)">${esc(c.title)}</span>` : ''}
+              </div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:2px;font-size:12px;color:var(--gray-3)">
+                ${c.phone ? `<span>${esc(c.phone)}</span>` : ''}
+                ${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--red)">${esc(c.email)}</a>` : ''}
+              </div>
+            </div>
+            ${canEdit ? `<div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn btn-outline btn-sm" data-edit-contact="${c.id}" data-edit-contact-account="${id}">Edit</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red)" data-delete-contact="${c.id}">✕</button>
+            </div>` : ''}
+          </div>`).join('');
+        return `<div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            Contacts
+            ${canEdit ? `<button class="btn btn-red btn-sm" data-add-contact="${id}">+ Add Contact</button>` : ''}
+          </div>
+          <div class="card-body" style="padding:0">
+            ${contactRows || '<div class="empty" style="padding:20px">No additional contacts.</div>'}
+          </div>
+        </div>`;
+      })()}
+      ${(() => {
         const acctNotes = STATE.notes.filter(n => n.accountId === id).sort((a,b) => b.timeStamp.localeCompare(a.timeStamp));
         const isAdmin = currentRepId === 'admin';
         const legacyNote = a.notes ? `<div class="comm-row"><div class="comm-body" style="flex:1"><div class="comm-date" style="color:var(--gray-3);font-style:italic">Legacy note</div><div class="comm-summary" style="white-space:pre-wrap">${esc(a.notes)}</div></div></div>` : '';
@@ -1555,6 +1618,14 @@ function bindDetailTabActions(id) {
     if (!confirm('Delete this note?')) return;
     await deleteNote(btn.dataset.deleteNote);
     toast('Note deleted.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  }));
+  document.querySelectorAll('[data-add-contact]').forEach(btn => btn.addEventListener('click', () => openContactModal(btn.dataset.addContact)));
+  document.querySelectorAll('[data-edit-contact]').forEach(btn => btn.addEventListener('click', () => openContactModal(btn.dataset.editContactAccount, btn.dataset.editContact)));
+  document.querySelectorAll('[data-delete-contact]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this contact?')) return;
+    await deleteContact(btn.dataset.deleteContact);
+    toast('Contact deleted.');
     if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
   }));
   document.querySelectorAll('[data-add-location]').forEach(btn => btn.addEventListener('click', () => openLocationModal(btn.dataset.addLocation)));
@@ -2864,6 +2935,54 @@ async function submitLocationForm() {
   finally { btn.disabled = false; btn.textContent = 'Save Location'; }
 }
 
+function openContactModal(accountId, contactId = null) {
+  currentContactId = contactId || null;
+  const c = contactId ? STATE.contacts.find(c => c.id === contactId) : null;
+  document.getElementById('contact-account-id').value = accountId;
+  document.getElementById('contact-name').value = c?.name || '';
+  document.getElementById('contact-title').value = c?.title || '';
+  document.getElementById('contact-phone').value = c?.phone || '';
+  document.getElementById('contact-email').value = c?.email || '';
+  document.getElementById('contact-err').textContent = '';
+  document.getElementById('modal-contact-title').textContent = contactId ? 'Edit Contact' : 'Add Contact';
+  openModal('modal-contact');
+}
+
+async function saveContact(data) {
+  const isNew = !data.id;
+  const entry = { action: isNew ? 'create_contact' : 'update_contact',
+    id: data.id || genId(), accountId: data.accountId,
+    name: data.name, title: data.title || '', phone: data.phone || '', email: data.email || '',
+    repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function deleteContact(id) {
+  const entry = { action: 'delete_contact', id, repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function submitContactForm() {
+  const accountId = document.getElementById('contact-account-id').value;
+  const name = document.getElementById('contact-name').value.trim();
+  const err = document.getElementById('contact-err');
+  if (!name) { err.textContent = 'Name is required.'; return; }
+  const btn = document.getElementById('contact-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await saveContact({ id: currentContactId, accountId, name,
+      title: document.getElementById('contact-title').value.trim(),
+      phone: document.getElementById('contact-phone').value.trim(),
+      email: document.getElementById('contact-email').value.trim() });
+    closeModal('modal-contact');
+    toast('Contact saved.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Contact'; }
+}
+
 async function submitNoteForm() {
   const accountId = document.getElementById('note-account-id').value;
   const text = document.getElementById('note-text').value.trim();
@@ -3033,6 +3152,7 @@ function bindAll() {
   document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
   document.getElementById('note-save-btn').addEventListener('click', submitNoteForm);
   document.getElementById('location-save-btn').addEventListener('click', submitLocationForm);
+  document.getElementById('contact-save-btn').addEventListener('click', submitContactForm);
 
 }
 
