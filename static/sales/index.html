@@ -973,6 +973,8 @@ function applyLogs(logs) {
     } else if (action === 'update_account') {
       const existing = STATE.accounts.get(row.id) || {};
       STATE.accounts.set(row.id, { ...existing, ...row, repId: existing.repId || row.repId || 'admin' });
+    } else if (action === 'delete_account') {
+      STATE.accounts.delete(row.id);
     } else if (action === 'create_deal' || action === 'update_deal') {
       STATE.deals.set(row.id, { ...(STATE.deals.get(row.id) || {}), ...row });
     } else if (action === 'create_task' || action === 'update_task') {
@@ -1264,7 +1266,7 @@ function renderAccounts() {
 
   document.querySelectorAll('.clickable[data-account-id]').forEach(row => {
     row.addEventListener('click', e => {
-      if (e.target.closest('button')) return;
+      if (e.target.closest('button, select')) return;
       navigate('account-detail', { id: row.dataset.accountId });
     });
   });
@@ -1317,6 +1319,7 @@ function renderAccountDetail(id) {
         <button class="btn btn-outline btn-sm" id="det-comm-btn">Log Contact</button>
         <button class="btn btn-red btn-sm" id="det-order-btn">+ Order</button>
         <button class="btn btn-outline btn-sm" id="det-sample-btn">+ Sample</button>
+        ${canEdit ? `<button class="btn btn-outline btn-sm" id="det-delete-btn" style="color:var(--red);border-color:var(--red)">Delete</button>` : ''}
       </div>
     </div>
     <div class="detail-tabs">
@@ -1329,6 +1332,14 @@ function renderAccountDetail(id) {
   document.getElementById('det-comm-btn').addEventListener('click', () => openCommModal(id));
   document.getElementById('det-order-btn').addEventListener('click', () => openOrderModal(id));
   document.getElementById('det-sample-btn').addEventListener('click', () => openSampleModal(id));
+  if (canEdit) document.getElementById('det-delete-btn')?.addEventListener('click', async () => {
+    if (!confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
+    const entry = { action: 'delete_account', id, repId: currentRepId, timeStamp: new Date().toISOString() };
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
+    toast('Account deleted.');
+    navigate('accounts');
+  });
   document.querySelectorAll('.detail-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       currentDetailTab = tab.dataset.tab;
