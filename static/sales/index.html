@@ -2087,8 +2087,9 @@ function openMileageModal(id = null) {
 async function saveReceipt(data) {
   const isNew = !data.id;
   const id = data.id || genId();
+  const existingRepId = !isNew ? STATE.receipts.find(r => r.id === id)?.repId : null;
   const entry = { action: isNew ? 'create_receipt' : 'update_receipt',
-    id, repId: data.targetRepId || currentRepId, vendor: data.vendor, date: data.date,
+    id, repId: data.targetRepId || existingRepId || currentRepId, vendor: data.vendor, date: data.date,
     amount: String(data.amount), category: data.category, description: data.description || '',
     status: data.status || 'pending', hasPhoto: data.hasPhoto || false,
     timeStamp: new Date().toISOString() };
@@ -2105,8 +2106,9 @@ async function saveMileage(data) {
   const id = data.id || genId();
   const rate = STATE.mileageRate || '';
   const reimbursement = rate ? (parseFloat(data.miles) * parseFloat(rate)).toFixed(2) : '0.00';
+  const existingRepId = !isNew ? STATE.mileage.find(m => m.id === id)?.repId : null;
   const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
-    id, repId: data.targetRepId || currentRepId, date: data.date, origin: data.origin,
+    id, repId: data.targetRepId || existingRepId || currentRepId, date: data.date, origin: data.origin,
     destination: data.destination, miles: String(data.miles), purpose: data.purpose || '',
     rate, reimbursement, status: data.status || 'pending',
     timeStamp: new Date().toISOString() };
