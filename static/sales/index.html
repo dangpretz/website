@@ -377,9 +377,6 @@ textarea{resize:vertical;min-height:70px}
         <input type="search" class="search-input" id="acct-search" placeholder="Search accounts…">
         <select class="filter-select" id="acct-seg-filter">
           <option value="">All Segments</option>
-          <option value="restaurant">Restaurant</option>
-          <option value="institution">Institution</option>
-          <option value="distributor">Distributor</option>
         </select>
         <select class="filter-select" id="acct-status-filter">
           <option value="">All Statuses</option>
@@ -405,9 +402,6 @@ textarea{resize:vertical;min-height:70px}
       <div class="search-row">
         <select class="filter-select" id="pipe-seg-filter">
           <option value="">All Segments</option>
-          <option value="restaurant">Restaurant</option>
-          <option value="institution">Institution</option>
-          <option value="distributor">Distributor</option>
         </select>
         <select class="filter-select" id="pipe-rep-filter" style="display:none">
           <option value="">All Reps</option>
@@ -487,9 +481,6 @@ textarea{resize:vertical;min-height:70px}
         <div class="form-group"><label>Segment *</label>
           <select id="acct-segment">
             <option value="">Select…</option>
-            <option value="restaurant">Restaurant / Food Service</option>
-            <option value="institution">Institution</option>
-            <option value="distributor">Distributor / Reseller</option>
           </select>
         </div>
       </div>
@@ -609,7 +600,6 @@ textarea{resize:vertical;min-height:70px}
     </div>
     <div class="modal-body">
       <input type="hidden" id="note-account-id">
-      <input type="hidden" id="note-id">
       <div class="form-group"><label>Note *</label><textarea id="note-text" placeholder="Enter note…" rows="4"></textarea></div>
       <div class="modal-err" id="note-err"></div>
     </div>
@@ -811,7 +801,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], repRegistry: [] };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], repRegistry: [], segments: ['restaurant','institution','distributor'] };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -820,6 +810,7 @@ let currentRepId = null; // 'rep1' | 'rep2' | 'admin'
 let acctViewMode = 'mine'; // 'mine' | 'all'
 let pendingDragDeal = null;
 let currentReceiptsTab = 'receipts';
+let currentNoteId = null;
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const genId = () => Math.random().toString(36).slice(2, 10);
@@ -831,6 +822,10 @@ const daysAgo = s => { if (!s) return Infinity; const ms = new Date(today()) - n
 const daysUntil = s => { if (!s) return Infinity; const ms = new Date(s) - new Date(today()); return Math.floor(ms / 86400000); };
 const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 const badge = (val, cls) => `<span class="badge badge-${esc(cls||val)}">${esc(val)}</span>`;
+const getSegments = () => STATE.segments;
+const SEG_COLORS = ['#b91c1c','#1d4ed8','#065f46','#7c3aed','#b45309','#0e7490','#be185d','#0369a1'];
+const segBarColor = s => { const i = getSegments().indexOf(s); return SEG_COLORS[i >= 0 ? i % SEG_COLORS.length : 0]; };
+const segOptions = (blank = 'All Segments') => `<option value="">${esc(blank)}</option>` + getSegments().map(s => `<option value="${esc(s)}">${esc(capitalize(s))}</option>`).join('');
 const segBadge = s => badge(capitalize(s), s);
 const stageBadge = s => badge(capitalize(s?.replace('-',' ')), s);
 const statusBadge = s => badge(capitalize(s), s);
@@ -1018,6 +1013,8 @@ function applyLogs(logs) {
       if (i >= 0) STATE.notes[i] = { ...STATE.notes[i], ...row };
     } else if (action === 'delete_note') {
       STATE.notes = STATE.notes.filter(n => n.id !== row.id);
+    } else if (action === 'set_segments') {
+      if (Array.isArray(row.segments)) STATE.segments = row.segments;
     } else if (action === 'set_rep') {
       const idx = STATE.repRegistry.findIndex(r => r.id === row.id);
       const rec = { id: row.id, label: row.label || row.id, email: row.email || '', pwdHash: row.pwdHash || '' };
@@ -1662,8 +1659,9 @@ function renderRevenueReport() {
   });
   const rows = [...accountMap.values()].sort((a,b) => b.revenue - a.revenue);
 
-  const segRevenue = {restaurant:0, institution:0, distributor:0};
-  rows.forEach(r => { if (segRevenue[r.acct.segment] !== undefined) segRevenue[r.acct.segment] += r.revenue; });
+  const segs = getSegments();
+  const segRevenue = Object.fromEntries(segs.map(s => [s, 0]));
+  rows.forEach(r => { if (r.acct.segment in segRevenue) segRevenue[r.acct.segment] += r.revenue; });
   const maxSeg = Math.max(...Object.values(segRevenue), 1);
 
   document.getElementById('report-content').innerHTML = `
@@ -1671,20 +1669,17 @@ function renderRevenueReport() {
       <label style="text-transform:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">From <input type="date" id="rev-from" value="${dfrom}" style="width:auto;padding:6px 10px"></label>
       <label style="text-transform:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">To <input type="date" id="rev-to" value="${dto}" style="width:auto;padding:6px 10px"></label>
       <select class="filter-select" id="rev-seg" style="padding:7px 12px">
-        <option value="">All Segments</option>
-        <option value="restaurant">Restaurant</option>
-        <option value="institution">Institution</option>
-        <option value="distributor">Distributor</option>
+        ${segOptions()}
       </select>
       <button class="btn btn-red btn-sm" id="rev-filter-btn">Apply</button>
       <button class="btn btn-outline btn-sm" id="rev-export-btn" style="margin-left:auto">↓ Export CSV</button>
     </div>
     <div class="bar-chart-wrap">
       <div class="bar-chart-title">Revenue by Segment</div>
-      ${['restaurant','institution','distributor'].map(s => `
+      ${segs.map(s => `
         <div class="bar-row">
-          <div class="bar-label">${capitalize(s)}</div>
-          <div class="bar-track"><div class="bar-fill ${s}" style="width:${(segRevenue[s]/maxSeg*100).toFixed(1)}%">${segRevenue[s] > 0 ? fmt$(segRevenue[s]) : ''}</div></div>
+          <div class="bar-label">${esc(capitalize(s))}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(segRevenue[s]/maxSeg*100).toFixed(1)}%;background:${segBarColor(s)}">${segRevenue[s] > 0 ? fmt$(segRevenue[s]) : ''}</div></div>
           <div class="bar-val">${fmt$(segRevenue[s])}</div>
         </div>`).join('')}
     </div>
@@ -2251,6 +2246,21 @@ function renderSettings() {
         <div class="form-hint">IRS standard rate for 2026 is $0.70/mile.</div>
       </div>
       <button class="btn btn-red btn-sm" id="mileage-rate-save">Save Rate</button>
+    </div>
+    <div class="settings-section">
+      <h2>Account Segments</h2>
+      <div class="form-hint" style="margin-bottom:12px">Segments appear in account forms, filters, and reports. Changes apply to all users.</div>
+      <div id="seg-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        ${getSegments().map(s => `<div style="display:flex;align-items:center;gap:6px;background:var(--gray-1);border:1px solid var(--border);border-radius:20px;padding:4px 10px 4px 12px;font-size:13px;font-weight:600">
+          ${esc(capitalize(s))}
+          <button style="background:none;border:none;cursor:pointer;color:var(--gray-3);font-size:14px;line-height:1;padding:0" data-remove-seg="${esc(s)}" title="Remove">✕</button>
+        </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;max-width:340px">
+        <input type="text" id="new-seg-input" placeholder="New segment name…" style="flex:1">
+        <button class="btn btn-red btn-sm" id="add-seg-btn">Add</button>
+      </div>
+      <div class="modal-err" id="seg-err" style="margin-top:8px"></div>
     </div>` : ''}
     <div class="settings-section">
       <h2>About</h2>
@@ -2285,6 +2295,30 @@ function renderSettings() {
     const v = document.getElementById('mileage-rate-input').value;
     if (v && Number(v) > 0) { localStorage.setItem('crm-mileage-rate', Number(v).toFixed(3)); toast('Mileage rate saved.'); }
   });
+
+  const saveSegments = async (newList) => {
+    const entry = { action: 'set_segments', segments: newList, repId: currentRepId, timeStamp: new Date().toISOString() };
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
+    populateSegmentDropdowns();
+    renderSettings();
+  };
+
+  document.getElementById('add-seg-btn')?.addEventListener('click', async () => {
+    const input = document.getElementById('new-seg-input');
+    const val = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+    const err = document.getElementById('seg-err');
+    if (!val) { err.textContent = 'Enter a segment name.'; return; }
+    if (getSegments().includes(val)) { err.textContent = 'Segment already exists.'; return; }
+    await saveSegments([...getSegments(), val]);
+  });
+
+  document.querySelectorAll('[data-remove-seg]').forEach(btn => btn.addEventListener('click', async () => {
+    const seg = btn.dataset.removeSeg;
+    const inUse = [...STATE.accounts.values()].some(a => a.segment === seg);
+    if (inUse && !confirm(`"${capitalize(seg)}" is used by existing accounts. Remove the segment anyway? Accounts will keep their current segment value.`)) return;
+    await saveSegments(getSegments().filter(s => s !== seg));
+  }));
 
   document.getElementById('save-label-btn')?.addEventListener('click', async () => {
     const val = document.getElementById('rep-label-input')?.value.trim();
@@ -2449,6 +2483,9 @@ function openAccountModal(id = null) {
   document.getElementById('modal-account-title').textContent = isEdit ? 'Edit Account' : 'New Account';
   document.getElementById('acct-id').value = id || '';
   document.getElementById('acct-err').textContent = '';
+  // Refresh segment options in case they changed since init
+  const acctSegEl = document.getElementById('acct-segment');
+  acctSegEl.innerHTML = `<option value="">Select…</option>` + getSegments().map(s => `<option value="${esc(s)}">${esc(capitalize(s))}</option>`).join('');
   if (isEdit) {
     const a = STATE.accounts.get(id);
     if (!a) return;
@@ -2674,9 +2711,9 @@ async function submitTaskForm() {
 }
 
 function openNoteModal(accountId, noteId = null) {
+  currentNoteId = noteId || null;
   const note = noteId ? STATE.notes.find(n => n.id === noteId) : null;
   document.getElementById('note-account-id').value = accountId;
-  document.getElementById('note-id').value = noteId || '';
   document.getElementById('note-text').value = note?.text || '';
   document.getElementById('note-err').textContent = '';
   document.querySelector('#modal-note .modal-title').textContent = noteId ? 'Edit Note' : 'Add Note';
@@ -2700,14 +2737,13 @@ async function deleteNote(id) {
 
 async function submitNoteForm() {
   const accountId = document.getElementById('note-account-id').value;
-  const noteId = document.getElementById('note-id').value;
   const text = document.getElementById('note-text').value.trim();
   const err = document.getElementById('note-err');
   if (!text) { err.textContent = 'Note text is required.'; return; }
   const btn = document.getElementById('note-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await saveNote({ id: noteId || null, accountId, text });
+    await saveNote({ id: currentNoteId, accountId, text });
     closeModal('modal-note');
     toast('Note saved.');
     if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
@@ -2871,11 +2907,22 @@ function bindAll() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+function populateSegmentDropdowns() {
+  const opts = segOptions();
+  ['acct-seg-filter','pipe-seg-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+  const acctSeg = document.getElementById('acct-segment');
+  if (acctSeg) acctSeg.innerHTML = `<option value="">Select…</option>` + getSegments().map(s => `<option value="${esc(s)}">${esc(capitalize(s))}</option>`).join('');
+}
+
 async function init() {
   ensureHashes();
   bindAll();
   // Pre-load log so STATE.repRegistry is populated before login credentials are checked
   await loadData();
+  populateSegmentDropdowns();
   const session = await checkAuth();
   if (session) {
     currentRepId = session.repId;
