@@ -819,7 +819,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], repRegistry: [], segments: ['restaurant','institution','distributor'] };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '' };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -1042,6 +1042,8 @@ function applyLogs(logs) {
       if (i >= 0) STATE.locations[i] = { ...STATE.locations[i], ...row };
     } else if (action === 'delete_location') {
       STATE.locations = STATE.locations.filter(l => l.id !== row.id);
+    } else if (action === 'set_mileage_rate') {
+      if (row.rate) STATE.mileageRate = row.rate;
     } else if (action === 'set_segments') {
       if (Array.isArray(row.segments)) STATE.segments = row.segments;
     } else if (action === 'set_rep') {
@@ -2060,7 +2062,7 @@ function openReceiptModal(id = null) {
 
 function openMileageModal(id = null) {
   const m = id ? STATE.mileage.find(m => m.id === id) : null;
-  const rate = localStorage.getItem('crm-mileage-rate');
+  const rate = STATE.mileageRate;
   document.getElementById('modal-mileage-title').textContent = m ? 'Edit Trip' : 'Log Trip';
   document.getElementById('mileage-id').value = id || '';
   document.getElementById('mileage-existing-status').value = m?.status || 'pending';
@@ -2101,7 +2103,7 @@ async function saveReceipt(data) {
 async function saveMileage(data) {
   const isNew = !data.id;
   const id = data.id || genId();
-  const rate = localStorage.getItem('crm-mileage-rate') || '';
+  const rate = STATE.mileageRate || '';
   const reimbursement = rate ? (parseFloat(data.miles) * parseFloat(rate)).toFixed(2) : '0.00';
   const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
     id, repId: data.targetRepId || currentRepId, date: data.date, origin: data.origin,
@@ -2312,7 +2314,7 @@ function renderSettings() {
       <h2>Reimbursements</h2>
       <div class="form-group" style="max-width:240px">
         <label>Mileage Rate ($/mile)</label>
-        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(localStorage.getItem('crm-mileage-rate') || '')}">
+        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(STATE.mileageRate || '')}">
         <div class="form-hint">IRS standard rate for 2026 is $0.70/mile.</div>
       </div>
       <button class="btn btn-red btn-sm" id="mileage-rate-save">Save Rate</button>
@@ -2361,9 +2363,14 @@ function renderSettings() {
     }
   });
 
-  document.getElementById('mileage-rate-save')?.addEventListener('click', () => {
+  document.getElementById('mileage-rate-save')?.addEventListener('click', async () => {
     const v = document.getElementById('mileage-rate-input').value;
-    if (v && Number(v) > 0) { localStorage.setItem('crm-mileage-rate', Number(v).toFixed(3)); toast('Mileage rate saved.'); }
+    if (!v || Number(v) <= 0) return;
+    const rate = Number(v).toFixed(3);
+    const entry = { action: 'set_mileage_rate', rate, repId: currentRepId, timeStamp: new Date().toISOString() };
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
+    toast('Mileage rate saved.');
   });
 
   const saveSegments = async (newList) => {
@@ -3004,7 +3011,7 @@ function bindAll() {
 
   // Mileage live reimbursement preview
   document.getElementById('mileage-miles').addEventListener('input', e => {
-    const rate = parseFloat(localStorage.getItem('crm-mileage-rate') || '0');
+    const rate = parseFloat(STATE.mileageRate || '0');
     const miles = parseFloat(e.target.value) || 0;
     document.getElementById('mileage-reimb-preview').textContent = fmt$(miles * rate);
   });
