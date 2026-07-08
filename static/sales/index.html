@@ -609,6 +609,25 @@ textarea{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<div class="modal-backdrop" id="modal-location">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-location-title">Add Location</div>
+      <button class="modal-close" data-close="modal-location">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="location-account-id">
+      <div class="form-group"><label>Location Name *</label><input id="location-label" placeholder="e.g. Downtown, Westside, Warehouse…"></div>
+      <div class="form-group"><label>Address *</label><input id="location-address" placeholder="123 Main St, City, ST 00000"></div>
+      <div class="modal-err" id="location-err"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-location">Cancel</button>
+      <button class="btn btn-red" id="location-save-btn">Save Location</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-order">
   <div class="modal">
     <div class="modal-header">
@@ -800,7 +819,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], repRegistry: [], segments: ['restaurant','institution','distributor'] };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '' };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -811,6 +830,7 @@ let pendingDragDeal = null;
 let currentReceiptsTab = 'receipts';
 let currentNoteId = null;
 let currentTaskId = null;
+let currentLocationId = null;
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const genId = () => Math.random().toString(36).slice(2, 10);
@@ -1015,6 +1035,15 @@ function applyLogs(logs) {
       if (i >= 0) STATE.notes[i] = { ...STATE.notes[i], ...row };
     } else if (action === 'delete_note') {
       STATE.notes = STATE.notes.filter(n => n.id !== row.id);
+    } else if (action === 'create_location') {
+      if (!STATE.locations.find(l => l.id === row.id)) STATE.locations.push(row);
+    } else if (action === 'update_location') {
+      const i = STATE.locations.findIndex(l => l.id === row.id);
+      if (i >= 0) STATE.locations[i] = { ...STATE.locations[i], ...row };
+    } else if (action === 'delete_location') {
+      STATE.locations = STATE.locations.filter(l => l.id !== row.id);
+    } else if (action === 'set_mileage_rate') {
+      if (row.rate) STATE.mileageRate = row.rate;
     } else if (action === 'set_segments') {
       if (Array.isArray(row.segments)) STATE.segments = row.segments;
     } else if (action === 'set_rep') {
@@ -1411,6 +1440,30 @@ function renderDetailTab(tab, id, a, m, deal) {
           </div>
         </div>`;
       })()}
+      ${(() => {
+        const locs = STATE.locations.filter(l => l.accountId === id).sort((a,b) => a.timeStamp.localeCompare(b.timeStamp));
+        const canEdit = currentRepId === 'admin' || (STATE.accounts.get(id)?.repId || 'admin') === currentRepId;
+        const locRows = locs.map(l => `
+          <div class="comm-row">
+            <div class="comm-body" style="flex:1">
+              <div class="comm-date" style="font-weight:700;color:var(--text1)">${esc(l.label)}</div>
+              <div class="comm-summary">${esc(l.address)}</div>
+            </div>
+            ${canEdit ? `<div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn btn-outline btn-sm" data-edit-location="${l.id}" data-edit-location-account="${id}">Edit</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red)" data-delete-location="${l.id}">✕</button>
+            </div>` : ''}
+          </div>`).join('');
+        return `<div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            Locations
+            ${canEdit ? `<button class="btn btn-red btn-sm" data-add-location="${id}">+ Add Location</button>` : ''}
+          </div>
+          <div class="card-body" style="padding:0">
+            ${locRows || '<div class="empty" style="padding:20px">No additional locations.</div>'}
+          </div>
+        </div>`;
+      })()}
       `;
   }
   if (tab === 'communications') {
@@ -1502,6 +1555,14 @@ function bindDetailTabActions(id) {
     if (!confirm('Delete this note?')) return;
     await deleteNote(btn.dataset.deleteNote);
     toast('Note deleted.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  }));
+  document.querySelectorAll('[data-add-location]').forEach(btn => btn.addEventListener('click', () => openLocationModal(btn.dataset.addLocation)));
+  document.querySelectorAll('[data-edit-location]').forEach(btn => btn.addEventListener('click', () => openLocationModal(btn.dataset.editLocationAccount, btn.dataset.editLocation)));
+  document.querySelectorAll('[data-delete-location]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this location?')) return;
+    await deleteLocation(btn.dataset.deleteLocation);
+    toast('Location deleted.');
     if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
   }));
 }
@@ -2001,7 +2062,7 @@ function openReceiptModal(id = null) {
 
 function openMileageModal(id = null) {
   const m = id ? STATE.mileage.find(m => m.id === id) : null;
-  const rate = localStorage.getItem('crm-mileage-rate');
+  const rate = STATE.mileageRate;
   document.getElementById('modal-mileage-title').textContent = m ? 'Edit Trip' : 'Log Trip';
   document.getElementById('mileage-id').value = id || '';
   document.getElementById('mileage-existing-status').value = m?.status || 'pending';
@@ -2042,7 +2103,7 @@ async function saveReceipt(data) {
 async function saveMileage(data) {
   const isNew = !data.id;
   const id = data.id || genId();
-  const rate = localStorage.getItem('crm-mileage-rate') || '';
+  const rate = STATE.mileageRate || '';
   const reimbursement = rate ? (parseFloat(data.miles) * parseFloat(rate)).toFixed(2) : '0.00';
   const entry = { action: isNew ? 'create_mileage' : 'update_mileage',
     id, repId: data.targetRepId || currentRepId, date: data.date, origin: data.origin,
@@ -2253,7 +2314,7 @@ function renderSettings() {
       <h2>Reimbursements</h2>
       <div class="form-group" style="max-width:240px">
         <label>Mileage Rate ($/mile)</label>
-        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(localStorage.getItem('crm-mileage-rate') || '')}">
+        <input type="number" id="mileage-rate-input" step="0.001" min="0" value="${esc(STATE.mileageRate || '')}">
         <div class="form-hint">IRS standard rate for 2026 is $0.70/mile.</div>
       </div>
       <button class="btn btn-red btn-sm" id="mileage-rate-save">Save Rate</button>
@@ -2302,9 +2363,14 @@ function renderSettings() {
     }
   });
 
-  document.getElementById('mileage-rate-save')?.addEventListener('click', () => {
+  document.getElementById('mileage-rate-save')?.addEventListener('click', async () => {
     const v = document.getElementById('mileage-rate-input').value;
-    if (v && Number(v) > 0) { localStorage.setItem('crm-mileage-rate', Number(v).toFixed(3)); toast('Mileage rate saved.'); }
+    if (!v || Number(v) <= 0) return;
+    const rate = Number(v).toFixed(3);
+    const entry = { action: 'set_mileage_rate', rate, repId: currentRepId, timeStamp: new Date().toISOString() };
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
+    toast('Mileage rate saved.');
   });
 
   const saveSegments = async (newList) => {
@@ -2751,6 +2817,51 @@ async function deleteNote(id) {
   applyLogs([entry]);
 }
 
+function openLocationModal(accountId, locationId = null) {
+  currentLocationId = locationId || null;
+  const loc = locationId ? STATE.locations.find(l => l.id === locationId) : null;
+  document.getElementById('location-account-id').value = accountId;
+  document.getElementById('location-label').value = loc?.label || '';
+  document.getElementById('location-address').value = loc?.address || '';
+  document.getElementById('location-err').textContent = '';
+  document.getElementById('modal-location-title').textContent = locationId ? 'Edit Location' : 'Add Location';
+  openModal('modal-location');
+}
+
+async function saveLocation(data) {
+  const isNew = !data.id;
+  const entry = { action: isNew ? 'create_location' : 'update_location',
+    id: data.id || genId(), accountId: data.accountId,
+    label: data.label, address: data.address,
+    repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function deleteLocation(id) {
+  const entry = { action: 'delete_location', id, repId: currentRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+async function submitLocationForm() {
+  const accountId = document.getElementById('location-account-id').value;
+  const label = document.getElementById('location-label').value.trim();
+  const address = document.getElementById('location-address').value.trim();
+  const err = document.getElementById('location-err');
+  if (!label) { err.textContent = 'Location name is required.'; return; }
+  if (!address) { err.textContent = 'Address is required.'; return; }
+  const btn = document.getElementById('location-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await saveLocation({ id: currentLocationId, accountId, label, address });
+    closeModal('modal-location');
+    toast('Location saved.');
+    if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch(e) { err.textContent = 'Failed: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Save Location'; }
+}
+
 async function submitNoteForm() {
   const accountId = document.getElementById('note-account-id').value;
   const text = document.getElementById('note-text').value.trim();
@@ -2900,7 +3011,7 @@ function bindAll() {
 
   // Mileage live reimbursement preview
   document.getElementById('mileage-miles').addEventListener('input', e => {
-    const rate = parseFloat(localStorage.getItem('crm-mileage-rate') || '0');
+    const rate = parseFloat(STATE.mileageRate || '0');
     const miles = parseFloat(e.target.value) || 0;
     document.getElementById('mileage-reimb-preview').textContent = fmt$(miles * rate);
   });
@@ -2919,6 +3030,7 @@ function bindAll() {
   document.getElementById('receipt-save-btn').addEventListener('click', submitReceiptForm);
   document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
   document.getElementById('note-save-btn').addEventListener('click', submitNoteForm);
+  document.getElementById('location-save-btn').addEventListener('click', submitLocationForm);
 
 }
 
