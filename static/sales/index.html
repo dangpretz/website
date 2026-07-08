@@ -537,7 +537,6 @@ textarea{resize:vertical;min-height:70px}
       <button class="modal-close" data-close="modal-task">✕</button>
     </div>
     <div class="modal-body">
-      <input type="hidden" id="task-id">
       <input type="hidden" id="task-account-id">
       <div class="form-group"><label>Description *</label><input id="task-desc" placeholder="Call to follow up on proposal…"></div>
       <div class="form-row">
@@ -811,6 +810,7 @@ let acctViewMode = 'mine'; // 'mine' | 'all'
 let pendingDragDeal = null;
 let currentReceiptsTab = 'receipts';
 let currentNoteId = null;
+let currentTaskId = null;
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const genId = () => Math.random().toString(36).slice(2, 10);
@@ -2515,8 +2515,8 @@ function openDealModal(dealId = null, accountId = null) {
 }
 
 function openTaskModal(accountId = null, taskId = null) {
+  currentTaskId = taskId || null;
   const task = taskId ? STATE.tasks.get(taskId) : null;
-  document.getElementById('task-id').value = taskId || '';
   document.getElementById('task-account-id').value = accountId || task?.accountId || '';
   document.getElementById('task-desc').value = task?.description || '';
   document.getElementById('task-due').value = task?.dueDate || '';
@@ -2597,9 +2597,14 @@ async function saveDeal(data) {
 }
 
 async function saveTask(data) {
+  const isNew = !data.id;
   const id = data.id || genId();
-  const entry = { action:'create_task', id, accountId:data.accountId||'', description:data.description,
-    dueDate:data.dueDate, priority:data.priority, done:'false', repId:currentRepId,
+  const existing = STATE.tasks.get(id);
+  const entry = { action: isNew ? 'create_task' : 'update_task', id,
+    accountId: data.accountId||'', description: data.description,
+    dueDate: data.dueDate, priority: data.priority,
+    done: isNew ? 'false' : (existing?.done || 'false'),
+    repId: isNew ? currentRepId : (existing?.repId || currentRepId),
     timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   STATE.tasks.set(id, entry);
@@ -2701,9 +2706,9 @@ async function submitTaskForm() {
   const btn = document.getElementById('task-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await saveTask({ description:desc, dueDate:due, priority, accountId });
+    await saveTask({ id: currentTaskId, description:desc, dueDate:due, priority, accountId });
     closeModal('modal-task');
-    toast('Task created.');
+    toast(currentTaskId ? 'Task updated.' : 'Task created.');
     if (currentView === 'tasks') renderTasks();
     else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
   } catch(e) { err.textContent = 'Failed: ' + e.message; }
