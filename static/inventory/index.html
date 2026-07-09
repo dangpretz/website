@@ -127,6 +127,10 @@
     .inv-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     .inv-table { width: 100%; border-collapse: collapse; background: #fff; }
     .inv-table th { font: 700 11px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 2px solid #f0ece6; white-space: nowrap; }
+    .inv-table th[data-col] { cursor: pointer; user-select: none; }
+    .inv-table th[data-col]:hover { color: #555; }
+    .inv-table th[data-col].sort-active { color: #C41E1E; }
+    .sort-arrow { margin-left: 4px; opacity: 0.6; font-style: normal; }
     .inv-table td { font: 400 14px 'Manrope', sans-serif; color: #1A1A1A; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
     .inv-table tr:last-child td { border-bottom: none; }
     .inv-table tr.low-stock { background: #fff8f8; }
@@ -283,13 +287,13 @@
         <table class="inv-table">
           <thead>
             <tr>
-              <th>Product</th>
-              <th>Unit</th>
-              <th>Stock</th>
-              <th>PAR</th>
-              <th>Status</th>
-              <th>Last Received</th>
-              <th>Last Used</th>
+              <th data-col="name">Product</th>
+              <th data-col="unit">Unit</th>
+              <th data-col="stock">Stock</th>
+              <th data-col="par">PAR</th>
+              <th data-col="status">Status</th>
+              <th data-col="lastReceived">Last Received</th>
+              <th data-col="lastUsed">Last Used</th>
               <th class="col-actions"></th>
             </tr>
           </thead>
@@ -699,6 +703,8 @@
     let inventoryMap = new Map();
     let showLowOnly  = false;
     let filterQuery  = '';
+    let sortCol = 'name';
+    let sortDir = 'asc';
 
     // ── Load data ─────────────────────────────────────────────────────────────
     async function loadData() {
@@ -733,13 +739,38 @@
 
       let rows = Array.from(inventoryMap.values());
 
-      // Sort: low-stock first, then alphabetical
+      // Sort by active column
       rows.sort((a, b) => {
-        const aLow = a.par !== null && a.stock < a.par;
-        const bLow = b.par !== null && b.stock < b.par;
-        if (aLow && !bLow) return -1;
-        if (!aLow && bLow) return 1;
-        return a.productName.localeCompare(b.productName);
+        let av, bv;
+        switch (sortCol) {
+          case 'name':         av = a.productName; bv = b.productName; break;
+          case 'unit':         av = parsePackSize(a.packSize).innerUnitLabel; bv = parsePackSize(b.packSize).innerUnitLabel; break;
+          case 'stock':        av = a.stock; bv = b.stock; break;
+          case 'par':          av = a.par ?? -Infinity; bv = b.par ?? -Infinity; break;
+          case 'status': {
+            const rank = (r) => r.par === null ? 1 : r.stock < r.par ? 2 : 0;
+            av = rank(a); bv = rank(b); break;
+          }
+          case 'lastReceived': av = a.lastReceived ?? ''; bv = b.lastReceived ?? ''; break;
+          case 'lastUsed':     av = a.lastUsed ?? ''; bv = b.lastUsed ?? ''; break;
+          default:             av = a.productName; bv = b.productName;
+        }
+        let cmp = typeof av === 'string' ? av.localeCompare(bv) : (av < bv ? -1 : av > bv ? 1 : 0);
+        if (sortDir === 'desc') cmp = -cmp;
+        return cmp || a.productName.localeCompare(b.productName);
+      });
+
+      // Update header indicators
+      document.querySelectorAll('.inv-table th[data-col]').forEach((th) => {
+        th.classList.toggle('sort-active', th.dataset.col === sortCol);
+        const arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.remove();
+        if (th.dataset.col === sortCol) {
+          const span = document.createElement('span');
+          span.className = 'sort-arrow';
+          span.textContent = sortDir === 'asc' ? '▲' : '▼';
+          th.appendChild(span);
+        }
       });
 
       if (showLowOnly) {
@@ -984,6 +1015,19 @@
       const btn = document.getElementById('refresh-btn');
       btn.disabled = true;
       loadData().finally(() => { btn.disabled = false; });
+    });
+
+    document.querySelectorAll('.inv-table th[data-col]').forEach((th) => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortCol = col;
+          sortDir = col === 'lastReceived' || col === 'lastUsed' ? 'desc' : 'asc';
+        }
+        renderTable();
+      });
     });
 
     // ── Product selector (reusable) ───────────────────────────────────────────
