@@ -1861,9 +1861,9 @@
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
-      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">📝${row.deliveryNote ? ' Note' : ''}</button>`;
+      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">Note</button>`;
       const deliveryNoteHtml = row.deliveryNote
-        ? `<div class="delivery-note-display">📝 ${escapeHtml(row.deliveryNote)}</div>`
+        ? `<div class="delivery-note-display">${escapeHtml(row.deliveryNote)}</div>`
         : '';
       return `
         <div class="delivery-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
@@ -1914,8 +1914,8 @@
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
       const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
-      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">📝${row.deliveryNote ? ' Note' : ''}</button>`;
-      const deliveryNoteHtml = row.deliveryNote ? `<div class="delivery-note-display">📝 ${escapeHtml(row.deliveryNote)}</div>` : '';
+      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">Note</button>`;
+      const deliveryNoteHtml = row.deliveryNote ? `<div class="delivery-note-display">${escapeHtml(row.deliveryNote)}</div>` : '';
       const contactHtml = renderContactLine(row);
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
@@ -2290,7 +2290,7 @@
       const customer = row.customer || row.location || '—';
       let itemsHtml = '';
       try { const items = JSON.parse(row.lineItems || '[]'); itemsHtml = items.map((it) => `${escapeHtml(it.sku)} x${it.quantity}`).join(', '); } catch (_) { itemsHtml = '—'; }
-      summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>${row.deliveryNote ? `<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:13px;color:#92400e">📝 ${escapeHtml(row.deliveryNote)}</div>` : ''}`;
+      summary.innerHTML = `<strong>${escapeHtml(customer)}</strong><div class="summary-items">${itemsHtml}</div>${row.deliveryNote ? `<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:13px;color:#92400e">${escapeHtml(row.deliveryNote)}</div>` : ''}`;
       document.getElementById('confirm-receiver').value = row.customer || row.location || '';
       document.getElementById('confirm-note').value = '';
       document.getElementById('confirm-error').hidden = true;
