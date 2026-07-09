@@ -271,7 +271,7 @@
     }
     .day-column {
       background: #2a2a2a; border-radius: 8px; padding: 10px 8px; min-height: 180px;
-      cursor: pointer; transition: background 0.15s;
+      cursor: pointer; transition: background 0.15s; min-width: 0; overflow: hidden;
     }
     .day-column:hover { background: #333; }
     .day-column.today { background: #333; border-top: 3px solid #C41E1E; }
@@ -633,19 +633,19 @@
     .scan-btn {
       padding: 4px 10px; font: 700 10px 'Manrope', sans-serif; color: #f0ad4e;
       background: none; border: 1px solid #f0ad4e; border-radius: 3px; cursor: pointer;
-      transition: background 0.2s, color 0.2s; min-height: 44px; min-width: 44px;
+      transition: background 0.2s, color 0.2s; min-height: 44px;
       display: inline-flex; align-items: center; gap: 4px;
     }
     .scan-btn:hover { background: #f0ad4e; color: #1A1A1A; }
     .note-btn {
       padding: 4px 10px; font: 700 10px 'Manrope', sans-serif; color: #6366f1;
       background: none; border: 1px solid #6366f1; border-radius: 3px; cursor: pointer;
-      transition: background 0.2s, color 0.2s; min-height: 44px; min-width: 44px;
+      transition: background 0.2s, color 0.2s; min-height: 44px;
       display: inline-flex; align-items: center; gap: 4px;
     }
     .note-btn:hover { background: #6366f1; color: #fff; }
     .delivery-note-display {
-      font: 400 12px 'Manrope', sans-serif; color: #4338ca;
+      font: 400 12px 'Manrope', sans-serif; color: #4338ca; word-break: break-word;
       background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 4px;
       padding: 6px 10px; margin: 4px 0;
     }
