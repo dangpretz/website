@@ -150,10 +150,8 @@
     .stock-neutral { color: #1A1A1A; font-weight: 400; }
 
     /* Stock inline adjustment */
-    .stock-cell { white-space: nowrap; }
+    .stock-cell { white-space: nowrap; cursor: pointer; }
     .stock-need { display: block; font: 600 11px 'Manrope', sans-serif; color: #C41E1E; margin-top: 2px; }
-    .btn-stock-adj { background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; padding: 2px 4px; line-height: 1; transition: color .15s; vertical-align: middle; }
-    .btn-stock-adj:hover { color: #C41E1E; }
     .stock-adj-wrap { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
     .stock-adj-wrap input { width: 60px; font: 400 13px 'Manrope', sans-serif; padding: 4px 7px; border: 2px solid #888; border-radius: 5px; outline: none; color: #1A1A1A; background: #fff; -moz-appearance: textfield; text-align: right; }
     .stock-adj-wrap input:focus { border-color: #1A1A1A; }
@@ -228,6 +226,7 @@
 
     /* ── Mobile ── */
     @media (max-width: 680px) {
+      .nav-links { display: none; }
       .inv-table th:nth-child(5),
       .inv-table td:nth-child(5),
       .inv-table th:nth-child(6),
@@ -236,6 +235,7 @@
       .inv-table td:nth-child(7) { display: none; }
       .inv-table th.col-actions,
       .inv-table td.col-actions { display: none; }
+      .inv-table th, .inv-table td { padding: 10px 8px; font-size: 13px; }
       .btn-par-edit { display: none; }
       .adjust-grid { grid-template-columns: 1fr; }
       .adjust-grid .span-2 { grid-column: span 1; }
@@ -788,7 +788,7 @@
       } else {
         tbody.innerHTML = rows.map(buildTableRow).join('');
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
-        tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
+        tbody.querySelectorAll('.stock-cell').forEach(wireStockAdj);
         tbody.querySelectorAll('.btn-row-delete').forEach(wireDeleteBtn);
       }
 
@@ -816,9 +816,8 @@
         <button class="btn-par-edit" title="Edit PAR" data-product-id="${escapeHtml(productId)}">✏</button>
       </div>`;
 
-      const stockCell = `<div class="stock-cell">
+      const stockCell = `<div class="stock-cell" data-product-id="${escapeHtml(productId)}" title="Click to adjust stock">
         <span class="${stockClass}">${stock}${isLow ? `<span class="stock-need">buy ${needQty} more</span>` : ''}</span>
-        <button class="btn-stock-adj" data-product-id="${escapeHtml(productId)}" title="Adjust stock">±</button>
       </div>`;
 
       return `<tr class="${isLow ? 'low-stock' : ''}" data-product-id="${escapeHtml(productId)}">
@@ -896,10 +895,10 @@
     }
 
     // ── Stock inline adjust ───────────────────────────────────────────────────
-    function wireStockAdj(btn) {
-      btn.addEventListener('click', () => {
-        const productId    = btn.dataset.productId;
-        const cell         = btn.closest('.stock-cell');
+    function wireStockAdj(cell) {
+      cell.addEventListener('click', () => {
+        if (cell.querySelector('.stock-adj-input')) return; // already open
+        const productId    = cell.dataset.productId;
         const currentStock = inventoryMap.get(productId)?.stock ?? 0;
         const originalHtml = cell.innerHTML;
 
@@ -917,7 +916,7 @@
 
         cancelBtn.addEventListener('click', () => {
           cell.innerHTML = originalHtml;
-          wireStockAdj(cell.querySelector('.btn-stock-adj'));
+          wireStockAdj(cell);
         });
 
         async function doSave() {
@@ -943,7 +942,7 @@
             showToast(`Stock set to ${newVal}`, 'success');
           } catch (err) {
             cell.innerHTML = originalHtml;
-            wireStockAdj(cell.querySelector('.btn-stock-adj'));
+            wireStockAdj(cell);
             showToast('Failed to save: ' + (err.message || 'unknown error'), 'error');
           }
         }
