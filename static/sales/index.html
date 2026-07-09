@@ -331,6 +331,7 @@ textarea{resize:vertical;min-height:70px}
       <li data-view="pipeline">📋 Pipeline</li>
       <li data-view="tasks">✅ Tasks</li>
       <li data-view="receipts">🧾 Receipts</li>
+      <li data-view="documents">📄 Documents</li>
       <li data-view="reports">📈 Reports</li>
       <li data-view="settings">⚙️ Settings</li>
     </ul>
@@ -446,6 +447,24 @@ textarea{resize:vertical;min-height:70px}
         </select>
       </div>
       <div id="receipts-table-wrap"></div>
+    </div>
+
+    <!-- Documents -->
+    <div id="view-documents" class="view">
+      <div class="view-header">
+        <div class="view-title">Documents</div>
+        <button class="btn btn-red btn-sm" id="upload-doc-btn">+ Upload</button>
+      </div>
+      <div class="search-row">
+        <input type="search" class="search-input" id="doc-search" placeholder="Search documents…">
+        <select class="filter-select" id="doc-acct-filter">
+          <option value="">All Accounts</option>
+        </select>
+        <select class="filter-select" id="doc-rep-filter" style="display:none">
+          <option value="">All Reps</option>
+        </select>
+      </div>
+      <div id="documents-table-wrap"></div>
     </div>
 
     <!-- Reports -->
@@ -807,6 +826,36 @@ textarea{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<!-- Document upload modal -->
+<div class="modal-backdrop" id="modal-document">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Upload Document</div>
+      <button class="modal-close" data-close="modal-document">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>File *</label>
+        <input type="file" id="doc-file" style="width:100%;padding:8px 0;font:400 14px Manrope,sans-serif">
+        <div id="doc-size-info" class="form-hint"></div>
+      </div>
+      <div class="form-group">
+        <label>Name *</label>
+        <input id="doc-name" placeholder="Document name">
+      </div>
+      <div class="form-group">
+        <label>Link to Account (optional)</label>
+        <select id="doc-account"><option value="">— No account —</option></select>
+      </div>
+      <div id="doc-err" style="color:var(--red);font-size:12px;margin-top:6px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-document">Cancel</button>
+      <button class="btn btn-red" id="doc-save-btn">Upload</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
@@ -847,7 +896,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '' };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '' };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -998,10 +1047,12 @@ async function showApp() {
   document.getElementById('acct-rep-filter').style.display = isAdmin ? '' : 'none';
   document.getElementById('pipe-rep-filter').style.display = isAdmin ? '' : 'none';
   document.getElementById('receipt-rep-filter').style.display = isAdmin ? '' : 'none';
+  document.getElementById('doc-rep-filter').style.display = isAdmin ? '' : 'none';
   if (isAdmin) {
     populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
     populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
     populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
+    populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
   }
   await loadData();
   navigate('dashboard');
@@ -1082,6 +1133,10 @@ function applyLogs(logs) {
       STATE.locations = STATE.locations.filter(l => l.id !== row.id);
     } else if (action === 'set_mileage_rate') {
       if (row.rate) STATE.mileageRate = row.rate;
+    } else if (action === 'create_document') {
+      if (!STATE.documents.find(d => d.id === row.id)) STATE.documents.push(row);
+    } else if (action === 'delete_document') {
+      STATE.documents = STATE.documents.filter(d => d.id !== row.id);
     } else if (action === 'set_segments') {
       if (Array.isArray(row.segments)) STATE.segments = row.segments;
     } else if (action === 'set_rep') {
@@ -1142,7 +1197,7 @@ function closeMobileSidebar() {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', receipts:'Receipts', reports:'Reports', settings:'Settings' };
+const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', receipts:'Receipts', documents:'Documents', reports:'Reports', settings:'Settings' };
 
 function navigate(view, params = {}) {
   currentView = view;
@@ -1161,6 +1216,7 @@ function navigate(view, params = {}) {
   else if (view === 'pipeline') renderPipeline();
   else if (view === 'tasks') renderTasks();
   else if (view === 'receipts') renderReceipts();
+  else if (view === 'documents') renderDocuments();
   else if (view === 'reports') { renderReport(); }
   else if (view === 'settings') renderSettings();
 }
@@ -2535,6 +2591,7 @@ function renderSettings() {
         populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
         populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
         populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
+        populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
         toast('Rep saved.');
       });
     });
@@ -2592,6 +2649,7 @@ function renderSettings() {
         populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
         populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
         populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
+        populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
       });
     });
 
@@ -3164,7 +3222,171 @@ function bindAll() {
   document.getElementById('note-save-btn').addEventListener('click', submitNoteForm);
   document.getElementById('location-save-btn').addEventListener('click', submitLocationForm);
   document.getElementById('contact-save-btn').addEventListener('click', submitContactForm);
+  document.getElementById('doc-save-btn').addEventListener('click', submitDocumentForm);
 
+  // Documents
+  document.getElementById('upload-doc-btn').addEventListener('click', openDocumentModal);
+  document.getElementById('doc-search').addEventListener('input', renderDocuments);
+  document.getElementById('doc-acct-filter').addEventListener('change', renderDocuments);
+  document.getElementById('doc-rep-filter').addEventListener('change', renderDocuments);
+  document.getElementById('doc-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!document.getElementById('doc-name').value) {
+      document.getElementById('doc-name').value = file.name.replace(/\.[^.]+$/, '');
+    }
+    document.getElementById('doc-size-info').textContent = `${file.name} · ${fmtFileSize(file.size)}`;
+    document.getElementById('doc-err').textContent = file.size > 5 * 1024 * 1024 ? 'File is too large (max 5 MB).' : '';
+  });
+
+}
+
+// ── Documents ─────────────────────────────────────────────────────────────────
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function fmtFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fileTypeLabel(file) {
+  const mime = file.type || '';
+  if (mime.includes('pdf')) return 'PDF';
+  if (mime.includes('word') || mime.includes('document')) return 'Word';
+  if (mime.includes('sheet') || mime.includes('excel')) return 'Excel';
+  if (mime.includes('powerpoint') || mime.includes('presentation')) return 'PPT';
+  if (mime.includes('image/')) return 'Image';
+  if (mime.includes('text/')) return 'Text';
+  const ext = file.name.split('.').pop()?.toUpperCase() || '';
+  return ext.length <= 5 ? ext : 'File';
+}
+
+function renderDocuments() {
+  const isAdmin = currentRepId === 'admin';
+  document.getElementById('doc-rep-filter').style.display = isAdmin ? '' : 'none';
+
+  const search = document.getElementById('doc-search').value.toLowerCase();
+  const acctFilter = document.getElementById('doc-acct-filter').value;
+  const repFilter = isAdmin ? document.getElementById('doc-rep-filter').value : '';
+
+  // Populate account filter (preserve selection)
+  const acctSel = document.getElementById('doc-acct-filter');
+  const acctCur = acctSel.value;
+  acctSel.innerHTML = '<option value="">All Accounts</option>' +
+    [...STATE.accounts.values()].sort((a, b) => a.name.localeCompare(b.name))
+      .map(a => `<option value="${a.id}"${a.id === acctCur ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+
+  let docs = isAdmin ? [...STATE.documents] : STATE.documents.filter(d => d.repId === currentRepId);
+  if (search) docs = docs.filter(d => d.name.toLowerCase().includes(search));
+  if (acctFilter) docs = docs.filter(d => d.accountId === acctFilter);
+  if (repFilter) docs = docs.filter(d => (d.repId || 'admin') === repFilter);
+  docs.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
+
+  const wrap = document.getElementById('documents-table-wrap');
+  if (!docs.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">📄</div>No documents uploaded yet.</div>';
+    return;
+  }
+
+  const rows = docs.map(d => {
+    const hasFile = !!localStorage.getItem('crm-doc-file-' + d.id);
+    const acct = d.accountId ? STATE.accounts.get(d.accountId) : null;
+    const canDelete = isAdmin || d.repId === currentRepId;
+    return `<tr>
+      <td><strong>${esc(d.name)}</strong></td>
+      <td><span class="badge">${esc(d.fileType || 'File')}</span></td>
+      <td style="white-space:nowrap">${d.fileSize ? fmtFileSize(Number(d.fileSize)) : '—'}</td>
+      <td>${acct ? `<span class="link-btn" data-nav-account="${acct.id}" style="cursor:pointer;color:var(--red);font-weight:600">${esc(acct.name)}</span>` : '<span style="color:#aaa">—</span>'}</td>
+      <td>${esc(getRepLabel(d.repId))}</td>
+      <td style="white-space:nowrap">${fmtDate(d.timeStamp)}</td>
+      <td style="white-space:nowrap">
+        ${hasFile
+          ? `<button class="btn btn-outline btn-sm" data-download-doc="${d.id}" data-doc-name="${esc(d.name)}">Download</button>`
+          : `<span style="color:#aaa;font-size:12px">Not on this device</span>`}
+        ${canDelete ? `<button class="btn btn-outline btn-sm" style="color:var(--red);margin-left:4px" data-delete-doc="${d.id}">✕</button>` : ''}
+      </td>
+    </tr>`;
+  });
+
+  wrap.innerHTML = `<table class="tbl"><thead><tr>
+    <th>Name</th><th>Type</th><th>Size</th><th>Account</th><th>Uploaded By</th><th>Date</th><th>Actions</th>
+  </tr></thead><tbody>${rows.join('')}</tbody></table>`;
+
+  wrap.querySelectorAll('[data-download-doc]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const data = localStorage.getItem('crm-doc-file-' + btn.dataset.downloadDoc);
+      if (!data) { toast('File not available on this device.'); return; }
+      const a = document.createElement('a');
+      a.href = data; a.download = btn.dataset.docName; a.click();
+    });
+  });
+
+  wrap.querySelectorAll('[data-delete-doc]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const d = STATE.documents.find(d => d.id === btn.dataset.deleteDoc);
+      if (!d || !confirm(`Delete "${d.name}"? This cannot be undone.`)) return;
+      const entry = { action: 'delete_document', id: d.id, repId: currentRepId, timeStamp: new Date().toISOString() };
+      await appendLog(LOG_PATH, entry);
+      applyLogs([entry]);
+      localStorage.removeItem('crm-doc-file-' + d.id);
+      renderDocuments();
+      toast('Document deleted.');
+    });
+  });
+
+  wrap.querySelectorAll('[data-nav-account]').forEach(el => {
+    el.addEventListener('click', () => navigate('account-detail', { id: el.dataset.navAccount }));
+  });
+}
+
+function openDocumentModal() {
+  document.getElementById('doc-file').value = '';
+  document.getElementById('doc-name').value = '';
+  document.getElementById('doc-size-info').textContent = '';
+  document.getElementById('doc-err').textContent = '';
+  const sel = document.getElementById('doc-account');
+  sel.innerHTML = '<option value="">— No account —</option>' +
+    [...STATE.accounts.values()].sort((a, b) => a.name.localeCompare(b.name))
+      .map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  openModal('modal-document');
+}
+
+async function submitDocumentForm() {
+  const file = document.getElementById('doc-file').files[0];
+  const name = document.getElementById('doc-name').value.trim();
+  const accountId = document.getElementById('doc-account').value;
+  const err = document.getElementById('doc-err');
+  err.textContent = '';
+  if (!file) { err.textContent = 'Please select a file.'; return; }
+  if (!name) { err.textContent = 'Please enter a name.'; return; }
+  if (file.size > 5 * 1024 * 1024) { err.textContent = 'File is too large (max 5 MB).'; return; }
+  const btn = document.getElementById('doc-save-btn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  try {
+    const fileData = await readFileAsDataURL(file);
+    const id = genId();
+    const entry = { action: 'create_document', id, name, fileType: fileTypeLabel(file),
+      fileSize: String(file.size), accountId: accountId || '', repId: currentRepId,
+      timeStamp: new Date().toISOString() };
+    localStorage.setItem('crm-doc-file-' + id, fileData);
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
+    closeModal('modal-document');
+    renderDocuments();
+    toast('Document uploaded.');
+  } catch (e) {
+    err.textContent = 'Upload failed: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Upload';
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
