@@ -903,6 +903,8 @@ let currentDetailTab = 'overview';
 let currentReportTab = 'revenue';
 let currentRepId = null; // 'rep1' | 'rep2' | 'admin'
 let acctViewMode = 'mine'; // 'mine' | 'all'
+let acctSortCol = 'name';
+let acctSortDir = 'asc';
 let pendingDragDeal = null;
 let currentReceiptsTab = 'receipts';
 let currentNoteId = null;
@@ -1351,7 +1353,19 @@ function renderAccounts() {
   if (seg) accounts = accounts.filter(a => a.segment === seg);
   if (status) accounts = accounts.filter(a => a.status === status);
   if (repFilter) accounts = accounts.filter(a => (a.repId || 'admin') === repFilter);
-  accounts.sort((a,b) => a.name.localeCompare(b.name));
+  accounts.sort((a, b) => {
+    const ma = getAccountMetrics(a.id);
+    const mb = getAccountMetrics(b.id);
+    let cmp = 0;
+    if (acctSortCol === 'name') {
+      cmp = a.name.localeCompare(b.name);
+    } else if (acctSortCol === 'lastContact') {
+      const da = ma.lastContactDate || '';
+      const db = mb.lastContactDate || '';
+      cmp = da < db ? -1 : da > db ? 1 : 0;
+    }
+    return acctSortDir === 'asc' ? cmp : -cmp;
+  });
 
   const colCount = showAll ? 7 : 6;
   const rows = accounts.map(a => {
@@ -1381,13 +1395,28 @@ function renderAccounts() {
     <div class="card" style="overflow:hidden"><div class="tbl-wrap">
       <table class="tbl">
         <thead><tr>
-          <th>Account</th><th>Segment</th><th>Status</th>
+          <th data-acct-sort="name" style="cursor:pointer;user-select:none">Account${acctSortCol==='name' ? (acctSortDir==='asc' ? ' ▲' : ' ▼') : ''}</th>
+          <th>Segment</th><th>Status</th>
           ${showAll ? '<th>Rep</th>' : ''}
-          <th>Last Contact</th><th>Next Follow-up</th><th>Actions</th>
+          <th data-acct-sort="lastContact" style="cursor:pointer;user-select:none">Last Contact${acctSortCol==='lastContact' ? (acctSortDir==='asc' ? ' ▲' : ' ▼') : ''}</th>
+          <th>Next Follow-up</th><th>Actions</th>
         </tr></thead>
         <tbody>${rows || `<tr><td colspan="${colCount}" class="empty">No accounts match your filters.</td></tr>`}</tbody>
       </table>
     </div></div>`;
+
+  document.querySelectorAll('[data-acct-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.acctSort;
+      if (acctSortCol === col) {
+        acctSortDir = acctSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        acctSortCol = col;
+        acctSortDir = col === 'lastContact' ? 'desc' : 'asc';
+      }
+      renderAccounts();
+    });
+  });
 
   document.querySelectorAll('.clickable[data-account-id]').forEach(row => {
     row.addEventListener('click', e => {
