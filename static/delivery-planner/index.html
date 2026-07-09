@@ -2274,7 +2274,7 @@
         if (delivery) delivery.deliveryNote = note;
         document.getElementById('note-overlay').classList.remove('open');
         noteDeliveryId = null;
-        renderSchedule();
+        renderView();
       } catch (err) {
         alert('Failed to save note: ' + err.message);
       } finally {
