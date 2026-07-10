@@ -331,7 +331,6 @@ textarea{resize:vertical;min-height:70px}
       <li data-view="pipeline">📋 Pipeline</li>
       <li data-view="tasks">✅ Tasks</li>
       <li data-view="receipts">🧾 Receipts</li>
-      <li data-view="documents">📄 Documents</li>
       <li data-view="reports">📈 Reports</li>
       <li data-view="settings">⚙️ Settings</li>
     </ul>
@@ -1363,6 +1362,10 @@ function renderAccounts() {
       const da = ma.lastContactDate || '';
       const db = mb.lastContactDate || '';
       cmp = da < db ? -1 : da > db ? 1 : 0;
+    } else if (acctSortCol === 'nextFollowUp') {
+      const da = a.nextFollowUp || '';
+      const db = b.nextFollowUp || '';
+      cmp = da < db ? -1 : da > db ? 1 : 0;
     }
     return acctSortDir === 'asc' ? cmp : -cmp;
   });
@@ -1399,7 +1402,8 @@ function renderAccounts() {
           <th>Segment</th><th>Status</th>
           ${showAll ? '<th>Rep</th>' : ''}
           <th data-acct-sort="lastContact" style="cursor:pointer;user-select:none">Last Contact${acctSortCol==='lastContact' ? (acctSortDir==='asc' ? ' ▲' : ' ▼') : ''}</th>
-          <th>Next Follow-up</th><th>Actions</th>
+          <th data-acct-sort="nextFollowUp" style="cursor:pointer;user-select:none">Next Follow-up${acctSortCol==='nextFollowUp' ? (acctSortDir==='asc' ? ' ▲' : ' ▼') : ''}</th>
+          <th>Actions</th>
         </tr></thead>
         <tbody>${rows || `<tr><td colspan="${colCount}" class="empty">No accounts match your filters.</td></tr>`}</tbody>
       </table>
@@ -1412,7 +1416,7 @@ function renderAccounts() {
         acctSortDir = acctSortDir === 'asc' ? 'desc' : 'asc';
       } else {
         acctSortCol = col;
-        acctSortDir = col === 'lastContact' ? 'desc' : 'asc';
+        acctSortDir = col === 'lastContact' ? 'desc' : 'asc'; // nextFollowUp defaults asc (soonest first)
       }
       renderAccounts();
     });
