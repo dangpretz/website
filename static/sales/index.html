@@ -100,6 +100,7 @@ body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text)
 .badge-converted{background:#dbeafe;color:#1d4ed8}
 .badge-approved{background:#dbeafe;color:#1d4ed8}
 .badge-reimbursed{background:#d1fae5;color:#065f46}
+.badge-company-card{background:#f1f5f9;color:#475569}
 .badge-call{background:#f3e8ff;color:#6b21a8}
 .badge-email{background:#dbeafe;color:#1d4ed8}
 .badge-in-person,.badge-in_person{background:#d1fae5;color:#065f46}
@@ -440,6 +441,7 @@ textarea{resize:vertical;min-height:70px}
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="reimbursed">Reimbursed</option>
+          <option value="company-card">Company Card</option>
         </select>
         <select class="filter-select" id="receipt-rep-filter" style="display:none">
           <option value="">All Reps</option>
@@ -762,6 +764,12 @@ textarea{resize:vertical;min-height:70px}
           </select>
         </div>
       </div>
+      <div class="form-group"><label>Paid via *</label>
+        <select id="receipt-payment">
+          <option value="out-of-pocket">Out of pocket (reimbursable)</option>
+          <option value="company-card">Company card (no reimbursement needed)</option>
+        </select>
+      </div>
       <div class="form-group"><label>Description</label><textarea id="receipt-description" placeholder="Brief note about the expense…"></textarea></div>
       <div class="form-group">
         <label>Receipt Photo <span style="font-weight:400;color:var(--gray-3)">(optional)</span></label>
@@ -855,6 +863,15 @@ textarea{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<script>
+// GIS library fires this when loaded; dispatches event so module can react
+function gisLoaded() {
+  window._gisReady = true;
+  window.dispatchEvent(new Event('gis-ready'));
+}
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+
 <script type="module">
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
@@ -895,7 +912,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '', adminCredentials: { pwdHash: '', email: '' } };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '', adminCredentials: { pwdHash: '', email: '' }, googleConfig: { clientId: '' } };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -932,6 +949,58 @@ const statusBadge = s => badge(capitalize(s), s);
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Google Drive photo upload ─────────────────────────────────────────────────
+let driveTokenClient = null;
+let driveAccessToken = null;
+
+function initDriveClient() {
+  if (driveTokenClient || !window._gisReady || !STATE.googleConfig.clientId) return;
+  driveTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: STATE.googleConfig.clientId,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: '',
+  });
+}
+
+function getDriveToken() {
+  return new Promise((resolve, reject) => {
+    if (driveAccessToken) { resolve(driveAccessToken); return; }
+    driveTokenClient.callback = (resp) => {
+      if (resp.error) { reject(new Error('Google sign-in failed.')); return; }
+      driveAccessToken = resp.access_token;
+      resolve(resp.access_token);
+    };
+    driveTokenClient.requestAccessToken({ prompt: '' });
+  });
+}
+
+async function uploadPhotoToDrive(file) {
+  if (!driveTokenClient) initDriveClient();
+  if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
+  const token = await getDriveToken();
+  const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg' };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', file);
+  const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!uploadRes.ok) throw new Error('Drive upload failed.');
+  const { id: driveFileId } = await uploadRes.json();
+  await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  });
+  return {
+    photoDriveId: driveFileId,
+    driveUrl: `https://drive.google.com/file/d/${driveFileId}/view`,
+    photoUrl: `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w800`,
+  };
 }
 
 function toast(msg, ms = 2500) {
@@ -1053,6 +1122,9 @@ async function showApp() {
     populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
   }
   await loadData();
+  // Initialise Drive client now that googleConfig is populated from the log
+  if (window._gisReady) initDriveClient();
+  else window.addEventListener('gis-ready', initDriveClient, { once: true });
   navigate('dashboard');
 }
 
@@ -1149,6 +1221,8 @@ function applyLogs(logs) {
     } else if (action === 'set_admin_credentials') {
       if (row.pwdHash) STATE.adminCredentials.pwdHash = row.pwdHash;
       if (row.email !== undefined) STATE.adminCredentials.email = row.email;
+    } else if (action === 'set_google_config') {
+      if (row.clientId !== undefined) STATE.googleConfig.clientId = row.clientId;
     }
   }
 }
@@ -1236,7 +1310,7 @@ function renderDashboard() {
   const pipelineDeals = myDeals.filter(d => ['quoted','follow-up'].includes(d.stage));
   const openDeals = myDeals.filter(d => !['won','lost'].includes(d.stage)).length;
   const riskDays = Number(localStorage.getItem(RISK_KEY) || 30);
-  const pendingReceipts = (isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId)).filter(r => r.status === 'pending').length;
+  const pendingReceipts = (isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId)).filter(r => r.status === 'pending' || r.status === 'approved').length;
   const pendingMileage = (isAdmin ? STATE.mileage : STATE.mileage.filter(m => m.repId === currentRepId)).filter(m => m.status === 'pending').length;
   const pendingExpenses = pendingReceipts + pendingMileage;
   const atRisk = myAccounts.filter(a => {
@@ -2044,9 +2118,10 @@ function renderReceipts() {
     if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
     rows = [...rows].sort((a,b) => (b.date||'').localeCompare(a.date||''));
 
-    const pendingTotal  = rows.filter(r => r.status === 'pending').reduce((s,r) => s + Number(r.amount||0), 0);
-    const approvedTotal = rows.filter(r => r.status === 'approved').reduce((s,r) => s + Number(r.amount||0), 0);
-    const reimbTotal    = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
+    const pendingTotal     = rows.filter(r => r.status === 'pending').reduce((s,r) => s + Number(r.amount||0), 0);
+    const approvedTotal    = rows.filter(r => r.status === 'approved').reduce((s,r) => s + Number(r.amount||0), 0);
+    const reimbTotal       = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
+    const companyCardTotal = rows.filter(r => r.status === 'company-card').reduce((s,r) => s + Number(r.amount||0), 0);
 
     const catLabel = { meals:'Meals', travel:'Travel', supplies:'Supplies', other:'Other' };
     wrap.innerHTML = rows.length === 0 ? `<div class="empty"><div class="empty-icon">🧾</div>No receipts yet.</div>` : `
@@ -2059,8 +2134,8 @@ function renderReceipts() {
           </tr></thead>
           <tbody>
             ${rows.map(r => {
-              const canEdit = (isAdmin || r.repId === currentRepId) && r.status === 'pending';
-              const hasPhoto = !!localStorage.getItem('crm-receipt-photo-' + r.id);
+              const canEdit = (isAdmin || r.repId === currentRepId) && (r.status === 'pending' || r.status === 'company-card');
+              const hasPhoto = !!(r.photoUrl || localStorage.getItem('crm-receipt-photo-' + r.id));
               return `<tr>
                 <td>${fmtDate(r.date)}</td>
                 <td><strong>${esc(r.vendor)}</strong></td>
@@ -2072,7 +2147,7 @@ function renderReceipts() {
                 <td>${hasPhoto ? `<button class="btn-ghost btn-sm" data-view-photo="${esc(r.id)}">📷 View</button>` : '—'}</td>
                 <td style="white-space:nowrap">
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
-                  ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
+                  ${isAdmin && r.status === 'pending' && r.status !== 'company-card' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
                   ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
                   ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-receipt="${esc(r.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
@@ -2084,7 +2159,8 @@ function renderReceipts() {
             <td colspan="2">
               <span style="color:var(--amber);font-weight:700">Pending: ${fmt$(pendingTotal)}</span> &nbsp;
               <span style="color:var(--blue);font-weight:700">Approved: ${fmt$(approvedTotal)}</span> &nbsp;
-              <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span>
+              <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span> &nbsp;
+              ${companyCardTotal > 0 ? `<span style="color:#475569;font-weight:700">Company Card: ${fmt$(companyCardTotal)}</span>` : ''}
             </td>
             <td colspan="${isAdmin ? 4 : 3}"></td>
           </tr></tfoot>
@@ -2093,8 +2169,9 @@ function renderReceipts() {
 
     wrap.querySelectorAll('[data-view-photo]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const data = localStorage.getItem('crm-receipt-photo-' + btn.dataset.viewPhoto);
-        if (data) { document.getElementById('photo-lightbox-img').src = data; openModal('modal-photo'); }
+        const r = STATE.receipts.find(x => x.id === btn.dataset.viewPhoto);
+        const src = r?.photoUrl || localStorage.getItem('crm-receipt-photo-' + btn.dataset.viewPhoto);
+        if (src) { document.getElementById('photo-lightbox-img').src = src; openModal('modal-photo'); }
       });
     });
     wrap.querySelectorAll('[data-edit-receipt]').forEach(btn => {
@@ -2213,11 +2290,14 @@ function openReceiptModal(id = null) {
   document.getElementById('receipt-date').value = r?.date || today();
   document.getElementById('receipt-amount').value = r?.amount || '';
   document.getElementById('receipt-category').value = r?.category || '';
+  document.getElementById('receipt-payment').value = r?.paymentMethod || 'out-of-pocket';
   document.getElementById('receipt-description').value = r?.description || '';
   document.getElementById('receipt-photo').value = '';
   document.getElementById('receipt-err').textContent = '';
   const preview = document.getElementById('receipt-photo-preview');
-  const existingPhoto = id ? localStorage.getItem('crm-receipt-photo-' + id) : null;
+  const existingDriveUrl = id ? STATE.receipts.find(r => r.id === id)?.photoUrl : null;
+  const existingLocalPhoto = id ? localStorage.getItem('crm-receipt-photo-' + id) : null;
+  const existingPhoto = existingDriveUrl || existingLocalPhoto;
   preview.innerHTML = existingPhoto ? `<img src="${existingPhoto}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">` : '';
   const repGroup = document.getElementById('receipt-rep-group');
   if (currentRepId === 'admin') {
@@ -2260,9 +2340,15 @@ async function saveReceipt(data) {
   const entry = { action: isNew ? 'create_receipt' : 'update_receipt',
     id, repId: data.targetRepId || existingRepId || currentRepId, vendor: data.vendor, date: data.date,
     amount: String(data.amount), category: data.category, description: data.description || '',
+    paymentMethod: data.paymentMethod || 'out-of-pocket',
     status: data.status || 'pending', hasPhoto: data.hasPhoto || false,
     timeStamp: new Date().toISOString() };
-  if (data.photoData) {
+  if (data.photoDriveId) {
+    entry.photoDriveId = data.photoDriveId;
+    entry.photoUrl = data.photoUrl;
+    entry.driveUrl = data.driveUrl;
+    entry.hasPhoto = true;
+  } else if (data.photoData) {
     localStorage.setItem('crm-receipt-photo-' + id, data.photoData);
     entry.hasPhoto = true;
   }
@@ -2317,17 +2403,30 @@ async function submitReceiptForm() {
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const photoFile = document.getElementById('receipt-photo').files[0];
-    const photoData = photoFile ? await compressPhoto(photoFile) : null;
     const existingId = document.getElementById('receipt-id').value || null;
     const existingStatus = document.getElementById('receipt-existing-status').value || 'pending';
+    const paymentMethod = document.getElementById('receipt-payment').value;
+    const derivedStatus = paymentMethod === 'company-card' ? 'company-card' : existingStatus;
     const repGroup = document.getElementById('receipt-rep-group');
     const targetRepId = (currentRepId === 'admin' && repGroup.style.display !== 'none')
       ? document.getElementById('receipt-rep-select').value : null;
+    let photoData = null;
+    let drivePhotoInfo = null;
+    if (photoFile) {
+      if (STATE.googleConfig.clientId) {
+        drivePhotoInfo = await uploadPhotoToDrive(photoFile);
+      } else {
+        photoData = await compressPhoto(photoFile);
+      }
+    }
+    const existingReceipt = existingId ? STATE.receipts.find(r => r.id === existingId) : null;
+    const existingHasPhoto = !!(existingReceipt?.photoUrl || (existingId && localStorage.getItem('crm-receipt-photo-' + existingId)));
     await saveReceipt({
-      id: existingId, vendor, date, amount, category,
+      id: existingId, vendor, date, amount, category, paymentMethod,
       description: document.getElementById('receipt-description').value.trim(),
-      status: existingStatus, photoData, targetRepId,
-      hasPhoto: !!photoData || (existingId && !!localStorage.getItem('crm-receipt-photo-' + existingId)),
+      status: derivedStatus, photoData, targetRepId,
+      ...(drivePhotoInfo || {}),
+      hasPhoto: !!(drivePhotoInfo || photoData || existingHasPhoto),
     });
     closeModal('modal-receipt');
     toast('Receipt saved.');
@@ -2505,6 +2604,19 @@ function renderSettings() {
       </div>
       <div class="modal-err" id="seg-err" style="margin-top:8px"></div>
     </div>` : ''}
+    ${isAdmin ? `
+    <div class="settings-section">
+      <h2>Google Drive (Receipt Photos)</h2>
+      <div class="form-hint" style="margin-bottom:12px">When configured, receipt photos upload to Google Drive so they're accessible from any device. Requires a Google Cloud project with the Drive API enabled and an OAuth 2.0 Web Client ID with <code>https://www.dangerouspretzel.com</code> as an authorized JavaScript origin.</div>
+      <div class="form-group" style="max-width:460px">
+        <label>OAuth Client ID</label>
+        <input type="text" id="gdrive-client-id" value="${esc(STATE.googleConfig.clientId)}" placeholder="*.apps.googleusercontent.com">
+      </div>
+      <button class="btn btn-red btn-sm" id="gdrive-config-save">Save</button>
+      <div style="margin-top:8px;font-size:12px;color:${STATE.googleConfig.clientId ? 'var(--green)' : 'var(--gray-3)'}">
+        ${STATE.googleConfig.clientId ? '✓ Configured — new receipt photos will upload to Google Drive.' : 'Not configured — photos stored on this device only.'}
+      </div>
+    </div>` : ''}
     <div class="settings-section">
       <h2>About</h2>
       <div style="font-size:13px;color:var(--text2);line-height:1.8">
@@ -2534,6 +2646,17 @@ function renderSettings() {
       applyLogs([entry]);
       toast('Email saved.');
     }
+  });
+
+  document.getElementById('gdrive-config-save')?.addEventListener('click', async () => {
+    const clientId = document.getElementById('gdrive-client-id').value.trim();
+    const entry = { action: 'set_google_config', clientId, repId: currentRepId, timeStamp: new Date().toISOString() };
+    await appendLog(LOG_PATH, entry);
+    applyLogs([entry]);
+    driveTokenClient = null; // reset so initDriveClient re-initialises with new clientId
+    initDriveClient();
+    toast('Google Drive settings saved.');
+    renderSettings();
   });
 
   document.getElementById('mileage-rate-save')?.addEventListener('click', async () => {
