@@ -990,13 +990,18 @@ async function uploadPhotoToDrive(file) {
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-  if (!uploadRes.ok) throw new Error('Drive upload failed.');
+  if (!uploadRes.ok) {
+    const errBody = await uploadRes.json().catch(() => ({}));
+    const reason = errBody?.error?.message || errBody?.error?.status || uploadRes.status;
+    throw new Error(`Drive upload failed (${reason}). Check that the Drive API is enabled in Google Cloud Console and your account is listed as a Test User on the OAuth consent screen.`);
+  }
   const { id: driveFileId } = await uploadRes.json();
+  // Make the file readable by anyone with the link — non-fatal if this fails
   await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-  });
+  }).catch(e => console.warn('Drive permissions call failed (photo still saved):', e));
   return {
     photoDriveId: driveFileId,
     driveUrl: `https://drive.google.com/file/d/${driveFileId}/view`,
