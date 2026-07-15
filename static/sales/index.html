@@ -959,7 +959,7 @@ function initDriveClient() {
   if (driveTokenClient || !window._gisReady || !STATE.googleConfig.clientId) return;
   driveTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: STATE.googleConfig.clientId,
-    scope: 'https://www.googleapis.com/auth/drive.file',
+    scope: 'https://www.googleapis.com/auth/drive',
     callback: '',
   });
 }
