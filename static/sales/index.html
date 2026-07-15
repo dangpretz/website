@@ -982,18 +982,24 @@ async function uploadPhotoToDrive(file) {
   const token = await getDriveToken();
   const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg',
     ...(STATE.googleConfig.folderId ? { parents: [STATE.googleConfig.folderId] } : {}) };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', file);
+  // Drive API requires multipart/related, not multipart/form-data
+  const boundary = 'receipt_' + Date.now();
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+    JSON.stringify(metadata),
+    `\r\n--${boundary}\r\nContent-Type: ${file.type || 'image/jpeg'}\r\n\r\n`,
+    file,
+    `\r\n--${boundary}--`,
+  ]);
   const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
   });
   if (!uploadRes.ok) {
     const errBody = await uploadRes.json().catch(() => ({}));
     const reason = errBody?.error?.message || errBody?.error?.status || uploadRes.status;
-    throw new Error(`Drive upload failed (${reason}). Check that the Drive API is enabled in Google Cloud Console and your account is listed as a Test User on the OAuth consent screen.`);
+    throw new Error(`Drive upload failed (${reason}).`);
   }
   const { id: driveFileId } = await uploadRes.json();
   // Make the file readable by anyone with the link — non-fatal if this fails
