@@ -2668,7 +2668,10 @@ function renderSettings() {
 
   document.getElementById('gdrive-config-save')?.addEventListener('click', async () => {
     const clientId = document.getElementById('gdrive-client-id').value.trim();
-    const folderId = document.getElementById('gdrive-folder-id').value.trim();
+    const raw = document.getElementById('gdrive-folder-id').value.trim();
+    // Accept a full Drive URL or a bare ID — extract just the ID either way
+    const folderMatch = raw.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    const folderId = folderMatch ? folderMatch[1] : raw;
     const entry = { action: 'set_google_config', clientId, folderId, repId: currentRepId, timeStamp: new Date().toISOString() };
     await appendLog(LOG_PATH, entry);
     applyLogs([entry]);
