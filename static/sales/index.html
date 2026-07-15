@@ -967,12 +967,18 @@ function initDriveClient() {
 function getDriveToken() {
   return new Promise((resolve, reject) => {
     if (driveAccessToken) { resolve(driveAccessToken); return; }
+    // Timeout so a silent OAuth failure doesn't hang the UI forever
+    const t = setTimeout(() => reject(new Error('Google sign-in timed out — please try again.')), 60000);
     driveTokenClient.callback = (resp) => {
-      if (resp.error) { reject(new Error('Google sign-in failed.')); return; }
+      clearTimeout(t);
+      if (resp.error) { reject(new Error('Google sign-in failed: ' + resp.error)); return; }
       driveAccessToken = resp.access_token;
+      // Auto-clear when token expires so next upload re-auths
+      setTimeout(() => { driveAccessToken = null; }, (resp.expires_in || 3600) * 1000);
       resolve(resp.access_token);
     };
-    driveTokenClient.requestAccessToken({ prompt: '' });
+    // No prompt override — let GIS show consent UI whenever scope requires it
+    driveTokenClient.requestAccessToken();
   });
 }
 
@@ -991,19 +997,22 @@ async function uploadPhotoToDrive(file) {
     file,
     `\r\n--${boundary}--`,
   ]);
+  const ctrl = new AbortController();
+  const uploadTimeout = setTimeout(() => ctrl.abort(), 30000);
   const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
     body,
-  });
+    signal: ctrl.signal,
+  }).finally(() => clearTimeout(uploadTimeout));
   if (!uploadRes.ok) {
     const errBody = await uploadRes.json().catch(() => ({}));
     const reason = errBody?.error?.message || errBody?.error?.status || uploadRes.status;
     throw new Error(`Drive upload failed (${reason}).`);
   }
   const { id: driveFileId } = await uploadRes.json();
-  // Make the file readable by anyone with the link — non-fatal if this fails
-  await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`, {
+  // Fire-and-forget — don't await so a slow permissions call can't block the save
+  fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'anyone' }),
