@@ -912,7 +912,7 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '', adminCredentials: { pwdHash: '', email: '' }, googleConfig: { clientId: '' } };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '', adminCredentials: { pwdHash: '', email: '' }, googleConfig: { clientId: '', folderId: '' } };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
@@ -980,7 +980,8 @@ async function uploadPhotoToDrive(file) {
   if (!driveTokenClient) initDriveClient();
   if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
   const token = await getDriveToken();
-  const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg' };
+  const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg',
+    ...(STATE.googleConfig.folderId ? { parents: [STATE.googleConfig.folderId] } : {}) };
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', file);
@@ -1223,6 +1224,7 @@ function applyLogs(logs) {
       if (row.email !== undefined) STATE.adminCredentials.email = row.email;
     } else if (action === 'set_google_config') {
       if (row.clientId !== undefined) STATE.googleConfig.clientId = row.clientId;
+      if (row.folderId !== undefined) STATE.googleConfig.folderId = row.folderId;
     }
   }
 }
@@ -2607,14 +2609,19 @@ function renderSettings() {
     ${isAdmin ? `
     <div class="settings-section">
       <h2>Google Drive (Receipt Photos)</h2>
-      <div class="form-hint" style="margin-bottom:12px">When configured, receipt photos upload to Google Drive so they're accessible from any device. Requires a Google Cloud project with the Drive API enabled and an OAuth 2.0 Web Client ID with <code>https://www.dangerouspretzel.com</code> as an authorized JavaScript origin.</div>
+      <div class="form-hint" style="margin-bottom:12px">When configured, receipt photos upload to a shared Google Drive folder accessible from any device. Requires a Google Cloud project with the Drive API enabled and an OAuth 2.0 Web Client ID with <code>https://www.dangerouspretzel.com</code> as an authorized JavaScript origin.</div>
       <div class="form-group" style="max-width:460px">
         <label>OAuth Client ID</label>
         <input type="text" id="gdrive-client-id" value="${esc(STATE.googleConfig.clientId)}" placeholder="*.apps.googleusercontent.com">
       </div>
+      <div class="form-group" style="max-width:460px">
+        <label>Shared Folder ID</label>
+        <input type="text" id="gdrive-folder-id" value="${esc(STATE.googleConfig.folderId)}" placeholder="Paste folder ID from the Drive URL">
+        <div class="form-hint">Open the folder in Google Drive — the ID is the string of letters and numbers at the end of the URL. All receipt photos will upload here.</div>
+      </div>
       <button class="btn btn-red btn-sm" id="gdrive-config-save">Save</button>
-      <div style="margin-top:8px;font-size:12px;color:${STATE.googleConfig.clientId ? 'var(--green)' : 'var(--gray-3)'}">
-        ${STATE.googleConfig.clientId ? '✓ Configured — new receipt photos will upload to Google Drive.' : 'Not configured — photos stored on this device only.'}
+      <div style="margin-top:8px;font-size:12px;color:${STATE.googleConfig.clientId && STATE.googleConfig.folderId ? 'var(--green)' : 'var(--gray-3)'}">
+        ${STATE.googleConfig.clientId && STATE.googleConfig.folderId ? '✓ Configured — receipt photos will upload to the shared folder.' : 'Not fully configured — photos stored on this device only.'}
       </div>
     </div>` : ''}
     <div class="settings-section">
@@ -2650,7 +2657,8 @@ function renderSettings() {
 
   document.getElementById('gdrive-config-save')?.addEventListener('click', async () => {
     const clientId = document.getElementById('gdrive-client-id').value.trim();
-    const entry = { action: 'set_google_config', clientId, repId: currentRepId, timeStamp: new Date().toISOString() };
+    const folderId = document.getElementById('gdrive-folder-id').value.trim();
+    const entry = { action: 'set_google_config', clientId, folderId, repId: currentRepId, timeStamp: new Date().toISOString() };
     await appendLog(LOG_PATH, entry);
     applyLogs([entry]);
     driveTokenClient = null; // reset so initDriveClient re-initialises with new clientId
