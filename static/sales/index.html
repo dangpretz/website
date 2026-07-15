@@ -3387,8 +3387,12 @@ function bindAll() {
   document.getElementById('receipt-photo').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
+    // Briefly disable Save to absorb the ghost-tap that fires when the iOS camera dismisses
+    const saveBtn = document.getElementById('receipt-save-btn');
+    saveBtn.disabled = true;
     const data = await compressPhoto(file);
     document.getElementById('receipt-photo-preview').innerHTML = `<img src="${data}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">`;
+    setTimeout(() => { saveBtn.disabled = false; }, 600);
   });
 
   // Mileage live reimbursement preview
