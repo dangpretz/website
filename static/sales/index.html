@@ -955,6 +955,9 @@ async function sha256(str) {
 let driveTokenClient = null;
 let driveAccessToken = null;
 
+// Increments every time the receipt modal opens; lets async callbacks detect a stale form session
+let receiptFormGen = 0;
+
 function initDriveClient() {
   if (driveTokenClient || !window._gisReady || !STATE.googleConfig.clientId) return;
   driveTokenClient = google.accounts.oauth2.initTokenClient({
@@ -967,8 +970,14 @@ function initDriveClient() {
 function getDriveToken() {
   return new Promise((resolve, reject) => {
     if (driveAccessToken) { resolve(driveAccessToken); return; }
-    // Timeout so a silent OAuth failure doesn't hang the UI forever
-    const t = setTimeout(() => reject(new Error('Google sign-in timed out — please try again.')), 60000);
+    // 20s timeout — if GIS silent-flow fails on iOS without calling the callback
+    // we surface an error quickly so the button re-enables
+    const t = setTimeout(() => {
+      // Reset so the next attempt reinitialises from scratch
+      driveTokenClient = null;
+      driveAccessToken = null;
+      reject(new Error('Google sign-in timed out — tap Save again to retry.'));
+    }, 20000);
     driveTokenClient.callback = (resp) => {
       clearTimeout(t);
       if (resp.error) { reject(new Error('Google sign-in failed: ' + resp.error)); return; }
@@ -977,8 +986,9 @@ function getDriveToken() {
       setTimeout(() => { driveAccessToken = null; }, (resp.expires_in || 3600) * 1000);
       resolve(resp.access_token);
     };
-    // No prompt override — let GIS show consent UI whenever scope requires it
-    driveTokenClient.requestAccessToken();
+    // 'consent' forces GIS to always show the sign-in UI rather than attempting a
+    // silent token grab — silent flow on iOS Safari can fail without calling the callback
+    driveTokenClient.requestAccessToken({ prompt: 'consent' });
   });
 }
 
@@ -2304,6 +2314,7 @@ function compressPhoto(file) {
 }
 
 function openReceiptModal(id = null) {
+  receiptFormGen++;
   const r = id ? STATE.receipts.find(r => r.id === id) : null;
   document.getElementById('modal-receipt-title').textContent = r ? 'Edit Receipt' : 'New Receipt';
   document.getElementById('receipt-id').value = id || '';
@@ -2421,6 +2432,7 @@ async function submitReceiptForm() {
   if (!date) { err.textContent = 'Date is required.'; return; }
   if (!amount || Number(amount) <= 0) { err.textContent = 'Amount is required.'; return; }
   if (!category) { err.textContent = 'Category is required.'; return; }
+  const myGen = receiptFormGen;
   const btn = document.getElementById('receipt-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
@@ -2453,8 +2465,13 @@ async function submitReceiptForm() {
     closeModal('modal-receipt');
     toast('Receipt saved.');
     renderReceipts();
-  } catch(e) { err.textContent = 'Failed: ' + e.message; }
-  finally { btn.disabled = false; btn.textContent = 'Save Receipt'; }
+  } catch(e) {
+    // Only show the error if the user is still looking at the same form session
+    if (myGen === receiptFormGen) err.textContent = 'Failed: ' + e.message;
+  }
+  finally {
+    if (myGen === receiptFormGen) { btn.disabled = false; btn.textContent = 'Save Receipt'; }
+  }
 }
 
 async function submitMileageForm() {
