@@ -100,6 +100,7 @@ body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text)
 .badge-converted{background:#dbeafe;color:#1d4ed8}
 .badge-approved{background:#dbeafe;color:#1d4ed8}
 .badge-reimbursed{background:#d1fae5;color:#065f46}
+.badge-company-card{background:#f1f5f9;color:#475569}
 .badge-call{background:#f3e8ff;color:#6b21a8}
 .badge-email{background:#dbeafe;color:#1d4ed8}
 .badge-in-person,.badge-in_person{background:#d1fae5;color:#065f46}
@@ -440,6 +441,7 @@ textarea{resize:vertical;min-height:70px}
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="reimbursed">Reimbursed</option>
+          <option value="company-card">Company Card</option>
         </select>
         <select class="filter-select" id="receipt-rep-filter" style="display:none">
           <option value="">All Reps</option>
@@ -761,6 +763,12 @@ textarea{resize:vertical;min-height:70px}
             <option value="other">Other</option>
           </select>
         </div>
+      </div>
+      <div class="form-group"><label>Paid via *</label>
+        <select id="receipt-payment">
+          <option value="out-of-pocket">Out of pocket (reimbursable)</option>
+          <option value="company-card">Company card (no reimbursement needed)</option>
+        </select>
       </div>
       <div class="form-group"><label>Description</label><textarea id="receipt-description" placeholder="Brief note about the expense…"></textarea></div>
       <div class="form-group">
@@ -1236,7 +1244,7 @@ function renderDashboard() {
   const pipelineDeals = myDeals.filter(d => ['quoted','follow-up'].includes(d.stage));
   const openDeals = myDeals.filter(d => !['won','lost'].includes(d.stage)).length;
   const riskDays = Number(localStorage.getItem(RISK_KEY) || 30);
-  const pendingReceipts = (isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId)).filter(r => r.status === 'pending').length;
+  const pendingReceipts = (isAdmin ? STATE.receipts : STATE.receipts.filter(r => r.repId === currentRepId)).filter(r => r.status === 'pending' || r.status === 'approved').length;
   const pendingMileage = (isAdmin ? STATE.mileage : STATE.mileage.filter(m => m.repId === currentRepId)).filter(m => m.status === 'pending').length;
   const pendingExpenses = pendingReceipts + pendingMileage;
   const atRisk = myAccounts.filter(a => {
@@ -2044,9 +2052,10 @@ function renderReceipts() {
     if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
     rows = [...rows].sort((a,b) => (b.date||'').localeCompare(a.date||''));
 
-    const pendingTotal  = rows.filter(r => r.status === 'pending').reduce((s,r) => s + Number(r.amount||0), 0);
-    const approvedTotal = rows.filter(r => r.status === 'approved').reduce((s,r) => s + Number(r.amount||0), 0);
-    const reimbTotal    = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
+    const pendingTotal     = rows.filter(r => r.status === 'pending').reduce((s,r) => s + Number(r.amount||0), 0);
+    const approvedTotal    = rows.filter(r => r.status === 'approved').reduce((s,r) => s + Number(r.amount||0), 0);
+    const reimbTotal       = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
+    const companyCardTotal = rows.filter(r => r.status === 'company-card').reduce((s,r) => s + Number(r.amount||0), 0);
 
     const catLabel = { meals:'Meals', travel:'Travel', supplies:'Supplies', other:'Other' };
     wrap.innerHTML = rows.length === 0 ? `<div class="empty"><div class="empty-icon">🧾</div>No receipts yet.</div>` : `
@@ -2059,7 +2068,7 @@ function renderReceipts() {
           </tr></thead>
           <tbody>
             ${rows.map(r => {
-              const canEdit = (isAdmin || r.repId === currentRepId) && r.status === 'pending';
+              const canEdit = (isAdmin || r.repId === currentRepId) && (r.status === 'pending' || r.status === 'company-card');
               const hasPhoto = !!localStorage.getItem('crm-receipt-photo-' + r.id);
               return `<tr>
                 <td>${fmtDate(r.date)}</td>
@@ -2072,7 +2081,7 @@ function renderReceipts() {
                 <td>${hasPhoto ? `<button class="btn-ghost btn-sm" data-view-photo="${esc(r.id)}">📷 View</button>` : '—'}</td>
                 <td style="white-space:nowrap">
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
-                  ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
+                  ${isAdmin && r.status === 'pending' && r.status !== 'company-card' ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
                   ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
                   ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-receipt="${esc(r.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
@@ -2084,7 +2093,8 @@ function renderReceipts() {
             <td colspan="2">
               <span style="color:var(--amber);font-weight:700">Pending: ${fmt$(pendingTotal)}</span> &nbsp;
               <span style="color:var(--blue);font-weight:700">Approved: ${fmt$(approvedTotal)}</span> &nbsp;
-              <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span>
+              <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span> &nbsp;
+              ${companyCardTotal > 0 ? `<span style="color:#475569;font-weight:700">Company Card: ${fmt$(companyCardTotal)}</span>` : ''}
             </td>
             <td colspan="${isAdmin ? 4 : 3}"></td>
           </tr></tfoot>
@@ -2213,6 +2223,7 @@ function openReceiptModal(id = null) {
   document.getElementById('receipt-date').value = r?.date || today();
   document.getElementById('receipt-amount').value = r?.amount || '';
   document.getElementById('receipt-category').value = r?.category || '';
+  document.getElementById('receipt-payment').value = r?.paymentMethod || 'out-of-pocket';
   document.getElementById('receipt-description').value = r?.description || '';
   document.getElementById('receipt-photo').value = '';
   document.getElementById('receipt-err').textContent = '';
@@ -2260,6 +2271,7 @@ async function saveReceipt(data) {
   const entry = { action: isNew ? 'create_receipt' : 'update_receipt',
     id, repId: data.targetRepId || existingRepId || currentRepId, vendor: data.vendor, date: data.date,
     amount: String(data.amount), category: data.category, description: data.description || '',
+    paymentMethod: data.paymentMethod || 'out-of-pocket',
     status: data.status || 'pending', hasPhoto: data.hasPhoto || false,
     timeStamp: new Date().toISOString() };
   if (data.photoData) {
@@ -2320,13 +2332,15 @@ async function submitReceiptForm() {
     const photoData = photoFile ? await compressPhoto(photoFile) : null;
     const existingId = document.getElementById('receipt-id').value || null;
     const existingStatus = document.getElementById('receipt-existing-status').value || 'pending';
+    const paymentMethod = document.getElementById('receipt-payment').value;
+    const derivedStatus = paymentMethod === 'company-card' ? 'company-card' : existingStatus;
     const repGroup = document.getElementById('receipt-rep-group');
     const targetRepId = (currentRepId === 'admin' && repGroup.style.display !== 'none')
       ? document.getElementById('receipt-rep-select').value : null;
     await saveReceipt({
-      id: existingId, vendor, date, amount, category,
+      id: existingId, vendor, date, amount, category, paymentMethod,
       description: document.getElementById('receipt-description').value.trim(),
-      status: existingStatus, photoData, targetRepId,
+      status: derivedStatus, photoData, targetRepId,
       hasPhoto: !!photoData || (existingId && !!localStorage.getItem('crm-receipt-photo-' + existingId)),
     });
     closeModal('modal-receipt');
