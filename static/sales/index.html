@@ -45,6 +45,7 @@ body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text)
 .sidebar-footer{padding:16px 20px;border-top:1px solid var(--sidebar-border)}
 #logout-btn{width:100%;padding:8px;background:transparent;border:1px solid #444;border-radius:var(--radius);color:#888;font:600 12px 'Manrope',sans-serif;cursor:pointer}
 #logout-btn:hover{border-color:#666;color:#ccc}
+.crm-version{margin-top:8px;font-size:11px;color:#777;text-align:center}
 
 /* ── Main content ── */
 #main{flex:1;overflow:auto;min-width:0}
@@ -317,6 +318,7 @@ textarea{resize:vertical;min-height:70px}
     <button class="login-btn" id="login-btn">Sign In</button>
     <div style="font-size:12px;color:#888;margin-top:6px;text-align:center">No email? Leave it blank and sign in with your password.</div>
     <div class="login-err" id="login-err"></div>
+    <div class="crm-version"></div>
   </div>
 </div>
 
@@ -338,6 +340,7 @@ textarea{resize:vertical;min-height:70px}
     <div class="sidebar-footer">
       <div class="identity-badge" id="identity-badge"></div>
       <button id="logout-btn">Log Out</button>
+      <div class="crm-version"></div>
     </div>
   </nav>
 
@@ -870,6 +873,10 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const LOG_PATH = '/dangpretz/sales-crm';
+// Bump on every release — shown on the login screen, sidebar, and Settings → About
+// so a stale browser-cached copy of this page is easy to spot.
+const CRM_VERSION = 'v1.3';
+document.querySelectorAll('.crm-version').forEach(el => { el.textContent = CRM_VERSION; });
 const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
 const REP_REGISTRY_KEY = 'crm-rep-registry';
@@ -2691,7 +2698,7 @@ function renderSettings() {
     <div class="settings-section">
       <h2>About</h2>
       <div style="font-size:13px;color:var(--text2);line-height:1.8">
-        <div>DPC Sales CRM · v1.2</div>
+        <div>DPC Sales CRM · ${CRM_VERSION}</div>
         <div>Data log: <code>${LOG_PATH}</code></div>
         <div>Dangerous Pretzel Co. internal tool.</div>
       </div>
