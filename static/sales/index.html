@@ -962,22 +962,37 @@ let receiptFormGen = 0;
 // OAuth pages set COOP headers that clear window.opener before the redirect.
 // Both pages share the same origin so the storage event fires here when the
 // popup writes to it.
-window.addEventListener('storage', (e) => {
-  if (e.key !== '_crm_drive_token' || !e.newValue) return;
-  localStorage.removeItem('_crm_drive_token');
+function consumeDriveToken(raw) {
   let data;
-  try { data = JSON.parse(e.newValue); } catch { return; }
+  try { data = JSON.parse(raw); } catch { return; }
   if (data.error) {
     const msgs = { access_denied: 'Access denied — please approve Google Drive access when prompted.' };
     toast(msgs[data.error] || 'Google sign-in failed: ' + data.error, 4000);
     return;
   }
-  if (data.token) {
-    driveAccessToken = data.token;
-    setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (data.expires_in || 3600) * 1000);
-    updateDriveAuthUI();
-  }
+  if (!data.token) return;
+  // Honor the real expiry even if this token sat in localStorage for a while
+  // (e.g. iOS reloaded this tab during sign-in and we're picking it up at startup)
+  const ageMs = data.at ? Date.now() - data.at : 0;
+  const remainingMs = (data.expires_in || 3600) * 1000 - ageMs;
+  if (remainingMs <= 0) return;
+  driveAccessToken = data.token;
+  setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, remainingMs);
+  updateDriveAuthUI();
+}
+
+window.addEventListener('storage', (e) => {
+  if (e.key !== '_crm_drive_token' || !e.newValue) return;
+  localStorage.removeItem('_crm_drive_token');
+  consumeDriveToken(e.newValue);
 });
+
+// iOS reloads background tabs, so this page may have missed the storage event
+// while the sign-in tab was open — pick up any token left behind at startup.
+{
+  const leftover = localStorage.getItem('_crm_drive_token');
+  if (leftover) { localStorage.removeItem('_crm_drive_token'); consumeDriveToken(leftover); }
+}
 
 // Called when the receipt modal opens or after auth state changes
 function updateDriveAuthUI() {
@@ -997,7 +1012,7 @@ function getDriveToken() {
   if (driveAccessToken) return Promise.resolve(driveAccessToken);
   const clientId = STATE.googleConfig && STATE.googleConfig.clientId;
   if (!clientId) return Promise.reject(new Error('Google Drive not configured. See Settings → Google Drive.'));
-  return Promise.reject(new Error('Please sign in to Google Drive first — use the "Sign in with Google Drive" button above the photo field.'));
+  return Promise.reject(new Error('Please sign in to Google Drive first — use the "Sign in with Google Drive" button below the photo field.'));
 }
 
 async function uploadPhotoToDrive(file, onStatus) {
