@@ -774,7 +774,8 @@ textarea{resize:vertical;min-height:70px}
       <div class="form-group">
         <label>Receipt Photo <span style="font-weight:400;color:var(--gray-3)">(optional)</span></label>
         <input type="file" id="receipt-photo" accept="image/*" capture="environment" style="font-size:13px">
-        <div class="form-hint">Stored on this device only.</div>
+        <div id="receipt-photo-hint" class="form-hint">Stored on this device only.</div>
+        <button type="button" id="gdrive-connect-btn" class="btn btn-outline btn-sm" style="margin-top:6px;display:none">Connect Google Drive</button>
         <div id="receipt-photo-preview" style="margin-top:8px"></div>
       </div>
       <div class="modal-err" id="receipt-err"></div>
@@ -960,47 +961,54 @@ let receiptFormGen = 0;
 
 function initDriveClient() {
   if (driveTokenClient || !window._gisReady || !STATE.googleConfig.clientId) return;
+  // Callback must be a real function at initTokenClient time — GIS stores it
+  // internally and never reads the .callback property again after the popup returns,
+  // so assigning driveTokenClient.callback later has no effect.
   driveTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: STATE.googleConfig.clientId,
     scope: 'https://www.googleapis.com/auth/drive',
-    callback: '',
-  });
-}
-
-function getDriveToken(onWaiting) {
-  return new Promise((resolve, reject) => {
-    if (driveAccessToken) { resolve(driveAccessToken); return; }
-    // 90s — enough time for a user to read the popup, pick an account, and approve
-    const t = setTimeout(() => {
-      driveTokenClient = null;
-      driveAccessToken = null;
-      reject(new Error('Google sign-in timed out. If a popup was blocked, allow popups for this site and try again.'));
-    }, 90000);
-    driveTokenClient.callback = (resp) => {
-      clearTimeout(t);
-      if (resp.error) {
-        const msgs = {
-          popup_blocked_by_browser: 'Popup blocked — please allow popups for this site and try again.',
-          popup_closed_by_user: 'Sign-in cancelled.',
-          access_denied: 'Access denied — please approve Google Drive access when prompted.',
-        };
-        reject(new Error(msgs[resp.error] || 'Google sign-in failed: ' + resp.error));
-        return;
-      }
+    callback: (resp) => {
+      const errMsgs = {
+        popup_blocked_by_browser: 'Popup blocked — please allow popups for this site and try again.',
+        popup_closed_by_user: 'Sign-in cancelled.',
+        access_denied: 'Access denied — please approve Google Drive access when prompted.',
+      };
+      if (resp.error) { toast(errMsgs[resp.error] || 'Google sign-in failed: ' + resp.error); return; }
       driveAccessToken = resp.access_token;
-      setTimeout(() => { driveAccessToken = null; }, (resp.expires_in || 3600) * 1000);
-      resolve(resp.access_token);
-    };
-    driveTokenClient.requestAccessToken({ prompt: 'consent' });
-    // Tell the caller a popup is now open so the UI can update
-    if (typeof onWaiting === 'function') onWaiting();
+      setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (resp.expires_in || 3600) * 1000);
+      updateDriveAuthUI();
+      toast('Google Drive connected — you can now save your receipt.');
+    },
   });
 }
 
-async function uploadPhotoToDrive(file, onWaiting) {
+// Called when the receipt modal opens or after auth completes
+function updateDriveAuthUI() {
+  const btn = document.getElementById('gdrive-connect-btn');
+  const hint = document.getElementById('receipt-photo-hint');
+  if (!btn || !hint) return;
+  const configured = !!(STATE.googleConfig && STATE.googleConfig.clientId);
+  if (!configured) {
+    btn.style.display = 'none';
+    hint.textContent = 'Stored on this device only.';
+  } else if (driveAccessToken) {
+    btn.style.display = 'none';
+    hint.textContent = 'Photo will upload to your shared Google Drive folder.';
+  } else {
+    btn.style.display = '';
+    hint.textContent = 'Connect Google Drive to store photos across all devices.';
+  }
+}
+
+function getDriveToken() {
+  if (driveAccessToken) return Promise.resolve(driveAccessToken);
+  return Promise.reject(new Error('Not connected to Google Drive — use the Connect button above, then save again.'));
+}
+
+async function uploadPhotoToDrive(file) {
   if (!driveTokenClient) initDriveClient();
   if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
-  const token = await getDriveToken(onWaiting);
+  const token = await getDriveToken();
   const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg',
     ...(STATE.googleConfig.folderId ? { parents: [STATE.googleConfig.folderId] } : {}) };
   // Drive API requires multipart/related, not multipart/form-data
@@ -2344,6 +2352,7 @@ function openReceiptModal(id = null) {
   } else {
     repGroup.style.display = 'none';
   }
+  updateDriveAuthUI();
   openModal('modal-receipt');
 }
 
@@ -2453,9 +2462,7 @@ async function submitReceiptForm() {
     let drivePhotoInfo = null;
     if (photoFile) {
       if (STATE.googleConfig.clientId) {
-        drivePhotoInfo = await uploadPhotoToDrive(photoFile, () => {
-          btn.textContent = 'Sign in with Google…';
-        });
+        drivePhotoInfo = await uploadPhotoToDrive(photoFile);
       } else {
         photoData = await compressPhoto(photoFile);
       }
@@ -3438,6 +3445,11 @@ function bindAll() {
   document.getElementById('order-save-btn').addEventListener('click', submitOrderForm);
   document.getElementById('sample-save-btn').addEventListener('click', submitSampleForm);
   document.getElementById('receipt-save-btn').addEventListener('click', submitReceiptForm);
+  document.getElementById('gdrive-connect-btn').addEventListener('click', () => {
+    if (!driveTokenClient) initDriveClient();
+    if (!driveTokenClient) { toast('Google Drive not configured — see Settings → Google Drive.'); return; }
+    driveTokenClient.requestAccessToken({ prompt: 'consent' });
+  });
   document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
   document.getElementById('note-save-btn').addEventListener('click', submitNoteForm);
   document.getElementById('location-save-btn').addEventListener('click', submitLocationForm);
