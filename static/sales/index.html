@@ -775,6 +775,7 @@ textarea{resize:vertical;min-height:70px}
         <label>Receipt Photo <span style="font-weight:400;color:var(--gray-3)">(optional)</span></label>
         <input type="file" id="receipt-photo" accept="image/*" capture="environment" style="font-size:13px">
         <div id="receipt-photo-hint" class="form-hint">Stored on this device only.</div>
+        <button type="button" id="gdrive-connect-btn" class="btn btn-outline btn-sm" style="display:none;margin-top:6px">Sign in with Google Drive</button>
         <div id="receipt-photo-preview" style="margin-top:8px"></div>
       </div>
       <div class="modal-err" id="receipt-err"></div>
@@ -945,8 +946,6 @@ async function sha256(str) {
 
 // ── Google Drive photo upload ─────────────────────────────────────────────────
 let driveAccessToken = null;
-let _driveResolve = null;
-let _driveReject  = null;
 
 // Increments every time the receipt modal opens; lets async callbacks detect a stale form session
 let receiptFormGen = 0;
@@ -963,67 +962,40 @@ window.addEventListener('storage', (e) => {
   try { data = JSON.parse(e.newValue); } catch { return; }
   if (data.error) {
     const msgs = { access_denied: 'Access denied — please approve Google Drive access when prompted.' };
-    const msg = msgs[data.error] || 'Google sign-in failed: ' + data.error;
-    if (_driveReject) { _driveReject(new Error(msg)); _driveResolve = _driveReject = null; }
+    toast(msgs[data.error] || 'Google sign-in failed: ' + data.error, 4000);
     return;
   }
   if (data.token) {
     driveAccessToken = data.token;
     setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (data.expires_in || 3600) * 1000);
     updateDriveAuthUI();
-    if (_driveResolve) { _driveResolve(driveAccessToken); _driveResolve = _driveReject = null; }
   }
 });
 
 // Called when the receipt modal opens or after auth state changes
 function updateDriveAuthUI() {
   const hint = document.getElementById('receipt-photo-hint');
-  if (!hint) return;
-  hint.textContent = (STATE.googleConfig && STATE.googleConfig.clientId)
-    ? 'Photo will upload to your shared Google Drive folder.'
+  const btn  = document.getElementById('gdrive-connect-btn');
+  const hasDrive = STATE.googleConfig && STATE.googleConfig.clientId;
+  if (hint) hint.textContent = hasDrive
+    ? (driveAccessToken ? 'Photo will upload to your shared Google Drive folder.' : 'Sign in to Google Drive to save the photo there.')
     : 'Stored on this device only.';
+  if (btn) btn.style.display = (hasDrive && !driveAccessToken) ? '' : 'none';
 }
 
-// Opens a Google OAuth popup and resolves with an access token.
-// Uses our own oauth-callback.html redirect so we control the entire channel —
-// no dependency on the GIS library's internal postMessage mechanism.
-function getDriveToken(onWaiting) {
+// Resolves with the cached Drive access token or rejects immediately.
+// The popup is opened by the "Sign in with Google Drive" button (a synchronous
+// click handler) so browsers never block it as an async-context popup.
+function getDriveToken() {
   if (driveAccessToken) return Promise.resolve(driveAccessToken);
   const clientId = STATE.googleConfig && STATE.googleConfig.clientId;
   if (!clientId) return Promise.reject(new Error('Google Drive not configured. See Settings → Google Drive.'));
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => {
-      _driveResolve = _driveReject = null;
-      reject(new Error('Google sign-in timed out. Check for a sign-in popup and complete it, then try again.'));
-    }, 120000);
-    _driveResolve = (v) => { clearTimeout(t); resolve(v); };
-    _driveReject  = (e) => { clearTimeout(t); reject(e); };
-    const redirectUri = location.origin + '/static/sales/oauth-callback.html';
-    const scope = 'https://www.googleapis.com/auth/drive';
-    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
-      + '?client_id='    + encodeURIComponent(clientId)
-      + '&redirect_uri=' + encodeURIComponent(redirectUri)
-      + '&response_type=token'
-      + '&scope='        + encodeURIComponent(scope)
-      + '&prompt=consent';
-    const pw = 500, ph = 600;
-    const popup = window.open(
-      authUrl, 'drive-auth',
-      `width=${pw},height=${ph},left=${Math.max(0,(screen.width-pw)/2)},top=${Math.max(0,(screen.height-ph)/2)},popup=1`
-    );
-    if (!popup) {
-      clearTimeout(t); _driveResolve = _driveReject = null;
-      reject(new Error('Popup blocked — please allow popups for this site and try again.'));
-      return;
-    }
-    if (typeof onWaiting === 'function') onWaiting();
-  });
+  return Promise.reject(new Error('Please sign in to Google Drive first — use the "Sign in with Google Drive" button above the photo field.'));
 }
 
 async function uploadPhotoToDrive(file, onStatus) {
   const status = (msg) => { if (typeof onStatus === 'function') onStatus(msg); };
-  status('Sign in with Google…');
-  const token = await getDriveToken(() => status('Complete Google sign-in…'));
+  const token = await getDriveToken();
   // Compress to ≤800px JPEG before upload — raw phone photos can be 5–10 MB
   status('Compressing photo…');
   const dataUrl = await compressPhoto(file);
@@ -3464,6 +3436,28 @@ function bindAll() {
     const data = await compressPhoto(file);
     document.getElementById('receipt-photo-preview').innerHTML = `<img src="${data}" style="max-width:100%;max-height:120px;border-radius:4px;border:1px solid var(--border)">`;
     setTimeout(() => { saveBtn.disabled = false; }, 600);
+  });
+
+  // Google Drive sign-in button — plain synchronous click handler so browsers
+  // never treat window.open as coming from an async context (Firefox blocks those)
+  document.getElementById('gdrive-connect-btn').addEventListener('click', () => {
+    const clientId = STATE.googleConfig && STATE.googleConfig.clientId;
+    if (!clientId) return;
+    localStorage.removeItem('_crm_drive_token');
+    const redirectUri = location.origin + '/static/sales/oauth-callback.html';
+    const scope = 'https://www.googleapis.com/auth/drive';
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+      + '?client_id='    + encodeURIComponent(clientId)
+      + '&redirect_uri=' + encodeURIComponent(redirectUri)
+      + '&response_type=token'
+      + '&scope='        + encodeURIComponent(scope)
+      + '&prompt=consent';
+    const pw = 500, ph = 600;
+    const popup = window.open(
+      authUrl, 'drive-auth',
+      `width=${pw},height=${ph},left=${Math.max(0,(screen.width-pw)/2)},top=${Math.max(0,(screen.height-ph)/2)},popup=1`
+    );
+    if (!popup) toast('Popup blocked — please allow popups for this site and try again.');
   });
 
   // Mileage live reimbursement preview
