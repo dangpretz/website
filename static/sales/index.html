@@ -967,35 +967,40 @@ function initDriveClient() {
   });
 }
 
-function getDriveToken() {
+function getDriveToken(onWaiting) {
   return new Promise((resolve, reject) => {
     if (driveAccessToken) { resolve(driveAccessToken); return; }
-    // 20s timeout — if GIS silent-flow fails on iOS without calling the callback
-    // we surface an error quickly so the button re-enables
+    // 90s — enough time for a user to read the popup, pick an account, and approve
     const t = setTimeout(() => {
-      // Reset so the next attempt reinitialises from scratch
       driveTokenClient = null;
       driveAccessToken = null;
-      reject(new Error('Google sign-in timed out — tap Save again to retry.'));
-    }, 20000);
+      reject(new Error('Google sign-in timed out. If a popup was blocked, allow popups for this site and try again.'));
+    }, 90000);
     driveTokenClient.callback = (resp) => {
       clearTimeout(t);
-      if (resp.error) { reject(new Error('Google sign-in failed: ' + resp.error)); return; }
+      if (resp.error) {
+        const msgs = {
+          popup_blocked_by_browser: 'Popup blocked — please allow popups for this site and try again.',
+          popup_closed_by_user: 'Sign-in cancelled.',
+          access_denied: 'Access denied — please approve Google Drive access when prompted.',
+        };
+        reject(new Error(msgs[resp.error] || 'Google sign-in failed: ' + resp.error));
+        return;
+      }
       driveAccessToken = resp.access_token;
-      // Auto-clear when token expires so next upload re-auths
       setTimeout(() => { driveAccessToken = null; }, (resp.expires_in || 3600) * 1000);
       resolve(resp.access_token);
     };
-    // 'consent' forces GIS to always show the sign-in UI rather than attempting a
-    // silent token grab — silent flow on iOS Safari can fail without calling the callback
     driveTokenClient.requestAccessToken({ prompt: 'consent' });
+    // Tell the caller a popup is now open so the UI can update
+    if (typeof onWaiting === 'function') onWaiting();
   });
 }
 
-async function uploadPhotoToDrive(file) {
+async function uploadPhotoToDrive(file, onWaiting) {
   if (!driveTokenClient) initDriveClient();
   if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
-  const token = await getDriveToken();
+  const token = await getDriveToken(onWaiting);
   const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg',
     ...(STATE.googleConfig.folderId ? { parents: [STATE.googleConfig.folderId] } : {}) };
   // Drive API requires multipart/related, not multipart/form-data
@@ -2448,7 +2453,9 @@ async function submitReceiptForm() {
     let drivePhotoInfo = null;
     if (photoFile) {
       if (STATE.googleConfig.clientId) {
-        drivePhotoInfo = await uploadPhotoToDrive(photoFile);
+        drivePhotoInfo = await uploadPhotoToDrive(photoFile, () => {
+          btn.textContent = 'Sign in with Google…';
+        });
       } else {
         photoData = await compressPhoto(photoFile);
       }
