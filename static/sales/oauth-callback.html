@@ -3,16 +3,16 @@
 <head><title>Connecting…</title></head>
 <body>
 <script>
+  // window.opener is cleared by Google's COOP headers, so use localStorage instead.
+  // Both this page and the main CRM page share the same origin, so the storage
+  // event fires in the main window when we write here.
   var p = new URLSearchParams(location.hash.slice(1));
   var token = p.get('access_token');
   var error = p.get('error');
   var expires = parseInt(p.get('expires_in') || '3600');
-  if (window.opener) {
-    window.opener.postMessage(
-      { type: 'drive-oauth', token: token || null, error: error || null, expires_in: expires },
-      window.opener.location.origin
-    );
-  }
+  localStorage.setItem('_crm_drive_token', JSON.stringify(
+    token ? { token: token, expires_in: expires } : { error: error || 'unknown' }
+  ));
   window.close();
 </script>
 </body>
