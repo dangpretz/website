@@ -1002,23 +1002,47 @@ function updateDriveAuthUI() {
 // Returns a promise that resolves with the Drive access token.
 // If no token is cached, triggers the GIS auth popup synchronously
 // (called in the user-gesture context of a Save click, before any await).
-function getDriveToken() {
+function getDriveToken(onWaiting) {
   if (driveAccessToken) return Promise.resolve(driveAccessToken);
   if (!driveTokenClient) return Promise.reject(new Error('Google Drive not configured. See Settings → Google Drive.'));
   return new Promise((resolve, reject) => {
     _driveResolve = resolve;
     _driveReject  = reject;
+    const t = setTimeout(() => {
+      _driveResolve = _driveReject = null;
+      reject(new Error('Google sign-in timed out. Check for a popup window and complete sign-in, then try again.'));
+    }, 120000);
+    const origResolve = resolve;
+    _driveResolve = (v) => { clearTimeout(t); origResolve(v); };
+    const origReject = reject;
+    _driveReject  = (e) => { clearTimeout(t); origReject(e); };
     driveTokenClient.requestAccessToken({ prompt: 'consent' });
+    if (typeof onWaiting === 'function') onWaiting();
   });
 }
 
-async function uploadPhotoToDrive(file) {
+async function uploadPhotoToDrive(file, onStatus) {
+  const status = (msg) => { if (typeof onStatus === 'function') onStatus(msg); };
   if (!driveTokenClient) initDriveClient();
   if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
-  const token = await getDriveToken();
+  status('Sign in with Google…');
+  const token = await getDriveToken(() => status('Complete Google sign-in…'));
   // Compress to ≤800px JPEG before upload — raw phone photos can be 5–10 MB
+  status('Compressing photo…');
   const dataUrl = await compressPhoto(file);
-  const compressedBlob = await fetch(dataUrl).then(r => r.blob());
+  // dataUrlToBlob avoids fetch() on data URLs which is unsupported in older Safari
+  const compressedBlob = dataUrlToBlob(dataUrl);
+  // Quick Drive API check to confirm the token actually works before uploading
+  status('Verifying Drive access…');
+  const checkRes = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!checkRes.ok) {
+    driveAccessToken = null; // force re-auth on next attempt
+    const body = await checkRes.json().catch(() => ({}));
+    throw new Error(`Drive auth error (${checkRes.status}): ${body?.error?.message || 'token may have expired'}`);
+  }
+  status('Uploading photo…');
   const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: 'image/jpeg',
     ...(STATE.googleConfig.folderId ? { parents: [STATE.googleConfig.folderId] } : {}) };
   // Drive API requires multipart/related, not multipart/form-data
@@ -2314,10 +2338,12 @@ function renderReceipts() {
 }
 
 function compressPhoto(file) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read photo file.'));
     reader.onload = e => {
       const img = new Image();
+      img.onerror = () => reject(new Error('Could not decode photo — unsupported format?'));
       img.onload = () => {
         const MAX = 800;
         let w = img.width, h = img.height;
@@ -2334,6 +2360,16 @@ function compressPhoto(file) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+// Converts a data URL to a Blob without using fetch() (not supported on data URLs in older Safari)
+function dataUrlToBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
 }
 
 function openReceiptModal(id = null) {
@@ -2472,7 +2508,7 @@ async function submitReceiptForm() {
     let drivePhotoInfo = null;
     if (photoFile) {
       if (STATE.googleConfig.clientId) {
-        drivePhotoInfo = await uploadPhotoToDrive(photoFile);
+        drivePhotoInfo = await uploadPhotoToDrive(photoFile, (msg) => { btn.textContent = msg; });
       } else {
         photoData = await compressPhoto(photoFile);
       }
