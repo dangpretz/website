@@ -2743,6 +2743,11 @@ function renderSettings() {
 
   document.getElementById('gdrive-config-save')?.addEventListener('click', async () => {
     const clientId = document.getElementById('gdrive-client-id').value.trim();
+    // A truncated paste here once broke sign-in for every device — reject early
+    if (clientId && !/^[\w-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
+      toast('That Client ID looks incomplete — it should end with .apps.googleusercontent.com', 5000);
+      return;
+    }
     const raw = document.getElementById('gdrive-folder-id').value.trim();
     // Accept a full Drive URL or a bare ID — extract just the ID either way
     const folderMatch = raw.match(/\/folders\/([a-zA-Z0-9_-]+)/);
