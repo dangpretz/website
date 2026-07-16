@@ -951,18 +951,25 @@ let _driveReject  = null;
 // Increments every time the receipt modal opens; lets async callbacks detect a stale form session
 let receiptFormGen = 0;
 
-// Receive the token posted back from oauth-callback.html after Google sign-in
-window.addEventListener('message', (e) => {
-  if (!e.data || e.data.type !== 'drive-oauth') return;
-  if (e.data.error) {
+// Receive the token written by oauth-callback.html via localStorage.
+// We use localStorage instead of window.opener.postMessage because Google's
+// OAuth pages set COOP headers that clear window.opener before the redirect.
+// Both pages share the same origin so the storage event fires here when the
+// popup writes to it.
+window.addEventListener('storage', (e) => {
+  if (e.key !== '_crm_drive_token' || !e.newValue) return;
+  localStorage.removeItem('_crm_drive_token');
+  let data;
+  try { data = JSON.parse(e.newValue); } catch { return; }
+  if (data.error) {
     const msgs = { access_denied: 'Access denied — please approve Google Drive access when prompted.' };
-    const msg = msgs[e.data.error] || 'Google sign-in failed: ' + e.data.error;
+    const msg = msgs[data.error] || 'Google sign-in failed: ' + data.error;
     if (_driveReject) { _driveReject(new Error(msg)); _driveResolve = _driveReject = null; }
     return;
   }
-  if (e.data.token) {
-    driveAccessToken = e.data.token;
-    setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (e.data.expires_in || 3600) * 1000);
+  if (data.token) {
+    driveAccessToken = data.token;
+    setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (data.expires_in || 3600) * 1000);
     updateDriveAuthUI();
     if (_driveResolve) { _driveResolve(driveAccessToken); _driveResolve = _driveReject = null; }
   }
