@@ -955,6 +955,9 @@ async function sha256(str) {
 // ── Google Drive photo upload ─────────────────────────────────────────────────
 let driveTokenClient = null;
 let driveAccessToken = null;
+// Pending resolve/reject for an in-flight requestAccessToken call
+let _driveResolve = null;
+let _driveReject  = null;
 
 // Increments every time the receipt modal opens; lets async callbacks detect a stale form session
 let receiptFormGen = 0;
@@ -962,8 +965,7 @@ let receiptFormGen = 0;
 function initDriveClient() {
   if (driveTokenClient || !window._gisReady || !STATE.googleConfig.clientId) return;
   // Callback must be a real function at initTokenClient time — GIS stores it
-  // internally and never reads the .callback property again after the popup returns,
-  // so assigning driveTokenClient.callback later has no effect.
+  // internally and never reads .callback again after the popup returns.
   driveTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: STATE.googleConfig.clientId,
     scope: 'https://www.googleapis.com/auth/drive',
@@ -973,16 +975,22 @@ function initDriveClient() {
         popup_closed_by_user: 'Sign-in cancelled.',
         access_denied: 'Access denied — please approve Google Drive access when prompted.',
       };
-      if (resp.error) { toast(errMsgs[resp.error] || 'Google sign-in failed: ' + resp.error); return; }
+      if (resp.error) {
+        const msg = errMsgs[resp.error] || 'Google sign-in failed: ' + resp.error;
+        if (_driveReject) { _driveReject(new Error(msg)); _driveResolve = _driveReject = null; }
+        else { toast(msg); }
+        return;
+      }
       driveAccessToken = resp.access_token;
       setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (resp.expires_in || 3600) * 1000);
       updateDriveAuthUI();
-      toast('Google Drive connected — you can now save your receipt.');
+      if (_driveResolve) { _driveResolve(driveAccessToken); _driveResolve = _driveReject = null; }
+      else { toast('Google Drive connected — you can now save your receipt.'); }
     },
   });
 }
 
-// Called when the receipt modal opens or after auth completes
+// Called when the receipt modal opens or after auth state changes
 function updateDriveAuthUI() {
   const btn = document.getElementById('gdrive-connect-btn');
   const hint = document.getElementById('receipt-photo-hint');
@@ -1000,9 +1008,17 @@ function updateDriveAuthUI() {
   }
 }
 
+// Returns a promise that resolves with the Drive access token.
+// If no token is cached, triggers the GIS auth popup synchronously
+// (called in the user-gesture context of a Save click, before any await).
 function getDriveToken() {
   if (driveAccessToken) return Promise.resolve(driveAccessToken);
-  return Promise.reject(new Error('Not connected to Google Drive — use the Connect button above, then save again.'));
+  if (!driveTokenClient) return Promise.reject(new Error('Google Drive not configured. See Settings → Google Drive.'));
+  return new Promise((resolve, reject) => {
+    _driveResolve = resolve;
+    _driveReject  = reject;
+    driveTokenClient.requestAccessToken({ prompt: 'consent' });
+  });
 }
 
 async function uploadPhotoToDrive(file) {
