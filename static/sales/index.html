@@ -863,14 +863,6 @@ textarea{resize:vertical;min-height:70px}
   </div>
 </div>
 
-<script>
-// GIS library fires this when loaded; dispatches event so module can react
-function gisLoaded() {
-  window._gisReady = true;
-  window.dispatchEvent(new Event('gis-ready'));
-}
-</script>
-<script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
 
 <script type="module">
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
@@ -952,79 +944,77 @@ async function sha256(str) {
 }
 
 // ── Google Drive photo upload ─────────────────────────────────────────────────
-let driveTokenClient = null;
 let driveAccessToken = null;
-// Pending resolve/reject for an in-flight requestAccessToken call
 let _driveResolve = null;
 let _driveReject  = null;
 
 // Increments every time the receipt modal opens; lets async callbacks detect a stale form session
 let receiptFormGen = 0;
 
-function initDriveClient() {
-  if (driveTokenClient || !window._gisReady || !STATE.googleConfig.clientId) return;
-  // Callback must be a real function at initTokenClient time — GIS stores it
-  // internally and never reads .callback again after the popup returns.
-  driveTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: STATE.googleConfig.clientId,
-    scope: 'https://www.googleapis.com/auth/drive',
-    callback: (resp) => {
-      const errMsgs = {
-        popup_blocked_by_browser: 'Popup blocked — please allow popups for this site and try again.',
-        popup_closed_by_user: 'Sign-in cancelled.',
-        access_denied: 'Access denied — please approve Google Drive access when prompted.',
-      };
-      if (resp.error) {
-        const msg = errMsgs[resp.error] || 'Google sign-in failed: ' + resp.error;
-        if (_driveReject) { _driveReject(new Error(msg)); _driveResolve = _driveReject = null; }
-        else { toast(msg); }
-        return;
-      }
-      driveAccessToken = resp.access_token;
-      setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (resp.expires_in || 3600) * 1000);
-      updateDriveAuthUI();
-      if (_driveResolve) { _driveResolve(driveAccessToken); _driveResolve = _driveReject = null; }
-      else { toast('Google Drive connected — you can now save your receipt.'); }
-    },
-  });
-}
+// Receive the token posted back from oauth-callback.html after Google sign-in
+window.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'drive-oauth') return;
+  if (e.data.error) {
+    const msgs = { access_denied: 'Access denied — please approve Google Drive access when prompted.' };
+    const msg = msgs[e.data.error] || 'Google sign-in failed: ' + e.data.error;
+    if (_driveReject) { _driveReject(new Error(msg)); _driveResolve = _driveReject = null; }
+    return;
+  }
+  if (e.data.token) {
+    driveAccessToken = e.data.token;
+    setTimeout(() => { driveAccessToken = null; updateDriveAuthUI(); }, (e.data.expires_in || 3600) * 1000);
+    updateDriveAuthUI();
+    if (_driveResolve) { _driveResolve(driveAccessToken); _driveResolve = _driveReject = null; }
+  }
+});
 
 // Called when the receipt modal opens or after auth state changes
 function updateDriveAuthUI() {
   const hint = document.getElementById('receipt-photo-hint');
   if (!hint) return;
-  const configured = !!(STATE.googleConfig && STATE.googleConfig.clientId);
-  hint.textContent = configured
+  hint.textContent = (STATE.googleConfig && STATE.googleConfig.clientId)
     ? 'Photo will upload to your shared Google Drive folder.'
     : 'Stored on this device only.';
 }
 
-// Returns a promise that resolves with the Drive access token.
-// If no token is cached, triggers the GIS auth popup synchronously
-// (called in the user-gesture context of a Save click, before any await).
+// Opens a Google OAuth popup and resolves with an access token.
+// Uses our own oauth-callback.html redirect so we control the entire channel —
+// no dependency on the GIS library's internal postMessage mechanism.
 function getDriveToken(onWaiting) {
   if (driveAccessToken) return Promise.resolve(driveAccessToken);
-  if (!driveTokenClient) return Promise.reject(new Error('Google Drive not configured. See Settings → Google Drive.'));
+  const clientId = STATE.googleConfig && STATE.googleConfig.clientId;
+  if (!clientId) return Promise.reject(new Error('Google Drive not configured. See Settings → Google Drive.'));
   return new Promise((resolve, reject) => {
-    _driveResolve = resolve;
-    _driveReject  = reject;
     const t = setTimeout(() => {
       _driveResolve = _driveReject = null;
-      reject(new Error('Google sign-in timed out. Check for a popup window and complete sign-in, then try again.'));
+      reject(new Error('Google sign-in timed out. Check for a sign-in popup and complete it, then try again.'));
     }, 120000);
-    const origResolve = resolve;
-    _driveResolve = (v) => { clearTimeout(t); origResolve(v); };
-    const origReject = reject;
-    _driveReject  = (e) => { clearTimeout(t); origReject(e); };
-    driveTokenClient.requestAccessToken({ prompt: 'consent' });
+    _driveResolve = (v) => { clearTimeout(t); resolve(v); };
+    _driveReject  = (e) => { clearTimeout(t); reject(e); };
+    const redirectUri = location.origin + '/static/sales/oauth-callback.html';
+    const scope = 'https://www.googleapis.com/auth/drive';
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+      + '?client_id='    + encodeURIComponent(clientId)
+      + '&redirect_uri=' + encodeURIComponent(redirectUri)
+      + '&response_type=token'
+      + '&scope='        + encodeURIComponent(scope)
+      + '&prompt=consent';
+    const pw = 500, ph = 600;
+    const popup = window.open(
+      authUrl, 'drive-auth',
+      `width=${pw},height=${ph},left=${Math.max(0,(screen.width-pw)/2)},top=${Math.max(0,(screen.height-ph)/2)},popup=1`
+    );
+    if (!popup) {
+      clearTimeout(t); _driveResolve = _driveReject = null;
+      reject(new Error('Popup blocked — please allow popups for this site and try again.'));
+      return;
+    }
     if (typeof onWaiting === 'function') onWaiting();
   });
 }
 
 async function uploadPhotoToDrive(file, onStatus) {
   const status = (msg) => { if (typeof onStatus === 'function') onStatus(msg); };
-  if (!driveTokenClient) initDriveClient();
-  if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
   status('Sign in with Google…');
   const token = await getDriveToken(() => status('Complete Google sign-in…'));
   // Compress to ≤800px JPEG before upload — raw phone photos can be 5–10 MB
@@ -1200,9 +1190,7 @@ async function showApp() {
     populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
   }
   await loadData();
-  // Initialise Drive client now that googleConfig is populated from the log
-  if (window._gisReady) initDriveClient();
-  else window.addEventListener('gis-ready', initDriveClient, { once: true });
+  updateDriveAuthUI();
   navigate('dashboard');
 }
 
@@ -2761,8 +2749,7 @@ function renderSettings() {
     const entry = { action: 'set_google_config', clientId, folderId, repId: currentRepId, timeStamp: new Date().toISOString() };
     await appendLog(LOG_PATH, entry);
     applyLogs([entry]);
-    driveTokenClient = null; // reset so initDriveClient re-initialises with new clientId
-    initDriveClient();
+    driveAccessToken = null; // clear cached token so next upload re-auths with new config
     toast('Google Drive settings saved.');
     renderSettings();
   });

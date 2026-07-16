@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Connecting…</title></head>
+<body>
+<script>
+  var p = new URLSearchParams(location.hash.slice(1));
+  var token = p.get('access_token');
+  var error = p.get('error');
+  var expires = parseInt(p.get('expires_in') || '3600');
+  if (window.opener) {
+    window.opener.postMessage(
+      { type: 'drive-oauth', token: token || null, error: error || null, expires_in: expires },
+      window.opener.location.origin
+    );
+  }
+  window.close();
+</script>
+</body>
+</html>
