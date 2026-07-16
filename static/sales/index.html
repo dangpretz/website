@@ -775,7 +775,6 @@ textarea{resize:vertical;min-height:70px}
         <label>Receipt Photo <span style="font-weight:400;color:var(--gray-3)">(optional)</span></label>
         <input type="file" id="receipt-photo" accept="image/*" capture="environment" style="font-size:13px">
         <div id="receipt-photo-hint" class="form-hint">Stored on this device only.</div>
-        <button type="button" id="gdrive-connect-btn" class="btn btn-outline btn-sm" style="margin-top:6px;display:none">Connect Google Drive</button>
         <div id="receipt-photo-preview" style="margin-top:8px"></div>
       </div>
       <div class="modal-err" id="receipt-err"></div>
@@ -992,20 +991,12 @@ function initDriveClient() {
 
 // Called when the receipt modal opens or after auth state changes
 function updateDriveAuthUI() {
-  const btn = document.getElementById('gdrive-connect-btn');
   const hint = document.getElementById('receipt-photo-hint');
-  if (!btn || !hint) return;
+  if (!hint) return;
   const configured = !!(STATE.googleConfig && STATE.googleConfig.clientId);
-  if (!configured) {
-    btn.style.display = 'none';
-    hint.textContent = 'Stored on this device only.';
-  } else if (driveAccessToken) {
-    btn.style.display = 'none';
-    hint.textContent = 'Photo will upload to your shared Google Drive folder.';
-  } else {
-    btn.style.display = '';
-    hint.textContent = 'Connect Google Drive to store photos across all devices.';
-  }
+  hint.textContent = configured
+    ? 'Photo will upload to your shared Google Drive folder.'
+    : 'Stored on this device only.';
 }
 
 // Returns a promise that resolves with the Drive access token.
@@ -1025,19 +1016,22 @@ async function uploadPhotoToDrive(file) {
   if (!driveTokenClient) initDriveClient();
   if (!driveTokenClient) throw new Error('Google Drive not configured. Ask your manager to set it up in Settings → Google Drive.');
   const token = await getDriveToken();
-  const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: file.type || 'image/jpeg',
+  // Compress to ≤800px JPEG before upload — raw phone photos can be 5–10 MB
+  const dataUrl = await compressPhoto(file);
+  const compressedBlob = await fetch(dataUrl).then(r => r.blob());
+  const metadata = { name: `receipt-${Date.now()}.jpg`, mimeType: 'image/jpeg',
     ...(STATE.googleConfig.folderId ? { parents: [STATE.googleConfig.folderId] } : {}) };
   // Drive API requires multipart/related, not multipart/form-data
   const boundary = 'receipt_' + Date.now();
   const body = new Blob([
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
     JSON.stringify(metadata),
-    `\r\n--${boundary}\r\nContent-Type: ${file.type || 'image/jpeg'}\r\n\r\n`,
-    file,
+    `\r\n--${boundary}\r\nContent-Type: image/jpeg\r\n\r\n`,
+    compressedBlob,
     `\r\n--${boundary}--`,
   ]);
   const ctrl = new AbortController();
-  const uploadTimeout = setTimeout(() => ctrl.abort(), 30000);
+  const uploadTimeout = setTimeout(() => ctrl.abort(), 60000);
   const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -3461,11 +3455,6 @@ function bindAll() {
   document.getElementById('order-save-btn').addEventListener('click', submitOrderForm);
   document.getElementById('sample-save-btn').addEventListener('click', submitSampleForm);
   document.getElementById('receipt-save-btn').addEventListener('click', submitReceiptForm);
-  document.getElementById('gdrive-connect-btn').addEventListener('click', () => {
-    if (!driveTokenClient) initDriveClient();
-    if (!driveTokenClient) { toast('Google Drive not configured — see Settings → Google Drive.'); return; }
-    driveTokenClient.requestAccessToken({ prompt: 'consent' });
-  });
   document.getElementById('mileage-save-btn').addEventListener('click', submitMileageForm);
   document.getElementById('note-save-btn').addEventListener('click', submitNoteForm);
   document.getElementById('location-save-btn').addEventListener('click', submitLocationForm);
