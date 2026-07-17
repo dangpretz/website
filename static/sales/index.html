@@ -101,6 +101,7 @@ body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text)
 .badge-converted{background:#dbeafe;color:#1d4ed8}
 .badge-approved{background:#dbeafe;color:#1d4ed8}
 .badge-reimbursed{background:#d1fae5;color:#065f46}
+.badge-paid{background:#e0e7ff;color:#3730a3}
 .badge-company-card{background:#f1f5f9;color:#475569}
 .badge-call{background:#f3e8ff;color:#6b21a8}
 .badge-email{background:#dbeafe;color:#1d4ed8}
@@ -444,6 +445,7 @@ textarea{resize:vertical;min-height:70px}
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="reimbursed">Reimbursed</option>
+          <option value="paid">Paid</option>
         </select>
         <select class="filter-select" id="receipt-rep-filter" style="display:none">
           <option value="">All Reps</option>
@@ -874,7 +876,7 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 const LOG_PATH = '/dangpretz/sales-crm';
 // Bump on every release — shown on the login screen, sidebar, and Settings → About
 // so a stale browser-cached copy of this page is easy to spot.
-const CRM_VERSION = 'v1.5';
+const CRM_VERSION = 'v1.7';
 document.querySelectorAll('.crm-version').forEach(el => { el.textContent = CRM_VERSION; });
 const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
@@ -2189,6 +2191,8 @@ function renderReceipts() {
     const pendingTotal     = rows.filter(r => r.status === 'pending' || r.status === 'company-card').reduce((s,r) => s + Number(r.amount||0), 0);
     const approvedTotal    = rows.filter(r => r.status === 'approved').reduce((s,r) => s + Number(r.amount||0), 0);
     const reimbTotal       = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
+    // 'paid' is the company-card terminal status — approved and settled by the company, never reimbursed to the rep
+    const paidTotal        = rows.filter(r => r.status === 'paid').reduce((s,r) => s + Number(r.amount||0), 0);
     // Paid-via-company-card is a payment method, not an approval status — tracked separately from status now
     const companyCardTotal = rows.filter(r => r.paymentMethod === 'company-card').reduce((s,r) => s + Number(r.amount||0), 0);
 
@@ -2217,7 +2221,8 @@ function renderReceipts() {
                 <td style="white-space:nowrap">
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
                   ${isAdmin && (r.status === 'pending' || r.status === 'company-card') ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
-                  ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin && r.status === 'approved' && r.paymentMethod !== 'company-card' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin && r.status === 'approved' && r.paymentMethod === 'company-card' ? `<button class="btn btn-outline btn-sm" data-paid-receipt="${esc(r.id)}">Mark Paid</button>` : ''}
                   ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-receipt="${esc(r.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
               </tr>`;
@@ -2229,6 +2234,7 @@ function renderReceipts() {
               <span style="color:var(--amber);font-weight:700">Pending: ${fmt$(pendingTotal)}</span> &nbsp;
               <span style="color:var(--blue);font-weight:700">Approved: ${fmt$(approvedTotal)}</span> &nbsp;
               <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span> &nbsp;
+              <span style="color:#3730a3;font-weight:700">Paid: ${fmt$(paidTotal)}</span> &nbsp;
               ${companyCardTotal > 0 ? `<span style="color:#475569;font-weight:700">Company Card: ${fmt$(companyCardTotal)}</span>` : ''}
             </td>
             <td colspan="${isAdmin ? 4 : 3}"></td>
@@ -2251,6 +2257,9 @@ function renderReceipts() {
     });
     wrap.querySelectorAll('[data-reimb-receipt]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.reimbReceipt, 'reimbursed'));
+    });
+    wrap.querySelectorAll('[data-paid-receipt]').forEach(btn => {
+      btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.paidReceipt, 'paid'));
     });
     wrap.querySelectorAll('[data-delete-receipt]').forEach(btn => {
       btn.addEventListener('click', () => { if (confirm('Delete this receipt? This cannot be undone.')) deleteExpense('receipt', btn.dataset.deleteReceipt); });
