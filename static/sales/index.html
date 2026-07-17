@@ -876,7 +876,7 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 const LOG_PATH = '/dangpretz/sales-crm';
 // Bump on every release — shown on the login screen, sidebar, and Settings → About
 // so a stale browser-cached copy of this page is easy to spot.
-const CRM_VERSION = 'v1.7';
+const CRM_VERSION = 'v1.8';
 document.querySelectorAll('.crm-version').forEach(el => { el.textContent = CRM_VERSION; });
 const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
@@ -2193,8 +2193,6 @@ function renderReceipts() {
     const reimbTotal       = rows.filter(r => r.status === 'reimbursed').reduce((s,r) => s + Number(r.amount||0), 0);
     // 'paid' is the company-card terminal status — approved and settled by the company, never reimbursed to the rep
     const paidTotal        = rows.filter(r => r.status === 'paid').reduce((s,r) => s + Number(r.amount||0), 0);
-    // Paid-via-company-card is a payment method, not an approval status — tracked separately from status now
-    const companyCardTotal = rows.filter(r => r.paymentMethod === 'company-card').reduce((s,r) => s + Number(r.amount||0), 0);
 
     const catLabel = { meals:'Meals', travel:'Travel', supplies:'Supplies', other:'Other' };
     wrap.innerHTML = rows.length === 0 ? `<div class="empty"><div class="empty-icon">🧾</div>No receipts yet.</div>` : `
@@ -2234,8 +2232,7 @@ function renderReceipts() {
               <span style="color:var(--amber);font-weight:700">Pending: ${fmt$(pendingTotal)}</span> &nbsp;
               <span style="color:var(--blue);font-weight:700">Approved: ${fmt$(approvedTotal)}</span> &nbsp;
               <span style="color:var(--green);font-weight:700">Reimbursed: ${fmt$(reimbTotal)}</span> &nbsp;
-              <span style="color:#3730a3;font-weight:700">Paid: ${fmt$(paidTotal)}</span> &nbsp;
-              ${companyCardTotal > 0 ? `<span style="color:#475569;font-weight:700">Company Card: ${fmt$(companyCardTotal)}</span>` : ''}
+              <span style="color:#3730a3;font-weight:700">Paid: ${fmt$(paidTotal)}</span>
             </td>
             <td colspan="${isAdmin ? 4 : 3}"></td>
           </tr></tfoot>
