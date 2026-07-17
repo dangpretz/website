@@ -586,6 +586,22 @@ function fmtDate(s) {
   return s;
 }
 function genId() { return crypto.randomUUID ? crypto.randomUUID() : `ev-${Date.now()}-${Math.random().toString(36).slice(2,9)}`; }
+// Every date string an event spans, inclusive of endDate — used so multi-day events show up on every day of the range, not just the start.
+function eventDateKeys(ev) {
+  const start = (ev.date||'').trim();
+  const end = (ev.endDate||'').trim();
+  if (!start) return [];
+  if (!end || end <= start) return [start];
+  const keys = [];
+  const cur = new Date(start+'T12:00:00');
+  const last = new Date(end+'T12:00:00');
+  // Cap at a year to guard against malformed data producing a runaway loop
+  for (let i = 0; i < 366 && cur <= last; i++) {
+    keys.push(toDateStr(cur));
+    cur.setDate(cur.getDate()+1);
+  }
+  return keys;
+}
 function typeClass(type) { return 'type-' + (type || 'other'); }
 function toast(msg, isErr = false) {
   const el = document.createElement('div');
@@ -767,8 +783,7 @@ function renderWeekly() {
   const todayStr = today();
   const byDate = {};
   events.forEach(ev => {
-    const d = (ev.date||'').trim();
-    if (d) { if (!byDate[d]) byDate[d]=[]; byDate[d].push(ev); }
+    eventDateKeys(ev).forEach(d => { if (!byDate[d]) byDate[d]=[]; byDate[d].push(ev); });
   });
   let html = '<div class="week-grid">';
   for (let i = 0; i < 7; i++) {
@@ -819,7 +834,7 @@ function renderEventCard(ev) {
 
 function renderDaily() {
   const dateStr = toDateStr(currentDay);
-  const dayEvents = events.filter(ev => (ev.date||'').trim() === dateStr);
+  const dayEvents = events.filter(ev => eventDateKeys(ev).includes(dateStr));
   let html = '';
   if (!dayEvents.length) {
     html = '<div class="week-empty">No events for this day. <button onclick="openModal(null,\''+dateStr+'\')" style="background:#C41E1E;color:#fff;border:none;padding:6px 14px;border-radius:4px;font:700 12px Manrope,sans-serif;cursor:pointer;margin-left:8px">+ Add Event</button></div>';
@@ -863,8 +878,7 @@ function renderMonthly() {
   const todayStr = today();
   const byDate = {};
   events.forEach(ev => {
-    const d = (ev.date||'').trim();
-    if (d) { if (!byDate[d]) byDate[d]=[]; byDate[d].push(ev); }
+    eventDateKeys(ev).forEach(d => { if (!byDate[d]) byDate[d]=[]; byDate[d].push(ev); });
   });
 
   // Grid starts on Sunday of the week containing the 1st
@@ -972,9 +986,11 @@ function closeModal() {
 async function saveEvent() {
   const name = document.getElementById('event-name').value.trim();
   const date = document.getElementById('event-date').value;
+  const endDate = document.getElementById('event-end-date').value;
   const err = document.getElementById('event-err');
   if (!name) { err.textContent = 'Event name is required.'; return; }
   if (!date) { err.textContent = 'Start date is required.'; return; }
+  if (endDate && endDate < date) { err.textContent = 'End date cannot be before the start date.'; return; }
 
   const skuVolumes = {};
   document.querySelectorAll('#sku-grid input[data-sku]').forEach(inp => {
