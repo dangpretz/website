@@ -874,7 +874,7 @@ import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 const LOG_PATH = '/dangpretz/sales-crm';
 // Bump on every release — shown on the login screen, sidebar, and Settings → About
 // so a stale browser-cached copy of this page is easy to spot.
-const CRM_VERSION = 'v1.5';
+const CRM_VERSION = 'v1.6';
 document.querySelectorAll('.crm-version').forEach(el => { el.textContent = CRM_VERSION; });
 const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
@@ -2217,7 +2217,7 @@ function renderReceipts() {
                 <td style="white-space:nowrap">
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-receipt="${esc(r.id)}" style="margin-right:4px">Edit</button>` : ''}
                   ${isAdmin && (r.status === 'pending' || r.status === 'company-card') ? `<button class="btn btn-outline btn-sm" data-approve-receipt="${esc(r.id)}">Approve</button>` : ''}
-                  ${isAdmin && r.status === 'approved' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
+                  ${isAdmin && r.status === 'approved' && r.paymentMethod !== 'company-card' ? `<button class="btn btn-outline btn-sm" data-reimb-receipt="${esc(r.id)}">Mark Reimbursed</button>` : ''}
                   ${isAdmin ? `<button class="btn btn-outline btn-sm" data-delete-receipt="${esc(r.id)}" style="color:var(--red);margin-left:4px">Delete</button>` : ''}
                 </td>
               </tr>`;
