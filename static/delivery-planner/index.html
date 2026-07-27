@@ -265,6 +265,26 @@
       font: 400 15px 'Manrope', sans-serif;
     }
 
+    /* ── Customer history search ── */
+    .customer-search-bar { max-width: 420px; margin: 0 auto 20px; }
+    .customer-search-bar input {
+      width: 100%; padding: 12px 14px; border-radius: 6px;
+      border: 1px solid #444; background: #2a2a2a; color: #fff;
+      font: 500 15px 'Manrope', sans-serif;
+    }
+    .customer-search-bar input::placeholder { color: #777; }
+    .customer-search-bar input:focus { outline: none; border-color: #C41E1E; }
+    .history-count {
+      text-align: center; color: #999; font: 600 12px 'Manrope', sans-serif;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+    }
+    .history-row { margin-bottom: 6px; }
+    .history-date {
+      font: 700 12px 'Manrope', sans-serif; color: #C41E1E;
+      text-transform: uppercase; letter-spacing: 0.3px; margin: 14px 2px 4px;
+    }
+    .history-row:first-child .history-date { margin-top: 0; }
+
     /* ── Week grid view ── */
     .week-grid {
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
@@ -800,6 +820,10 @@
             <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             Day
           </button>
+          <button class="view-toggle-btn" id="view-customers" aria-label="Customer order history">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Customers
+          </button>
         </div>
       </div>
       <div id="schedule-container">
@@ -1131,19 +1155,25 @@
     formOverlay.addEventListener('click', (e) => { if (e.target === formOverlay) closeFormModal(); });
 
     // ── View mode ──
-    let viewMode = localStorage.getItem('dp-view-mode') || 'weekly'; // 'weekly' | 'daily'
+    let viewMode = localStorage.getItem('dp-view-mode') || 'weekly'; // 'weekly' | 'daily' | 'customers'
+    if (viewMode === 'customers') viewMode = 'weekly'; // don't land on an empty search on page load
     let weekOffset = 0;
     let currentDay = new Date();
+    let customerSearchQuery = '';
 
     const viewWeeklyBtn = document.getElementById('view-weekly');
     const viewDailyBtn = document.getElementById('view-daily');
+    const viewCustomersBtn = document.getElementById('view-customers');
+    const weekNavArrows = [document.getElementById('week-prev'), document.getElementById('week-label'), document.getElementById('week-next'), document.getElementById('week-today')];
 
     viewWeeklyBtn.addEventListener('click', () => { if (viewMode !== 'weekly') { viewMode = 'weekly'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
     viewDailyBtn.addEventListener('click', () => { if (viewMode !== 'daily') { viewMode = 'daily'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
+    viewCustomersBtn.addEventListener('click', () => { if (viewMode !== 'customers') { viewMode = 'customers'; updateViewToggle(); updateNavLabel(); renderView(); } });
 
     function updateViewToggle() {
       viewWeeklyBtn.classList.toggle('active', viewMode === 'weekly');
       viewDailyBtn.classList.toggle('active', viewMode === 'daily');
+      viewCustomersBtn.classList.toggle('active', viewMode === 'customers');
     }
 
     // ── Navigation ──
@@ -1171,6 +1201,9 @@
     function updateNavLabel() {
       const weekLabel = document.getElementById('week-label');
       const weekDates = document.getElementById('week-dates');
+      // Date paging doesn't apply to the customer history search — hide the arrows/label/Today button
+      weekNavArrows.forEach((el) => { if (el) el.style.display = viewMode === 'customers' ? 'none' : ''; });
+      if (viewMode === 'customers') return;
       if (viewMode === 'weekly') {
         const { start, end } = getWeekRange(weekOffset);
         let title;
@@ -1197,14 +1230,17 @@
     }
 
     document.getElementById('week-prev').addEventListener('click', () => {
+      if (viewMode === 'customers') return;
       if (viewMode === 'weekly') { weekOffset--; } else { currentDay.setDate(currentDay.getDate() - 1); }
       updateNavLabel(); renderView();
     });
     document.getElementById('week-next').addEventListener('click', () => {
+      if (viewMode === 'customers') return;
       if (viewMode === 'weekly') { weekOffset++; } else { currentDay.setDate(currentDay.getDate() + 1); }
       updateNavLabel(); renderView();
     });
     document.getElementById('week-today').addEventListener('click', () => {
+      if (viewMode === 'customers') return;
       if (viewMode === 'weekly') { weekOffset = 0; } else { currentDay = new Date(); }
       updateNavLabel(); renderView();
     });
@@ -1951,7 +1987,73 @@
 
     function renderView() {
       if (viewMode === 'weekly') renderWeeklyView();
-      else renderDailyView();
+      else if (viewMode === 'daily') renderDailyView();
+      else renderCustomerHistoryView();
+    }
+
+    // Distinct, deduped, alphabetized customer names seen across all deliveries —
+    // separate from updateCustomerSelect's list since that one always seeds "FOH Placeholder".
+    function getKnownCustomerNames(deliveries) {
+      const normalized = new Map();
+      deliveries.forEach((row) => {
+        const name = normalizeCustomer(row.customer || row.location || '');
+        if (name) { const key = name.toLowerCase(); if (!normalized.has(key)) normalized.set(key, name); }
+      });
+      return [...normalized.values()].sort((a, b) => a.localeCompare(b));
+    }
+
+    function renderCustomerHistoryView() {
+      const names = getKnownCustomerNames(currentDeliveries);
+      const datalistOpts = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+      scheduleContainer.innerHTML = `
+        <div class="customer-search-bar">
+          <input type="text" id="customer-search-input" list="customer-history-datalist" placeholder="Search by customer name…" autocomplete="off" value="${escapeHtml(customerSearchQuery)}">
+          <datalist id="customer-history-datalist">${datalistOpts}</datalist>
+        </div>
+        <div id="customer-history-results"></div>
+      `;
+      const input = document.getElementById('customer-search-input');
+      renderCustomerHistoryResults();
+      // Only the results div re-renders on keystroke — recreating the input itself
+      // would drop focus/cursor position on every character typed.
+      input.addEventListener('input', () => {
+        customerSearchQuery = input.value;
+        renderCustomerHistoryResults();
+      });
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    }
+
+    function renderCustomerHistoryResults() {
+      const resultsEl = document.getElementById('customer-history-results');
+      if (!resultsEl) return;
+      const query = customerSearchQuery.trim().toLowerCase();
+      if (!query) {
+        resultsEl.innerHTML = '<div class="week-empty">Type or select a customer name above to see their full order history.</div>';
+        return;
+      }
+      const matches = currentDeliveries.filter((row) => {
+        const name = normalizeCustomer(row.customer || row.location || '');
+        return name && name.toLowerCase().includes(query);
+      }).sort((a, b) => {
+        const d = (b.date || '').localeCompare(a.date || '');
+        return d !== 0 ? d : (b.timeStamp || '').localeCompare(a.timeStamp || '');
+      });
+      if (!matches.length) {
+        resultsEl.innerHTML = `<div class="week-empty">No past orders found for "${escapeHtml(customerSearchQuery.trim())}".</div>`;
+        return;
+      }
+      const countLabel = matches.length === 1 ? '1 order' : `${matches.length} orders`;
+      resultsEl.innerHTML = `<div class="history-count">${countLabel} found</div><div class="daily-list">${matches.map(renderCustomerHistoryCard).join('')}</div>`;
+      bindActions(resultsEl);
+    }
+
+    function renderCustomerHistoryCard(row) {
+      const dateLabel = row.date
+        ? new Date(row.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+        : 'No date';
+      return `<div class="history-row"><div class="history-date">${escapeHtml(dateLabel)}</div>${renderDailyCard(row)}</div>`;
     }
 
     function renderWeeklyView() {
