@@ -1320,7 +1320,7 @@
   const _urlSearch    = new URLSearchParams(window.location.search);
   const _langParam    = _urlSearch.get('lang');
   const _roleParamRaw = _urlSearch.get('role');
-  const _isWorkerView = _roleParamRaw === 'shape' || _roleParamRaw === 'bfp' || _roleParamRaw === 'dips';
+  const _isWorkerView = _roleParamRaw === 'shape' || _roleParamRaw === 'bfp' || _roleParamRaw === 'dips' || _roleParamRaw === 'stock';
   const _langStored   = (() => { try { return localStorage.getItem('prod-lang'); } catch { return null; } })();
   const _langBrowser  = (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
   let appLang = ['en','es'].includes(_langParam)  ? _langParam
@@ -1459,6 +1459,7 @@
       header_shape_team: 'Shape Team',
       header_bfp_team:   'BFP Team',
       header_dips_team:  'Dips Team',
+      header_stock_team: 'Stock Team',
       section_pending:   'PENDING TODAY',
       section_progress:  'IN PROGRESS',
       section_done:      'DONE',
@@ -1605,6 +1606,7 @@
       header_shape_team: 'Equipo de Masa',
       header_bfp_team:   'Equipo HCE',
       header_dips_team:  'Equipo de Salsas',
+      header_stock_team: 'Equipo de Inventario',
       section_pending:   'PENDIENTE HOY',
       section_progress:  'EN PROGRESO',
       section_done:      'LISTO',
@@ -1673,11 +1675,13 @@
                   : _roleParam === 'bfp'   ? 'bfp'
                   : _roleParam === 'foh'   ? 'foh'
                   : _roleParam === 'dips'  ? 'dips'
+                  : _roleParam === 'stock' ? 'stock'
                   : 'manager';
   if (userRole === 'shape')      document.title = appLang === 'es' ? 'Formar · Producción' : 'Shape · Production';
   else if (userRole === 'bfp')   document.title = appLang === 'es' ? 'HCE · Producción'    : 'BFP · Production';
   else if (userRole === 'foh')   document.title = appLang === 'es' ? 'FOH · Salsas'        : 'FOH · Dips';
   else if (userRole === 'dips')  document.title = appLang === 'es' ? 'Salsas · Producción' : 'Dips · Production';
+  else if (userRole === 'stock') document.title = appLang === 'es' ? 'Inventario · Producción' : 'Stock · Production';
   else                            document.title = appLang === 'es' ? 'Producción' : 'Production';
 
   // Set body class for role-aware CSS hiding (handled in stylesheet).
@@ -1688,14 +1692,21 @@
       document.body.classList.add('role-worker', `role-${userRole}`);
       const wh = document.getElementById('worker-header');
       if (wh) wh.style.display = 'flex';
+      // Stock is a live snapshot, not tied to a specific day — the day-nav
+      // row (prev/next/date) has no effect on it, so hide it to avoid dead controls.
+      if (userRole === 'stock') {
+        const row2 = document.querySelector('.worker-header-row2');
+        if (row2) row2.style.display = 'none';
+      }
     };
     if (document.body) setBody();
     else document.addEventListener('DOMContentLoaded', setBody);
   }
 
-  let dayTab = userRole === 'bfp'  ? 'bfp'
-             : userRole === 'foh'  ? 'foh-home' // single-screen view: Dips + Dough on one page
-             : userRole === 'dips' ? 'dips'     // dips-only standalone view (no dough section)
+  let dayTab = userRole === 'bfp'   ? 'bfp'
+             : userRole === 'foh'   ? 'foh-home' // single-screen view: Dips + Dough on one page
+             : userRole === 'dips'  ? 'dips'     // dips-only standalone view (no dough section)
+             : userRole === 'stock' ? 'stock'    // stock-only standalone view (live snapshot, no day-nav)
              : 'shape'; // 'shape' | 'bfp' | 'stock' | 'dips' | 'foh-home' (visibility per role rules)
 
   // Inline logging state
@@ -2769,9 +2780,11 @@
     const dateStr    = toDateStr(currentDate);
     // FOH role has its own single-page surface (Dips + Dough on one screen)
     // — pin it regardless of which tab the dayTab string says.
-    if (userRole === 'foh')  return renderFohHome(dateStr);
+    if (userRole === 'foh')   return renderFohHome(dateStr);
     // Dips role gets a dips-only standalone view (no dough section, no tab bar).
-    if (userRole === 'dips') return renderCheeseTab(dateStr);
+    if (userRole === 'dips')  return renderCheeseTab(dateStr);
+    // Stock role gets a stock-only standalone view (live snapshot, no tab bar).
+    if (userRole === 'stock') return renderStockTab();
     // Stock + Dips tabs are visible to manager + FOH; shape/BFP get
     // forced back to their team's home tab if they somehow land there.
     const isAllowedStockCheese = userRole === 'manager' || userRole === 'foh';
@@ -4861,8 +4874,9 @@
     if (userRole !== 'manager') {
       const teamLabel = userRole === 'shape' ? t('header_shape_team')
                       : userRole === 'bfp'   ? t('header_bfp_team')
+                      : userRole === 'stock' ? t('header_stock_team')
                       : t('header_dips_team');
-      const emoji     = userRole === 'shape' ? '🥨' : userRole === 'bfp' ? '🔥' : '🧀';
+      const emoji     = userRole === 'shape' ? '🥨' : userRole === 'bfp' ? '🔥' : userRole === 'stock' ? '📦' : '🧀';
       setHTML('worker-header-name', `${emoji} ${esc(teamLabel)}`);
       const esEl = document.getElementById('worker-lang-es');
       const enEl = document.getElementById('worker-lang-en');
