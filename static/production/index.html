@@ -963,9 +963,79 @@
       margin-left: 8px;
     }
     #stock-audit:hover { background: var(--paper); color: #1A1A1A; }
+
+    /* ── PIN gate ── */
+    .pin-gate {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #141414; border-top: 4px solid var(--red);
+      padding: 24px; box-sizing: border-box;
+    }
+    .pin-gate.pin-gate-hidden { display: none; }
+    .pin-gate-logo { font-size: 40px; margin-bottom: 4px; }
+    .pin-gate-title {
+      font: 800 20px 'Paytone One', 'Manrope', sans-serif; color: #fff; text-align: center;
+    }
+    .pin-gate-sub { font: 500 13px 'Manrope', sans-serif; color: #999; margin-top: 4px; margin-bottom: 22px; }
+    .pin-dots { display: flex; gap: 14px; margin-bottom: 10px; }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #555;
+      background: transparent; transition: background 0.15s, border-color 0.15s;
+    }
+    .pin-dot.filled { background: var(--red); border-color: var(--red); }
+    .pin-error {
+      min-height: 18px; font: 700 12px 'Manrope', sans-serif; color: var(--red);
+      margin-bottom: 8px; text-align: center;
+    }
+    .pin-keypad {
+      display: grid; grid-template-columns: repeat(3, 64px); gap: 14px; margin-top: 8px;
+    }
+    .pin-keypad button {
+      width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444;
+      background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif;
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
+    .pin-keypad button:hover { background: #3a3a3a; border-color: var(--red); }
+    .pin-keypad button.pin-key-sub { font: 700 12px 'Manrope', sans-serif; color: #999; }
+    .pin-gate.pin-shake .pin-dots { animation: pin-shake 0.35s; }
+    @keyframes pin-shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
   </style>
 </head>
 <body>
+
+<!-- PIN gate — blocks all content (manager view and every ?role= tab) until a valid
+     4-digit employee code is entered. Visible by default in CSS so it's the first
+     thing painted; the inline script below hides it instantly (no flash) if this
+     device already unlocked earlier in the browser session. -->
+<div class="pin-gate" id="pin-gate">
+  <div class="pin-gate-logo">🥨</div>
+  <div class="pin-gate-title">Dangerous Pretzel Co.</div>
+  <div class="pin-gate-sub" id="pin-gate-sub">Enter your 4-digit code</div>
+  <div class="pin-dots" id="pin-dots">
+    <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+  <div class="pin-keypad" id="pin-keypad">
+    <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+    <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+    <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+    <button type="button" class="pin-key-sub" data-key="clr">CLR</button><button type="button" data-key="0">0</button><button type="button" class="pin-key-sub" data-key="del">⌫</button>
+  </div>
+</div>
+<script>
+  // Blocking, non-module — runs the instant the parser reaches it, before the
+  // deferred module script below even starts, so an already-unlocked device
+  // never flashes the PIN screen.
+  try {
+    if (sessionStorage.getItem('prod-pin-unlocked') === '1') {
+      document.getElementById('pin-gate').classList.add('pin-gate-hidden');
+    }
+  } catch (_) {}
+</script>
 
 <nav class="topnav">
   <button class="nav-arrow" id="nav-prev" aria-label="Previous day">‹</button>
@@ -5260,10 +5330,79 @@
     console.log('Self-test results:', { passed, failed, tests });
   }
 
+  // ─── PIN GATE ─────────────────────────────────────────────────────────────
+  // Blocks the entire app — manager view and every ?role= tab alike, since
+  // they're all the same file — until a valid 4-digit employee code is
+  // entered. Not a real security boundary (client-side, codes are visible in
+  // source), just a casual-access gate for shared kitchen tablets.
+  const PIN_CODES      = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770'];
+  const PIN_SESSION_KEY = 'prod-pin-unlocked';
+
+  function waitForPinUnlock() {
+    const gate = document.getElementById('pin-gate');
+    let alreadyUnlocked = false;
+    try { alreadyUnlocked = sessionStorage.getItem(PIN_SESSION_KEY) === '1'; } catch (_) {}
+    if (alreadyUnlocked) { gate.classList.add('pin-gate-hidden'); return Promise.resolve(); }
+
+    return new Promise((resolve) => {
+      let entered = '';
+      const dots     = [...gate.querySelectorAll('.pin-dot')];
+      const errorEl  = document.getElementById('pin-error');
+      const subEl    = document.getElementById('pin-gate-sub');
+
+      const updateDots = () => dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
+
+      const tryUnlock = () => {
+        if (PIN_CODES.includes(entered)) {
+          try { sessionStorage.setItem(PIN_SESSION_KEY, '1'); } catch (_) {}
+          gate.classList.add('pin-gate-hidden');
+          resolve();
+          return;
+        }
+        errorEl.textContent = appLang === 'es' ? 'Código incorrecto' : 'Incorrect code';
+        gate.classList.add('pin-shake');
+        setTimeout(() => {
+          gate.classList.remove('pin-shake');
+          entered = '';
+          updateDots();
+        }, 350);
+      };
+
+      subEl.textContent = appLang === 'es' ? 'Ingresa tu código de 4 dígitos' : 'Enter your 4-digit code';
+
+      document.getElementById('pin-keypad').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-key]');
+        if (!btn) return;
+        const key = btn.dataset.key;
+        errorEl.textContent = '';
+        if (key === 'clr') entered = '';
+        else if (key === 'del') entered = entered.slice(0, -1);
+        else if (entered.length < 4) entered += key;
+        updateDots();
+        if (entered.length === 4) setTimeout(tryUnlock, 100);
+      });
+
+      // Physical keyboard support (desktop testing / a device with a keyboard attached)
+      document.addEventListener('keydown', (e) => {
+        if (gate.classList.contains('pin-gate-hidden')) return;
+        if (/^[0-9]$/.test(e.key) && entered.length < 4) {
+          entered += e.key;
+          errorEl.textContent = '';
+          updateDots();
+          if (entered.length === 4) setTimeout(tryUnlock, 100);
+        } else if (e.key === 'Backspace') {
+          entered = entered.slice(0, -1);
+          updateDots();
+        }
+      });
+    });
+  }
+
   // ─── BOOT ─────────────────────────────────────────────────────────────────
 
   (async () => {
     try {
+      await waitForPinUnlock();
       await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
