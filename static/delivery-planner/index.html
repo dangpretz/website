@@ -427,6 +427,16 @@
       vertical-align: middle;
     }
 
+    /* Event order badge — same slot as sq-badge, just a different tag */
+    .event-badge {
+      display: inline-block; margin-left: 6px;
+      padding: 1px 6px; border-radius: 4px;
+      background: #5c3a0a; color: #ffd699;
+      font: 600 10px 'Manrope', sans-serif;
+      letter-spacing: 0.3px; text-transform: uppercase;
+      vertical-align: middle;
+    }
+
     /* Manager: Sync from Square button */
     .sync-square-btn {
       background: none; border: 1px solid #444; color: #ccc;
@@ -880,6 +890,13 @@
               <option value="pickup">Pickup</option>
             </select>
           </div>
+        </div>
+        <div>
+          <label for="order-category">Order Category</label>
+          <select id="order-category" name="orderCategory">
+            <option value="wholesale">Wholesale</option>
+            <option value="event">Event</option>
+          </select>
         </div>
         <div class="line-items-head">
           <label>Line items (SKU + quantity)</label>
@@ -1853,6 +1870,8 @@
       const contactHtml = renderContactLine(row);
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
+      const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
+      const eventBadge = isEvent ? '<span class="event-badge" title="Event order">🎪 Event</span>' : '';
       const isConfirmed = status === 'delivered' || status === 'picked_up';
       // Compact button label — full "Confirm Delivery" wrapped to two lines on
       // narrow columns. Type still visible via the subline + the icon.
@@ -1870,7 +1889,7 @@
       return `
         <div class="delivery-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="card-customer">
-            <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</span>
+            <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}</span>
             <div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
@@ -1917,10 +1936,12 @@
       const contactHtml = renderContactLine(row);
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
+      const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
+      const eventBadge = isEvent ? '<span class="event-badge" title="Event order">🎪 Event</span>' : '';
       return `
         <div class="daily-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="daily-main">
-            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}</div>
+            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}</div>
             <div class="card-subline">${covBadgeHtml}<span class="type-tag">${typeLabel}</span></div>
             ${pillsHtml}
             ${contactHtml}
@@ -2207,6 +2228,7 @@
       }
       form.date.value = row.date || '';
       form.type.value = (row.type || 'delivery').toLowerCase();
+      form.orderCategory.value = (row.orderCategory || 'wholesale').toLowerCase() === 'event' ? 'event' : 'wholesale';
       clearLineItems();
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
@@ -2559,7 +2581,7 @@
             if (!generated[genKey]) {
               const newId = generateDeliveryId();
               try {
-                await appendLog(LOG_PATH, { action: 'create', deliveryId: newId, customer: rec.customer || '', date: dateStr, type: rec.type || 'delivery', lineItems: rec.lineItems || '[]', status: 'scheduled', recurrenceId: rec.recurrenceId, timeStamp: new Date().toISOString() });
+                await appendLog(LOG_PATH, { action: 'create', deliveryId: newId, customer: rec.customer || '', date: dateStr, type: rec.type || 'delivery', orderCategory: rec.orderCategory || 'wholesale', lineItems: rec.lineItems || '[]', status: 'scheduled', recurrenceId: rec.recurrenceId, timeStamp: new Date().toISOString() });
                 await appendLog(TEMPLATE_LOG_PATH, { action: 'recurrence_generated', recurrenceId: rec.recurrenceId, generatedDate: dateStr, deliveryId: newId, timeStamp: new Date().toISOString() });
                 generated[genKey] = true; didGenerate = true;
               } catch (err) { console.error('Recurrence generation error', err); }
@@ -2619,6 +2641,7 @@
       const customer = form.customer.value.trim();
       const date = form.date.value.trim();
       const type = form.type.value;
+      const orderCategory = form.orderCategory.value === 'event' ? 'event' : 'wholesale';
       const rows = lineItemsContainer.querySelectorAll('.line-item-row');
       const lineItems = [];
       let hasZeroQty = false;
@@ -2656,13 +2679,13 @@
       const lineItemsJson = JSON.stringify(lineItems);
       try {
         if (editingId) {
-          await appendLog(LOG_PATH, { action: 'update', deliveryId: editingId, customer, date, type, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
+          await appendLog(LOG_PATH, { action: 'update', deliveryId: editingId, customer, date, type, orderCategory, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
         } else if (!recurringCheck.checked) {
-          await appendLog(LOG_PATH, { action: 'create', deliveryId: generateDeliveryId(), customer, date, type, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
+          await appendLog(LOG_PATH, { action: 'create', deliveryId: generateDeliveryId(), customer, date, type, orderCategory, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
         }
         if (recurringCheck.checked && !editingId) {
           await appendLog(TEMPLATE_LOG_PATH, {
-            action: 'create_recurrence', recurrenceId: generateDeliveryId(), customer, type, lineItems: lineItemsJson,
+            action: 'create_recurrence', recurrenceId: generateDeliveryId(), customer, type, orderCategory, lineItems: lineItemsJson,
             frequency: document.getElementById('frequency').value, dayOfWeek: document.getElementById('day-of-week').value,
             startDate: date, endDate: document.getElementById('recurrence-end').value || '', timeStamp,
           });
