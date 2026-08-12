@@ -259,10 +259,45 @@
     .view-toggle-btn:hover { color: #fff; background: #333; }
     .view-toggle-btn.active { color: #fff; background: #C41E1E; }
     .view-toggle-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+    /* Spacing between this and the view-mode toggle comes from .week-nav's own gap,
+       not a margin here — avoids overflow when both go full-width on mobile. */
 
     .week-empty {
       text-align: center; color: #666; padding: 40px 20px;
       font: 400 15px 'Manrope', sans-serif;
+    }
+
+    /* ── Month grid view ── */
+    .month-day-names {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px;
+    }
+    .month-day-name {
+      text-align: center; font: 700 11px 'Manrope', sans-serif; color: #999;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .month-cell {
+      background: #2a2a2a; border-radius: 8px; padding: 6px; min-height: 92px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .month-cell:hover { background: #333; }
+    .month-cell.other-month { opacity: 0.4; }
+    .month-cell.today { background: #333; border-top: 3px solid #C41E1E; }
+    .month-cell-date {
+      font: 700 12px 'Manrope', sans-serif; color: #ccc; margin-bottom: 4px; padding: 0 2px;
+    }
+    .month-cell.today .month-cell-date { color: #fff; }
+    .month-order-chip {
+      display: block; padding: 2px 5px; margin-bottom: 3px; border-radius: 3px;
+      background: #1A1A1A; color: #eee;
+      font: 500 10px 'Manrope', sans-serif; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; cursor: pointer;
+    }
+    .month-order-chip:hover { opacity: 0.85; }
+    /* Events get their own color so they're distinguishable from wholesale at a glance */
+    .month-order-chip.month-order-chip-event { background: #E8CF82; color: #1A1A1A; }
+    .month-more {
+      font: 600 10px 'Manrope', sans-serif; color: #888; padding: 0 2px;
     }
 
     /* ── Customer history search ── */
@@ -427,11 +462,13 @@
       vertical-align: middle;
     }
 
-    /* Event order badge — same slot as sq-badge, just a different tag */
+    /* Event order badge — same slot as sq-badge, just a different tag.
+       Same gold/dark-text treatment as the month-view event chips so the
+       "this is an event order" signal is consistent everywhere. */
     .event-badge {
       display: inline-block; margin-left: 6px;
       padding: 1px 6px; border-radius: 4px;
-      background: #5c3a0a; color: #ffd699;
+      background: #E8CF82; color: #1A1A1A;
       font: 600 10px 'Manrope', sans-serif;
       letter-spacing: 0.3px; text-transform: uppercase;
       vertical-align: middle;
@@ -816,10 +853,19 @@
             <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             Day
           </button>
+          <button class="view-toggle-btn" id="view-monthly" aria-label="Monthly view">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+            Month
+          </button>
           <button class="view-toggle-btn" id="view-customers" aria-label="Customer order history">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Customers
           </button>
+        </div>
+        <div class="view-toggle category-filter" id="category-filter">
+          <button class="view-toggle-btn active" id="cat-all" data-category="all">All</button>
+          <button class="view-toggle-btn" id="cat-wholesale" data-category="wholesale">Wholesale</button>
+          <button class="view-toggle-btn" id="cat-event" data-category="event">Events</button>
         </div>
       </div>
       <div id="schedule-container">
@@ -1144,24 +1190,48 @@
     formOverlay.addEventListener('click', (e) => { if (e.target === formOverlay) closeFormModal(); });
 
     // ── View mode ──
-    let viewMode = localStorage.getItem('dp-view-mode') || 'weekly'; // 'weekly' | 'daily' | 'customers'
+    let viewMode = localStorage.getItem('dp-view-mode') || 'weekly'; // 'weekly' | 'daily' | 'monthly' | 'customers'
     if (viewMode === 'customers') viewMode = 'weekly'; // don't land on an empty search on page load
     let weekOffset = 0;
+    let monthOffset = 0;
     let currentDay = new Date();
     let customerSearchQuery = '';
 
+    // ── Category filter (All / Wholesale / Event) — applies to every list/grid view ──
+    let categoryFilter = localStorage.getItem('dp-category-filter') || 'all'; // 'all' | 'wholesale' | 'event'
+    function filterByCategory(deliveries) {
+      if (categoryFilter === 'all') return deliveries;
+      return deliveries.filter((row) => {
+        const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
+        return categoryFilter === 'event' ? isEvent : !isEvent;
+      });
+    }
+    document.querySelectorAll('#category-filter [data-category]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.category === categoryFilter); // reflect any persisted choice on load
+      btn.addEventListener('click', () => {
+        if (categoryFilter === btn.dataset.category) return;
+        categoryFilter = btn.dataset.category;
+        localStorage.setItem('dp-category-filter', categoryFilter);
+        document.querySelectorAll('#category-filter [data-category]').forEach((b) => b.classList.toggle('active', b === btn));
+        renderView();
+      });
+    });
+
     const viewWeeklyBtn = document.getElementById('view-weekly');
     const viewDailyBtn = document.getElementById('view-daily');
+    const viewMonthlyBtn = document.getElementById('view-monthly');
     const viewCustomersBtn = document.getElementById('view-customers');
     const weekNavArrows = [document.getElementById('week-prev'), document.getElementById('week-label'), document.getElementById('week-next'), document.getElementById('week-today')];
 
     viewWeeklyBtn.addEventListener('click', () => { if (viewMode !== 'weekly') { viewMode = 'weekly'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
     viewDailyBtn.addEventListener('click', () => { if (viewMode !== 'daily') { viewMode = 'daily'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
+    viewMonthlyBtn.addEventListener('click', () => { if (viewMode !== 'monthly') { viewMode = 'monthly'; localStorage.setItem('dp-view-mode', viewMode); updateViewToggle(); updateNavLabel(); renderView(); } });
     viewCustomersBtn.addEventListener('click', () => { if (viewMode !== 'customers') { viewMode = 'customers'; updateViewToggle(); updateNavLabel(); renderView(); } });
 
     function updateViewToggle() {
       viewWeeklyBtn.classList.toggle('active', viewMode === 'weekly');
       viewDailyBtn.classList.toggle('active', viewMode === 'daily');
+      viewMonthlyBtn.classList.toggle('active', viewMode === 'monthly');
       viewCustomersBtn.classList.toggle('active', viewMode === 'customers');
     }
 
@@ -1184,6 +1254,11 @@
       return { start: monday, end: sunday };
     }
 
+    function getMonthRange(offset) {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    }
+
     function formatShortDate(d) { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
     function toDateStr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
@@ -1202,6 +1277,15 @@
         else title = 'Week of ' + formatShortDate(start);
         weekLabel.childNodes[0].textContent = title + ' ';
         weekDates.textContent = formatShortDate(start) + ' – ' + formatShortDate(end);
+      } else if (viewMode === 'monthly') {
+        const first = getMonthRange(monthOffset);
+        let title;
+        if (monthOffset === 0) title = 'This Month';
+        else if (monthOffset === -1) title = 'Last Month';
+        else if (monthOffset === 1) title = 'Next Month';
+        else title = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        weekLabel.childNodes[0].textContent = title + ' ';
+        weekDates.textContent = first.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
       } else {
         const d = currentDay;
         const todayStr = toDateStr(new Date());
@@ -1220,17 +1304,23 @@
 
     document.getElementById('week-prev').addEventListener('click', () => {
       if (viewMode === 'customers') return;
-      if (viewMode === 'weekly') { weekOffset--; } else { currentDay.setDate(currentDay.getDate() - 1); }
+      if (viewMode === 'weekly') { weekOffset--; }
+      else if (viewMode === 'monthly') { monthOffset--; }
+      else { currentDay.setDate(currentDay.getDate() - 1); }
       updateNavLabel(); renderView();
     });
     document.getElementById('week-next').addEventListener('click', () => {
       if (viewMode === 'customers') return;
-      if (viewMode === 'weekly') { weekOffset++; } else { currentDay.setDate(currentDay.getDate() + 1); }
+      if (viewMode === 'weekly') { weekOffset++; }
+      else if (viewMode === 'monthly') { monthOffset++; }
+      else { currentDay.setDate(currentDay.getDate() + 1); }
       updateNavLabel(); renderView();
     });
     document.getElementById('week-today').addEventListener('click', () => {
       if (viewMode === 'customers') return;
-      if (viewMode === 'weekly') { weekOffset = 0; } else { currentDay = new Date(); }
+      if (viewMode === 'weekly') { weekOffset = 0; }
+      else if (viewMode === 'monthly') { monthOffset = 0; }
+      else { currentDay = new Date(); }
       updateNavLabel(); renderView();
     });
 
@@ -1967,6 +2057,7 @@
     function renderView() {
       if (viewMode === 'weekly') renderWeeklyView();
       else if (viewMode === 'daily') renderDailyView();
+      else if (viewMode === 'monthly') renderMonthlyView();
       else renderCustomerHistoryView();
     }
 
@@ -2012,7 +2103,7 @@
         resultsEl.innerHTML = '<div class="week-empty">Type or select a customer name above to see their full order history.</div>';
         return;
       }
-      const matches = currentDeliveries.filter((row) => {
+      const matches = filterByCategory(currentDeliveries).filter((row) => {
         const name = normalizeCustomer(row.customer || row.location || '');
         return name && name.toLowerCase().includes(query);
       }).sort((a, b) => {
@@ -2039,7 +2130,7 @@
       const { start } = getWeekRange(weekOffset);
       const todayStr = toDateStr(new Date());
       const byDate = {};
-      currentDeliveries.forEach((row) => { const d = (row.date || '').trim(); if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(row); } });
+      filterByCategory(currentDeliveries).forEach((row) => { const d = (row.date || '').trim(); if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(row); } });
       let html = '<div class="week-grid" id="week-grid">';
       for (let i = 0; i < 7; i++) {
         const dayDate = new Date(start);
@@ -2077,7 +2168,7 @@
 
     function renderDailyView() {
       const dateStr = toDateStr(currentDay);
-      const dayDeliveries = currentDeliveries.filter((r) => (r.date || '').trim() === dateStr);
+      const dayDeliveries = filterByCategory(currentDeliveries).filter((r) => (r.date || '').trim() === dateStr);
       let html = '';
       if (dayDeliveries.length === 0) {
         html = '<div class="week-empty">No deliveries or pickups for this day.</div>';
@@ -2093,6 +2184,69 @@
       }
       scheduleContainer.innerHTML = html;
       bindActions(scheduleContainer);
+    }
+
+    function renderMonthlyView() {
+      const first = getMonthRange(monthOffset);
+      const month = first.getMonth();
+      const todayStr = toDateStr(new Date());
+      const byDate = {};
+      filterByCategory(currentDeliveries).forEach((row) => { const d = (row.date || '').trim(); if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(row); } });
+
+      // Grid starts on Sunday of the week containing the 1st, always 6 rows for consistent height
+      const gridStart = new Date(first);
+      gridStart.setDate(1 - first.getDay());
+      const cells = [];
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(gridStart);
+        d.setDate(gridStart.getDate() + i);
+        cells.push(d);
+      }
+
+      let html = '<div class="month-day-names">' + DAY_NAMES.map((n) => `<div class="month-day-name">${n}</div>`).join('') + '</div>';
+      html += '<div class="month-grid">';
+      const MAX_SHOWN = 4;
+      cells.forEach((d) => {
+        const dateStr = toDateStr(d);
+        const isThisMonth = d.getMonth() === month;
+        const isToday = dateStr === todayStr;
+        const dayOrders = byDate[dateStr] || [];
+        const shown = dayOrders.slice(0, MAX_SHOWN);
+        const overflow = dayOrders.length - MAX_SHOWN;
+        // One line per order, customer name only — the point of month view is a fast visual scan, not detail
+        const chipsHtml = shown.map((row) => {
+          const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
+          const customer = row.customer || row.location || '—';
+          return `<span class="month-order-chip${isEvent ? ' month-order-chip-event' : ''}" data-month-edit="${escapeHtml(row.deliveryId || '')}" title="${escapeHtml(customer)}">${escapeHtml(customer)}</span>`;
+        }).join('');
+        html += `<div class="month-cell${!isThisMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" data-month-date="${dateStr}">
+          <div class="month-cell-date">${d.getDate()}</div>
+          ${chipsHtml}
+          ${overflow > 0 ? `<div class="month-more">+${overflow} more</div>` : ''}
+        </div>`;
+      });
+      html += '</div>';
+      scheduleContainer.innerHTML = html;
+
+      // Click a day cell (not an order chip) to jump into Daily view for that date
+      scheduleContainer.querySelectorAll('.month-cell').forEach((cell) => {
+        cell.addEventListener('click', (e) => {
+          if (e.target.closest('[data-month-edit]')) return;
+          viewMode = 'daily';
+          localStorage.setItem('dp-view-mode', viewMode);
+          currentDay = new Date(cell.dataset.monthDate + 'T12:00:00');
+          updateViewToggle();
+          updateNavLabel();
+          renderView();
+        });
+      });
+      // Click an order chip to edit that order directly
+      scheduleContainer.querySelectorAll('[data-month-edit]').forEach((chip) => {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          startEdit(chip.dataset.monthEdit);
+        });
+      });
     }
 
     function bindActions(container) {
