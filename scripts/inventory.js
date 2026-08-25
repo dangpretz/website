@@ -140,11 +140,11 @@ export const BATCH_SIZES = {
   '10oz bbk': 48,
   '10oz spicy bee': 48,
   '10oz Vegan Pretzel': 48,
-  '6.5oz plain': 72,
-  '6.5oz bbk': 72,
-  '6.5oz spicy bee': 72,
-  '6.5oz bootlegger': 72,
-  '6.5oz pepperoni': 72,
+  '7oz plain': 72,
+  '7oz bbk': 72,
+  '7oz spicy bee': 72,
+  '7oz bootlegger': 72,
+  '7oz pepperoni': 72,
   'plain bombs': 432,
   'bees bats': 48,
   '3oz cheese dip': CHEESE_BATCH_SIZE,
@@ -159,11 +159,11 @@ export const CASE_SIZES = {
   '10oz bbk': 48,
   '10oz spicy bee': 48,
   '10oz Vegan Pretzel': 48,
-  '6.5oz plain': 72,
-  '6.5oz bbk': 72,
-  '6.5oz spicy bee': 72,
-  '6.5oz bootlegger': 72,
-  '6.5oz pepperoni': 72,
+  '7oz plain': 72,
+  '7oz bbk': 72,
+  '7oz spicy bee': 72,
+  '7oz bootlegger': 72,
+  '7oz pepperoni': 72,
   '4oz twist plain': 40,
   '4oz twist bbk': 40,
   '4oz twist spicy bee': 40,
@@ -173,7 +173,7 @@ export const CASE_SIZES = {
 
 // Per-SKU allowed case sizes. First value = default selection in dropdown.
 // SKUs missing or empty array → no standard cases (pretzel-only entry).
-// 10oz and 6.5oz pretzels ship in two sizes depending on the customer's
+// 10oz and 7oz pretzels ship in two sizes depending on the customer's
 // order; manager picks per delivery line item in the planner form.
 export const CASE_SIZE_OPTIONS = {
   '21oz mammoth pretzel': [25],
@@ -182,11 +182,11 @@ export const CASE_SIZE_OPTIONS = {
   '10oz bbk': [48, 20],
   '10oz spicy bee': [48, 20],
   '10oz Vegan Pretzel': [48, 20],
-  '6.5oz plain': [72, 32],
-  '6.5oz bbk': [72, 32],
-  '6.5oz spicy bee': [72, 32],
-  '6.5oz bootlegger': [72, 32],
-  '6.5oz pepperoni': [72, 32],
+  '7oz plain': [72, 32],
+  '7oz bbk': [72, 32],
+  '7oz spicy bee': [72, 32],
+  '7oz bootlegger': [72, 32],
+  '7oz pepperoni': [72, 32],
   '4oz twist plain': [40],
   '4oz twist bbk': [40],
   '4oz twist spicy bee': [40],
@@ -197,7 +197,8 @@ export const CASE_SIZE_OPTIONS = {
  * Returns [] when the SKU has no standard case (pretzel-only entry).
  */
 export function caseSizeOptionsFor(sku) {
-  return CASE_SIZE_OPTIONS[sku] || [];
+  const canonical = LEGACY_SKU_RENAMES[sku] || sku;
+  return CASE_SIZE_OPTIONS[canonical] || [];
 }
 
 // Pretzels per baking sheet (tray) — BFP team's natural unit.
@@ -208,11 +209,11 @@ export const TRAY_SIZES = {
   '10oz bbk': 4,
   '10oz spicy bee': 4,
   '10oz Vegan Pretzel': 4,
-  '6.5oz plain': 9,
-  '6.5oz bbk': 9,
-  '6.5oz spicy bee': 9,
-  '6.5oz bootlegger': 9,
-  '6.5oz pepperoni': 9,
+  '7oz plain': 9,
+  '7oz bbk': 9,
+  '7oz spicy bee': 9,
+  '7oz bootlegger': 9,
+  '7oz pepperoni': 9,
   '4oz twist plain': 12,
   '4oz twist bbk': 12,
   '4oz twist spicy bee': 12,
@@ -235,7 +236,7 @@ export const FOH_SKUS = new Set([
 
 // SKUs that need a coating step at BFP (cheese on top during bake).
 export const BAKE_GROUPS = {
-  coating: ['10oz bbk', '6.5oz bbk', '4oz twist bbk'],
+  coating: ['10oz bbk', '7oz bbk', '4oz twist bbk'],
 };
 
 // ─── SHAPE-ONLY (CATERING / FOH) RULES ────────────────────────────────────
@@ -253,15 +254,15 @@ export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
 // production app's "Box mapping" tab — those entries take priority.
 //
 // User-confirmed mappings:
-//   Catering: Salty Pretzel Box      → 15 × 6.5oz plain     (2026-05-05)
-//   Catering: BBK Pretzel Box - 15   → 15 × 6.5oz bbk       (2026-05-05)
-//   Catering: Saint Pretzel Box      → 15 × 6.5oz plain     (2026-05-07; FOH tops w/ cinn sugar)
+//   Catering: Salty Pretzel Box      → 15 × 7oz plain     (2026-05-05)
+//   Catering: BBK Pretzel Box - 15   → 15 × 7oz bbk       (2026-05-05)
+//   Catering: Saint Pretzel Box      → 15 × 7oz plain     (2026-05-07; FOH tops w/ cinn sugar)
 //   Catering: Dangerous Dip Box      → 15 × 3oz cheese dip  (2026-05-07; "dangerous dip" is the external name for the internal cheese-dip SKU)
 //   Catering: Swell Cream Box - 15   → 15 × sweet cream dip (2026-05-07; production-tracked via DIP_CONFIG so FOH gets lead-time visibility)
 export const DEFAULT_BOX_EXPANSIONS = {
-  'Catering: Salty Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
-  'Catering: BBK Pretzel Box - 15': [{ sku: '6.5oz bbk', multiplier: 15 }],
-  'Catering: Saint Pretzel Box': [{ sku: '6.5oz plain', multiplier: 15 }],
+  'Catering: Salty Pretzel Box': [{ sku: '7oz plain', multiplier: 15 }],
+  'Catering: BBK Pretzel Box - 15': [{ sku: '7oz bbk', multiplier: 15 }],
+  'Catering: Saint Pretzel Box': [{ sku: '7oz plain', multiplier: 15 }],
   'Catering: Dangerous Dip Box': [{ sku: '3oz cheese dip', multiplier: 15 }],
   'Catering: Swell Cream Box - 15': [{ sku: 'sweet cream dip', multiplier: 15 }],
 };
@@ -445,6 +446,20 @@ export function resolveDeliveries(logs, options = {}) {
 
 // ─── PRODUCTION LOG RESOLUTION ────────────────────────────────────────────
 
+// Static legacy → canonical renames, always active regardless of any
+// admin-configured sku_alias log entries. Used when a SKU's canonical name
+// changes outright (not just merged with another SKU) so every historical
+// order already logged under the old name still resolves correctly
+// wherever case/batch/tray sizes are looked up.
+// 2026-08: 6.5oz pretzels renamed to 7oz.
+export const LEGACY_SKU_RENAMES = {
+  '6.5oz plain': '7oz plain',
+  '6.5oz bbk': '7oz bbk',
+  '6.5oz spicy bee': '7oz spicy bee',
+  '6.5oz bootlegger': '7oz bootlegger',
+  '6.5oz pepperoni': '7oz pepperoni',
+};
+
 /**
  * Reduce production-log rows into per-date state + global skuConfig + skuAliases.
  * Returns { state, skuConfig, skuAliases, latestInventoryTs, productionLogs }.
@@ -454,7 +469,7 @@ export function resolveDeliveries(logs, options = {}) {
 export function resolveProductionLogs(logs) {
   const state = {};
   const skuConfig = {};
-  const skuAliases = {};
+  const skuAliases = { ...LEGACY_SKU_RENAMES };
   const productionLogs = Array.isArray(logs) ? logs : [];
   // packedCases keyed by deliveryId → { canonicalSku → { caseIndex → {packed, ts} } }
   // Last-write-wins per (deliveryId, sku, caseIndex). Tap to pack, tap again
