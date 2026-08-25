@@ -1310,15 +1310,15 @@
   ]);
   // FOH bakes/sells these SKUs in-store. When FOH pulls trays from the
   // wholesale walk-in to stock their speed rack, the Dough section logs a
-  // foh_transfer for each. Subset matches "all 6.5oz + bombs" — bats
+  // foh_transfer for each. Subset matches "all 7oz + bombs" — bats
   // included because they're bomb-shape and likely pulled together. Tune
   // here if FOH ever bakes a 10oz line in-store.
   const FOH_DOUGH_SKUS = [
-    '6.5oz plain',
-    '6.5oz bbk',
-    '6.5oz spicy bee',
-    '6.5oz bootlegger',
-    '6.5oz pepperoni',
+    '7oz plain',
+    '7oz bbk',
+    '7oz spicy bee',
+    '7oz bootlegger',
+    '7oz pepperoni',
     'plain bombs',
     'bees bats',
   ];
@@ -1717,7 +1717,7 @@
   // Per-SKU Spanish display names. Only needed for SKUs whose Spanish name
   // differs from the canonical English key stored in the log.
   const SKU_NAMES_ES = {
-    '6.5oz bootlegger': '6.5oz Tocino',
+    '7oz bootlegger': '7oz Tocino',
   };
   // Returns the display name for a SKU in the current language.
   const skuDisplayName = (sku) => (appLang === 'es' && SKU_NAMES_ES[sku]) ? SKU_NAMES_ES[sku] : sku;
@@ -5278,13 +5278,13 @@
     // T7 — User's reported scenario
     {
       const items = [
-        mkItem({ need: 1, made: 0, sku: '6.5oz plain', bs: 72 }),
+        mkItem({ need: 1, made: 0, sku: '7oz plain', bs: 72 }),
         mkItem({ need: 1, made: 0, sku: '10oz plain', bs: 48 }),
         mkItem({ need: 4, made: 0, sku: 'plain bombs', bs: 72 }),
         mkItem({ need: 3, made: 2, sku: '4oz twist plain', bs: 108 }),
         mkItem({ need: 2, made: 0, sku: '4oz twist bbk', bs: 108 }),
         mkItem({ need: 1, made: 0, sku: '4oz twist spicy bee', bs: 108 }),
-        mkItem({ need: 1, made: 0, sku: '6.5oz Bootlegger', bs: 72 }),
+        mkItem({ need: 1, made: 0, sku: '7oz Bootlegger', bs: 72 }),
       ];
       const a = aggregate(items, 15);
       expect('T7 user-scenario: total=15 (was 13 with max-based math)', a.totalOrig, 15);
