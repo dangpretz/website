@@ -171,6 +171,20 @@ export const CASE_SIZES = {
   'bees bats': 0,
 };
 
+// Static legacy → canonical renames, always active regardless of any
+// admin-configured sku_alias log entries. Used when a SKU's canonical name
+// changes outright (not just merged with another SKU) so every historical
+// order already logged under the old name still resolves correctly
+// wherever case/batch/tray sizes are looked up.
+// 2026-08: 6.5oz pretzels renamed to 7oz.
+export const LEGACY_SKU_RENAMES = {
+  '6.5oz plain': '7oz plain',
+  '6.5oz bbk': '7oz bbk',
+  '6.5oz spicy bee': '7oz spicy bee',
+  '6.5oz bootlegger': '7oz bootlegger',
+  '6.5oz pepperoni': '7oz pepperoni',
+};
+
 // Per-SKU allowed case sizes. First value = default selection in dropdown.
 // SKUs missing or empty array → no standard cases (pretzel-only entry).
 // 10oz and 7oz pretzels ship in two sizes depending on the customer's
@@ -445,20 +459,6 @@ export function resolveDeliveries(logs, options = {}) {
 }
 
 // ─── PRODUCTION LOG RESOLUTION ────────────────────────────────────────────
-
-// Static legacy → canonical renames, always active regardless of any
-// admin-configured sku_alias log entries. Used when a SKU's canonical name
-// changes outright (not just merged with another SKU) so every historical
-// order already logged under the old name still resolves correctly
-// wherever case/batch/tray sizes are looked up.
-// 2026-08: 6.5oz pretzels renamed to 7oz.
-export const LEGACY_SKU_RENAMES = {
-  '6.5oz plain': '7oz plain',
-  '6.5oz bbk': '7oz bbk',
-  '6.5oz spicy bee': '7oz spicy bee',
-  '6.5oz bootlegger': '7oz bootlegger',
-  '6.5oz pepperoni': '7oz pepperoni',
-};
 
 /**
  * Reduce production-log rows into per-date state + global skuConfig + skuAliases.
