@@ -227,6 +227,38 @@
       line-height: 44px;
     }
 
+    /* ── Ingredient scan (Shape tab only) ──────── */
+    .ingredient-scan-card {
+      background: var(--gray-1); border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+    .ingredient-scan-title {
+      font: 700 11px 'Manrope', sans-serif; color: var(--gray-4);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .ingredient-scan-field {
+      width: 100%; font: 500 16px 'Manrope', sans-serif; padding: 11px 14px;
+      border: 1.5px solid var(--gray-2); border-radius: 8px; background: var(--white);
+      color: var(--dark); outline: none; box-sizing: border-box;
+    }
+    .ingredient-scan-field:focus { border-color: var(--red); }
+    .ingredient-scan-empty {
+      font: 400 13px 'Manrope', sans-serif; color: var(--gray-3);
+      padding: 10px 2px 2px;
+    }
+    #ingredient-scan-list { margin-top: 8px; }
+    .ingredient-scan-row {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--white); border-radius: 6px; padding: 8px 10px; margin-top: 6px;
+    }
+    .ingredient-scan-name { flex: 1; min-width: 0; font: 600 13px 'Manrope', sans-serif; color: var(--dark); }
+    .ingredient-scan-barcode { font: 400 11px 'Courier New', monospace; color: var(--gray-3); white-space: nowrap; }
+    .ingredient-scan-void {
+      background: none; border: none; color: var(--gray-3); font-size: 18px;
+      cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0;
+    }
+    .ingredient-scan-void:hover { color: var(--red); }
+
     /* ── SKU list ──────────────────────────────── */
     .section-label {
       font: 700 11px 'Manrope', sans-serif; color: var(--gray-3);
@@ -1282,6 +1314,7 @@
 
   const DELIVERY_LOG   = '/dangpretz/delivery-planner';
   const PRODUCTION_LOG = '/dangpretz/production';
+  const SHAPE_INGREDIENTS_LOG = '/dangpretz/shape-ingredients';
 
   // BATCH_SIZES, CASE_SIZES, TRAY_SIZES, FOH_SKUS, BAKE_GROUPS imported from shared module.
 
@@ -2259,6 +2292,77 @@
     return 'partial';
   }
 
+  // ─── SHAPE-TAB INGREDIENT SCANS ───────────────────────────────────────────
+  // Day-level traceability: whatever gets scanned while viewing a given Shape
+  // day is logged against that date, not against any single batch — one flour
+  // bag covers everything shaped that day. 'label_product' rows resolve a
+  // barcode to a friendly name for every row that shares it (past and
+  // future), so labeling once from the review page fixes the whole history —
+  // simpler than per-item correction since a barcode always means the same
+  // thing here, unlike receiving where the same barcode note doesn't apply.
+  function resolveShapeIngredients() {
+    const voided = new Set();
+    const labels = {};
+    const items = [];
+    shapeIngredientLogs.forEach((row) => {
+      if (row.action === 'void') { voided.add(row.itemId); return; }
+      if (row.action === 'label_product') { if (row.barcode) labels[row.barcode] = row.productName || ''; return; }
+      if (row.action === 'scan') items.push({ itemId: row.itemId, date: row.date || '', barcode: row.barcode || '', timeStamp: row.timeStamp || '' });
+    });
+    return items.filter((i) => !voided.has(i.itemId)).map((i) => ({ ...i, productName: labels[i.barcode] || '' }));
+  }
+
+  function generateIngredientId() {
+    return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ing-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  function ingredientRowHtml(item) {
+    return `<div class="ingredient-scan-row" data-item-id="${esc(item.itemId)}">
+      <span class="ingredient-scan-name">${item.productName ? esc(item.productName) : esc(item.barcode)}</span>
+      ${item.productName ? `<span class="ingredient-scan-barcode">${esc(item.barcode)}</span>` : ''}
+      <button class="ingredient-scan-void" data-void-ingredient="${esc(item.itemId)}" title="Remove">&times;</button>
+    </div>`;
+  }
+
+  function ingredientListHtml(dateStr) {
+    const todays = resolveShapeIngredients()
+      .filter((i) => i.date === dateStr)
+      .sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
+    if (!todays.length) {
+      return `<div class="ingredient-scan-empty">${appLang === 'es' ? 'Nada escaneado hoy todavía' : 'Nothing scanned yet today'}</div>`;
+    }
+    return todays.map(ingredientRowHtml).join('');
+  }
+
+  function renderIngredientScanSection(dateStr) {
+    const reviewLinkLabel = appLang === 'es' ? 'Ver historial completo →' : 'View full log →';
+    return `<div class="ingredient-scan-card">
+      <div class="ingredient-scan-title">${appLang === 'es' ? 'Ingredientes escaneados hoy' : 'Ingredients scanned today'}</div>
+      <input type="text" id="ingredient-scan-input" class="ingredient-scan-field" placeholder="${appLang === 'es' ? 'Escanear código de barras…' : 'Scan ingredient barcode…'}" autocomplete="off" data-date="${esc(dateStr)}">
+      <div id="ingredient-scan-list">${ingredientListHtml(dateStr)}</div>
+      <a href="../shape-ingredients/index.html" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font:600 12px 'Manrope',sans-serif;color:var(--gray-4)">${reviewLinkLabel}</a>
+    </div>`;
+  }
+
+  function bindIngredientVoidButtons() {
+    document.querySelectorAll('[data-void-ingredient]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const itemId = btn.dataset.voidIngredient;
+        const dateStr = document.getElementById('ingredient-scan-input')?.dataset.date;
+        const entry = { action: 'void', itemId, timeStamp: new Date().toISOString() };
+        shapeIngredientLogs.push(entry);
+        const listEl = document.getElementById('ingredient-scan-list');
+        if (listEl && dateStr) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
+        try { await appendLog(SHAPE_INGREDIENTS_LOG, entry); }
+        catch (err) {
+          shapeIngredientLogs = shapeIngredientLogs.filter((r) => r !== entry);
+          if (listEl && dateStr) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
+          alert('Failed to remove: ' + err.message);
+        }
+      });
+    });
+  }
+
   // ─── RENDER TEAM CARD ─────────────────────────────────────────────────────
 
   function renderTeamCard(type, dateStr) {
@@ -2373,6 +2477,9 @@
     // Only the "+ Add Unscheduled Batch" button remains — log completions are inline now
     const extraBtnHtml = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">${t('add_unsched')}</button>`;
 
+    // Ingredient scan — Shape only, applies to the whole day's shaping rather than a single batch
+    const ingredientHtml = !isBFP ? renderIngredientScanSection(dateStr) : '';
+
     return `<div class="team-card">
       <div class="team-header">
         <div>
@@ -2383,6 +2490,7 @@
       </div>
       <div class="team-body">
         ${workersHtml}
+        ${ingredientHtml}
         ${skuHtml}
         ${totalHtml}
         ${spareHint}
@@ -2841,7 +2949,10 @@
     // Walk-in button at the bottom
     const extraBtn = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">${t('add_unsched')}</button>`;
 
-    return meterHtml + celebrate + sectionsHtml + extraBtn;
+    // Ingredient scan — Shape only, applies to the whole day's shaping rather than a single batch
+    const ingredientHtml = type === 'shape' ? renderIngredientScanSection(dateStr) : '';
+
+    return ingredientHtml + meterHtml + celebrate + sectionsHtml + extraBtn;
   }
 
   // ─── RENDER DAY VIEW ──────────────────────────────────────────────────────
@@ -4406,6 +4517,33 @@
   // ─── BIND ACTIONS ─────────────────────────────────────────────────────────
 
   function bindActions() {
+    // Ingredient scan — Enter logs immediately and only refreshes its own
+    // list div (never the full render()), so continuous rapid-fire scanning
+    // never loses focus on the input.
+    const ingredientInput = document.getElementById('ingredient-scan-input');
+    if (ingredientInput) {
+      ingredientInput.addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const raw = ingredientInput.value.trim();
+        ingredientInput.value = '';
+        if (!raw) return;
+        const dateStr = ingredientInput.dataset.date;
+        const entry = { action: 'scan', itemId: generateIngredientId(), date: dateStr, barcode: raw, timeStamp: new Date().toISOString() };
+        shapeIngredientLogs.push(entry);
+        const listEl = document.getElementById('ingredient-scan-list');
+        if (listEl) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
+        ingredientInput.focus();
+        try { await appendLog(SHAPE_INGREDIENTS_LOG, entry); }
+        catch (err) {
+          shapeIngredientLogs = shapeIngredientLogs.filter((r) => r !== entry);
+          if (listEl) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
+          alert('Failed to log ingredient scan: ' + err.message);
+        }
+      });
+    }
+    bindIngredientVoidButtons();
+
     document.querySelectorAll('[data-worker-dec]').forEach(btn => {
       btn.addEventListener('click', () => {
         const { type, date } = btn.dataset;
@@ -4832,6 +4970,17 @@
     resolveDeliveriesNow();
   }
 
+  // Shape-tab ingredient scans — day-level traceability log, independent of
+  // the production log. See resolveShapeIngredients() for how scan/void/
+  // label_product rows combine into the list shown per day.
+  let shapeIngredientLogs = [];
+  async function loadShapeIngredients() {
+    try {
+      const logs = await fetchLog(SHAPE_INGREDIENTS_LOG);
+      shapeIngredientLogs = Array.isArray(logs) ? logs : [];
+    } catch (_) { shapeIngredientLogs = []; }
+  }
+
   async function loadProduction() {
     const logs = await fetchLog(PRODUCTION_LOG);
     productionLogs = Array.isArray(logs) ? logs : [];
@@ -4924,7 +5073,7 @@
     const btn = document.getElementById('refresh-btn');
     btn.disabled = true; btn.textContent = '…';
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
     } finally {
@@ -5010,7 +5159,7 @@
   if (wRef) wRef.addEventListener('click', async () => {
     wRef.disabled = true; wRef.textContent = '…';
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
     } finally {
@@ -5026,7 +5175,7 @@
   // it, FOH could be partway through typing "5" when the 60s interval
   // fires and rebuilds the dough section back to 0.
   const _isInputBusy = () =>
-    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit, [data-foh-transfer-sheets]')
+    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit, [data-foh-transfer-sheets], #ingredient-scan-input')
     || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null)
     || [...document.querySelectorAll('[data-stock-section][data-initial-value]')].some(inp => inp.value !== inp.dataset.initialValue);
 
@@ -5041,7 +5190,7 @@
     // already sees diffs on saveStock; soft-refreshes there are silent.
     const prevSched = (_isWorkerView && _workerDiffArmed) ? schedule : null;
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       // Skip render if user just started typing during the network call
       if (!_isInputBusy()) render();
@@ -5403,7 +5552,7 @@
   (async () => {
     try {
       await waitForPinUnlock();
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption()]); resolveDeliveriesNow();
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       render();
       // Self-test mode: ?selftest=1 — synthesizes items and verifies the
