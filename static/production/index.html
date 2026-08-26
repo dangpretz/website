@@ -1755,6 +1755,10 @@
   // differs from the canonical English key stored in the log.
   const SKU_NAMES_ES = {
     '7oz bootlegger': '7oz Tocino',
+    // "Bats" here means baseball bats (the shape), not the animal — "bate/
+    // bates" not "murciélago". Matches batch-tracking's existing Spanish
+    // name for the same product.
+    'bees bats': 'Bates de béisbol',
   };
   // Returns the display name for a SKU in the current language.
   const skuDisplayName = (sku) => (appLang === 'es' && SKU_NAMES_ES[sku]) ? SKU_NAMES_ES[sku] : sku;
