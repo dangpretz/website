@@ -101,28 +101,6 @@
     .btn-submit:hover { background: #333; }
     .btn-submit:disabled { background: #bbb; cursor: not-allowed; }
 
-    /* ── New product form ── */
-    .new-product-form { background: #fff; border-radius: 10px; padding: 18px 22px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); border-left: 4px solid #f0a500; }
-    .new-product-header { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
-    .new-product-title { font: 700 14px 'Manrope', sans-serif; color: #1A1A1A; }
-    .new-product-code { font: 600 12px 'Courier New', monospace; background: #F5F0E8; padding: 3px 8px; border-radius: 4px; color: #555; }
-    .new-product-hint { font: 400 13px 'Manrope', sans-serif; color: #888; margin-bottom: 14px; }
-    .new-product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-    .checkbox-label { display: flex; align-items: center; gap: 8px; font: 600 13px 'Manrope', sans-serif; color: #555; margin-bottom: 14px; cursor: pointer; }
-    .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #C41E1E; }
-
-    /* ── Product selector ── */
-    .product-selector { background: #fff; border-radius: 10px; padding: 18px 22px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-    .product-selector > label { font: 700 11px 'Manrope', sans-serif; color: #888; letter-spacing: 0.8px; text-transform: uppercase; display: block; margin-bottom: 8px; }
-    .product-selector input { width: 100%; font: 400 14px 'Manrope', sans-serif; padding: 9px 12px; border: 2px solid #e8e0d5; border-radius: 6px; outline: none; margin-bottom: 10px; transition: border-color 0.2s; }
-    .product-selector input:focus { border-color: #C41E1E; }
-    .product-options { max-height: 260px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; }
-    .product-option { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; cursor: pointer; border-bottom: 1px solid #f5f5f5; transition: background 0.15s; gap: 12px; }
-    .product-option:last-child { border-bottom: none; }
-    .product-option:hover { background: #F5F0E8; }
-    .option-name { font: 600 13px 'Manrope', sans-serif; color: #1A1A1A; }
-    .option-pack { font: 400 12px 'Manrope', sans-serif; color: #aaa; white-space: nowrap; flex-shrink: 0; }
-    .product-option-empty { padding: 20px; text-align: center; font: 400 13px 'Manrope', sans-serif; color: #ccc; }
 
     /* ── Session items list ── */
     .session-items-heading { font: 700 13px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
@@ -137,9 +115,6 @@
     .item-temp-badge.fail { background: #fde8e8; color: #C41E1E; }
     .item-remove { background: none; border: none; color: #ddd; font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; transition: color 0.15s; }
     .item-remove:hover { color: #C41E1E; }
-
-    /* ── Warning banner ── */
-    .warn-banner { background: #fff8e6; border: 1px solid #f0c050; border-radius: 6px; padding: 10px 14px; font: 600 13px 'Manrope', sans-serif; color: #a07000; margin-bottom: 12px; }
 
     /* ── History filters ── */
     .filter-card { background: #2e2e2e; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
@@ -204,14 +179,96 @@
     @media (max-width: 600px) {
       .session-grid    { grid-template-columns: 1fr; }
       .session-grid .span-2 { grid-column: span 1; }
-      .new-product-grid { grid-template-columns: 1fr; }
       .filter-grid     { grid-template-columns: 1fr; }
       .filter-row      { grid-template-columns: 1fr; }
       .session-badges  { display: none; }
+      .issue-body      { grid-template-columns: 1fr; }
     }
+
+    /* ── PIN gate ── */
+    .pin-gate {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #141414; border-top: 4px solid #C41E1E;
+      padding: 24px; box-sizing: border-box;
+    }
+    .pin-gate.pin-gate-hidden { display: none; }
+    .pin-gate-logo { font-size: 40px; margin-bottom: 4px; }
+    .pin-gate-title { font: 800 20px 'Manrope', sans-serif; color: #fff; text-align: center; }
+    .pin-gate-sub { font: 500 13px 'Manrope', sans-serif; color: #999; margin-top: 4px; margin-bottom: 22px; }
+    .pin-dots { display: flex; gap: 14px; margin-bottom: 10px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #555; background: transparent; transition: background 0.15s, border-color 0.15s; }
+    .pin-dot.filled { background: #C41E1E; border-color: #C41E1E; }
+    .pin-error { min-height: 18px; font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-bottom: 8px; text-align: center; }
+    .pin-keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 14px; margin-top: 8px; }
+    .pin-keypad button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444; background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .pin-keypad button:hover { background: #3a3a3a; border-color: #C41E1E; }
+    .pin-keypad button.pin-key-sub { font: 700 12px 'Manrope', sans-serif; color: #999; }
+    .pin-gate.pin-shake .pin-dots { animation: pin-shake 0.35s; }
+    @keyframes pin-shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    /* ── Tabs ── */
+    .page-tabs { display: flex; justify-content: center; gap: 0; border: 1px solid #444; border-radius: 6px; overflow: hidden; max-width: 460px; margin: 0 auto 24px; }
+    .page-tab { flex: 1; padding: 11px 14px; font: 700 13px 'Manrope', sans-serif; color: #999; background: #2a2a2a; border: none; cursor: pointer; transition: background 0.2s, color 0.2s; }
+    .page-tab:not(:last-child) { border-right: 1px solid #444; }
+    .page-tab:hover { color: #fff; background: #333; }
+    .page-tab.active { color: #fff; background: #C41E1E; }
+    .page-tab .tab-count { margin-left: 5px; opacity: 0.85; }
+
+    /* ── Data issues ── */
+    .issue-card { background: #2e2e2e; border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; }
+    .issue-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .issue-barcode { font: 600 12px 'Courier New', monospace; color: #ccc; background: #3a3a3a; padding: 3px 8px; border-radius: 4px; }
+    .issue-meta { font: 400 12px 'Manrope', sans-serif; color: #888; }
+    .issue-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .issue-body input, .issue-body select { font: 400 13px 'Manrope', sans-serif; padding: 8px 10px; border: 2px solid #444; border-radius: 6px; background: #3a3a3a; color: #fff; outline: none; width: 100%; }
+    .issue-body input:focus, .issue-body select:focus { border-color: #C41E1E; }
+    .issue-actions { display: flex; gap: 8px; align-items: center; }
+    .btn-fix { background: #C41E1E; color: #fff; font: 700 13px 'Manrope', sans-serif; border: none; border-radius: 6px; padding: 9px 18px; cursor: pointer; }
+    .btn-fix:hover { background: #a01818; }
+    .btn-fix:disabled { background: #555; cursor: not-allowed; }
+    .checkbox-label-dark { display: flex; align-items: center; gap: 8px; font: 600 12px 'Manrope', sans-serif; color: #aaa; cursor: pointer; }
+    .checkbox-label-dark input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #C41E1E; }
+    .issues-heading { font: 700 13px 'Manrope', sans-serif; color: #999; letter-spacing: 1px; text-transform: uppercase; margin: 4px 0 12px; }
+    .no-issues { text-align: center; padding: 30px 20px; font: 400 14px 'Manrope', sans-serif; color: #6abf6a; }
   </style>
 </head>
 <body>
+
+  <!-- PIN gate — blocks the whole page until a valid 4-digit employee code is
+       entered. Visible by default in CSS so it's the first thing painted; the
+       inline script below hides it instantly (no flash) if this device
+       already unlocked earlier in the browser session. Same codes as the
+       production app. -->
+  <div class="pin-gate" id="pin-gate">
+    <div class="pin-gate-logo">🥨</div>
+    <div class="pin-gate-title">Dangerous Pretzel Co.</div>
+    <div class="pin-gate-sub">Enter your 4-digit code</div>
+    <div class="pin-dots" id="pin-dots">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-keypad" id="pin-keypad">
+      <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+      <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+      <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+      <button type="button" class="pin-key-sub" data-key="clr">CLR</button><button type="button" data-key="0">0</button><button type="button" class="pin-key-sub" data-key="del">⌫</button>
+    </div>
+  </div>
+  <script>
+    // Blocking, non-module — runs the instant the parser reaches it, before
+    // the deferred module script even starts, so an already-unlocked device
+    // never flashes the PIN screen.
+    try {
+      if (sessionStorage.getItem('receiving-pin-unlocked') === '1') {
+        document.getElementById('pin-gate').classList.add('pin-gate-hidden');
+      }
+    } catch (_) {}
+  </script>
 
   <nav class="site-nav">
     <div class="nav-wrap">
@@ -235,19 +292,25 @@
     <h1>RECEIVING HISTORY.</h1>
   </section>
 
+  <div class="section-cream" style="padding-bottom:0">
+    <div class="max-800">
+      <div class="page-tabs">
+        <button type="button" class="page-tab active" data-tab="scan">Scan</button>
+        <button type="button" class="page-tab" data-tab="history">History</button>
+        <button type="button" class="page-tab" data-tab="issues">Data Issues<span class="tab-count" id="issues-tab-count"></span></button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ ENTRY FORM ══════════════════════════════════════════════ -->
-  <div class="section-cream">
+  <div class="section-cream" id="tab-panel-scan" style="padding-top:0">
     <div class="max-800">
 
       <div class="card">
         <div class="card-title">New Receiving Session</div>
         <div class="session-grid">
           <div class="field-group">
-            <label for="employee-name">Received By</label>
-            <input type="text" id="employee-name" placeholder="Your name" autocomplete="off">
-          </div>
-          <div class="field-group">
-            <label for="supplier-select">Supplier</label>
+            <label for="supplier-select">Supplier <span style="text-transform:none;font-weight:400;color:#bbb">(optional — can be added later)</span></label>
             <select id="supplier-select">
               <option value="">Select supplier…</option>
               <option value="usfoods">US Foods</option>
@@ -269,11 +332,9 @@
       <div class="card" id="scan-card">
         <div class="card-title">Scan Items</div>
         <div class="scan-input-wrap">
-          <input type="text" id="barcode-input" placeholder="Scan barcode here…" autocomplete="off" spellcheck="false" disabled>
-          <p class="scan-hint" id="scan-hint">Enter your name and select a supplier to begin.</p>
+          <input type="text" id="barcode-input" placeholder="Scan barcode here…" autocomplete="off" spellcheck="false">
+          <p class="scan-hint" id="scan-hint">Scan a barcode or type it and press Enter.</p>
         </div>
-
-        <div id="barcode-warn" class="warn-banner" hidden></div>
 
         <div id="product-card" class="product-card" hidden>
           <div class="product-label">Product Identified</div>
@@ -291,35 +352,6 @@
           </div>
           <button id="add-item-btn" class="btn-primary" disabled>Add to Session</button>
         </div>
-
-        <div id="new-product-form" class="new-product-form" hidden>
-          <div class="new-product-header">
-            <span class="new-product-title">Unknown Product</span>
-            <span class="new-product-code" id="new-product-code-display"></span>
-          </div>
-          <p class="new-product-hint">This barcode isn't in the system yet. Fill in the details to add it and continue.</p>
-          <div class="new-product-grid">
-            <div class="field-group">
-              <label for="new-product-name">Product Name</label>
-              <input type="text" id="new-product-name" placeholder="e.g. Cheese, Cheddar Mild" autocomplete="off">
-            </div>
-            <div class="field-group">
-              <label for="new-product-pack">Pack Size (e.g. 4/5/LB)</label>
-              <input type="text" id="new-product-pack" placeholder="e.g. 4/5/LB" autocomplete="off">
-            </div>
-          </div>
-          <label class="checkbox-label">
-            <input type="checkbox" id="new-product-temp">
-            Requires temperature check (refrigerated / dairy / fresh)
-          </label>
-          <button id="save-new-product-btn" class="btn-primary">Save & Continue</button>
-        </div>
-
-        <div id="product-selector" class="product-selector" hidden>
-          <label for="product-search">Select Product</label>
-          <input type="text" id="product-search" placeholder="Type to search products…" autocomplete="off">
-          <div id="product-options" class="product-options"></div>
-        </div>
       </div>
 
       <div id="session-section" hidden>
@@ -332,7 +364,7 @@
   </div>
 
   <!-- ══ HISTORY ═════════════════════════════════════════════════ -->
-  <div class="section-dark">
+  <div class="section-dark" id="tab-panel-history" hidden>
     <div class="max-1000">
       <h2>RECEIVING HISTORY.</h2>
 
@@ -380,11 +412,85 @@
     </div>
   </div>
 
+  <!-- ══ DATA ISSUES ═════════════════════════════════════════════ -->
+  <div class="section-dark" id="tab-panel-issues" hidden>
+    <div class="max-1000">
+      <h2>DATA ISSUES.</h2>
+
+      <div class="issues-heading">Unidentified Items</div>
+      <div id="unidentified-items"></div>
+
+      <div class="issues-heading" style="margin-top:24px">Sessions Missing Supplier</div>
+      <div id="missing-supplier-sessions"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { appendLog, fetchLog } from '../../scripts/sheet-logger.js';
 
     const LOG_PATH = '/dangpretz/receiving';
     const TEMP_THRESHOLD = 42;
+
+    // ─────────────────────────────────────────────────────────────
+    // PIN GATE — same employee codes as the production app. Blocks the
+    // whole page until a valid 4-digit code is entered; once unlocked,
+    // the code itself (not a typed name) is what tags each receiving
+    // session, replacing the old "Received By" field.
+    // ─────────────────────────────────────────────────────────────
+    const PIN_CODES       = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377'];
+    const PIN_SESSION_KEY = 'receiving-pin-unlocked';
+    const PIN_CODE_KEY    = 'receiving-pin-code';
+    let currentPinCode = '';
+
+    function waitForPinUnlock() {
+      const gate = document.getElementById('pin-gate');
+      let already = false;
+      try { already = sessionStorage.getItem(PIN_SESSION_KEY) === '1'; } catch (_) {}
+      if (already) {
+        gate.classList.add('pin-gate-hidden');
+        try { currentPinCode = sessionStorage.getItem(PIN_CODE_KEY) || ''; } catch (_) {}
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        let entered = '';
+        const dots    = [...gate.querySelectorAll('.pin-dot')];
+        const errorEl = document.getElementById('pin-error');
+        const updateDots = () => dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
+        const tryUnlock = () => {
+          if (PIN_CODES.includes(entered)) {
+            currentPinCode = entered;
+            try { sessionStorage.setItem(PIN_SESSION_KEY, '1'); sessionStorage.setItem(PIN_CODE_KEY, entered); } catch (_) {}
+            gate.classList.add('pin-gate-hidden');
+            resolve();
+            return;
+          }
+          errorEl.textContent = 'Incorrect code';
+          gate.classList.add('pin-shake');
+          setTimeout(() => { gate.classList.remove('pin-shake'); entered = ''; updateDots(); }, 350);
+        };
+        document.getElementById('pin-keypad').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-key]');
+          if (!btn) return;
+          const key = btn.dataset.key;
+          errorEl.textContent = '';
+          if (key === 'clr') entered = '';
+          else if (key === 'del') entered = entered.slice(0, -1);
+          else if (entered.length < 4) entered += key;
+          updateDots();
+          if (entered.length === 4) setTimeout(tryUnlock, 100);
+        });
+        document.addEventListener('keydown', (e) => {
+          if (gate.classList.contains('pin-gate-hidden')) return;
+          if (/^[0-9]$/.test(e.key) && entered.length < 4) {
+            entered += e.key; errorEl.textContent = ''; updateDots();
+            if (entered.length === 4) setTimeout(tryUnlock, 100);
+          } else if (e.key === 'Backspace') {
+            entered = entered.slice(0, -1); updateDots();
+          }
+        });
+        updateDots();
+      });
+    }
 
     // ─────────────────────────────────────────────────────────────
     // PRODUCT CATALOG
@@ -429,22 +535,16 @@
     let pendingProduct = null;
     let pendingBarcode = '';
 
-    const nameInput       = document.getElementById('employee-name');
     const supplierSelect  = document.getElementById('supplier-select');
     const otherWrap       = document.getElementById('other-supplier-wrap');
     const otherInput      = document.getElementById('other-supplier');
     const barcodeInput    = document.getElementById('barcode-input');
     const scanHint        = document.getElementById('scan-hint');
-    const barcodeWarn     = document.getElementById('barcode-warn');
     const productCard     = document.getElementById('product-card');
     const tempArea        = document.getElementById('temp-area');
     const tempInput       = document.getElementById('temp-input');
     const tempBadge       = document.getElementById('temp-badge');
     const addItemBtn      = document.getElementById('add-item-btn');
-    const newProductForm  = document.getElementById('new-product-form');
-    const productSelector = document.getElementById('product-selector');
-    const productSearch   = document.getElementById('product-search');
-    const productOptions  = document.getElementById('product-options');
     const sessionSection  = document.getElementById('session-section');
     const sessionItemsEl  = document.getElementById('session-items');
     const submitBtn       = document.getElementById('submit-btn');
@@ -452,24 +552,11 @@
     document.getElementById('date-display').textContent =
       new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    nameInput.addEventListener('input', checkSessionReady);
+    // Supplier is optional metadata now, not a gate — scanning is available
+    // immediately once the PIN unlocks the page (see waitForPinUnlock below).
     supplierSelect.addEventListener('change', () => {
       otherWrap.hidden = supplierSelect.value !== 'other';
-      checkSessionReady();
     });
-    otherInput.addEventListener('input', checkSessionReady);
-
-    function checkSessionReady() {
-      const name     = nameInput.value.trim();
-      const supplier = supplierSelect.value;
-      const otherOk  = supplier !== 'other' || otherInput.value.trim();
-      const ready    = !!(name && supplier && otherOk);
-      barcodeInput.disabled = !ready;
-      scanHint.textContent  = ready
-        ? 'Scan a barcode or type it and press Enter.'
-        : 'Enter your name and select a supplier to begin.';
-      if (ready) barcodeInput.focus();
-    }
 
     barcodeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -480,27 +567,35 @@
       }
     });
 
+    // Matches a scanned barcode against the catalog: either the exact full
+    // barcode (any supplier, saved via the Data Issues "identify" flow) or,
+    // for the common 16-character US Foods format, the 7-digit product code
+    // at chars 7–13. No match → logged instantly as unidentified, no prompts,
+    // so scanning is never interrupted; product identity gets filled in later
+    // on the Data Issues tab.
     function handleBarcode(raw) {
-      pendingBarcode = raw;
-      pendingProduct = null;
       hideAll();
-      if (supplierSelect.value === 'usfoods') {
-        if (raw.length !== 16) {
-          barcodeWarn.hidden = false;
-          barcodeWarn.textContent = `US Foods barcodes are 16 characters — this one is ${raw.length}. Select the product manually below.`;
-          showProductSelector();
-          return;
-        }
-        const code  = raw.slice(6, 13);
-        const match = PRODUCTS.find((p) => p.usFoodsCode === code);
-        match ? showProductCard(match) : showNewProductForm(code);
-      } else {
-        showProductSelector();
+      let product = PRODUCTS.find((p) => p.barcode === raw) || null;
+      if (!product && raw.length === 16) {
+        const code = raw.slice(6, 13);
+        product = PRODUCTS.find((p) => p.usFoodsCode === code) || null;
       }
+      if (product) showProductCard(product, raw);
+      else addPendingItem(raw);
     }
 
-    function showProductCard(product) {
+    function addPendingItem(barcode) {
+      sessionItems.push({
+        itemId: generateId(), barcode, productId: '', productName: '', packSize: '',
+        requiresTemp: null, temperature: null, tempPass: null,
+      });
+      renderSessionItems();
+      barcodeInput.focus();
+    }
+
+    function showProductCard(product, barcode) {
       pendingProduct = product;
+      pendingBarcode = barcode;
       document.getElementById('product-name-display').textContent = product.name;
       document.getElementById('product-pack-display').textContent = product.packSize;
       tempArea.hidden = !product.requiresTemp;
@@ -528,7 +623,7 @@
       if (!pendingProduct) return;
       const temp = pendingProduct.requiresTemp ? parseFloat(tempInput.value) : null;
       sessionItems.push({
-        barcode: pendingBarcode, productId: pendingProduct.id, productName: pendingProduct.name,
+        itemId: generateId(), barcode: pendingBarcode, productId: pendingProduct.id, productName: pendingProduct.name,
         packSize: pendingProduct.packSize, requiresTemp: pendingProduct.requiresTemp,
         temperature: temp, tempPass: temp !== null ? temp < TEMP_THRESHOLD : null,
       });
@@ -536,53 +631,21 @@
       hideAll(); renderSessionItems(); barcodeInput.focus();
     }
 
-    function showNewProductForm(code) {
-      document.getElementById('new-product-code-display').textContent = `Code: ${code}`;
-      document.getElementById('new-product-name').value = '';
-      document.getElementById('new-product-pack').value = '';
-      document.getElementById('new-product-temp').checked = false;
-      newProductForm.hidden = false;
-      document.getElementById('new-product-name').focus();
-    }
-
-    document.getElementById('save-new-product-btn').addEventListener('click', async () => {
-      const name     = document.getElementById('new-product-name').value.trim();
-      const packSize = document.getElementById('new-product-pack').value.trim();
-      const reqTemp  = document.getElementById('new-product-temp').checked;
-      const code     = document.getElementById('new-product-code-display').textContent.replace('Code: ', '');
-      if (!name || !packSize) { showToast('Please fill in product name and pack size', 'error'); return; }
-      const newProduct = { id: `new-${code}`, name, packSize, requiresTemp: reqTemp, usFoodsCode: code };
-      PRODUCTS.push(newProduct);
-      try { await appendLog(LOG_PATH, { action: 'new_product', usFoodsCode: code, productName: name, packSize, requiresTemp: String(reqTemp), timeStamp: new Date().toISOString(), addedBy: nameInput.value.trim() }); } catch (_) {}
-      newProductForm.hidden = true;
-      showToast('Product saved and available for future sessions', 'success');
-      showProductCard(newProduct);
-    });
-
-    function showProductSelector() {
-      productSearch.value = ''; renderProductOptions('');
-      productSelector.hidden = false; productSearch.focus();
-    }
-
-    productSearch.addEventListener('input', () => renderProductOptions(productSearch.value));
-    function renderProductOptions(query) {
-      const q = query.toLowerCase().trim();
-      const matches = q ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(q)) : [...PRODUCTS].sort((a, b) => a.name.localeCompare(b.name));
-      if (!matches.length) { productOptions.innerHTML = '<div class="product-option-empty">No products found</div>'; return; }
-      productOptions.innerHTML = matches.map((p) => `<div class="product-option" data-id="${escapeHtml(p.id)}"><span class="option-name">${escapeHtml(p.name)}</span><span class="option-pack">${escapeHtml(p.packSize)}</span></div>`).join('');
-      productOptions.querySelectorAll('.product-option').forEach((el) => {
-        el.addEventListener('click', () => {
-          const product = PRODUCTS.find((p) => p.id === el.dataset.id);
-          if (!product) return;
-          productSelector.hidden = true; barcodeWarn.hidden = true; showProductCard(product);
-        });
-      });
-    }
-
     function renderSessionItems() {
       if (!sessionItems.length) { sessionSection.hidden = true; submitBtn.disabled = true; return; }
       sessionSection.hidden = false; submitBtn.disabled = false;
       sessionItemsEl.innerHTML = sessionItems.map((item, i) => {
+        // Unidentified item — logged instantly with no blocking prompts. An
+        // optional inline temperature field is still offered right here, so
+        // a reading can be captured while the product is physically in hand
+        // even though we don't yet know if it's temp-sensitive.
+        if (!item.productName) {
+          return `<div class="session-item">
+            <div class="item-info"><span class="item-name" style="color:#c48000">Unidentified item</span><span class="item-pack">Barcode: ${escapeHtml(item.barcode || '—')}</span></div>
+            <input type="number" class="pending-temp-input" data-index="${i}" placeholder="Temp °F" step="0.1" value="${item.temperature !== null ? item.temperature : ''}" style="width:96px;font:400 13px 'Manrope',sans-serif;padding:7px 9px;border:2px solid #e8e0d5;border-radius:6px;outline:none">
+            <button class="item-remove" data-index="${i}">&times;</button>
+          </div>`;
+        }
         const tempHtml = item.requiresTemp
           ? `<span class="item-temp">${item.temperature}°F <span class="item-temp-badge ${item.tempPass ? 'pass' : 'fail'}">${item.tempPass ? '✓ Pass' : '✗ Fail'}</span></span>`
           : '<span class="item-temp muted">No temp req.</span>';
@@ -591,22 +654,30 @@
       sessionItemsEl.querySelectorAll('.item-remove').forEach((btn) => {
         btn.addEventListener('click', () => { sessionItems.splice(parseInt(btn.dataset.index, 10), 1); renderSessionItems(); });
       });
+      sessionItemsEl.querySelectorAll('.pending-temp-input').forEach((inp) => {
+        inp.addEventListener('input', () => {
+          const idx = parseInt(inp.dataset.index, 10);
+          const t = parseFloat(inp.value);
+          sessionItems[idx].temperature = isNaN(t) ? null : t;
+          sessionItems[idx].tempPass = isNaN(t) ? null : t < TEMP_THRESHOLD;
+        });
+      });
     }
 
     submitBtn.addEventListener('click', submitSession);
     async function submitSession() {
       submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
-      const receivedBy   = nameInput.value.trim();
       const supplierVal  = supplierSelect.value;
       const supplierName = supplierVal === 'other' ? otherInput.value.trim() : supplierVal;
       const date         = new Date().toISOString().slice(0, 10);
       try {
         for (const item of sessionItems) {
           await appendLog(LOG_PATH, {
-            action: 'receive', sessionId, receivedBy, date, timeStamp: new Date().toISOString(),
+            action: 'receive', sessionId, itemId: item.itemId, enteredCode: currentPinCode,
+            date, timeStamp: new Date().toISOString(),
             supplier: supplierName, barcode: item.barcode, productId: item.productId,
             productName: item.productName, packSize: item.packSize,
-            requiresTemp: String(item.requiresTemp),
+            requiresTemp: item.requiresTemp === null ? '' : String(item.requiresTemp),
             temperature:  item.temperature !== null ? String(item.temperature) : '',
             tempPass:     item.tempPass    !== null ? String(item.tempPass)    : '',
           });
@@ -626,8 +697,7 @@
     }
 
     function hideAll() {
-      productCard.hidden = true; newProductForm.hidden = true;
-      productSelector.hidden = true; barcodeWarn.hidden = true;
+      productCard.hidden = true;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -659,6 +729,7 @@
         buildSessions(Array.isArray(logs) ? logs : []);
         historyStatus.hidden = true;
         applyFilters();
+        renderDataIssues();
       } catch (err) {
         historyStatus.className = 'history-status error';
         historyStatus.textContent = 'Failed to load history: ' + (err.message || 'unknown error');
@@ -666,33 +737,59 @@
     }
 
     function buildSessions(logs) {
-      // Re-load any products added via the unknown-product form in past sessions
+      // Re-load any products added via the identify-later flow (Data Issues tab)
+      // or the legacy unknown-product form, keyed by either the full raw
+      // barcode (any supplier) or the 7-digit US Foods code.
       logs.filter((r) => r.action === 'new_product').forEach((r) => {
-        const exists = PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode);
-        if (!exists && r.usFoodsCode && r.productName) {
+        const exists = PRODUCTS.some((p) => (r.usFoodsCode && p.usFoodsCode === r.usFoodsCode) || (r.barcode && p.barcode === r.barcode));
+        if (!exists && (r.usFoodsCode || r.barcode) && r.productName) {
           PRODUCTS.push({
-            id:           `new-${r.usFoodsCode}`,
+            id:           `new-${r.usFoodsCode || r.barcode}`,
             name:         r.productName,
             packSize:     r.packSize    || '',
             requiresTemp: r.requiresTemp === 'true',
-            usFoodsCode:  r.usFoodsCode,
+            ...(r.usFoodsCode ? { usFoodsCode: r.usFoodsCode } : {}),
+            ...(r.barcode     ? { barcode: r.barcode }         : {}),
           });
         }
       });
 
       const map = {};
-      logs.filter((r) => r.action === 'receive').forEach((r) => {
+      logs.filter((r) => r.action === 'receive').forEach((r, idx) => {
         const sid = r.sessionId || `legacy-${r.timeStamp}`;
-        if (!map[sid]) map[sid] = { sessionId: sid, date: r.date || '', supplier: r.supplier || '', receivedBy: r.receivedBy || '', items: [] };
-        map[sid].items.push({
-          productName:  r.productName || '—',
+        if (!map[sid]) map[sid] = { sessionId: sid, date: r.date || '', supplier: r.supplier || '', enteredCode: r.enteredCode || '', items: {} };
+        const iid = r.itemId || `legacy-${r.timeStamp}-${idx}`;
+        map[sid].items[iid] = {
+          itemId: iid, barcode: r.barcode || '',
+          productName:  r.productName || '',
           packSize:     r.packSize    || '',
-          requiresTemp: r.requiresTemp === 'true',
+          requiresTemp: r.requiresTemp === 'true' ? true : r.requiresTemp === 'false' ? false : null,
           temperature:  r.temperature !== '' ? parseFloat(r.temperature) : null,
           tempPass:     r.tempPass === 'true' ? true : r.tempPass === 'false' ? false : null,
-        });
+        };
       });
-      allSessions = Object.values(map).sort((a, b) => b.date.localeCompare(a.date) || b.sessionId.localeCompare(a.sessionId));
+
+      // Corrections made later via the Data Issues tab — applied after all
+      // receive rows so they always win regardless of log order.
+      logs.filter((r) => r.action === 'update_item').forEach((r) => {
+        const s = map[r.sessionId];
+        if (!s || !s.items[r.itemId]) return;
+        s.items[r.itemId] = {
+          ...s.items[r.itemId],
+          productName:  r.productName || '',
+          packSize:     r.packSize    || '',
+          requiresTemp: r.requiresTemp === 'true' ? true : r.requiresTemp === 'false' ? false : null,
+          temperature:  r.temperature !== '' && r.temperature != null ? parseFloat(r.temperature) : s.items[r.itemId].temperature,
+          tempPass:     r.tempPass === 'true' ? true : r.tempPass === 'false' ? false : s.items[r.itemId].tempPass,
+        };
+      });
+      logs.filter((r) => r.action === 'update_supplier').forEach((r) => {
+        if (map[r.sessionId]) map[r.sessionId].supplier = r.supplier || '';
+      });
+
+      allSessions = Object.values(map)
+        .map((s) => ({ ...s, items: Object.values(s.items) }))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.sessionId.localeCompare(a.sessionId));
     }
 
     function applyFilters() {
@@ -735,24 +832,30 @@
         const dateLabel     = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '—';
         const supplierLabel = s.supplier === 'usfoods' ? 'US Foods' : s.supplier === 'sysco' ? 'Sysco' : (s.supplier || '—');
         const hasFail       = s.items.some((i) => i.tempPass === false);
+        const hasUnknown    = s.items.some((i) => !i.productName);
         const count         = s.items.length;
 
         const itemsHtml = s.items.map((item) => {
           const tempHtml = item.requiresTemp && item.temperature !== null
             ? `<span class="history-temp">${item.temperature}°F<span class="history-temp-badge ${item.tempPass ? 'pass' : 'fail'}">${item.tempPass ? '✓' : '✗'}</span></span>`
-            : '<span class="history-temp no-temp">No temp req.</span>';
-          return `<div class="history-item${item.tempPass === false ? ' temp-fail' : ''}"><div class="history-item-info"><div class="history-item-name">${escapeHtml(item.productName)}</div>${item.packSize ? `<div class="history-item-pack">${escapeHtml(item.packSize)}</div>` : ''}</div>${tempHtml}</div>`;
+            : item.temperature !== null
+              ? `<span class="history-temp">${item.temperature}°F</span>`
+              : '<span class="history-temp no-temp">No temp req.</span>';
+          const nameHtml = item.productName
+            ? escapeHtml(item.productName)
+            : `<span style="color:#e0a030">Unidentified — ${escapeHtml(item.barcode || 'no barcode')}</span>`;
+          return `<div class="history-item${item.tempPass === false ? ' temp-fail' : ''}"><div class="history-item-info"><div class="history-item-name">${nameHtml}</div>${item.packSize ? `<div class="history-item-pack">${escapeHtml(item.packSize)}</div>` : ''}</div>${tempHtml}</div>`;
         }).join('');
 
         return `<div class="session-card">
           <div class="session-summary">
-            <div class="session-info"><div class="session-date">${escapeHtml(dateLabel)}</div><div class="session-meta">Received by ${escapeHtml(s.receivedBy || '—')}</div></div>
-            <div class="session-badges"><span class="badge badge-supplier">${escapeHtml(supplierLabel)}</span>${hasFail ? '<span class="badge badge-fail">Temp Fail</span>' : ''}</div>
+            <div class="session-info"><div class="session-date">${escapeHtml(dateLabel)}</div><div class="session-meta">Code ${escapeHtml(s.enteredCode || '—')}</div></div>
+            <div class="session-badges"><span class="badge badge-supplier">${escapeHtml(supplierLabel)}</span>${hasFail ? '<span class="badge badge-fail">Temp Fail</span>' : ''}${hasUnknown ? '<span class="badge badge-fail" style="background:#4a3a1a;color:#e0a030">Unidentified</span>' : ''}</div>
             <span class="item-count-badge">${count} item${count !== 1 ? 's' : ''}</span>
             <span class="expand-icon">&#8964;</span>
           </div>
           <div class="session-body">
-            <div class="session-body-meta"><strong>Supplier:</strong> ${escapeHtml(supplierLabel)} &nbsp;·&nbsp; <strong>Received by:</strong> ${escapeHtml(s.receivedBy || '—')} &nbsp;·&nbsp; <strong>Date:</strong> ${escapeHtml(s.date || '—')}</div>
+            <div class="session-body-meta"><strong>Supplier:</strong> ${escapeHtml(supplierLabel)} &nbsp;·&nbsp; <strong>Code:</strong> ${escapeHtml(s.enteredCode || '—')} &nbsp;·&nbsp; <strong>Date:</strong> ${escapeHtml(s.date || '—')}</div>
             ${itemsHtml}
           </div>
         </div>`;
@@ -762,6 +865,148 @@
         el.addEventListener('click', () => el.closest('.session-card').classList.toggle('open'));
       });
     }
+
+    // ════════════════════════════════════════════════════════════
+    // DATA ISSUES — items still needing a product name, and sessions
+    // still needing a supplier. Fixing either appends a correction row
+    // (update_item / update_supplier); buildSessions() applies these on
+    // top of the original receive rows, so history always reflects the
+    // latest fix without rewriting anything.
+    // ════════════════════════════════════════════════════════════
+    const unidentifiedEl      = document.getElementById('unidentified-items');
+    const missingSupplierEl   = document.getElementById('missing-supplier-sessions');
+    const issuesTabCount      = document.getElementById('issues-tab-count');
+
+    function renderDataIssues() {
+      const unidentified = [];
+      allSessions.forEach((s) => {
+        s.items.forEach((item) => { if (!item.productName) unidentified.push({ session: s, item }); });
+      });
+      const missingSupplier = allSessions.filter((s) => !s.supplier);
+
+      const total = unidentified.length + missingSupplier.length;
+      issuesTabCount.textContent = total ? ` (${total})` : '';
+
+      if (!unidentified.length) {
+        unidentifiedEl.innerHTML = '<div class="no-issues">✓ Nothing to identify</div>';
+      } else {
+        unidentifiedEl.innerHTML = unidentified.map(({ session, item }, idx) => {
+          const dateLabel = session.date ? new Date(session.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+          const tempNote  = item.temperature !== null ? ` · ${item.temperature}°F recorded at scan` : '';
+          return `<div class="issue-card">
+            <div class="issue-card-top">
+              <span class="issue-barcode">${escapeHtml(item.barcode || '—')}</span>
+              <span class="issue-meta">Scanned ${escapeHtml(dateLabel)}${tempNote}</span>
+            </div>
+            <div class="issue-body">
+              <input type="text" class="fix-name" placeholder="Product name">
+              <input type="text" class="fix-pack" placeholder="Pack size (e.g. 4/5/LB)">
+            </div>
+            <div class="issue-actions">
+              <label class="checkbox-label-dark"><input type="checkbox" class="fix-temp"> Requires temp check</label>
+              <button class="btn-fix" data-idx="${idx}">Save</button>
+            </div>
+          </div>`;
+        }).join('');
+
+        unidentifiedEl.querySelectorAll('.btn-fix').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const idx = parseInt(btn.dataset.idx, 10);
+            const { session, item } = unidentified[idx];
+            const card = btn.closest('.issue-card');
+            const name = card.querySelector('.fix-name').value.trim();
+            const pack = card.querySelector('.fix-pack').value.trim();
+            const reqTemp = card.querySelector('.fix-temp').checked;
+            if (!name) { showToast('Enter a product name', 'error'); return; }
+            btn.disabled = true; btn.textContent = 'Saving…';
+            try {
+              const tempStr     = item.temperature !== null ? String(item.temperature) : '';
+              const tempPassStr = item.temperature !== null ? String(item.temperature < TEMP_THRESHOLD) : '';
+              await appendLog(LOG_PATH, {
+                action: 'update_item', sessionId: session.sessionId, itemId: item.itemId,
+                productName: name, packSize: pack, requiresTemp: String(reqTemp),
+                temperature: tempStr, tempPass: tempPassStr,
+                timeStamp: new Date().toISOString(), fixedByCode: currentPinCode,
+              });
+              // Also save as a reusable catalog entry, keyed by the raw barcode,
+              // so the next scan of the same product auto-identifies it.
+              if (item.barcode && !PRODUCTS.some((p) => p.barcode === item.barcode)) {
+                PRODUCTS.push({ id: `new-${item.barcode}`, name, packSize: pack, requiresTemp: reqTemp, barcode: item.barcode });
+                await appendLog(LOG_PATH, { action: 'new_product', barcode: item.barcode, productName: name, packSize: pack, requiresTemp: String(reqTemp), timeStamp: new Date().toISOString() });
+              }
+              showToast('Item identified', 'success');
+              await loadHistory();
+            } catch (err) {
+              showToast('Failed: ' + (err.message || 'unknown error'), 'error');
+              btn.disabled = false; btn.textContent = 'Save';
+            }
+          });
+        });
+      }
+
+      if (!missingSupplier.length) {
+        missingSupplierEl.innerHTML = '<div class="no-issues">✓ All sessions have a supplier</div>';
+      } else {
+        missingSupplierEl.innerHTML = missingSupplier.map((s) => {
+          const dateLabel = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+          return `<div class="issue-card">
+            <div class="issue-card-top">
+              <span class="issue-meta">${escapeHtml(dateLabel)} · ${s.items.length} item${s.items.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div class="issue-actions">
+              <select class="fix-supplier">
+                <option value="">Select supplier…</option>
+                <option value="usfoods">US Foods</option>
+                <option value="sysco">Sysco</option>
+                <option value="other">Other</option>
+              </select>
+              <input type="text" class="fix-supplier-other" placeholder="Supplier name" style="display:none;font:400 13px 'Manrope',sans-serif;padding:8px 10px;border:2px solid #444;border-radius:6px;background:#3a3a3a;color:#fff">
+              <button class="btn-fix" data-session="${escapeHtml(s.sessionId)}">Save</button>
+            </div>
+          </div>`;
+        }).join('');
+
+        missingSupplierEl.querySelectorAll('.fix-supplier').forEach((sel) => {
+          sel.addEventListener('change', () => {
+            sel.closest('.issue-actions').querySelector('.fix-supplier-other').style.display = sel.value === 'other' ? '' : 'none';
+          });
+        });
+        missingSupplierEl.querySelectorAll('.btn-fix').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const card = btn.closest('.issue-card');
+            const sel = card.querySelector('.fix-supplier');
+            const otherVal = card.querySelector('.fix-supplier-other').value.trim();
+            const supplierVal = sel.value === 'other' ? otherVal : sel.value;
+            if (!sel.value || (sel.value === 'other' && !otherVal)) { showToast('Select a supplier', 'error'); return; }
+            btn.disabled = true; btn.textContent = 'Saving…';
+            try {
+              await appendLog(LOG_PATH, { action: 'update_supplier', sessionId: btn.dataset.session, supplier: supplierVal, timeStamp: new Date().toISOString(), fixedByCode: currentPinCode });
+              showToast('Supplier saved', 'success');
+              await loadHistory();
+            } catch (err) {
+              showToast('Failed: ' + (err.message || 'unknown error'), 'error');
+              btn.disabled = false; btn.textContent = 'Save';
+            }
+          });
+        });
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // TABS
+    // ════════════════════════════════════════════════════════════
+    const tabButtons = document.querySelectorAll('.page-tab');
+    const tabPanels = {
+      scan:    document.getElementById('tab-panel-scan'),
+      history: document.getElementById('tab-panel-history'),
+      issues:  document.getElementById('tab-panel-issues'),
+    };
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach((b) => b.classList.toggle('active', b === btn));
+        Object.entries(tabPanels).forEach(([key, el]) => { el.hidden = key !== btn.dataset.tab; });
+      });
+    });
 
     // ════════════════════════════════════════════════════════════
     // UTILITIES
@@ -781,7 +1026,11 @@
     }
 
     // Boot
-    loadHistory();
+    (async () => {
+      await waitForPinUnlock();
+      barcodeInput.focus();
+      await loadHistory();
+    })();
   </script>
 </body>
 </html>
