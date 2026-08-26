@@ -32,7 +32,7 @@
 
     /* ── Filters ── */
     .filter-card { background: #2e2e2e; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
-    .filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
     .filter-row  { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
     .field-group { display: flex; flex-direction: column; gap: 5px; }
     .field-group label { font: 700 11px 'Manrope', sans-serif; color: #888; letter-spacing: 0.8px; text-transform: uppercase; }
@@ -60,6 +60,7 @@
     .log-table td { padding: 12px 16px; border-bottom: 1px solid #333; font: 400 13px 'Manrope', sans-serif; color: #ddd; vertical-align: middle; }
     .log-table tr:last-child td { border-bottom: none; }
     .log-date { white-space: nowrap; color: #ccc; font-weight: 600; }
+    .log-sku { white-space: nowrap; color: #fff; font-weight: 600; }
     .log-barcode { font: 600 12px 'Courier New', monospace; color: #999; }
     .log-product { color: #fff; }
     .log-product.unlabeled { color: #e0a030; font-style: italic; }
@@ -165,7 +166,7 @@
 
   <section class="hero">
     <h1>SHAPE INGREDIENT LOG.</h1>
-    <p>Every ingredient scanned on the Shape tab, by day.</p>
+    <p>Every ingredient scanned on the Shape tab, by dough type and day.</p>
   </section>
 
   <div class="section-dark">
@@ -173,6 +174,12 @@
 
       <div class="filter-card">
         <div class="filter-grid">
+          <div class="field-group">
+            <label for="filter-sku">Dough Type</label>
+            <select id="filter-sku">
+              <option value="">All dough types</option>
+            </select>
+          </div>
           <div class="field-group">
             <label for="filter-product">Product</label>
             <input type="text" id="filter-product" placeholder="Search by product name or barcode…" autocomplete="off">
@@ -267,7 +274,7 @@
       logs.forEach((row) => {
         if (row.action === 'void') { voided.add(row.itemId); return; }
         if (row.action === 'label_product') { if (row.barcode) labels[row.barcode] = row.productName || ''; return; }
-        if (row.action === 'scan') items.push({ itemId: row.itemId, date: row.date || '', barcode: row.barcode || '', timeStamp: row.timeStamp || '' });
+        if (row.action === 'scan') items.push({ itemId: row.itemId, date: row.date || '', sku: row.sku || '', barcode: row.barcode || '', timeStamp: row.timeStamp || '' });
       });
       return items
         .filter((i) => !voided.has(i.itemId))
@@ -275,6 +282,7 @@
         .sort((a, b) => b.date.localeCompare(a.date) || b.timeStamp.localeCompare(a.timeStamp));
     }
 
+    const filterSku      = document.getElementById('filter-sku');
     const filterProduct  = document.getElementById('filter-product');
     const filterDateFrom = document.getElementById('filter-date-from');
     const filterDateTo   = document.getElementById('filter-date-to');
@@ -285,15 +293,26 @@
 
     let debounce;
     filterProduct.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(applyFilters, 250); });
-    [filterDateFrom, filterDateTo].forEach((el) => el.addEventListener('change', applyFilters));
+    [filterSku, filterDateFrom, filterDateTo].forEach((el) => el.addEventListener('change', applyFilters));
     clearBtn.addEventListener('click', () => {
-      filterProduct.value = ''; filterDateFrom.value = ''; filterDateTo.value = ''; applyFilters();
+      filterSku.value = ''; filterProduct.value = ''; filterDateFrom.value = ''; filterDateTo.value = ''; applyFilters();
     });
+
+    // Dough-type options are derived from whatever's actually been scanned —
+    // no separate SKU catalog import needed on this page.
+    function populateSkuFilter() {
+      const skus = [...new Set(allEntries.map((e) => e.sku).filter(Boolean))].sort();
+      const prevVal = filterSku.value;
+      filterSku.innerHTML = '<option value="">All dough types</option>'
+        + skus.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      if (skus.includes(prevVal)) filterSku.value = prevVal;
+    }
 
     async function loadLog() {
       try {
         const logs = await fetchLog(LOG_PATH);
         allEntries = resolveEntries(Array.isArray(logs) ? logs : []);
+        populateSkuFilter();
         logStatus.hidden = true;
         applyFilters();
       } catch (err) {
@@ -309,11 +328,13 @@
     }
 
     function applyFilters() {
+      const sku      = filterSku.value;
       const q        = filterProduct.value.trim().toLowerCase();
       const dateFrom = filterDateFrom.value;
       const dateTo   = filterDateTo.value;
 
       const filtered = allEntries.filter((e) => {
+        if (sku && e.sku !== sku) return false;
         if (dateFrom && e.date < dateFrom) return false;
         if (dateTo   && e.date > dateTo)   return false;
         if (q) {
@@ -332,10 +353,11 @@
       }
 
       logResults.innerHTML = `<table class="log-table">
-        <thead><tr><th>Date</th><th>Barcode</th><th>Product</th></tr></thead>
+        <thead><tr><th>Date</th><th>Dough Type</th><th>Barcode</th><th>Product</th></tr></thead>
         <tbody>
           ${filtered.map((e) => `<tr data-barcode="${escapeHtml(e.barcode)}">
             <td class="log-date">${escapeHtml(fmtDate(e.date))}</td>
+            <td class="log-sku">${escapeHtml(e.sku || '—')}</td>
             <td class="log-barcode">${escapeHtml(e.barcode || '—')}</td>
             <td>
               ${e.productName

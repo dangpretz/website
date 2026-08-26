@@ -246,7 +246,7 @@
       font: 400 13px 'Manrope', sans-serif; color: var(--gray-3);
       padding: 10px 2px 2px;
     }
-    #ingredient-scan-list { margin-top: 8px; }
+    .ingredient-scan-list { margin-top: 8px; }
     .ingredient-scan-row {
       display: flex; align-items: center; gap: 8px;
       background: var(--white); border-radius: 6px; padding: 8px 10px; margin-top: 6px;
@@ -258,6 +258,10 @@
       cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0;
     }
     .ingredient-scan-void:hover { color: var(--red); }
+    .ingredient-log-link {
+      display: block; font: 600 12px 'Manrope', sans-serif; color: var(--gray-4);
+      margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-2);
+    }
 
     /* ── SKU list ──────────────────────────────── */
     .section-label {
@@ -2293,13 +2297,13 @@
   }
 
   // ─── SHAPE-TAB INGREDIENT SCANS ───────────────────────────────────────────
-  // Day-level traceability: whatever gets scanned while viewing a given Shape
-  // day is logged against that date, not against any single batch — one flour
-  // bag covers everything shaped that day. 'label_product' rows resolve a
-  // barcode to a friendly name for every row that shares it (past and
-  // future), so labeling once from the review page fixes the whole history —
-  // simpler than per-item correction since a barcode always means the same
-  // thing here, unlike receiving where the same barcode note doesn't apply.
+  // One scan field per dough type (SKU) recommended that day, not one for the
+  // whole day — each dough type's worker card gets its own field + list, so
+  // an ingredient scan is tied to exactly which dough it went into.
+  // 'label_product' rows resolve a barcode to a friendly name for every row
+  // that shares it (past and future), so labeling once from the review page
+  // fixes the whole history — simpler than per-item correction since a
+  // barcode always means the same ingredient here.
   function resolveShapeIngredients() {
     const voided = new Set();
     const labels = {};
@@ -2307,13 +2311,19 @@
     shapeIngredientLogs.forEach((row) => {
       if (row.action === 'void') { voided.add(row.itemId); return; }
       if (row.action === 'label_product') { if (row.barcode) labels[row.barcode] = row.productName || ''; return; }
-      if (row.action === 'scan') items.push({ itemId: row.itemId, date: row.date || '', barcode: row.barcode || '', timeStamp: row.timeStamp || '' });
+      if (row.action === 'scan') items.push({ itemId: row.itemId, date: row.date || '', sku: row.sku || '', barcode: row.barcode || '', timeStamp: row.timeStamp || '' });
     });
     return items.filter((i) => !voided.has(i.itemId)).map((i) => ({ ...i, productName: labels[i.barcode] || '' }));
   }
 
   function generateIngredientId() {
     return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ing-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  // DOM-safe fragment for the per-SKU input/list pairing (SKU names contain
+  // spaces/periods/etc. that aren't valid as-is in a selector).
+  function ingredientSkuSlug(sku) {
+    return String(sku).toLowerCase().replace(/[^a-z0-9]+/g, '-');
   }
 
   function ingredientRowHtml(item) {
@@ -2324,43 +2334,78 @@
     </div>`;
   }
 
-  function ingredientListHtml(dateStr) {
+  function ingredientListHtml(dateStr, sku) {
     const todays = resolveShapeIngredients()
-      .filter((i) => i.date === dateStr)
+      .filter((i) => i.date === dateStr && i.sku === sku)
       .sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
     if (!todays.length) {
-      return `<div class="ingredient-scan-empty">${appLang === 'es' ? 'Nada escaneado hoy todavía' : 'Nothing scanned yet today'}</div>`;
+      return `<div class="ingredient-scan-empty">${appLang === 'es' ? 'Nada escaneado' : 'Nothing scanned'}</div>`;
     }
     return todays.map(ingredientRowHtml).join('');
   }
 
-  function renderIngredientScanSection(dateStr) {
-    const reviewLinkLabel = appLang === 'es' ? 'Ver historial completo →' : 'View full log →';
+  function renderIngredientScanSection(dateStr, sku) {
+    const slug = ingredientSkuSlug(sku);
     return `<div class="ingredient-scan-card">
-      <div class="ingredient-scan-title">${appLang === 'es' ? 'Ingredientes escaneados hoy' : 'Ingredients scanned today'}</div>
-      <input type="text" id="ingredient-scan-input" class="ingredient-scan-field" placeholder="${appLang === 'es' ? 'Escanear código de barras…' : 'Scan ingredient barcode…'}" autocomplete="off" data-date="${esc(dateStr)}">
-      <div id="ingredient-scan-list">${ingredientListHtml(dateStr)}</div>
-      <a href="../shape-ingredients/index.html" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font:600 12px 'Manrope',sans-serif;color:var(--gray-4)">${reviewLinkLabel}</a>
+      <div class="ingredient-scan-title">${appLang === 'es' ? 'Ingredientes escaneados' : 'Ingredients scanned'}</div>
+      <input type="text" class="ingredient-scan-field" data-ingredient-scan-input data-date="${esc(dateStr)}" data-sku="${esc(sku)}" data-slug="${slug}" placeholder="${appLang === 'es' ? 'Escanear código de barras…' : 'Scan ingredient barcode…'}" autocomplete="off">
+      <div class="ingredient-scan-list" data-ingredient-scan-list="${slug}">${ingredientListHtml(dateStr, sku)}</div>
     </div>`;
   }
 
-  function bindIngredientVoidButtons() {
-    document.querySelectorAll('[data-void-ingredient]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const itemId = btn.dataset.voidIngredient;
-        const dateStr = document.getElementById('ingredient-scan-input')?.dataset.date;
-        const entry = { action: 'void', itemId, timeStamp: new Date().toISOString() };
+  function bindIngredientScans() {
+    document.querySelectorAll('[data-ingredient-scan-input]').forEach((input) => {
+      input.addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const raw = input.value.trim();
+        input.value = '';
+        if (!raw) return;
+        const { date, sku, slug } = input.dataset;
+        const entry = { action: 'scan', itemId: generateIngredientId(), date, sku, barcode: raw, timeStamp: new Date().toISOString() };
         shapeIngredientLogs.push(entry);
-        const listEl = document.getElementById('ingredient-scan-list');
-        if (listEl && dateStr) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
+        refreshIngredientList(slug, date, sku);
+        input.focus();
         try { await appendLog(SHAPE_INGREDIENTS_LOG, entry); }
         catch (err) {
           shapeIngredientLogs = shapeIngredientLogs.filter((r) => r !== entry);
-          if (listEl && dateStr) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
+          refreshIngredientList(slug, date, sku);
+          alert('Failed to log ingredient scan: ' + err.message);
+        }
+      });
+    });
+    document.querySelectorAll('[data-ingredient-scan-list]').forEach((listEl) => bindVoidButtonsIn(listEl));
+  }
+
+  // Scoped to one list at a time — binding globally would re-attach a second
+  // listener to every OTHER card's void buttons on every scan/void anywhere
+  // on the page, double-firing them.
+  function bindVoidButtonsIn(listEl) {
+    const slug  = listEl.dataset.ingredientScanList;
+    const input = document.querySelector(`[data-ingredient-scan-input][data-slug="${slug}"]`);
+    const date  = input?.dataset.date;
+    const sku   = input?.dataset.sku;
+    listEl.querySelectorAll('[data-void-ingredient]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const itemId = btn.dataset.voidIngredient;
+        const entry = { action: 'void', itemId, timeStamp: new Date().toISOString() };
+        shapeIngredientLogs.push(entry);
+        refreshIngredientList(slug, date, sku);
+        try { await appendLog(SHAPE_INGREDIENTS_LOG, entry); }
+        catch (err) {
+          shapeIngredientLogs = shapeIngredientLogs.filter((r) => r !== entry);
+          refreshIngredientList(slug, date, sku);
           alert('Failed to remove: ' + err.message);
         }
       });
     });
+  }
+
+  function refreshIngredientList(slug, date, sku) {
+    const listEl = document.querySelector(`[data-ingredient-scan-list="${slug}"]`);
+    if (!listEl || !date || !sku) return;
+    listEl.innerHTML = ingredientListHtml(date, sku);
+    bindVoidButtonsIn(listEl);
   }
 
   // ─── RENDER TEAM CARD ─────────────────────────────────────────────────────
@@ -2477,8 +2522,11 @@
     // Only the "+ Add Unscheduled Batch" button remains — log completions are inline now
     const extraBtnHtml = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">${t('add_unsched')}</button>`;
 
-    // Ingredient scan — Shape only, applies to the whole day's shaping rather than a single batch
-    const ingredientHtml = !isBFP ? renderIngredientScanSection(dateStr) : '';
+    // Ingredient scan fields now live inside each dough type's own card
+    // (renderWorkerCard) — this is just the one link to the full review page.
+    const ingredientLogLinkHtml = !isBFP
+      ? `<a href="../shape-ingredients/index.html" target="_blank" rel="noopener" class="ingredient-log-link">${appLang === 'es' ? 'Ver historial de ingredientes →' : 'View ingredient log →'}</a>`
+      : '';
 
     return `<div class="team-card">
       <div class="team-header">
@@ -2490,7 +2538,7 @@
       </div>
       <div class="team-body">
         ${workersHtml}
-        ${ingredientHtml}
+        ${ingredientLogLinkHtml}
         ${skuHtml}
         ${totalHtml}
         ${spareHint}
@@ -2882,6 +2930,7 @@
       </div>
 
       ${packListHtml}
+      ${!isBFP ? renderIngredientScanSection(dateStr, d.sku) : ''}
 
       <div class="wstepper">
         <button class="wstep-btn" data-log-step data-key="${esc(stepperKey)}" data-delta="-1" ${madeP <= 0 ? 'disabled' : ''}>−</button>
@@ -2949,10 +2998,13 @@
     // Walk-in button at the bottom
     const extraBtn = `<button class="log-btn-extra" data-extra-btn data-type="${esc(type)}" data-date="${esc(dateStr)}" style="margin-top:14px">${t('add_unsched')}</button>`;
 
-    // Ingredient scan — Shape only, applies to the whole day's shaping rather than a single batch
-    const ingredientHtml = type === 'shape' ? renderIngredientScanSection(dateStr) : '';
+    // Ingredient scan fields now live inside each dough type's own card
+    // (renderWorkerCard) — this is just the one link to the full review page.
+    const ingredientLogLinkHtml = type === 'shape'
+      ? `<a href="../shape-ingredients/index.html" target="_blank" rel="noopener" class="ingredient-log-link">${appLang === 'es' ? 'Ver historial de ingredientes →' : 'View ingredient log →'}</a>`
+      : '';
 
-    return ingredientHtml + meterHtml + celebrate + sectionsHtml + extraBtn;
+    return ingredientLogLinkHtml + meterHtml + celebrate + sectionsHtml + extraBtn;
   }
 
   // ─── RENDER DAY VIEW ──────────────────────────────────────────────────────
@@ -4517,32 +4569,10 @@
   // ─── BIND ACTIONS ─────────────────────────────────────────────────────────
 
   function bindActions() {
-    // Ingredient scan — Enter logs immediately and only refreshes its own
-    // list div (never the full render()), so continuous rapid-fire scanning
-    // never loses focus on the input.
-    const ingredientInput = document.getElementById('ingredient-scan-input');
-    if (ingredientInput) {
-      ingredientInput.addEventListener('keydown', async (e) => {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        const raw = ingredientInput.value.trim();
-        ingredientInput.value = '';
-        if (!raw) return;
-        const dateStr = ingredientInput.dataset.date;
-        const entry = { action: 'scan', itemId: generateIngredientId(), date: dateStr, barcode: raw, timeStamp: new Date().toISOString() };
-        shapeIngredientLogs.push(entry);
-        const listEl = document.getElementById('ingredient-scan-list');
-        if (listEl) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
-        ingredientInput.focus();
-        try { await appendLog(SHAPE_INGREDIENTS_LOG, entry); }
-        catch (err) {
-          shapeIngredientLogs = shapeIngredientLogs.filter((r) => r !== entry);
-          if (listEl) { listEl.innerHTML = ingredientListHtml(dateStr); bindIngredientVoidButtons(); }
-          alert('Failed to log ingredient scan: ' + err.message);
-        }
-      });
-    }
-    bindIngredientVoidButtons();
+    // Ingredient scans — one field per dough-type card. Enter logs
+    // immediately and only refreshes that card's own list div (never the
+    // full render()), so continuous rapid-fire scanning never loses focus.
+    bindIngredientScans();
 
     document.querySelectorAll('[data-worker-dec]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -5175,7 +5205,7 @@
   // it, FOH could be partway through typing "5" when the 60s interval
   // fires and rebuilds the dough section back to 0.
   const _isInputBusy = () =>
-    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit, [data-foh-transfer-sheets], #ingredient-scan-input')
+    document.activeElement?.matches?.('[data-log-input], [data-stock-section], [data-log-step], #extra-val, .inline-onhand-edit, [data-foh-transfer-sheets], [data-ingredient-scan-input]')
     || Object.keys(saveTimers || {}).some(k => saveTimers[k] != null)
     || [...document.querySelectorAll('[data-stock-section][data-initial-value]')].some(inp => inp.value !== inp.dataset.initialValue);
 
