@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Ingredient Log | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 9999; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    /* ── Hero ── */
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
+    .hero h1 { font: 900 italic clamp(28px, 4.5vw, 46px)/1.05 Georgia, serif; color: #fff; margin: 0; }
+    .hero p { color: #999; font: 400 14px 'Manrope', sans-serif; margin-top: 8px; }
+
+    /* ── Sections ── */
+    .section-dark { background: #222; padding: clamp(24px, 4vw, 48px) 5%; }
+    .max-1000 { max-width: 1000px; margin: 0 auto; }
+
+    /* ── Filters ── */
+    .filter-card { background: #2e2e2e; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+    .filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .filter-row  { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-group label { font: 700 11px 'Manrope', sans-serif; color: #888; letter-spacing: 0.8px; text-transform: uppercase; }
+    .field-group input, .field-group select {
+      font: 400 14px 'Manrope', sans-serif; padding: 9px 12px; border: 2px solid #444;
+      border-radius: 6px; background: #3a3a3a; color: #fff; outline: none; transition: border-color 0.2s; width: 100%;
+    }
+    .field-group input:focus, .field-group select:focus { border-color: #C41E1E; }
+    .btn-clear { background: #3a3a3a; color: #888; font: 700 13px 'Manrope', sans-serif; border: 1px solid #555; border-radius: 6px; padding: 9px 18px; cursor: pointer; white-space: nowrap; transition: background 0.2s, color 0.2s; height: fit-content; }
+    .btn-clear:hover { background: #444; color: #fff; }
+
+    .results-meta { font: 400 13px 'Manrope', sans-serif; color: #888; margin-bottom: 14px; }
+    .results-meta strong { color: #ccc; }
+    .status-msg { font: 400 14px 'Manrope', sans-serif; color: #666; padding: 32px 0; text-align: center; }
+    .status-msg.error { color: #C41E1E; }
+    .no-results { text-align: center; padding: 40px 20px; font: 400 14px 'Manrope', sans-serif; color: #555; }
+    .no-results strong { color: #888; display: block; font-size: 16px; margin-bottom: 6px; }
+
+    /* ── Table ── */
+    .log-table { width: 100%; border-collapse: collapse; background: #2e2e2e; border-radius: 10px; overflow: hidden; }
+    .log-table th {
+      text-align: left; font: 700 11px 'Manrope', sans-serif; color: #888; text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 12px 16px; border-bottom: 1px solid #383838; background: #282828;
+    }
+    .log-table td { padding: 12px 16px; border-bottom: 1px solid #333; font: 400 13px 'Manrope', sans-serif; color: #ddd; vertical-align: middle; }
+    .log-table tr:last-child td { border-bottom: none; }
+    .log-date { white-space: nowrap; color: #ccc; font-weight: 600; }
+    .log-barcode { font: 600 12px 'Courier New', monospace; color: #999; }
+    .log-product { color: #fff; }
+    .log-product.unlabeled { color: #e0a030; font-style: italic; }
+
+    .label-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .label-form input {
+      font: 400 13px 'Manrope', sans-serif; padding: 7px 10px; border: 2px solid #444; border-radius: 6px;
+      background: #3a3a3a; color: #fff; outline: none; min-width: 160px;
+    }
+    .label-form input:focus { border-color: #C41E1E; }
+    .btn-label { background: #C41E1E; color: #fff; font: 700 12px 'Manrope', sans-serif; border: none; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+    .btn-label:hover { background: #a01818; }
+    .btn-label:disabled { background: #555; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 6px; font: 700 14px 'Manrope', sans-serif; color: #fff; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.3); pointer-events: none; opacity: 1; transition: opacity 0.4s ease; white-space: nowrap; background: #1A1A1A; }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    @media (max-width: 700px) {
+      .filter-grid { grid-template-columns: 1fr; }
+      .filter-row  { grid-template-columns: 1fr; }
+      .log-table thead { display: none; }
+      .log-table, .log-table tbody, .log-table tr, .log-table td { display: block; width: 100%; }
+      .log-table tr { border-bottom: 1px solid #383838; padding: 10px 0; }
+      .log-table td { padding: 4px 16px; border-bottom: none; }
+    }
+
+    /* ── PIN gate ── */
+    .pin-gate {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #141414; border-top: 4px solid #C41E1E;
+      padding: 24px; box-sizing: border-box;
+    }
+    .pin-gate.pin-gate-hidden { display: none; }
+    .pin-gate-logo { font-size: 40px; margin-bottom: 4px; }
+    .pin-gate-title { font: 800 20px 'Manrope', sans-serif; color: #fff; text-align: center; }
+    .pin-gate-sub { font: 500 13px 'Manrope', sans-serif; color: #999; margin-top: 4px; margin-bottom: 22px; }
+    .pin-dots { display: flex; gap: 14px; margin-bottom: 10px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #555; background: transparent; transition: background 0.15s, border-color 0.15s; }
+    .pin-dot.filled { background: #C41E1E; border-color: #C41E1E; }
+    .pin-error { min-height: 18px; font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-bottom: 8px; text-align: center; }
+    .pin-keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 14px; margin-top: 8px; }
+    .pin-keypad button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444; background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .pin-keypad button:hover { background: #3a3a3a; border-color: #C41E1E; }
+    .pin-keypad button.pin-key-sub { font: 700 12px 'Manrope', sans-serif; color: #999; }
+    .pin-gate.pin-shake .pin-dots { animation: pin-shake 0.35s; }
+    @keyframes pin-shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PIN gate — same employee codes as the production app. Visible by
+       default in CSS; the inline script below hides it instantly (no flash)
+       if this device already unlocked earlier in the browser session. -->
+  <div class="pin-gate" id="pin-gate">
+    <div class="pin-gate-logo">🥨</div>
+    <div class="pin-gate-title">Dangerous Pretzel Co.</div>
+    <div class="pin-gate-sub">Enter your 4-digit code</div>
+    <div class="pin-dots" id="pin-dots">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-keypad" id="pin-keypad">
+      <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+      <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+      <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+      <button type="button" class="pin-key-sub" data-key="clr">CLR</button><button type="button" data-key="0">0</button><button type="button" class="pin-key-sub" data-key="del">⌫</button>
+    </div>
+  </div>
+  <script>
+    try {
+      if (sessionStorage.getItem('prod-pin-unlocked') === '1') {
+        document.getElementById('pin-gate').classList.add('pin-gate-hidden');
+      }
+    } catch (_) {}
+  </script>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+        <a href="../barcode-lookup/index.html">Barcode Lookup</a>
+        <a href="../receiving-history/index.html">Receiving History</a>
+        <a href="../shape-ingredients/index.html">Ingredient Log</a>
+        <a href="../inventory/index.html">Inventory</a>
+        <a href="../inventory-forecast/index.html">Forecast</a>
+        <a href="../recipes/index.html">Recipes</a>
+        <a href="../batch-tracking/index.html">Batch Tracking</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>SHAPE INGREDIENT LOG.</h1>
+    <p>Every ingredient scanned on the Shape tab, by day.</p>
+  </section>
+
+  <div class="section-dark">
+    <div class="max-1000">
+
+      <div class="filter-card">
+        <div class="filter-grid">
+          <div class="field-group">
+            <label for="filter-product">Product</label>
+            <input type="text" id="filter-product" placeholder="Search by product name or barcode…" autocomplete="off">
+          </div>
+          <div class="field-group">
+            <label>From Date</label>
+            <input type="date" id="filter-date-from">
+          </div>
+          <div class="field-group">
+            <label>To Date</label>
+            <input type="date" id="filter-date-to">
+          </div>
+        </div>
+        <div class="filter-row">
+          <div></div>
+          <button class="btn-clear" id="clear-btn">Clear Filters</button>
+        </div>
+      </div>
+
+      <div id="results-meta" class="results-meta" hidden></div>
+      <div id="log-status" class="status-msg">Loading…</div>
+      <div id="log-results"></div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { appendLog, fetchLog } from '../../scripts/sheet-logger.js';
+
+    const LOG_PATH = '/dangpretz/shape-ingredients';
+
+    // ─────────────────────────────────────────────────────────────
+    // PIN GATE — same employee codes and pattern as the production app.
+    // ─────────────────────────────────────────────────────────────
+    const PIN_CODES       = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377'];
+    const PIN_SESSION_KEY = 'prod-pin-unlocked';
+
+    function waitForPinUnlock() {
+      const gate = document.getElementById('pin-gate');
+      let already = false;
+      try { already = sessionStorage.getItem(PIN_SESSION_KEY) === '1'; } catch (_) {}
+      if (already) { gate.classList.add('pin-gate-hidden'); return Promise.resolve(); }
+      return new Promise((resolve) => {
+        let entered = '';
+        const dots    = [...gate.querySelectorAll('.pin-dot')];
+        const errorEl = document.getElementById('pin-error');
+        const updateDots = () => dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
+        const tryUnlock = () => {
+          if (PIN_CODES.includes(entered)) {
+            try { sessionStorage.setItem(PIN_SESSION_KEY, '1'); } catch (_) {}
+            gate.classList.add('pin-gate-hidden');
+            resolve();
+            return;
+          }
+          errorEl.textContent = 'Incorrect code';
+          gate.classList.add('pin-shake');
+          setTimeout(() => { gate.classList.remove('pin-shake'); entered = ''; updateDots(); }, 350);
+        };
+        document.getElementById('pin-keypad').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-key]');
+          if (!btn) return;
+          const key = btn.dataset.key;
+          errorEl.textContent = '';
+          if (key === 'clr') entered = '';
+          else if (key === 'del') entered = entered.slice(0, -1);
+          else if (entered.length < 4) entered += key;
+          updateDots();
+          if (entered.length === 4) setTimeout(tryUnlock, 100);
+        });
+        document.addEventListener('keydown', (e) => {
+          if (gate.classList.contains('pin-gate-hidden')) return;
+          if (/^[0-9]$/.test(e.key) && entered.length < 4) {
+            entered += e.key; errorEl.textContent = ''; updateDots();
+            if (entered.length === 4) setTimeout(tryUnlock, 100);
+          } else if (e.key === 'Backspace') {
+            entered = entered.slice(0, -1); updateDots();
+          }
+        });
+        updateDots();
+      });
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // DATA
+    // ════════════════════════════════════════════════════════════
+    let allEntries = [];   // resolved scan rows, with productName joined in
+
+    function resolveEntries(logs) {
+      const voided = new Set();
+      const labels = {};
+      const items = [];
+      logs.forEach((row) => {
+        if (row.action === 'void') { voided.add(row.itemId); return; }
+        if (row.action === 'label_product') { if (row.barcode) labels[row.barcode] = row.productName || ''; return; }
+        if (row.action === 'scan') items.push({ itemId: row.itemId, date: row.date || '', barcode: row.barcode || '', timeStamp: row.timeStamp || '' });
+      });
+      return items
+        .filter((i) => !voided.has(i.itemId))
+        .map((i) => ({ ...i, productName: labels[i.barcode] || '' }))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.timeStamp.localeCompare(a.timeStamp));
+    }
+
+    const filterProduct  = document.getElementById('filter-product');
+    const filterDateFrom = document.getElementById('filter-date-from');
+    const filterDateTo   = document.getElementById('filter-date-to');
+    const clearBtn       = document.getElementById('clear-btn');
+    const logStatus      = document.getElementById('log-status');
+    const resultsMeta    = document.getElementById('results-meta');
+    const logResults     = document.getElementById('log-results');
+
+    let debounce;
+    filterProduct.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(applyFilters, 250); });
+    [filterDateFrom, filterDateTo].forEach((el) => el.addEventListener('change', applyFilters));
+    clearBtn.addEventListener('click', () => {
+      filterProduct.value = ''; filterDateFrom.value = ''; filterDateTo.value = ''; applyFilters();
+    });
+
+    async function loadLog() {
+      try {
+        const logs = await fetchLog(LOG_PATH);
+        allEntries = resolveEntries(Array.isArray(logs) ? logs : []);
+        logStatus.hidden = true;
+        applyFilters();
+      } catch (err) {
+        logStatus.className = 'status-msg error';
+        logStatus.textContent = 'Failed to load log: ' + (err.message || 'unknown error');
+      }
+    }
+
+    function fmtDate(dateStr) {
+      if (!dateStr) return '—';
+      try { return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
+      catch (_) { return dateStr; }
+    }
+
+    function applyFilters() {
+      const q        = filterProduct.value.trim().toLowerCase();
+      const dateFrom = filterDateFrom.value;
+      const dateTo   = filterDateTo.value;
+
+      const filtered = allEntries.filter((e) => {
+        if (dateFrom && e.date < dateFrom) return false;
+        if (dateTo   && e.date > dateTo)   return false;
+        if (q) {
+          const hay = (e.productName + ' ' + e.barcode).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      resultsMeta.hidden = false;
+      resultsMeta.innerHTML = `Showing <strong>${filtered.length}</strong> of <strong>${allEntries.length}</strong> scans`;
+
+      if (!filtered.length) {
+        logResults.innerHTML = '<div class="no-results"><strong>No records found</strong>Try adjusting your filters.</div>';
+        return;
+      }
+
+      logResults.innerHTML = `<table class="log-table">
+        <thead><tr><th>Date</th><th>Barcode</th><th>Product</th></tr></thead>
+        <tbody>
+          ${filtered.map((e) => `<tr data-barcode="${escapeHtml(e.barcode)}">
+            <td class="log-date">${escapeHtml(fmtDate(e.date))}</td>
+            <td class="log-barcode">${escapeHtml(e.barcode || '—')}</td>
+            <td>
+              ${e.productName
+                ? `<span class="log-product">${escapeHtml(e.productName)}</span>`
+                : `<div class="label-form">
+                     <span class="log-product unlabeled">Unlabeled</span>
+                     <input type="text" class="label-input" placeholder="Product name…">
+                     <button class="btn-label" data-label-barcode="${escapeHtml(e.barcode)}">Save</button>
+                   </div>`}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+      logResults.querySelectorAll('[data-label-barcode]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const barcode = btn.dataset.labelBarcode;
+          const input = btn.closest('.label-form').querySelector('.label-input');
+          const name = input.value.trim();
+          if (!name) { showToast('Enter a product name', 'error'); return; }
+          if (!barcode) { showToast('This row has no barcode to label', 'error'); return; }
+          btn.disabled = true; btn.textContent = 'Saving…';
+          try {
+            await appendLog(LOG_PATH, { action: 'label_product', barcode, productName: name, timeStamp: new Date().toISOString() });
+            showToast('Labeled — applies to every scan of this barcode', 'success');
+            await loadLog();
+          } catch (err) {
+            showToast('Failed: ' + (err.message || 'unknown error'), 'error');
+            btn.disabled = false; btn.textContent = 'Save';
+          }
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function showToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 3500);
+    }
+
+    // Boot
+    (async () => {
+      await waitForPinUnlock();
+      await loadLog();
+    })();
+  </script>
+</body>
+</html>
