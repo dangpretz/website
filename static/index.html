@@ -304,7 +304,20 @@
       panel.hidden = false;
 
       const cardsEl = document.getElementById('staff-cards');
-      const codes = Object.keys(directory).sort();
+      // Named entries first (alphabetically); anyone still unnamed — the
+      // seeded "(unassigned)" placeholder or a blank name on a manually
+      // added code — sinks to the bottom, sorted by code.
+      const hasName = (code) => {
+        const n = (directory[code].name || '').trim();
+        return n !== '' && n !== '(unassigned)';
+      };
+      const codes = Object.keys(directory).sort((a, b) => {
+        const aHas = hasName(a);
+        const bHas = hasName(b);
+        if (aHas !== bHas) return aHas ? -1 : 1;
+        if (aHas) return directory[a].name.localeCompare(directory[b].name, undefined, { sensitivity: 'base' }) || a.localeCompare(b);
+        return a.localeCompare(b);
+      });
       cardsEl.innerHTML = codes.map((code) => {
         const entry = directory[code];
         return `
