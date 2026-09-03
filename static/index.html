@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Hub | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Header ── */
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 999; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .nav-logo { height: 46px; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-greeting { color: #ccc; font: 600 14px 'Manrope', sans-serif; }
+    .nav-logout { color: #888; font: 600 13px 'Manrope', sans-serif; cursor: pointer; }
+    .nav-logout:hover { color: #C41E1E; }
+
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
+    .hero h1 { font: 900 italic clamp(28px, 4.5vw, 46px)/1.05 Georgia, serif; color: #fff; margin: 0; }
+    .hero p { color: #999; font: 400 14px 'Manrope', sans-serif; margin-top: 8px; }
+
+    .section-dark { background: #222; padding: clamp(24px, 4vw, 48px) 5%; }
+    .max-1000 { max-width: 1000px; margin: 0 auto; }
+
+    /* ── Link grid ── */
+    .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .link-card {
+      background: #2e2e2e; border: 1px solid #3a3a3a; border-radius: 10px; padding: 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .link-card:hover { border-color: #C41E1E; background: #333; }
+    .link-card-label { font: 700 15px 'Manrope', sans-serif; color: #fff; }
+    .link-card-arrow { color: #C41E1E; font-size: 18px; }
+    .empty-state { text-align: center; padding: 40px 20px; color: #888; font: 400 14px 'Manrope', sans-serif; }
+    .empty-state strong { color: #ccc; display: block; font-size: 16px; margin-bottom: 6px; }
+
+    /* ── Manager panel ── */
+    .manager-section-title { font: 800 18px 'Manrope', sans-serif; color: #fff; margin: 40px 0 4px; }
+    .manager-section-sub { color: #888; font: 400 13px 'Manrope', sans-serif; margin-bottom: 18px; }
+    .staff-card { background: #2e2e2e; border: 1px solid #3a3a3a; border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
+    .staff-card-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+    .staff-name {
+      font: 700 15px 'Manrope', sans-serif; padding: 8px 12px; border: 2px solid #444; border-radius: 6px;
+      background: #3a3a3a; color: #fff; outline: none; min-width: 160px;
+    }
+    .staff-name:focus { border-color: #C41E1E; }
+    .staff-code { font: 700 13px 'Courier New', monospace; color: #999; background: #1f1f1f; padding: 6px 10px; border-radius: 6px; letter-spacing: 1px; }
+    .staff-manager-toggle { display: flex; align-items: center; gap: 6px; color: #e0a030; font: 700 12px 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; }
+    .staff-links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; margin-bottom: 14px; }
+    .staff-links-grid label { display: flex; align-items: center; gap: 7px; color: #ccc; font: 400 13px 'Manrope', sans-serif; cursor: pointer; }
+    .btn-save-staff { background: #C41E1E; color: #fff; font: 700 12px 'Manrope', sans-serif; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+    .btn-save-staff:hover { background: #a01818; }
+    .btn-save-staff:disabled { background: #555; cursor: not-allowed; }
+    .add-staff-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+    .add-staff-row input[type="text"] {
+      font: 400 14px 'Manrope', sans-serif; padding: 9px 12px; border: 2px solid #444;
+      border-radius: 6px; background: #3a3a3a; color: #fff; outline: none;
+    }
+    .add-staff-row input[type="text"]:focus { border-color: #C41E1E; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 6px; font: 700 14px 'Manrope', sans-serif; color: #fff; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.3); pointer-events: none; opacity: 1; transition: opacity 0.4s ease; white-space: nowrap; background: #1A1A1A; }
+    .toast.success { background: #2a7a2a; }
+    .toast.error   { background: #C41E1E; }
+    .toast.fade    { opacity: 0; }
+
+    .status-msg { font: 400 14px 'Manrope', sans-serif; color: #666; padding: 32px 0; text-align: center; }
+    .status-msg.error { color: #C41E1E; }
+
+    /* ── PIN gate ── */
+    .pin-gate {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #141414; border-top: 4px solid #C41E1E;
+      padding: 24px; box-sizing: border-box;
+    }
+    .pin-gate.pin-gate-hidden { display: none; }
+    .pin-gate-logo { font-size: 40px; margin-bottom: 4px; }
+    .pin-gate-title { font: 800 20px 'Manrope', sans-serif; color: #fff; text-align: center; }
+    .pin-gate-sub { font: 500 13px 'Manrope', sans-serif; color: #999; margin-top: 4px; margin-bottom: 22px; }
+    .pin-dots { display: flex; gap: 14px; margin-bottom: 10px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #555; background: transparent; transition: background 0.15s, border-color 0.15s; }
+    .pin-dot.filled { background: #C41E1E; border-color: #C41E1E; }
+    .pin-error { min-height: 18px; font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-bottom: 8px; text-align: center; }
+    .pin-keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 14px; margin-top: 8px; }
+    .pin-keypad button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444; background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .pin-keypad button:hover { background: #3a3a3a; border-color: #C41E1E; }
+    .pin-keypad button.pin-key-sub { font: 700 12px 'Manrope', sans-serif; color: #999; }
+    .pin-gate.pin-shake .pin-dots { animation: pin-shake 0.35s; }
+    @keyframes pin-shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    @media (max-width: 700px) {
+      .link-grid { grid-template-columns: 1fr; }
+      .staff-links-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PIN gate — the ONLY keypad left in the codebase. Every other tool page
+       redirects here instead of showing its own. Visible by default in CSS;
+       the inline script below hides it instantly (no flash) if this tab
+       already unlocked earlier in the session. -->
+  <div class="pin-gate" id="pin-gate">
+    <div class="pin-gate-logo">🥨</div>
+    <div class="pin-gate-title">Dangerous Pretzel Co.</div>
+    <div class="pin-gate-sub">Enter your 4-digit code</div>
+    <div class="pin-dots" id="pin-dots">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-keypad" id="pin-keypad">
+      <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+      <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+      <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+      <button type="button" class="pin-key-sub" data-key="clr">CLR</button><button type="button" data-key="0">0</button><button type="button" class="pin-key-sub" data-key="del">⌫</button>
+    </div>
+  </div>
+  <script>
+    try {
+      if (sessionStorage.getItem('dpc-unlock')) {
+        document.getElementById('pin-gate').classList.add('pin-gate-hidden');
+      }
+    } catch (_) {}
+  </script>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="/static/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-right">
+        <span class="nav-greeting" id="nav-greeting" hidden></span>
+        <span class="nav-logout" id="nav-logout" hidden>Not you?</span>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1 id="hero-title">STAFF HUB.</h1>
+    <p id="hero-sub">Your tools, in one place.</p>
+  </section>
+
+  <div class="section-dark">
+    <div class="max-1000">
+      <div id="link-status" class="status-msg" hidden>Loading…</div>
+      <div id="link-grid" class="link-grid"></div>
+      <div id="empty-state" class="empty-state" hidden>
+        <strong>No pages assigned yet</strong>
+        Ask your manager to grant access to your code.
+      </div>
+
+      <div id="manager-panel" hidden>
+        <div class="manager-section-title">Manage Access</div>
+        <div class="manager-section-sub">Toggle which pages each PIN code can see. Changes apply the next time that code logs in.</div>
+        <div id="staff-cards"></div>
+
+        <div class="staff-card">
+          <div class="staff-card-head">
+            <strong style="color:#fff;font:700 14px 'Manrope',sans-serif;">Add a code</strong>
+          </div>
+          <div class="add-staff-row">
+            <input type="text" id="new-code" placeholder="4-digit code" maxlength="4" inputmode="numeric" style="width:110px;">
+            <input type="text" id="new-name" placeholder="Name">
+          </div>
+          <div class="staff-links-grid" id="new-links-grid"></div>
+          <label class="staff-manager-toggle" style="margin-bottom:12px;display:inline-flex;">
+            <input type="checkbox" id="new-is-manager"> Manager
+          </label>
+          <div><button class="btn-save-staff" id="add-staff-btn">Add</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../scripts/sheet-logger.js';
+    import {
+      STAFF_LOG_PATH, LINK_CATALOG, resolveStaffDirectory,
+      getSessionUnlock, setSessionUnlock, clearSessionUnlock,
+    } from '../scripts/staff-access.js';
+
+    // ─────────────────────────────────────────────────────────────
+    // PIN GATE
+    // ─────────────────────────────────────────────────────────────
+    const PIN_CODES = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377'];
+
+    function waitForPinEntry() {
+      const gate = document.getElementById('pin-gate');
+      return new Promise((resolve) => {
+        let entered = '';
+        const dots = [...gate.querySelectorAll('.pin-dot')];
+        const errorEl = document.getElementById('pin-error');
+        const updateDots = () => dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
+        const tryUnlock = () => {
+          if (PIN_CODES.includes(entered)) {
+            gate.classList.add('pin-gate-hidden');
+            resolve(entered);
+            return;
+          }
+          errorEl.textContent = 'Incorrect code';
+          gate.classList.add('pin-shake');
+          setTimeout(() => { gate.classList.remove('pin-shake'); entered = ''; updateDots(); }, 350);
+        };
+        document.getElementById('pin-keypad').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-key]');
+          if (!btn) return;
+          const key = btn.dataset.key;
+          errorEl.textContent = '';
+          if (key === 'clr') entered = '';
+          else if (key === 'del') entered = entered.slice(0, -1);
+          else if (entered.length < 4) entered += key;
+          updateDots();
+          if (entered.length === 4) setTimeout(tryUnlock, 100);
+        });
+        document.addEventListener('keydown', (e) => {
+          if (gate.classList.contains('pin-gate-hidden')) return;
+          if (/^[0-9]$/.test(e.key) && entered.length < 4) {
+            entered += e.key; errorEl.textContent = ''; updateDots();
+            if (entered.length === 4) setTimeout(tryUnlock, 100);
+          } else if (e.key === 'Backspace') {
+            entered = entered.slice(0, -1); updateDots();
+          }
+        });
+        updateDots();
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // DATA
+    // ─────────────────────────────────────────────────────────────
+    let directoryLogs = [];
+    let directory = {};
+    let currentCode = '';
+    let currentSession = null;
+
+    async function loadDirectory() {
+      try {
+        const logs = await fetchLog(STAFF_LOG_PATH);
+        directoryLogs = Array.isArray(logs) ? logs : [];
+      } catch (_) {
+        directoryLogs = [];
+      }
+      directory = resolveStaffDirectory(directoryLogs);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, kind = '') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (kind ? ' ' + kind : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 3500);
+    }
+
+    async function saveStaff({ code, name, isManager, links }, btn) {
+      if (!/^[0-9]{4}$/.test(code)) { showToast('Code must be 4 digits', 'error'); return; }
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+      try {
+        await appendLog(STAFF_LOG_PATH, {
+          action: 'set_staff',
+          code,
+          name: name || '',
+          isManager: !!isManager,
+          links: links.join(','),
+          updatedBy: currentCode,
+          timeStamp: new Date().toISOString(),
+        });
+        showToast('Saved', 'success');
+        await loadDirectory();
+        renderManagerPanel();
+      } catch (err) {
+        showToast('Failed: ' + (err.message || 'unknown error'), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+      }
+    }
+
+    function linksGridHtml(checkedLinks, namePrefix) {
+      return LINK_CATALOG.map((l) => `
+        <label>
+          <input type="checkbox" name="${namePrefix}" value="${l.key}" ${checkedLinks.includes(l.key) ? 'checked' : ''}>
+          ${escapeHtml(l.label)}
+        </label>
+      `).join('');
+    }
+
+    function renderManagerPanel() {
+      const panel = document.getElementById('manager-panel');
+      if (!currentSession || !currentSession.isManager) { panel.hidden = true; return; }
+      panel.hidden = false;
+
+      const cardsEl = document.getElementById('staff-cards');
+      const codes = Object.keys(directory).sort();
+      cardsEl.innerHTML = codes.map((code) => {
+        const entry = directory[code];
+        return `
+          <div class="staff-card" data-code="${escapeHtml(code)}">
+            <div class="staff-card-head">
+              <input type="text" class="staff-name" value="${escapeHtml(entry.name)}" placeholder="Name">
+              <span class="staff-code">${escapeHtml(code)}</span>
+              <label class="staff-manager-toggle">
+                <input type="checkbox" class="staff-ismanager" ${entry.isManager ? 'checked' : ''}> Manager
+              </label>
+            </div>
+            <div class="staff-links-grid">${linksGridHtml(entry.links, 'links-' + code)}</div>
+            <button class="btn-save-staff" data-save-code="${escapeHtml(code)}">Save</button>
+          </div>
+        `;
+      }).join('');
+
+      cardsEl.querySelectorAll('[data-save-code]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const code = btn.dataset.saveCode;
+          const card = cardsEl.querySelector(`.staff-card[data-code="${CSS.escape(code)}"]`);
+          const name = card.querySelector('.staff-name').value.trim();
+          const isManager = card.querySelector('.staff-ismanager').checked;
+          const links = [...card.querySelectorAll('.staff-links-grid input[type="checkbox"]:checked')].map((c) => c.value);
+          saveStaff({ code, name, isManager, links }, btn);
+        });
+      });
+
+      document.getElementById('new-links-grid').innerHTML = linksGridHtml([], 'links-new');
+    }
+
+    document.getElementById('add-staff-btn').addEventListener('click', () => {
+      const btn = document.getElementById('add-staff-btn');
+      const code = document.getElementById('new-code').value.trim();
+      const name = document.getElementById('new-name').value.trim();
+      const isManager = document.getElementById('new-is-manager').checked;
+      const links = [...document.querySelectorAll('#new-links-grid input[type="checkbox"]:checked')].map((c) => c.value);
+      saveStaff({ code, name, isManager, links }, btn).then(() => {
+        document.getElementById('new-code').value = '';
+        document.getElementById('new-name').value = '';
+        document.getElementById('new-is-manager').checked = false;
+      });
+    });
+
+    function renderLinks() {
+      const grid = document.getElementById('link-grid');
+      const empty = document.getElementById('empty-state');
+      const links = (currentSession && currentSession.links) || [];
+      const entries = LINK_CATALOG.filter((l) => links.includes(l.key));
+      if (!entries.length) {
+        grid.hidden = true;
+        empty.hidden = false;
+        return;
+      }
+      grid.hidden = false;
+      empty.hidden = true;
+      grid.innerHTML = entries.map((l) => `
+        <a class="link-card" href="${l.url}">
+          <span class="link-card-label">${escapeHtml(l.label)}</span>
+          <span class="link-card-arrow">→</span>
+        </a>
+      `).join('');
+    }
+
+    function renderHeader() {
+      const greeting = document.getElementById('nav-greeting');
+      const logout = document.getElementById('nav-logout');
+      greeting.hidden = false;
+      greeting.textContent = currentSession.name ? `Hi, ${currentSession.name}` : `Code ${currentCode}`;
+      logout.hidden = false;
+      document.getElementById('hero-sub').textContent = currentSession.name
+        ? `Welcome back, ${currentSession.name}.`
+        : 'Your tools, in one place.';
+    }
+
+    document.getElementById('nav-logout').addEventListener('click', () => {
+      clearSessionUnlock();
+      window.location.reload();
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // BOOT
+    // ─────────────────────────────────────────────────────────────
+    (async () => {
+      document.getElementById('link-status').hidden = false;
+
+      // If this tab already unlocked earlier, skip the keypad entirely — the
+      // sync inline script above already hid the gate visually; this just
+      // needs to avoid awaiting a click that will never come.
+      const existing = getSessionUnlock();
+      if (existing && existing.code) {
+        document.getElementById('pin-gate').classList.add('pin-gate-hidden');
+        currentCode = existing.code;
+      } else {
+        currentCode = await waitForPinEntry();
+      }
+
+      await loadDirectory();
+      const entry = directory[currentCode] || { name: '', isManager: false, links: [] };
+      currentSession = { code: currentCode, name: entry.name, isManager: entry.isManager, links: entry.links, ts: Date.now() };
+      setSessionUnlock(currentSession);
+
+      document.getElementById('link-status').hidden = true;
+
+      // Only follow ?return= when it's a same-origin path (starts with exactly
+      // one "/", no embedded scheme) — otherwise a crafted hub link could
+      // redirect someone off-site right after they enter a real PIN.
+      const returnTo = new URLSearchParams(window.location.search).get('return');
+      if (returnTo && /^\/(?!\/)/.test(returnTo) && !returnTo.includes('://')) {
+        window.location.replace(returnTo);
+        return;
+      }
+
+      renderHeader();
+      renderLinks();
+      renderManagerPanel();
+    })();
+  </script>
+</body>
+</html>
