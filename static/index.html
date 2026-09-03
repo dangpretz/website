@@ -56,9 +56,13 @@
     .staff-manager-toggle { display: flex; align-items: center; gap: 6px; color: #e0a030; font: 700 12px 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; }
     .staff-links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; margin-bottom: 14px; }
     .staff-links-grid label { display: flex; align-items: center; gap: 7px; color: #ccc; font: 400 13px 'Manrope', sans-serif; cursor: pointer; }
+    .staff-card-actions { display: flex; gap: 10px; }
     .btn-save-staff { background: #C41E1E; color: #fff; font: 700 12px 'Manrope', sans-serif; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
     .btn-save-staff:hover { background: #a01818; }
     .btn-save-staff:disabled { background: #555; cursor: not-allowed; }
+    .btn-delete-staff { background: transparent; color: #C41E1E; font: 700 12px 'Manrope', sans-serif; border: 1px solid #5a2a2a; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+    .btn-delete-staff:hover { background: #C41E1E; color: #fff; }
+    .btn-delete-staff:disabled { color: #666; border-color: #444; cursor: not-allowed; background: transparent; }
     .add-staff-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
     .add-staff-row input[type="text"] {
       font: 400 14px 'Manrope', sans-serif; padding: 9px 12px; border: 2px solid #444;
@@ -193,9 +197,13 @@
     // ─────────────────────────────────────────────────────────────
     // PIN GATE
     // ─────────────────────────────────────────────────────────────
-    const PIN_CODES = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377'];
-
-    function waitForPinEntry() {
+    // Accepts any code the resolved directory already knows about — the
+    // bootstrap manager, the legacy defaults, and anything a manager has
+    // added via the panel below. The keypad itself is interactive right
+    // away (no waiting on the directory fetch to attach listeners); only
+    // the final 4-digit check awaits `knownCodesPromise`, so a freshly
+    // added code works immediately without stalling the keypad on load.
+    function waitForPinEntry(knownCodesPromise) {
       const gate = document.getElementById('pin-gate');
       return new Promise((resolve) => {
         let entered = '';
@@ -203,14 +211,18 @@
         const errorEl = document.getElementById('pin-error');
         const updateDots = () => dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
         const tryUnlock = () => {
-          if (PIN_CODES.includes(entered)) {
-            gate.classList.add('pin-gate-hidden');
-            resolve(entered);
-            return;
-          }
-          errorEl.textContent = 'Incorrect code';
-          gate.classList.add('pin-shake');
-          setTimeout(() => { gate.classList.remove('pin-shake'); entered = ''; updateDots(); }, 350);
+          const attempt = entered;
+          knownCodesPromise.then((knownCodes) => {
+            if (attempt !== entered) return; // cleared/edited while the directory was loading
+            if (knownCodes.includes(attempt)) {
+              gate.classList.add('pin-gate-hidden');
+              resolve(attempt);
+              return;
+            }
+            errorEl.textContent = 'Incorrect code';
+            gate.classList.add('pin-shake');
+            setTimeout(() => { gate.classList.remove('pin-shake'); entered = ''; updateDots(); }, 350);
+          });
         };
         document.getElementById('pin-keypad').addEventListener('click', (e) => {
           const btn = e.target.closest('button[data-key]');
@@ -289,6 +301,26 @@
       }
     }
 
+    async function deleteStaff(code, name, btn) {
+      const label = name && name.trim() ? name.trim() : `code ${code}`;
+      if (!window.confirm(`Remove ${label}? They will no longer be able to log in.`)) return;
+      if (btn) { btn.disabled = true; btn.textContent = 'Removing…'; }
+      try {
+        await appendLog(STAFF_LOG_PATH, {
+          action: 'delete_staff',
+          code,
+          updatedBy: currentCode,
+          timeStamp: new Date().toISOString(),
+        });
+        showToast('Removed', 'success');
+        await loadDirectory();
+        renderManagerPanel();
+      } catch (err) {
+        showToast('Failed: ' + (err.message || 'unknown error'), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
+      }
+    }
+
     function linksGridHtml(checkedLinks, namePrefix) {
       return LINK_CATALOG.map((l) => `
         <label>
@@ -304,7 +336,20 @@
       panel.hidden = false;
 
       const cardsEl = document.getElementById('staff-cards');
-      const codes = Object.keys(directory).sort();
+      // Named entries first (alphabetically); anyone still unnamed — the
+      // seeded "(unassigned)" placeholder or a blank name on a manually
+      // added code — sinks to the bottom, sorted by code.
+      const hasName = (code) => {
+        const n = (directory[code].name || '').trim();
+        return n !== '' && n !== '(unassigned)';
+      };
+      const codes = Object.keys(directory).sort((a, b) => {
+        const aHas = hasName(a);
+        const bHas = hasName(b);
+        if (aHas !== bHas) return aHas ? -1 : 1;
+        if (aHas) return directory[a].name.localeCompare(directory[b].name, undefined, { sensitivity: 'base' }) || a.localeCompare(b);
+        return a.localeCompare(b);
+      });
       cardsEl.innerHTML = codes.map((code) => {
         const entry = directory[code];
         return `
@@ -317,7 +362,10 @@
               </label>
             </div>
             <div class="staff-links-grid">${linksGridHtml(entry.links, 'links-' + code)}</div>
-            <button class="btn-save-staff" data-save-code="${escapeHtml(code)}">Save</button>
+            <div class="staff-card-actions">
+              <button class="btn-save-staff" data-save-code="${escapeHtml(code)}">Save</button>
+              <button class="btn-delete-staff" data-delete-code="${escapeHtml(code)}">Delete</button>
+            </div>
           </div>
         `;
       }).join('');
@@ -330,6 +378,15 @@
           const isManager = card.querySelector('.staff-ismanager').checked;
           const links = [...card.querySelectorAll('.staff-links-grid input[type="checkbox"]:checked')].map((c) => c.value);
           saveStaff({ code, name, isManager, links }, btn);
+        });
+      });
+
+      cardsEl.querySelectorAll('[data-delete-code]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const code = btn.dataset.deleteCode;
+          const card = cardsEl.querySelector(`.staff-card[data-code="${CSS.escape(code)}"]`);
+          const name = card.querySelector('.staff-name').value;
+          deleteStaff(code, name, btn);
         });
       });
 
@@ -391,6 +448,11 @@
     (async () => {
       document.getElementById('link-status').hidden = false;
 
+      // Kick the directory fetch off immediately, but don't block the
+      // keypad on it — the keypad is clickable right away, and only the
+      // final 4-digit check awaits this promise (see waitForPinEntry).
+      const directoryPromise = loadDirectory().then(() => Object.keys(directory));
+
       // If this tab already unlocked earlier, skip the keypad entirely — the
       // sync inline script above already hid the gate visually; this just
       // needs to avoid awaiting a click that will never come.
@@ -398,11 +460,11 @@
       if (existing && existing.code) {
         document.getElementById('pin-gate').classList.add('pin-gate-hidden');
         currentCode = existing.code;
+        await directoryPromise;
       } else {
-        currentCode = await waitForPinEntry();
+        currentCode = await waitForPinEntry(directoryPromise);
       }
 
-      await loadDirectory();
       const entry = directory[currentCode] || { name: '', isManager: false, links: [] };
       currentSession = { code: currentCode, name: entry.name, isManager: entry.isManager, links: entry.links, ts: Date.now() };
       setSessionUnlock(currentSession);

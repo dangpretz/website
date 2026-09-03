@@ -23,6 +23,10 @@
 // ║   reduction style as sku_config elsewhere in this codebase). `links` is ║
 // ║   a comma-joined list of LINK_CATALOG keys (appendLog serializes plain  ║
 // ║   values via URLSearchParams, so a joined string round-trips cleanly).  ║
+// ║   action: 'delete_staff' → { code, updatedBy, timeStamp } removes any   ║
+// ║   earlier set_staff for that code. For a legacy/bootstrap code this     ║
+// ║   just resets it back to its hardcoded default (see below) rather than  ║
+// ║   deleting it for good — those codes are always physically valid PINs. ║
 // ║                                                                          ║
 // ║ DEFAULTS — so nobody is locked out before real data exists:              ║
 // ║   - BOOTSTRAP_MANAGER_CODE is always a manager, even with zero rows in  ║
@@ -81,7 +85,9 @@ export function linkLabel(pageKey) {
 export function resolveStaffDirectory(logs) {
   const directory = {};
   (Array.isArray(logs) ? logs : []).forEach((row) => {
-    if (row.action !== 'set_staff' || !row.code) return;
+    if (!row.code) return;
+    if (row.action === 'delete_staff') { delete directory[row.code]; return; }
+    if (row.action !== 'set_staff') return;
     const links = String(row.links || '').split(',').map((s) => s.trim()).filter(Boolean);
     directory[row.code] = {
       name: row.name || '',
