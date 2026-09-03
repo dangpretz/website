@@ -63,6 +63,7 @@
     .btn-delete-staff { background: transparent; color: #C41E1E; font: 700 12px 'Manrope', sans-serif; border: 1px solid #5a2a2a; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
     .btn-delete-staff:hover { background: #C41E1E; color: #fff; }
     .btn-delete-staff:disabled { color: #666; border-color: #444; cursor: not-allowed; background: transparent; }
+    .btn-delete-staff.confirming { background: #C41E1E; color: #fff; border-color: #C41E1E; }
     .add-staff-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
     .add-staff-row input[type="text"] {
       font: 400 14px 'Manrope', sans-serif; padding: 9px 12px; border: 2px solid #444;
@@ -301,10 +302,36 @@
       }
     }
 
+    // Two-click confirm, entirely in-page — no window.confirm(). Native
+    // dialogs can be silently suppressed by some browsers/extensions after
+    // repeated use (confirm() then just returns false with nothing shown),
+    // which looked exactly like "says deleted but nothing happens." First
+    // click arms the button for 4s; a second click within that window
+    // actually deletes. Any other click on the panel disarms it.
+    function armDeleteConfirm(btn) {
+      clearTimeout(btn._confirmTimer);
+      btn.dataset.confirming = '1';
+      btn.textContent = 'Confirm?';
+      btn.classList.add('confirming');
+      btn._confirmTimer = setTimeout(() => disarmDeleteConfirm(btn), 4000);
+    }
+    function disarmDeleteConfirm(btn) {
+      clearTimeout(btn._confirmTimer);
+      delete btn.dataset.confirming;
+      btn.textContent = 'Delete';
+      btn.classList.remove('confirming');
+    }
+
     async function deleteStaff(code, name, btn) {
+      if (btn && !btn.dataset.confirming) { armDeleteConfirm(btn); return; }
+      if (btn) {
+        clearTimeout(btn._confirmTimer);
+        delete btn.dataset.confirming;
+        btn.classList.remove('confirming');
+        btn.disabled = true;
+        btn.textContent = 'Removing…';
+      }
       const label = name && name.trim() ? name.trim() : `code ${code}`;
-      if (!window.confirm(`Remove ${label}? They will no longer be able to log in.`)) return;
-      if (btn) { btn.disabled = true; btn.textContent = 'Removing…'; }
       try {
         await appendLog(STAFF_LOG_PATH, {
           action: 'delete_staff',
@@ -312,12 +339,21 @@
           updatedBy: currentCode,
           timeStamp: new Date().toISOString(),
         });
-        showToast('Removed', 'success');
         await loadDirectory();
+        // A legacy/bootstrap code always falls back to its hardcoded
+        // default rather than disappearing (see resolveStaffDirectory) —
+        // it'll still be sitting right there afterward, reset. Say so
+        // explicitly instead of a generic "Removed" that reads as "did
+        // nothing" when the card obviously didn't vanish.
+        if (directory[code]) {
+          showToast(`${label} can't be fully removed — reset to default access instead`, 'success');
+        } else {
+          showToast(`Removed ${label}`, 'success');
+        }
         renderManagerPanel();
       } catch (err) {
         showToast('Failed: ' + (err.message || 'unknown error'), 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
+        if (btn) { btn.disabled = false; disarmDeleteConfirm(btn); }
       }
     }
 
@@ -440,6 +476,15 @@
     document.getElementById('nav-logout').addEventListener('click', () => {
       clearSessionUnlock();
       window.location.reload();
+    });
+
+    // Clicking anything other than an armed "Confirm?" button disarms it,
+    // so an accidental click elsewhere doesn't leave a delete armed and
+    // ready to fire on the next unrelated click.
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.btn-delete-staff.confirming').forEach((btn) => {
+        if (btn !== e.target) disarmDeleteConfirm(btn);
+      });
     });
 
     // ─────────────────────────────────────────────────────────────
