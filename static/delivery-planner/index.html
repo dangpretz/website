@@ -485,6 +485,11 @@
     }
     .sync-square-btn:hover { background: #333; color: #fff; }
     .sync-square-btn:disabled { opacity: 0.5; cursor: default; }
+    .view-only-badge {
+      background: #f3f0e8; border: 1px solid #d8d2c2; color: #7a6f52;
+      padding: 6px 12px; border-radius: 6px;
+      font: 700 12px 'Manrope', sans-serif; letter-spacing: 0.3px;
+    }
     .sync-toast {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
       background: #2a2a2a; color: #fff; padding: 10px 16px; border-radius: 8px;
@@ -843,6 +848,7 @@
       <div class="schedule-header">
         <h2>SCHEDULED DELIVERIES &amp; PICKUPS</h2>
         <div style="display:flex;gap:8px;align-items:center">
+          <span class="view-only-badge" id="view-only-badge" hidden title="Your code has view-only access to this page">👁 View only</span>
           <button class="sync-square-btn" id="sync-square-btn" hidden title="Pull catering orders from Square">↻ Sync from Square</button>
           <button class="new-order-btn" id="new-order-btn">+ New Order</button>
         </div>
@@ -1093,6 +1099,12 @@
       expandBoxLineItems,
       caseSizeOptionsFor,
     } from '../../scripts/inventory.js?v=2026-05-22-new-skus';
+    import { requireAccess, canEdit } from '../../scripts/staff-access.js';
+
+    // Set once at boot from the resolved session (see the boot IIFE below).
+    // Everything that renders or triggers a write checks this — false means
+    // the logged-in code has view-only access to this page.
+    let CAN_EDIT = true;
 
     // Shape-only catering + box expansion. ENABLED BY DEFAULT — kept in
     // sync with production app via the same localStorage key.
@@ -1139,6 +1151,7 @@
 
     async function syncFromSquare() {
       const btn = document.getElementById('sync-square-btn');
+      if (!CAN_EDIT) { showSyncToast('View-only access', 'error'); return; }
       if (!ADMIN_TOKEN) { showSyncToast('No admin token configured', 'error'); return; }
       btn.disabled = true;
       const orig = btn.textContent;
@@ -1165,11 +1178,17 @@
       }
     }
 
-    // Wire button + reveal it only when an admin token is available
+    // Reveal the sync button only when both an admin token is configured on
+    // this device AND the logged-in code has edit access — re-run once
+    // CAN_EDIT is known (boot resolves after DOMContentLoaded).
+    function updateSyncButtonVisibility() {
+      const btn = document.getElementById('sync-square-btn');
+      if (btn) btn.hidden = !(ADMIN_TOKEN && CAN_EDIT);
+    }
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('sync-square-btn');
       if (!btn) return;
-      if (ADMIN_TOKEN) btn.hidden = false;
+      updateSyncButtonVisibility();
       btn.addEventListener('click', syncFromSquare);
     });
 
@@ -1212,6 +1231,17 @@
     function closeFormModal() {
       formOverlay.classList.remove('open');
       clearEditState();
+    }
+
+    // Applies view-only mode to every static (non-card-rendered) control.
+    // Card-rendered mutating buttons (edit/duplicate/delete/confirm/scan/note)
+    // are handled separately in renderDeliveryCard/renderDailyCard, since
+    // those are rebuilt from scratch on every render anyway. Called once
+    // from the boot IIFE, before any data loads.
+    function applyViewOnlyMode() {
+      document.getElementById('view-only-badge').hidden = CAN_EDIT;
+      document.getElementById('new-order-btn').hidden = !CAN_EDIT;
+      updateSyncButtonVisibility();
     }
 
     document.getElementById('new-order-btn').addEventListener('click', () => openFormModal());
@@ -1999,7 +2029,7 @@
       // Compact button label — full "Confirm Delivery" wrapped to two lines on
       // narrow columns. Type still visible via the subline + the icon.
       const confirmBtnLabel = type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm';
-      const confirmBtnHtml = !isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${confirmBtnLabel}</button>` : '';
+      const confirmBtnHtml = (CAN_EDIT && !isConfirmed) ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${confirmBtnLabel}</button>` : '';
       const sigBtnHtml = isConfirmed && row.confirmation ? `<button class="btn-sig-view" data-action="view-signature" data-delivery-id="${id}">📋 View Signature</button>` : '';
       const confirmedHtml = row.confirmation ? `<div class="card-confirmed">Confirmed by ${escapeHtml(row.confirmation.confirmedBy || '—')}</div>` : '';
       const recurrenceHtml = row.recurrenceId ? '<svg class="recurrence-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' : '';
@@ -2008,8 +2038,8 @@
       const barcodeHtml = barcodeCount > 0
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
-      const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
-      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">Note</button>`;
+      const scanBtnHtml = CAN_EDIT ? `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>` : '';
+      const noteBtnHtml = CAN_EDIT ? `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">Note</button>` : '';
       const deliveryNoteHtml = row.deliveryNote
         ? `<div class="delivery-note-display">${escapeHtml(row.deliveryNote)}</div>`
         : '';
@@ -2017,14 +2047,14 @@
         <div class="delivery-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="card-customer">
             <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}</span>
-            <div class="overflow-wrap">
+            ${CAN_EDIT ? `<div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
                 <button data-action="edit" data-delivery-id="${id}">Edit</button>
                 <button data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
                 <button class="menu-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
               </div>
-            </div>
+            </div>` : ''}
           </div>
           <div class="card-subline">${covBadgeHtml}<span class="type-tag">${typeLabel}</span></div>
           ${pillsHtml}
@@ -2061,8 +2091,8 @@
       const barcodeHtml = barcodeCount > 0
         ? `<details class="barcode-details"><summary>${barcodeCount} barcode${barcodeCount !== 1 ? 's' : ''}</summary><div class="barcode-codes">${barcodeCodes}</div></details>`
         : '';
-      const scanBtnHtml = `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>`;
-      const noteBtnHtml = `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">Note</button>`;
+      const scanBtnHtml = CAN_EDIT ? `<button class="scan-btn" data-action="scan" data-delivery-id="${id}"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="4" y2="17"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="7" x2="20" y2="17"/></svg>Scan</button>` : '';
+      const noteBtnHtml = CAN_EDIT ? `<button class="note-btn" data-action="note" data-delivery-id="${id}" title="${row.deliveryNote ? 'Edit note' : 'Add note'}">Note</button>` : '';
       const deliveryNoteHtml = row.deliveryNote ? `<div class="delivery-note-display">${escapeHtml(row.deliveryNote)}</div>` : '';
       const contactHtml = renderContactLine(row);
       const isSquare = (row.deliveryId || '').startsWith('sq_') || row._source === 'square';
@@ -2083,16 +2113,16 @@
           <div class="daily-actions">
             ${noteBtnHtml}
             ${scanBtnHtml}
-            ${!isConfirmed ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm'}</button>` : ''}
+            ${(CAN_EDIT && !isConfirmed) ? `<button class="confirm-btn" data-action="confirm" data-delivery-id="${id}">${type === 'pickup' ? '✓ Confirm Pickup' : '✓ Confirm'}</button>` : ''}
             ${sigBtnHtml}
-            <div class="overflow-wrap">
+            ${CAN_EDIT ? `<div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
                 <button data-action="edit" data-delivery-id="${id}">Edit</button>
                 <button data-action="duplicate" data-delivery-id="${id}">Duplicate</button>
                 <button class="menu-delete" data-action="delete" data-delivery-id="${id}">Delete</button>
               </div>
-            </div>
+            </div>` : ''}
           </div>
         </div>`;
     }
@@ -2283,13 +2313,18 @@
           renderView();
         });
       });
-      // Click an order chip to edit that order directly
-      scheduleContainer.querySelectorAll('[data-month-edit]').forEach((chip) => {
-        chip.addEventListener('click', (e) => {
-          e.stopPropagation();
-          startEdit(chip.dataset.monthEdit);
+      // Click an order chip to edit that order directly — view-only sessions
+      // don't get this listener at all, so the chip is just inert (the
+      // day-cell handler above also skips its own jump-to-Daily-view when
+      // the click landed on a chip, to avoid double-handling in edit mode).
+      if (CAN_EDIT) {
+        scheduleContainer.querySelectorAll('[data-month-edit]').forEach((chip) => {
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startEdit(chip.dataset.monthEdit);
+          });
         });
-      });
+      }
     }
 
     function bindActions(container) {
@@ -2473,6 +2508,7 @@
     }
 
     function confirmDelete(deliveryId) {
+      if (!CAN_EDIT) return;
       if (!deliveryId) return;
       if (!window.confirm('Delete this delivery?')) return;
       (async () => {
@@ -2545,6 +2581,7 @@
     });
 
     document.getElementById('note-modal-save').addEventListener('click', async () => {
+      if (!CAN_EDIT) return;
       if (!noteDeliveryId) return;
       const note = document.getElementById('delivery-note-input').value.trim();
       const btn = document.getElementById('note-modal-save');
@@ -2625,6 +2662,7 @@
     });
 
     document.getElementById('confirm-submit').addEventListener('click', async () => {
+      if (!CAN_EDIT) return;
       const errEl = document.getElementById('confirm-error');
       errEl.hidden = true;
       const receiver = document.getElementById('confirm-receiver').value.trim();
@@ -2751,6 +2789,7 @@
     });
 
     document.getElementById('barcode-save').addEventListener('click', async () => {
+      if (!CAN_EDIT) return;
       if (!barcodeDeliveryId) return;
       const btn = document.getElementById('barcode-save');
       btn.disabled = true; btn.textContent = 'Saving...';
@@ -2846,10 +2885,12 @@
         const day = DAY_NAMES[Number(rec.dayOfWeek)] || '?';
         let summary = '';
         try { const items = JSON.parse(rec.lineItems || '[]'); summary = items.map((it) => `${it.sku} x${it.quantity}`).join(', '); } catch (_) {}
-        return `<li><div class="rec-info"><div class="rec-customer">${escapeHtml(rec.customer || '—')}</div><div class="rec-detail">${escapeHtml(freqLabel[rec.frequency] || rec.frequency)} on ${escapeHtml(day)}${rec.endDate ? ' until ' + escapeHtml(rec.endDate) : ''}</div><div class="rec-detail">${escapeHtml(summary)}</div></div><div class="rec-actions"><button style="background:#8B0000;color:#fff" data-rec-delete="${escapeHtml(rec.recurrenceId)}">Delete</button></div></li>`;
+        const deleteBtnHtml = CAN_EDIT ? `<button style="background:#8B0000;color:#fff" data-rec-delete="${escapeHtml(rec.recurrenceId)}">Delete</button>` : '';
+        return `<li><div class="rec-info"><div class="rec-customer">${escapeHtml(rec.customer || '—')}</div><div class="rec-detail">${escapeHtml(freqLabel[rec.frequency] || rec.frequency)} on ${escapeHtml(day)}${rec.endDate ? ' until ' + escapeHtml(rec.endDate) : ''}</div><div class="rec-detail">${escapeHtml(summary)}</div></div><div class="rec-actions">${deleteBtnHtml}</div></li>`;
       }).join('');
       list.querySelectorAll('[data-rec-delete]').forEach((btn) => {
         btn.addEventListener('click', async () => {
+          if (!CAN_EDIT) return;
           if (!window.confirm('Delete this recurring order?')) return;
           await appendLog(TEMPLATE_LOG_PATH, { action: 'delete_recurrence', recurrenceId: btn.dataset.recDelete, timeStamp: new Date().toISOString() });
           await loadRecurrences();
@@ -2877,6 +2918,7 @@
     // ── Form submit ──
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!CAN_EDIT) { showError('View-only access — you can\'t make changes here.'); return; }
       showError('');
       const customer = form.customer.value.trim();
       const date = form.date.value.trim();
@@ -2944,6 +2986,9 @@
     document.getElementById('date').value = today.toISOString().slice(0, 10);
 
     (async () => {
+      const session = await requireAccess('delivery-planner');
+      CAN_EDIT = canEdit(session, 'delivery-planner');
+      applyViewOnlyMode();
       await loadSkus();
       await loadRecords();
       await loadRecurrences();

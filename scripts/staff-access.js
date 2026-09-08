@@ -23,6 +23,8 @@
 // ║   reduction style as sku_config elsewhere in this codebase). `links` is ║
 // ║   a comma-joined list of LINK_CATALOG keys (appendLog serializes plain  ║
 // ║   values via URLSearchParams, so a joined string round-trips cleanly).  ║
+// ║   A token may carry an access level as `pageKey:view` — bare pageKey    ║
+// ║   means edit (see canEdit()/ACCESS_EDIT/ACCESS_VIEW below).             ║
 // ║   action: 'delete_staff' → { code, updatedBy, timeStamp } removes any   ║
 // ║   earlier set_staff for that code. For a legacy/bootstrap code this     ║
 // ║   just resets it back to its hardcoded default (see below) rather than  ║
@@ -54,7 +56,7 @@ const LEGACY_DEFAULT_CODES = ['0068', '0571', '8468', '6124', '9281', '9646', '6
 export const LINK_CATALOG = [
   { key: 'production:manager', label: 'Production — Manager', url: '/static/production/index.html' },
   { key: 'production:shape', label: 'Production — Shape', url: '/static/production/index.html?role=shape' },
-  { key: 'production:bfp', label: 'Production — BFP', url: '/static/production/index.html?role=bfp' },
+  { key: 'production:bfp', label: 'Production — Bake', url: '/static/production/index.html?role=bfp' },
   { key: 'production:dips', label: 'Production — Dips', url: '/static/production/index.html?role=dips' },
   { key: 'production:stock', label: 'Production — Stock', url: '/static/production/index.html?role=stock' },
   { key: 'production:foh', label: 'Production — FOH', url: '/static/production/index.html?role=foh' },
@@ -81,6 +83,54 @@ export function linkLabel(pageKey) {
   return entry ? entry.label : pageKey;
 }
 
+// Access levels a grant can carry. VIEW is only meaningful on pages that
+// actually enforce it (currently just delivery-planner) — everywhere else
+// it's stored but ignored, ready for the page's own future gate.
+export const ACCESS_EDIT = 'edit';
+export const ACCESS_VIEW = 'view';
+
+// A `links` field token is either a bare pageKey (edit — the historical,
+// only-ever format before per-page levels existed) or `pageKey:view`.
+// Parsing it this way means every pre-existing row keeps full access with
+// no migration and no silent downgrade.
+//
+// Deliberately NOT a plain token.split(':') — several LINK_CATALOG keys
+// (production:manager, production:shape, ...) already contain a colon, so
+// splitting on the first one would truncate the key itself and misread the
+// role suffix as the level. Only ever strip a trailing ":view".
+function parseLinksField(raw) {
+  const links = [];
+  const levels = {};
+  const viewSuffix = `:${ACCESS_VIEW}`;
+  String(raw || '').split(',').map((s) => s.trim()).filter(Boolean)
+    .forEach((token) => {
+      const isView = token.endsWith(viewSuffix);
+      const key = isView ? token.slice(0, -viewSuffix.length) : token;
+      if (!key) return;
+      links.push(key);
+      levels[key] = isView ? ACCESS_VIEW : ACCESS_EDIT;
+    });
+  return { links, levels };
+}
+
+function allEditLevels(links) {
+  return Object.fromEntries(links.map((k) => [k, ACCESS_EDIT]));
+}
+
+// Does `session` (as returned by requireAccess / getSessionUnlock) have at
+// least view access to `pageKey`?
+export function hasAccess(session, pageKey) {
+  return !!(session && Array.isArray(session.links) && session.links.includes(pageKey));
+}
+
+// Does `session` have edit (not view-only) access to `pageKey`? False if
+// the code has no access to the page at all.
+export function canEdit(session, pageKey) {
+  if (!hasAccess(session, pageKey)) return false;
+  const level = session.levels && session.levels[pageKey];
+  return level !== ACCESS_VIEW;
+}
+
 // ── Directory resolution ────────────────────────────────────────────────
 export function resolveStaffDirectory(logs) {
   const directory = {};
@@ -88,25 +138,33 @@ export function resolveStaffDirectory(logs) {
     if (!row.code) return;
     if (row.action === 'delete_staff') { delete directory[row.code]; return; }
     if (row.action !== 'set_staff') return;
-    const links = String(row.links || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const { links, levels } = parseLinksField(row.links);
     directory[row.code] = {
       name: row.name || '',
       isManager: row.isManager === true || row.isManager === 'true',
       links,
+      levels,
     };
   });
 
   if (!directory[BOOTSTRAP_MANAGER_CODE]) {
+    const links = LINK_CATALOG.map((l) => l.key);
     directory[BOOTSTRAP_MANAGER_CODE] = {
       name: 'Manager',
       isManager: true,
-      links: LINK_CATALOG.map((l) => l.key),
+      links,
+      levels: allEditLevels(links),
     };
   }
 
   LEGACY_DEFAULT_CODES.forEach((code) => {
     if (!directory[code]) {
-      directory[code] = { name: '(unassigned)', isManager: false, links: [...LEGACY_DEFAULT_LINKS] };
+      directory[code] = {
+        name: '(unassigned)',
+        isManager: false,
+        links: [...LEGACY_DEFAULT_LINKS],
+        levels: allEditLevels(LEGACY_DEFAULT_LINKS),
+      };
     }
   });
 
@@ -175,7 +233,7 @@ export function requireAccess(pageKey) {
   return new Promise((resolve) => {
     const session = getSessionUnlock();
     if (!session) { redirectToHub(); return; }
-    if (!Array.isArray(session.links) || !session.links.includes(pageKey)) {
+    if (!hasAccess(session, pageKey)) {
       renderDenied(pageKey, session);
       return;
     }

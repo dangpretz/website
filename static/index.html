@@ -54,8 +54,15 @@
     .staff-name:focus { border-color: #C41E1E; }
     .staff-code { font: 700 13px 'Courier New', monospace; color: #999; background: #1f1f1f; padding: 6px 10px; border-radius: 6px; letter-spacing: 1px; }
     .staff-manager-toggle { display: flex; align-items: center; gap: 6px; color: #e0a030; font: 700 12px 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; }
-    .staff-links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; margin-bottom: 14px; }
-    .staff-links-grid label { display: flex; align-items: center; gap: 7px; color: #ccc; font: 400 13px 'Manrope', sans-serif; cursor: pointer; }
+    .staff-links-grid { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+    .link-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid #333; }
+    .link-row:last-child { border-bottom: none; }
+    .link-row label { display: flex; align-items: center; gap: 7px; color: #ccc; font: 400 13px 'Manrope', sans-serif; cursor: pointer; }
+    .link-level {
+      font: 600 12px 'Manrope', sans-serif; padding: 4px 8px; border: 1px solid #444; border-radius: 5px;
+      background: #3a3a3a; color: #ccc; cursor: pointer; flex-shrink: 0;
+    }
+    .link-level:disabled { color: #666; border-color: #3a3a3a; cursor: default; opacity: 0.6; }
     .staff-card-actions { display: flex; gap: 10px; }
     .btn-save-staff { background: #C41E1E; color: #fff; font: 700 12px 'Manrope', sans-serif; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
     .btn-save-staff:hover { background: #a01818; }
@@ -108,7 +115,7 @@
 
     @media (max-width: 700px) {
       .link-grid { grid-template-columns: 1fr; }
-      .staff-links-grid { grid-template-columns: 1fr; }
+      .link-row { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -167,7 +174,10 @@
 
       <div id="manager-panel" hidden>
         <div class="manager-section-title">Manage Access</div>
-        <div class="manager-section-sub">Toggle which pages each PIN code can see. Changes apply the next time that code logs in.</div>
+        <div class="manager-section-sub">
+          Toggle which pages each PIN code can see, and whether they can edit or only view each one. Changes apply the next time that code logs in.
+          "View only" is currently enforced on Delivery Planner — other pages don't yet tell the difference, though the setting is saved either way.
+        </div>
         <div id="staff-cards"></div>
 
         <div class="staff-card">
@@ -193,6 +203,7 @@
     import {
       STAFF_LOG_PATH, LINK_CATALOG, resolveStaffDirectory,
       getSessionUnlock, setSessionUnlock, clearSessionUnlock,
+      ACCESS_EDIT, ACCESS_VIEW,
     } from '../scripts/staff-access.js';
 
     // ─────────────────────────────────────────────────────────────
@@ -357,13 +368,54 @@
       }
     }
 
-    function linksGridHtml(checkedLinks, namePrefix) {
-      return LINK_CATALOG.map((l) => `
-        <label>
-          <input type="checkbox" name="${namePrefix}" value="${l.key}" ${checkedLinks.includes(l.key) ? 'checked' : ''}>
-          ${escapeHtml(l.label)}
-        </label>
-      `).join('');
+    // Each row pairs a grant checkbox with a view/edit level select. The
+    // select only matters when its checkbox is checked — collectLinksFromGrid
+    // skips unchecked rows entirely — but is disabled visually too so it
+    // doesn't look like an active, meaningful control while unchecked.
+    function linksGridHtml(entry, namePrefix) {
+      const checkedLinks = (entry && entry.links) || [];
+      const levels = (entry && entry.levels) || {};
+      return LINK_CATALOG.map((l) => {
+        const checked = checkedLinks.includes(l.key);
+        const level = levels[l.key] === ACCESS_VIEW ? ACCESS_VIEW : ACCESS_EDIT;
+        return `
+          <div class="link-row">
+            <label>
+              <input type="checkbox" name="${namePrefix}" value="${l.key}" ${checked ? 'checked' : ''}>
+              ${escapeHtml(l.label)}
+            </label>
+            <select class="link-level" ${checked ? '' : 'disabled'}>
+              <option value="${ACCESS_EDIT}" ${level === ACCESS_EDIT ? 'selected' : ''}>Can edit</option>
+              <option value="${ACCESS_VIEW}" ${level === ACCESS_VIEW ? 'selected' : ''}>View only</option>
+            </select>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Keeps each row's level select enabled only while its checkbox is
+    // checked — purely visual, collectLinksFromGrid ignores unchecked rows
+    // regardless.
+    function wireLinkRowToggles(gridEl) {
+      gridEl.querySelectorAll('.link-row').forEach((row) => {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        const select = row.querySelector('select');
+        checkbox.addEventListener('change', () => { select.disabled = !checkbox.checked; });
+      });
+    }
+
+    // Reads a links grid back into the wire-format token list — bare pageKey
+    // for edit, `pageKey:view` for view-only (see parseLinksField in
+    // scripts/staff-access.js).
+    function collectLinksFromGrid(gridEl) {
+      const tokens = [];
+      gridEl.querySelectorAll('.link-row').forEach((row) => {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        if (!checkbox.checked) return;
+        const level = row.querySelector('select').value;
+        tokens.push(level === ACCESS_VIEW ? `${checkbox.value}:${ACCESS_VIEW}` : checkbox.value);
+      });
+      return tokens;
     }
 
     function renderManagerPanel() {
@@ -397,7 +449,7 @@
                 <input type="checkbox" class="staff-ismanager" ${entry.isManager ? 'checked' : ''}> Manager
               </label>
             </div>
-            <div class="staff-links-grid">${linksGridHtml(entry.links, 'links-' + code)}</div>
+            <div class="staff-links-grid">${linksGridHtml(entry, 'links-' + code)}</div>
             <div class="staff-card-actions">
               <button class="btn-save-staff" data-save-code="${escapeHtml(code)}">Save</button>
               <button class="btn-delete-staff" data-delete-code="${escapeHtml(code)}">Delete</button>
@@ -412,10 +464,12 @@
           const card = cardsEl.querySelector(`.staff-card[data-code="${CSS.escape(code)}"]`);
           const name = card.querySelector('.staff-name').value.trim();
           const isManager = card.querySelector('.staff-ismanager').checked;
-          const links = [...card.querySelectorAll('.staff-links-grid input[type="checkbox"]:checked')].map((c) => c.value);
+          const links = collectLinksFromGrid(card.querySelector('.staff-links-grid'));
           saveStaff({ code, name, isManager, links }, btn);
         });
       });
+
+      cardsEl.querySelectorAll('.staff-links-grid').forEach(wireLinkRowToggles);
 
       cardsEl.querySelectorAll('[data-delete-code]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -426,7 +480,9 @@
         });
       });
 
-      document.getElementById('new-links-grid').innerHTML = linksGridHtml([], 'links-new');
+      const newLinksGrid = document.getElementById('new-links-grid');
+      newLinksGrid.innerHTML = linksGridHtml({ links: [], levels: {} }, 'links-new');
+      wireLinkRowToggles(newLinksGrid);
     }
 
     document.getElementById('add-staff-btn').addEventListener('click', () => {
@@ -434,7 +490,7 @@
       const code = document.getElementById('new-code').value.trim();
       const name = document.getElementById('new-name').value.trim();
       const isManager = document.getElementById('new-is-manager').checked;
-      const links = [...document.querySelectorAll('#new-links-grid input[type="checkbox"]:checked')].map((c) => c.value);
+      const links = collectLinksFromGrid(document.getElementById('new-links-grid'));
       saveStaff({ code, name, isManager, links }, btn).then(() => {
         document.getElementById('new-code').value = '';
         document.getElementById('new-name').value = '';
@@ -510,8 +566,11 @@
         currentCode = await waitForPinEntry(directoryPromise);
       }
 
-      const entry = directory[currentCode] || { name: '', isManager: false, links: [] };
-      currentSession = { code: currentCode, name: entry.name, isManager: entry.isManager, links: entry.links, ts: Date.now() };
+      const entry = directory[currentCode] || { name: '', isManager: false, links: [], levels: {} };
+      currentSession = {
+        code: currentCode, name: entry.name, isManager: entry.isManager,
+        links: entry.links, levels: entry.levels || {}, ts: Date.now(),
+      };
       setSessionUnlock(currentSession);
 
       document.getElementById('link-status').hidden = true;
