@@ -57,6 +57,8 @@ main{max-width:1100px;margin:0 auto;padding:24px 28px 60px}
 .sku-table{width:100%;border-collapse:collapse;font-size:13px}
 .sku-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
 .sku-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1);vertical-align:middle}
+.sku-alias-input{width:120px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font:400 13px 'Manrope',sans-serif}
+.sku-alias-input:placeholder-shown{border-style:dashed}
 .sku-row-editing td{vertical-align:top;padding-top:10px}
 .tier-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .tier-row input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px}
@@ -122,6 +124,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
 
   <nav class="tabs">
     <button class="tab-btn active" data-tab="pricing">Customers &amp; Pricing</button>
+    <button class="tab-btn" data-tab="sku-mapping">SKU Mapping</button>
     <button class="tab-btn" data-tab="events">Event Commissions</button>
     <button class="tab-btn" data-tab="adjustments">Adjustments</button>
     <button class="tab-btn" data-tab="preview">Commission Preview</button>
@@ -135,6 +138,20 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
         <div class="card-body pricing-layout">
           <div id="customer-list"></div>
           <div id="customer-detail"><div class="empty-hint">Select a customer to configure their rep and SKU pricing.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SKU Mapping ───────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-sku-mapping">
+      <div class="card">
+        <div class="card-header">SKU Mapping</div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Every item name that's actually shown up on a confirmed wholesale delivery, whether from Square or a manual entry. Connect it to a SKU to make it priceable on the Customers &amp; Pricing tab — leave it blank for anything that isn't a commissioned product (drinks, catering boxes, one-offs). New item names show up here automatically as new orders come in.</p>
+          <table class="sku-table">
+            <thead><tr><th>Delivery Planner Item</th><th>Times Ordered</th><th>Last Ordered</th><th>Connected SKU</th></tr></thead>
+            <tbody id="sku-mapping-list"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -224,6 +241,7 @@ import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventor
 import {
   resolveCommissionsConfig, resolveCommissionsLedger, processWholesaleCommissions,
   summarizeCommissions, pricingKey, EVENT_RATE_PER_PRETZEL,
+  collectRawSkuUsage, collectConnectedSkus,
 } from '../../scripts/commissions.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -237,11 +255,10 @@ let staffLogs = [];
 let deliveryLogs = [];
 let configLogs = [];
 let ledgerLogs = [];
-let skus = [];
 let staffDirectory = {};
 let deliveries = []; // full resolveDeliveries() output, ghosts included
 let wholesaleDeliveries = []; // confirmed, non-deleted, wholesale-category only — for pickers
-let config = { repByCustomer: {}, pricingByCustomerSku: {} };
+let config = { repByCustomer: {}, pricingByCustomerSku: {}, connectedSkuByItem: {} };
 let ledger = { wholesale: {}, events: [], adjustments: [] };
 let selectedCustomer = null;
 let editingSkuKey = null;
@@ -296,14 +313,13 @@ function recomputeAll() {
 }
 
 async function loadAll() {
-  const [sLogs, dLogs, cLogs, lLogs, skuList] = await Promise.all([
+  const [sLogs, dLogs, cLogs, lLogs] = await Promise.all([
     fetchLog(STAFF_LOG_PATH),
     fetchLog(DELIVERY_LOG_PATH),
     fetchLog(CONFIG_LOG_PATH),
     fetchLog(LEDGER_LOG_PATH),
-    fetch('../delivery-planner/skus.json?v=2026-05-22-new-skus').then((r) => r.json()),
   ]);
-  staffLogs = sLogs; deliveryLogs = dLogs; configLogs = cLogs; ledgerLogs = lLogs; skus = skuList;
+  staffLogs = sLogs; deliveryLogs = dLogs; configLogs = cLogs; ledgerLogs = lLogs;
   recomputeAll();
 }
 
@@ -434,6 +450,7 @@ function renderPricingTab() {
     return;
   }
   const repCode = config.repByCustomer[selectedCustomer] || '';
+  const connectedSkus = collectConnectedSkus(config.connectedSkuByItem);
   detail.innerHTML = `
     <h3>${esc(selectedCustomer)}</h3>
     <div class="form-row">
@@ -443,10 +460,11 @@ function renderPricingTab() {
         ${getReps().map((r) => `<option value="${esc(r.id)}"${r.id === repCode ? ' selected' : ''}>${esc(r.label)}</option>`).join('')}
       </select>
     </div>
+    ${connectedSkus.length ? `
     <table class="sku-table">
       <thead><tr><th>SKU</th><th>Price</th><th>Tiers</th><th></th></tr></thead>
-      <tbody>${skus.map((sku) => renderSkuRow(selectedCustomer, sku)).join('')}</tbody>
-    </table>
+      <tbody>${connectedSkus.map((sku) => renderSkuRow(selectedCustomer, sku)).join('')}</tbody>
+    </table>` : '<div class="empty-hint">No connected SKUs yet — map delivery items to SKUs on the SKU Mapping tab first.</div>'}
   `;
   document.getElementById('customer-rep-select').addEventListener('change', (e) => saveCustomerRep(selectedCustomer, e.target.value));
   bindSkuRowEvents();
@@ -476,6 +494,40 @@ async function saveSkuPricing(customer, sku, price, tiers) {
     renderPricingTab();
   } catch (err) {
     toast(`Error saving pricing: ${err.message}`);
+  }
+}
+
+// ── SKU Mapping tab ──────────────────────────────────────────────────────────
+// Ongoing "add new items later" surface: collectRawSkuUsage() re-derives the
+// item list from live wholesale deliveries every render, so a brand-new item
+// name just shows up here on next load — nothing to register manually.
+function renderSkuMappingTab() {
+  const usage = collectRawSkuUsage(wholesaleDeliveries);
+  const tbody = document.getElementById('sku-mapping-list');
+  tbody.innerHTML = usage.length ? usage.map((u) => `
+    <tr>
+      <td>${esc(u.rawSku)}</td>
+      <td>${u.count}</td>
+      <td>${esc(u.lastOrdered)}</td>
+      <td><input type="text" class="sku-alias-input" data-raw-sku="${esc(u.rawSku)}" value="${esc(config.connectedSkuByItem[u.rawSku] || '')}" placeholder="not commissioned"></td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="empty-hint">No confirmed wholesale deliveries yet.</td></tr>';
+  document.querySelectorAll('.sku-alias-input').forEach((input) => {
+    input.addEventListener('change', () => saveSkuAlias(input.dataset.rawSku, input.value.trim()));
+  });
+}
+
+async function saveSkuAlias(rawSku, connectedSku) {
+  if (connectedSku === (config.connectedSkuByItem[rawSku] || '')) return; // unchanged, no write needed
+  try {
+    await appendLog(CONFIG_LOG_PATH, {
+      action: 'set_sku_alias', deliveryItem: rawSku, connectedSku, updatedBy: session.code, timeStamp: new Date().toISOString(),
+    });
+    toast(connectedSku ? `${rawSku} → ${connectedSku}` : `${rawSku} marked not commissioned`);
+    await refreshConfig();
+    renderSkuMappingTab();
+  } catch (err) {
+    toast(`Error saving SKU mapping: ${err.message}`);
   }
 }
 
@@ -537,7 +589,7 @@ function money(n) {
 function renderPreviewTab() {
   const needsSetup = computeNeedsSetup();
   document.getElementById('needs-setup-list').innerHTML = needsSetup.length
-    ? needsSetup.map((n) => `<li>${esc(n.customer)} &mdash; ${esc(n.sku)} <span class="text-muted">(${[n.missingRep && 'no rep assigned', n.missingPricing && 'no pricing set'].filter(Boolean).join(', ')})</span></li>`).join('')
+    ? needsSetup.map((n) => `<li>${esc(n.customer)} &mdash; ${esc(n.sku)} <span class="text-muted">(from "${esc(n.rawSku)}"; ${[n.missingRep && 'no rep assigned', n.missingPricing && 'no pricing set'].filter(Boolean).join(', ')})</span></li>`).join('')
     : '<li class="empty-hint">Nothing pending &mdash; every confirmed wholesale delivery is fully configured.</li>';
 
   const summary = summarizeCommissions(ledger);
@@ -615,6 +667,7 @@ async function computeCommissions() {
 // on the way in rather than trying to track every cross-tab dependency.
 const TAB_RENDERERS = {
   pricing: renderPricingTab,
+  'sku-mapping': renderSkuMappingTab,
   events: renderEventsTab,
   adjustments: renderAdjustmentsTab,
   preview: renderPreviewTab,
@@ -695,6 +748,7 @@ async function init() {
   await loadAll();
   document.getElementById('identity-name').textContent = session.name || session.code;
   renderPricingTab();
+  renderSkuMappingTab();
   renderEventsTab();
   renderAdjustmentsTab();
   renderPreviewTab();
