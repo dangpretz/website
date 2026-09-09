@@ -877,9 +877,21 @@ function getReps() {
     .map((code) => ({ id: code, label: staffDirectory[code].name || code }));
 }
 
+// True only for a repId that actually resolves to something today — 'admin'
+// or a PIN code currently granted sales-crm access. Pre-migration accounts
+// still carry the old 'rep1'/'rep2' ids, which match neither.
+function isKnownRepId(repId) {
+  return repId === 'admin' || getReps().some((r) => r.id === repId);
+}
+
 function getRepLabel(repId) {
-  if (repId === 'admin') return 'Manager';
-  return staffDirectory[repId]?.name || repId || '';
+  if (repId === 'admin' || !repId) return 'Manager';
+  const known = staffDirectory[repId]?.name;
+  if (known) return known;
+  // Stale pre-migration id (e.g. 'rep1') — say so plainly instead of
+  // silently showing something else, so it's obvious this account still
+  // needs reassigning to a real PIN-code rep.
+  return `${repId} (unmapped)`;
 }
 
 function repBadgeStyle(repId) {
@@ -1429,6 +1441,7 @@ function renderAccounts() {
       <td>${statusBadge(a.status)}</td>
       ${showAll ? `<td>${isAdmin
         ? `<select class="rep-inline-select" data-reassign-acct="${a.id}" style="font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(a.repId||'admin')}">
+            ${isKnownRepId(a.repId||'admin') ? '' : `<option value="${esc(a.repId)}" selected>${esc(getRepLabel(a.repId))}</option>`}
             <option value="admin"${(a.repId||'admin')==='admin'?' selected':''}>Manager</option>
             ${getReps().map(r => `<option value="${r.id}"${a.repId===r.id?' selected':''}>${esc(r.label)}</option>`).join('')}
           </select>`
