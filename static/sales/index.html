@@ -18,18 +18,6 @@
 }
 body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
 
-/* ── Login ── */
-#login-overlay{position:fixed;inset:0;background:var(--dark);display:flex;align-items:center;justify-content:center;z-index:9999}
-#login-overlay[hidden]{display:none}
-.login-box{background:#fff;border-radius:10px;padding:48px 40px;width:340px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)}
-.login-logo{font-size:36px;margin-bottom:8px}
-.login-title{font-size:22px;font-weight:800;margin-bottom:4px}
-.login-sub{color:var(--gray-3);font-size:13px;margin-bottom:28px}
-.login-input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);font:600 15px 'Manrope',sans-serif;margin-bottom:12px;outline:none}
-.login-input:focus{border-color:var(--red);box-shadow:0 0 0 2px rgba(196,30,30,.15)}
-.login-btn{width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:var(--radius);font:700 15px 'Manrope',sans-serif;cursor:pointer}
-.login-btn:hover{background:var(--red-dk)}
-.login-err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
 
 /* ── App shell ── */
 #app{display:flex;min-height:100vh}
@@ -308,20 +296,6 @@ textarea{resize:vertical;min-height:70px}
 </head>
 <body>
 
-<!-- ── Login ── -->
-<div id="login-overlay">
-  <div class="login-box">
-    <div class="login-logo">🥨</div>
-    <div class="login-title">DPC Sales CRM</div>
-    <div class="login-sub">Dangerous Pretzel Co. — Internal Tool</div>
-    <input type="email" id="email-input" class="login-input" placeholder="Email address (optional)" autocomplete="email">
-    <input type="password" id="pwd-input" class="login-input" placeholder="Password" autocomplete="current-password">
-    <button class="login-btn" id="login-btn">Sign In</button>
-    <div style="font-size:12px;color:#888;margin-top:6px;text-align:center">No email? Leave it blank and sign in with your password.</div>
-    <div class="login-err" id="login-err"></div>
-    <div class="crm-version"></div>
-  </div>
-</div>
 
 <!-- ── App ── -->
 <div id="app" hidden>
@@ -871,23 +845,18 @@ textarea{resize:vertical;min-height:70px}
 
 <script type="module">
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+import {
+  requireAccess, resolveStaffDirectory, clearSessionUnlock,
+  STAFF_LOG_PATH, HUB_URL,
+} from '../../scripts/staff-access.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const LOG_PATH = '/dangpretz/sales-crm';
-// Bump on every release — shown on the login screen, sidebar, and Settings → About
-// so a stale browser-cached copy of this page is easy to spot.
-const CRM_VERSION = 'v1.8';
+// Bump on every release — shown on the sidebar and Settings → About so a stale
+// browser-cached copy of this page is easy to spot.
+const CRM_VERSION = 'v1.9';
 document.querySelectorAll('.crm-version').forEach(el => { el.textContent = CRM_VERSION; });
-const SESSION_KEY = 'crm-auth';
 const RISK_KEY = 'crm-risk-days';
-const REP_REGISTRY_KEY = 'crm-rep-registry';
-// Pre-computed SHA-256 of default admin password (dpcsales2026)
-const ADMIN_ID = { pwdKey:'crm-pwd-hash-admin', emailKey:'crm-email-admin', defaultHash:'9c81ccd4ac27a34e740c8ac4007b4635f384bdeb254fe755b0afcc86a17553a2' };
-// Legacy defaults for rep1/rep2 in case they were created before the registry
-const LEGACY_DEFAULTS = {
-  rep1: { defaultHash:'9bb68b9209a1c442cc5e3b5d0c6b9071b6c6d8c823995d2a8349f91cfa382716' },
-  rep2: { defaultHash:'296bc6bfe121ebdfd8216f752e10032698c22c2fd6554377bc3d2d8b52971d51' },
-};
 const REP_COLORS = [
   { bg:'#f3e8ff', color:'#7e22ce' },
   { bg:'#fce7f3', color:'#9d174d' },
@@ -897,12 +866,20 @@ const REP_COLORS = [
   { bg:'#fee2e2', color:'#991b1b' },
 ];
 
-function getReps() { return STATE.repRegistry; }
+// Reps are whichever PIN codes the hub's manager page has granted
+// sales-crm access to — resolved once at boot from the shared staff
+// directory (see loadStaffDirectory). No CRM-specific rep registry anymore.
+let staffDirectory = {};
+
+function getReps() {
+  return Object.keys(staffDirectory)
+    .filter((code) => (staffDirectory[code].links || []).includes('sales-crm'))
+    .map((code) => ({ id: code, label: staffDirectory[code].name || code }));
+}
 
 function getRepLabel(repId) {
   if (repId === 'admin') return 'Manager';
-  const rep = STATE.repRegistry.find(r => r.id === repId);
-  return rep?.label || repId || '';
+  return staffDirectory[repId]?.name || repId || '';
 }
 
 function repBadgeStyle(repId) {
@@ -913,12 +890,12 @@ function repBadgeStyle(repId) {
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
-let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], repRegistry: [], segments: ['restaurant','institution','distributor'], mileageRate: '', adminCredentials: { pwdHash: '', email: '' }, googleConfig: { clientId: '', folderId: '' } };
+let STATE = { accounts: new Map(), deals: new Map(), tasks: new Map(), comms: [], orders: [], samples: [], receipts: [], mileage: [], notes: [], locations: [], contacts: [], documents: [], segments: ['restaurant','institution','distributor'], mileageRate: '', googleConfig: { clientId: '', folderId: '' } };
 let currentView = 'dashboard';
 let currentAccountId = null;
 let currentDetailTab = 'overview';
 let currentReportTab = 'revenue';
-let currentRepId = null; // 'rep1' | 'rep2' | 'admin'
+let currentRepId = null; // a PIN code, or 'admin' for a hub-manager session
 let acctViewMode = 'mine'; // 'mine' | 'all'
 let acctSortCol = 'name';
 let acctSortDir = 'asc';
@@ -946,11 +923,6 @@ const segOptions = (blank = 'All Segments') => `<option value="">${esc(blank)}</
 const segBadge = s => badge(capitalize(s), s);
 const stageBadge = s => badge(capitalize(s?.replace('-',' ')), s);
 const statusBadge = s => badge(capitalize(s), s);
-
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
 
 // ── Google Drive photo upload ─────────────────────────────────────────────────
 let driveAccessToken = null;
@@ -1083,74 +1055,23 @@ function toast(msg, ms = 2500) {
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-function getRepPwdKey(repId)     { return `crm-pwd-hash-${repId}`; }
-function getRepEmailKey(repId)   { return `crm-email-${repId}`; }
-function getRepDefaultHash(repId) {
-  if (LEGACY_DEFAULTS[repId]) return LEGACY_DEFAULTS[repId].defaultHash;
-  return null;
-}
-
-function ensureHashes() {
-  // Credentials are now fully log-backed; nothing to seed in localStorage
-}
-
-async function login() {
-  const email = document.getElementById('email-input').value.trim().toLowerCase();
-  const pwd = document.getElementById('pwd-input').value;
-  const errEl = document.getElementById('login-err');
-  errEl.textContent = '';
-  if (!pwd) { errEl.textContent = 'Enter your password.'; return; }
-  const hash = await sha256(pwd);
-  let matched = null;
-
-  // Build credential lookup: admin (log-backed STATE) + all reps (log-backed STATE)
-  const allIds = [
-    { repId: 'admin', email: STATE.adminCredentials.email.toLowerCase(), pwdHash: STATE.adminCredentials.pwdHash },
-    ...STATE.repRegistry.map(r => ({ repId: r.id, email: (r.email || '').toLowerCase(), pwdHash: r.pwdHash })),
-  ];
-
-  if (email) {
-    for (const id of allIds) {
-      if (id.email && id.email === email) { matched = id; break; }
-    }
-    if (!matched) { errEl.textContent = 'Email not recognised. Contact your manager.'; return; }
-    if (hash !== matched.pwdHash) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
-    matched = matched.repId;
-  } else {
-    for (const id of allIds) {
-      if (id.pwdHash && hash === id.pwdHash) { matched = id.repId; break; }
-    }
-    if (!matched) { errEl.textContent = 'Incorrect password.'; document.getElementById('pwd-input').value = ''; return; }
-  }
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: matched, hash }));
-  currentRepId = matched;
-  showApp();
-}
-
+// Clears the shared hub session (affects every gated tool, not just this
+// one — same action as the hub's own "Not you?") and sends the browser
+// back to the hub to pick a different code.
 function logout() {
-  sessionStorage.removeItem(SESSION_KEY);
-  currentRepId = null;
-  document.getElementById('app').hidden = true;
-  document.getElementById('login-overlay').removeAttribute('hidden');
-  document.getElementById('pwd-input').value = '';
-  document.getElementById('login-err').textContent = '';
+  clearSessionUnlock();
+  window.location.href = HUB_URL;
 }
 
-async function checkAuth() {
-  const raw = sessionStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
+// Pulls the current PIN code's name + the full rep roster from the shared
+// staff directory. Called once at boot, before the app renders.
+async function loadStaffDirectory() {
   try {
-    const { repId, hash } = JSON.parse(raw);
-    let storedHash;
-    if (repId === 'admin') {
-      storedHash = STATE.adminCredentials.pwdHash;
-    } else {
-      const rep = STATE.repRegistry.find(r => r.id === repId);
-      if (!rep) return null;
-      storedHash = rep.pwdHash;
-    }
-    return (storedHash && hash === storedHash) ? { repId } : null;
-  } catch { return null; }
+    const logs = await fetchLog(STAFF_LOG_PATH);
+    staffDirectory = resolveStaffDirectory(Array.isArray(logs) ? logs : []);
+  } catch (_) {
+    staffDirectory = {};
+  }
 }
 
 function populateLogForDropdown(selectEl, preselect = 'admin') {
@@ -1176,8 +1097,10 @@ function populateRepFilterDropdown(selectEl) {
   selectEl.value = cur;
 }
 
-async function showApp() {
-  document.getElementById('login-overlay').hidden = true;
+// Called once, after requireAccess() has resolved and the staff directory +
+// CRM log have both loaded. No more login-overlay to hide — access is
+// already decided by the time this runs.
+function showApp() {
   document.getElementById('app').removeAttribute('hidden');
   document.getElementById('identity-badge').textContent = getRepLabel(currentRepId);
   acctViewMode = currentRepId === 'admin' ? 'all' : 'mine';
@@ -1192,20 +1115,8 @@ async function showApp() {
     populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
     populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
   }
-  await loadData();
   updateDriveAuthUI();
   navigate('dashboard');
-}
-
-// ── Seed Data ─────────────────────────────────────────────────────────────────
-function initSeedData() {
-  // Admin credentials default to hardcoded hash; log entries (set_admin_credentials) override these
-  STATE.adminCredentials = { pwdHash: ADMIN_ID.defaultHash, email: '' };
-  // Seed rep registry with legacy defaults; log entries (set_rep) override these
-  STATE.repRegistry = [
-    { id:'rep1', label:'Rep 1', email:'', pwdHash: LEGACY_DEFAULTS.rep1.defaultHash },
-    { id:'rep2', label:'Rep 2', email:'', pwdHash: LEGACY_DEFAULTS.rep2.defaultHash },
-  ];
 }
 
 function applyLogs(logs) {
@@ -1280,16 +1191,6 @@ function applyLogs(logs) {
       STATE.documents = STATE.documents.filter(d => d.id !== row.id);
     } else if (action === 'set_segments') {
       if (Array.isArray(row.segments)) STATE.segments = row.segments;
-    } else if (action === 'set_rep') {
-      const idx = STATE.repRegistry.findIndex(r => r.id === row.id);
-      const rec = { id: row.id, label: row.label || row.id, email: row.email || '', pwdHash: row.pwdHash || '' };
-      if (idx >= 0) STATE.repRegistry[idx] = rec;
-      else STATE.repRegistry.push(rec);
-    } else if (action === 'remove_rep') {
-      STATE.repRegistry = STATE.repRegistry.filter(r => r.id !== row.id);
-    } else if (action === 'set_admin_credentials') {
-      if (row.pwdHash) STATE.adminCredentials.pwdHash = row.pwdHash;
-      if (row.email !== undefined) STATE.adminCredentials.email = row.email;
     } else if (action === 'set_google_config') {
       if (row.clientId !== undefined) STATE.googleConfig.clientId = row.clientId;
       if (row.folderId !== undefined) STATE.googleConfig.folderId = row.folderId;
@@ -1298,11 +1199,10 @@ function applyLogs(logs) {
 }
 
 async function loadData() {
-  initSeedData();
   try {
     const logs = await fetchLog(LOG_PATH);
     if (Array.isArray(logs)) applyLogs(logs);
-  } catch (_) { /* network issue — seed data still available */ }
+  } catch (_) { /* network issue — data unavailable this load */ }
 }
 
 // ── Computed metrics ──────────────────────────────────────────────────────────
@@ -2567,95 +2467,12 @@ async function submitMileageForm() {
 function renderSettings() {
   const isAdmin = currentRepId === 'admin';
   const riskDays = localStorage.getItem(RISK_KEY) || '30';
-  const reps = getReps();
-
-  const myEmail = isAdmin
-    ? STATE.adminCredentials.email
-    : (STATE.repRegistry.find(r => r.id === currentRepId)?.email || '');
-
-  const pwdSection = (targetRepId, sectionTitle) => `
-    <div class="settings-section">
-      <h2>${esc(sectionTitle)}</h2>
-      <div class="form-group" style="max-width:300px">
-        <label>Current Password</label><input type="password" id="cur-pwd-${targetRepId}">
-      </div>
-      <div class="form-group" style="max-width:300px">
-        <label>New Password</label><input type="password" id="new-pwd-${targetRepId}">
-      </div>
-      <div class="form-group" style="max-width:300px">
-        <label>Confirm New Password</label><input type="password" id="conf-pwd-${targetRepId}">
-      </div>
-      <div class="modal-err" id="pwd-err-${targetRepId}"></div>
-      <button class="btn btn-red btn-sm" data-change-pwd="${targetRepId}">Change Password</button>
-    </div>`;
-
-  const teamSection = () => {
-    const repRows = reps.map(rep => {
-      const label = getRepLabel(rep.id);
-      const email = rep.email || '';
-      return `<div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
-        <div class="form-row" style="margin-bottom:8px">
-          <div class="form-group" style="flex:1">
-            <label>Name</label>
-            <input type="text" class="rep-name-input" data-rep-id="${rep.id}" value="${esc(label)}" placeholder="Rep Name">
-          </div>
-          <div class="form-group" style="flex:1">
-            <label>Email</label>
-            <input type="email" class="rep-email-input" data-rep-id="${rep.id}" value="${esc(email)}" placeholder="email@example.com">
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-red btn-sm" data-save-rep="${rep.id}">Save</button>
-          <button class="btn btn-outline btn-sm" data-toggle-reset="${rep.id}">Reset Password</button>
-          <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#dc2626" data-remove-rep="${rep.id}">Remove Rep</button>
-        </div>
-        <div id="reset-form-${rep.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div class="form-row">
-            <div class="form-group" style="flex:1"><label>New Password</label><input type="password" id="rep-new-pwd-${rep.id}"></div>
-            <div class="form-group" style="flex:1"><label>Confirm</label><input type="password" id="rep-conf-pwd-${rep.id}"></div>
-          </div>
-          <div class="modal-err" id="reset-pwd-err-${rep.id}"></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-red btn-sm" data-confirm-reset="${rep.id}">Set Password</button>
-            <button class="btn btn-outline btn-sm" data-cancel-reset="${rep.id}">Cancel</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div class="settings-section">
-      <h2>Sales Team</h2>
-      <div id="team-rep-list">${repRows}</div>
-      <button class="btn btn-red btn-sm" id="add-rep-btn">+ Add Rep</button>
-      <div id="add-rep-form" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-        <div class="form-row">
-          <div class="form-group" style="flex:1"><label>Name *</label><input type="text" id="new-rep-name" placeholder="Rep Name"></div>
-          <div class="form-group" style="flex:1"><label>Email</label><input type="email" id="new-rep-email" placeholder="email@example.com"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group" style="flex:1"><label>Password *</label><input type="password" id="new-rep-pwd"></div>
-          <div class="form-group" style="flex:1"><label>Confirm Password *</label><input type="password" id="new-rep-conf-pwd"></div>
-        </div>
-        <div class="modal-err" id="new-rep-err"></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-red btn-sm" id="confirm-add-rep">Add Rep</button>
-          <button class="btn btn-outline btn-sm" id="cancel-add-rep">Cancel</button>
-        </div>
-      </div>
-    </div>`;
-  };
 
   document.getElementById('settings-content').innerHTML = `
     <div class="settings-section">
       <h2>Your Identity</h2>
       <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Logged in as <strong>${esc(getRepLabel(currentRepId))}</strong></div>
-      ${!isAdmin ? `
-      <div class="form-group" style="max-width:300px">
-        <label>Display Name</label>
-        <input type="text" id="rep-label-input" value="${esc(getRepLabel(currentRepId))}" placeholder="Rep 1">
-        <div class="form-hint">Your name shown on accounts and cards.</div>
-      </div>
-      <button class="btn btn-red btn-sm" id="save-label-btn">Save Name</button>` : ''}
+      <div class="form-hint">Your name and access are managed from the staff hub's manager page, not here.</div>
     </div>
     <div class="settings-section">
       <h2>At-Risk Threshold</h2>
@@ -2666,17 +2483,6 @@ function renderSettings() {
       </div>
       <button class="btn btn-red btn-sm" id="save-risk-btn">Save</button>
     </div>
-    <div class="settings-section">
-      <h2>My Email Address</h2>
-      <div class="form-group" style="max-width:300px">
-        <label>Email Address</label>
-        <input type="email" id="my-email-field" value="${esc(myEmail)}" placeholder="name@example.com">
-        <div class="form-hint">Used to identify you at login.</div>
-      </div>
-      <button class="btn btn-red btn-sm" id="save-my-email-btn">Save Email</button>
-    </div>
-    ${pwdSection(currentRepId, 'Change My Password')}
-    ${isAdmin ? teamSection() : ''}
     ${isAdmin ? `
     <div class="settings-section">
       <h2>Reimbursements</h2>
@@ -2734,23 +2540,6 @@ function renderSettings() {
     if (v && Number(v) > 0) { localStorage.setItem(RISK_KEY, v); toast('At-risk threshold saved.'); }
   });
 
-  document.getElementById('save-my-email-btn').addEventListener('click', async () => {
-    const val = document.getElementById('my-email-field').value.trim().toLowerCase();
-    if (!val) { toast('Enter a valid email address.'); return; }
-    if (currentRepId === 'admin') {
-      const entry = { action: 'set_admin_credentials', pwdHash: STATE.adminCredentials.pwdHash, email: val, repId: 'admin', timeStamp: new Date().toISOString() };
-      await appendLog(LOG_PATH, entry);
-      applyLogs([entry]);
-      toast('Email saved.');
-    } else {
-      const rep = STATE.repRegistry.find(r => r.id === currentRepId);
-      const entry = { action: 'set_rep', id: currentRepId, label: rep?.label || currentRepId, email: val, pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
-      await appendLog(LOG_PATH, entry);
-      applyLogs([entry]);
-      toast('Email saved.');
-    }
-  });
-
   document.getElementById('gdrive-config-save')?.addEventListener('click', async () => {
     const clientId = document.getElementById('gdrive-client-id').value.trim();
     // A truncated paste here once broke sign-in for every device — reject early
@@ -2803,165 +2592,6 @@ function renderSettings() {
     if (inUse && !confirm(`"${capitalize(seg)}" is used by existing accounts. Remove the segment anyway? Accounts will keep their current segment value.`)) return;
     await saveSegments(getSegments().filter(s => s !== seg));
   }));
-
-  document.getElementById('save-label-btn')?.addEventListener('click', async () => {
-    const val = document.getElementById('rep-label-input')?.value.trim();
-    if (!val) return;
-    const rep = STATE.repRegistry.find(r => r.id === currentRepId);
-    const entry = { action: 'set_rep', id: currentRepId, label: val, email: rep?.email || '', pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
-    await appendLog(LOG_PATH, entry);
-    applyLogs([entry]);
-    document.getElementById('identity-badge').textContent = val;
-    toast('Name saved.');
-  });
-
-  document.querySelectorAll('[data-change-pwd]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const t = btn.dataset.changePwd;
-      const cur = document.getElementById(`cur-pwd-${t}`).value;
-      const nw  = document.getElementById(`new-pwd-${t}`).value;
-      const cf  = document.getElementById(`conf-pwd-${t}`).value;
-      const err = document.getElementById(`pwd-err-${t}`);
-      err.textContent = '';
-      if (!cur || !nw || !cf) { err.textContent = 'All fields required.'; return; }
-      if (nw !== cf) { err.textContent = 'New passwords do not match.'; return; }
-      if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
-      const curHash = await sha256(cur);
-      if (t === 'admin') {
-        if (curHash !== STATE.adminCredentials.pwdHash) { err.textContent = 'Current password is incorrect.'; return; }
-        const newHash = await sha256(nw);
-        const entry = { action: 'set_admin_credentials', pwdHash: newHash, email: STATE.adminCredentials.email, repId: 'admin', timeStamp: new Date().toISOString() };
-        await appendLog(LOG_PATH, entry);
-        applyLogs([entry]);
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: 'admin', hash: newHash }));
-      } else {
-        const rep = STATE.repRegistry.find(r => r.id === t);
-        if (!rep || curHash !== rep.pwdHash) { err.textContent = 'Current password is incorrect.'; return; }
-        const newHash = await sha256(nw);
-        const entry = { action: 'set_rep', id: t, label: rep.label, email: rep.email || '', pwdHash: newHash, timeStamp: new Date().toISOString() };
-        await appendLog(LOG_PATH, entry);
-        applyLogs([entry]);
-        if (t === currentRepId) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ repId: t, hash: newHash }));
-      }
-      [`cur-pwd-${t}`,`new-pwd-${t}`,`conf-pwd-${t}`].forEach(id => { document.getElementById(id).value = ''; });
-      toast('Password changed successfully.');
-    });
-  });
-
-  // Team management (admin only)
-  if (isAdmin) {
-    document.querySelectorAll('[data-save-rep]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.saveRep;
-        const name = document.querySelector(`.rep-name-input[data-rep-id="${id}"]`)?.value.trim();
-        const email = document.querySelector(`.rep-email-input[data-rep-id="${id}"]`)?.value.trim().toLowerCase() || '';
-        if (!name) { toast('Rep name is required.'); return; }
-        const rep = STATE.repRegistry.find(r => r.id === id);
-        const entry = { action: 'set_rep', id, label: name, email, pwdHash: rep?.pwdHash || '', timeStamp: new Date().toISOString() };
-        await appendLog(LOG_PATH, entry);
-        applyLogs([entry]);
-        populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
-        populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
-        populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
-        populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
-        toast('Rep saved.');
-      });
-    });
-
-    document.querySelectorAll('[data-toggle-reset]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.toggleReset;
-        const form = document.getElementById(`reset-form-${id}`);
-        form.style.display = form.style.display === 'none' ? '' : 'none';
-      });
-    });
-
-    document.querySelectorAll('[data-cancel-reset]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.cancelReset;
-        document.getElementById(`reset-form-${id}`).style.display = 'none';
-        document.getElementById(`rep-new-pwd-${id}`).value = '';
-        document.getElementById(`rep-conf-pwd-${id}`).value = '';
-        document.getElementById(`reset-pwd-err-${id}`).textContent = '';
-      });
-    });
-
-    document.querySelectorAll('[data-confirm-reset]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.confirmReset;
-        const nw = document.getElementById(`rep-new-pwd-${id}`).value;
-        const cf = document.getElementById(`rep-conf-pwd-${id}`).value;
-        const err = document.getElementById(`reset-pwd-err-${id}`);
-        err.textContent = '';
-        if (!nw || !cf) { err.textContent = 'Both fields required.'; return; }
-        if (nw !== cf) { err.textContent = 'Passwords do not match.'; return; }
-        if (nw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
-        const newHash = await sha256(nw);
-        const rep = STATE.repRegistry.find(r => r.id === id);
-        const entry = { action: 'set_rep', id, label: rep?.label || id, email: rep?.email || '', pwdHash: newHash, timeStamp: new Date().toISOString() };
-        await appendLog(LOG_PATH, entry);
-        applyLogs([entry]);
-        document.getElementById(`reset-form-${id}`).style.display = 'none';
-        document.getElementById(`rep-new-pwd-${id}`).value = '';
-        document.getElementById(`rep-conf-pwd-${id}`).value = '';
-        toast(`Password reset for ${getRepLabel(id)}.`);
-      });
-    });
-
-    document.querySelectorAll('[data-remove-rep]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.removeRep;
-        const label = getRepLabel(id);
-        if (!confirm(`Remove ${label}? They will no longer be able to log in. Their historical data is preserved.`)) return;
-        const entry = { action: 'remove_rep', id, timeStamp: new Date().toISOString() };
-        await appendLog(LOG_PATH, entry);
-        applyLogs([entry]);
-        toast(`${label} removed.`);
-        renderSettings();
-        populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
-        populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
-        populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
-        populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
-      });
-    });
-
-    document.getElementById('add-rep-btn').addEventListener('click', () => {
-      document.getElementById('add-rep-form').style.display = '';
-      document.getElementById('add-rep-btn').style.display = 'none';
-    });
-
-    document.getElementById('cancel-add-rep').addEventListener('click', () => {
-      document.getElementById('add-rep-form').style.display = 'none';
-      document.getElementById('add-rep-btn').style.display = '';
-      ['new-rep-name','new-rep-email','new-rep-pwd','new-rep-conf-pwd'].forEach(id => { document.getElementById(id).value = ''; });
-      document.getElementById('new-rep-err').textContent = '';
-    });
-
-    document.getElementById('confirm-add-rep').addEventListener('click', async () => {
-      const name = document.getElementById('new-rep-name').value.trim();
-      const email = document.getElementById('new-rep-email').value.trim().toLowerCase();
-      const pwd = document.getElementById('new-rep-pwd').value;
-      const conf = document.getElementById('new-rep-conf-pwd').value;
-      const err = document.getElementById('new-rep-err');
-      err.textContent = '';
-      if (!name) { err.textContent = 'Name is required.'; return; }
-      if (!pwd) { err.textContent = 'Password is required.'; return; }
-      if (pwd !== conf) { err.textContent = 'Passwords do not match.'; return; }
-      if (pwd.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
-      const reps = getReps();
-      const maxNum = reps.reduce((m, r) => { const n = parseInt(r.id.replace('rep',''),10); return isNaN(n) ? m : Math.max(m,n); }, 0);
-      const newId = `rep${maxNum + 1}`;
-      const newHash = await sha256(pwd);
-      const entry = { action: 'set_rep', id: newId, label: name, email: email || '', pwdHash: newHash, timeStamp: new Date().toISOString() };
-      await appendLog(LOG_PATH, entry);
-      applyLogs([entry]);
-      toast(`${name} added.`);
-      renderSettings();
-      populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
-      populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
-      populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
-    });
-  }
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
@@ -3402,12 +3032,7 @@ async function submitSampleForm() {
 
 // ── Event bindings ────────────────────────────────────────────────────────────
 function bindAll() {
-  // Login
-  document.getElementById('login-btn').addEventListener('click', login);
-  document.getElementById('email-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pwd-input').focus(); });
-  document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-
-  // Logout
+  // Logout — clears the shared hub session, not just this page
   document.getElementById('logout-btn').addEventListener('click', logout);
 
   // Mobile menu
@@ -3699,16 +3324,16 @@ function populateSegmentDropdowns() {
 }
 
 async function init() {
-  ensureHashes();
   bindAll();
-  // Pre-load log so STATE.repRegistry is populated before login credentials are checked
-  await loadData();
+  // Gates on the shared hub session — redirects to the hub (or shows an
+  // access-denied message) before any data ever loads, same as every other
+  // migrated tool. Resolves only once this code is actually granted
+  // sales-crm access.
+  const session = await requireAccess('sales-crm');
+  currentRepId = session.isManager ? 'admin' : session.code;
+  await Promise.all([loadStaffDirectory(), loadData()]);
   populateSegmentDropdowns();
-  const session = await checkAuth();
-  if (session) {
-    currentRepId = session.repId;
-    showApp();
-  }
+  showApp();
 }
 
 init();
