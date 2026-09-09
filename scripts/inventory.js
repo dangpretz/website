@@ -253,6 +253,23 @@ export const BAKE_GROUPS = {
   coating: ['10oz bbk', '7oz bbk', '4oz twist bbk'],
 };
 
+// ─── CUSTOMER NAME NORMALIZATION ───────────────────────────────────────────
+// Shared with delivery-planner AND the commissions engine — a typo'd/variant
+// customer name here would silently fail to match its configured price/rep
+// in commissions-config, so both sides must normalize identically.
+// Maps known aliases (lowercase) → canonical name. null = exclude from customer list.
+export const CUSTOMER_ALIASES = {
+  bees: 'The Bees',
+  'handle bar': 'Handle Bar',
+  test: null,
+};
+export function normalizeCustomerName(name) {
+  if (!name) return null;
+  const key = name.trim().toLowerCase();
+  if (key in CUSTOMER_ALIASES) return CUSTOMER_ALIASES[key]; // null = excluded
+  return name.trim();
+}
+
 // ─── SHAPE-ONLY (CATERING / FOH) RULES ────────────────────────────────────
 // Some deliveries leave the production pipeline at the dough stage:
 //   - Catering boxes are baked + boxed fresh in the FOH store at fulfillment.
