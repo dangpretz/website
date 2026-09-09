@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commissions Setup | Dangerous Pretzel Co.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C41E1E;--red-dk:#8B0000;--dark:#1A1A1A;
+  --amber:#f0ad4e;--green:#2a7a2a;--blue:#2563eb;
+  --gray-1:#f5f5f5;--gray-2:#e8e8e8;--gray-3:#999;--gray-4:#666;
+  --bg:#f0f0f0;--card:#fff;--border:#e0e0e0;--text:#1A1A1A;--text2:#555;
+  --radius:6px;--shadow:0 1px 4px rgba(0,0,0,.08);
+}
+body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+
+#app[hidden]{display:none}
+
+header{background:var(--dark);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+header h1{color:#fff;font-size:18px;font-weight:800}
+.header-right{display:flex;align-items:center;gap:14px}
+.identity{color:#bbb;font-size:13px}
+.identity strong{color:#fff}
+.hub-link{color:#bbb;font-size:13px;font-weight:600}
+.hub-link:hover{color:#fff}
+#logout-btn{padding:7px 12px;background:transparent;border:1px solid #444;border-radius:var(--radius);color:#888;font:600 12px 'Manrope',sans-serif;cursor:pointer}
+#logout-btn:hover{border-color:#666;color:#ccc}
+
+.tabs{display:flex;gap:4px;padding:0 28px;background:var(--dark);border-top:1px solid #333}
+.tab-btn{padding:12px 16px;background:transparent;border:none;border-bottom:3px solid transparent;color:#999;font:700 13px 'Manrope',sans-serif;cursor:pointer}
+.tab-btn:hover{color:#ddd}
+.tab-btn.active{color:#fff;border-bottom-color:var(--red)}
+
+main{max-width:1100px;margin:0 auto;padding:24px 28px 60px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
+.card-body{padding:18px}
+
+/* ── Customers & Pricing layout ── */
+.pricing-layout{display:grid;grid-template-columns:240px 1fr;gap:20px}
+#customer-list{display:flex;flex-direction:column;gap:2px}
+.customer-item{display:block;width:100%;text-align:left;padding:9px 10px;background:transparent;border:none;border-radius:4px;font:600 13px 'Manrope',sans-serif;color:var(--text);cursor:pointer}
+.customer-item:hover{background:var(--gray-1)}
+.customer-item.active{background:var(--red);color:#fff}
+#customer-detail h3{font-size:16px;margin-bottom:14px}
+.form-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.form-row label{font-weight:700;font-size:12px;color:var(--text2);min-width:100px}
+.form-row select,.form-row input{padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);font:400 13px 'Manrope',sans-serif}
+
+.sku-table{width:100%;border-collapse:collapse;font-size:13px}
+.sku-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.sku-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1);vertical-align:middle}
+.sku-row-editing td{vertical-align:top;padding-top:10px}
+.tier-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.tier-row input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px}
+.tier-remove{background:transparent;border:none;color:var(--gray-3);cursor:pointer;font-size:12px}
+.tier-remove:hover{color:var(--red)}
+.btn-link{background:none;border:none;color:var(--blue);font:600 12px 'Manrope',sans-serif;cursor:pointer;padding:2px 0}
+
+.badge-warn{display:inline-block;padding:2px 7px;border-radius:10px;background:#fff3cd;color:#856404;font-size:11px;font-weight:700}
+.text-muted{color:var(--gray-3)}
+.text-neg{color:var(--red)}
+.empty-hint{color:var(--gray-3);font-size:13px;padding:8px 0}
+
+.btn{padding:8px 14px;border-radius:var(--radius);border:1px solid var(--border);font:700 13px 'Manrope',sans-serif;cursor:pointer;background:#fff}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-red{background:var(--red);border-color:var(--red);color:#fff}
+.btn-red:hover{background:var(--red-dk)}
+.btn-outline{background:#fff}
+.btn-outline:hover{background:var(--gray-1)}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* ── Forms (Events / Adjustments) ── */
+.entry-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px}
+.entry-form .full{grid-column:1/-1}
+.entry-form label{display:block;font-weight:700;font-size:12px;color:var(--text2);margin-bottom:5px}
+.entry-form input,.entry-form textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);font:400 13px 'Manrope',sans-serif}
+.checklist{display:flex;flex-wrap:wrap;gap:12px}
+.check-item{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:500;cursor:pointer}
+
+table.list-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+table.list-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
+
+/* ── Preview tab ── */
+#needs-setup-card .card-header{color:var(--red-dk)}
+#needs-setup-list{list-style:none;padding:0}
+#needs-setup-list li{padding:6px 0;border-bottom:1px solid var(--gray-1);font-size:13px}
+#needs-setup-list li:last-child{border-bottom:none}
+
+.rep-summary-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.rep-summary-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--gray-1)}
+.rep-summary-header h3{font-size:15px}
+.rep-total{font-size:18px;font-weight:800;color:var(--red)}
+.preview-table{width:100%;border-collapse:collapse;font-size:12px}
+.preview-table th{text-align:left;padding:7px 12px;color:var(--gray-3);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--gray-1)}
+.preview-table td{padding:7px 12px;border-bottom:1px solid var(--gray-1)}
+.grand-total{text-align:right;font-size:16px;font-weight:800;padding:14px 4px}
+
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:#fff;padding:10px 20px;border-radius:var(--radius);font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:999}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div id="app" hidden>
+  <header>
+    <h1>Commissions Setup</h1>
+    <div class="header-right">
+      <span class="identity">Logged in as <strong id="identity-name"></strong></span>
+      <a class="hub-link" href="/static/index.html">&larr; Hub</a>
+      <button id="logout-btn">Log Out</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="pricing">Customers &amp; Pricing</button>
+    <button class="tab-btn" data-tab="events">Event Commissions</button>
+    <button class="tab-btn" data-tab="adjustments">Adjustments</button>
+    <button class="tab-btn" data-tab="preview">Commission Preview</button>
+  </nav>
+
+  <main>
+    <!-- ── Customers & Pricing ───────────────────────────────────────────── -->
+    <section class="tab-panel active" id="tab-pricing">
+      <div class="card">
+        <div class="card-header">Customers &amp; Pricing</div>
+        <div class="card-body pricing-layout">
+          <div id="customer-list"></div>
+          <div id="customer-detail"><div class="empty-hint">Select a customer to configure their rep and SKU pricing.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Event Commissions ────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-events">
+      <div class="card">
+        <div class="card-header">Log an Event</div>
+        <div class="card-body">
+          <form id="event-form" class="entry-form">
+            <div><label>Date</label><input type="date" id="event-date" required></div>
+            <div><label>Pretzel count</label><input type="number" id="event-pretzels" min="1" step="1" required></div>
+            <div class="full"><label>Event / label</label><input type="text" id="event-label" placeholder="e.g. Farmers Market — Downtown" required></div>
+            <div class="full">
+              <label>Reps present</label>
+              <div class="checklist" id="event-reps-checklist"></div>
+            </div>
+            <div class="full"><button type="submit" class="btn btn-red">Log Event</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Event History</div>
+        <div class="card-body">
+          <table class="list-table">
+            <thead><tr><th>Date</th><th>Event</th><th>Pretzels</th><th>Reps present</th><th>Total</th><th>Split</th></tr></thead>
+            <tbody id="event-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Adjustments ───────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-adjustments">
+      <div class="card">
+        <div class="card-header">Log an Adjustment</div>
+        <div class="card-body">
+          <form id="adjustment-form" class="entry-form">
+            <div><label>Rep</label><select id="adj-rep-select"></select></div>
+            <div><label>Amount ($)</label><input type="number" id="adj-amount" step="0.01" required></div>
+            <div class="full"><label>Note</label><input type="text" id="adj-note" placeholder="Why this adjustment" required></div>
+            <div class="full"><button type="submit" class="btn btn-red">Log Adjustment</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Adjustment History</div>
+        <div class="card-body">
+          <table class="list-table">
+            <thead><tr><th>Date</th><th>Rep</th><th>Amount</th><th>Note</th><th>Entered by</th></tr></thead>
+            <tbody id="adjustment-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Commission Preview ───────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-preview">
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Compute</span>
+          <button id="compute-btn" class="btn btn-red">Compute new commissions</button>
+        </div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text2)">Scans confirmed wholesale deliveries and locks in commissions for any line item that isn't in the ledger yet, using whatever price/tiers are configured right now. Already-computed amounts are never changed.</p>
+        </div>
+      </div>
+      <div class="card" id="needs-setup-card">
+        <div class="card-header">Needs Setup</div>
+        <div class="card-body">
+          <ul id="needs-setup-list"></ul>
+        </div>
+      </div>
+      <div id="preview-breakdown"></div>
+    </section>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+import {
+  requireAccess, resolveStaffDirectory, clearSessionUnlock, STAFF_LOG_PATH, HUB_URL,
+} from '../../scripts/staff-access.js';
+import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
+import {
+  resolveCommissionsConfig, resolveCommissionsLedger, processWholesaleCommissions,
+  summarizeCommissions, pricingKey, EVENT_RATE_PER_PRETZEL,
+} from '../../scripts/commissions.js';
+
+// ── Config ──────────────────────────────────────────────────────────────────
+const DELIVERY_LOG_PATH = '/dangpretz/delivery-planner';
+const CONFIG_LOG_PATH = '/dangpretz/commissions-config';
+const LEDGER_LOG_PATH = '/dangpretz/commissions';
+
+// ── State ────────────────────────────────────────────────────────────────────
+let session = null;
+let staffLogs = [];
+let deliveryLogs = [];
+let configLogs = [];
+let ledgerLogs = [];
+let skus = [];
+let staffDirectory = {};
+let deliveries = []; // full resolveDeliveries() output, ghosts included
+let wholesaleDeliveries = []; // confirmed, non-deleted, wholesale-category only — for pickers
+let config = { repByCustomer: {}, pricingByCustomerSku: {} };
+let ledger = { wholesale: {}, events: [], adjustments: [] };
+let selectedCustomer = null;
+let editingSkuKey = null;
+let editingDraft = null;
+
+// Reps are whichever PIN codes the hub's manager page has granted
+// sales-crm access to — same derivation static/sales/index.html uses. No
+// separate commissions-specific rep registry.
+function getReps() {
+  return Object.keys(staffDirectory)
+    .filter((code) => (staffDirectory[code].links || []).includes('sales-crm'))
+    .map((code) => ({ id: code, label: staffDirectory[code].name || code }));
+}
+
+function getRepLabel(repId) {
+  if (!repId) return '—';
+  return staffDirectory[repId]?.name || `${repId} (unmapped)`;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function toast(msg, ms = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function sleep(ms) { return new Promise((r) => { setTimeout(r, ms); }); }
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+function logout() {
+  clearSessionUnlock();
+  window.location.href = HUB_URL;
+}
+
+// ── Data loading ─────────────────────────────────────────────────────────────
+function recomputeAll() {
+  staffDirectory = resolveStaffDirectory(staffLogs);
+  deliveries = resolveDeliveries(deliveryLogs);
+  wholesaleDeliveries = deliveries.filter(
+    (d) => !d._deleted
+      && (d.orderCategory || 'wholesale') === 'wholesale'
+      && ['delivered', 'picked_up'].includes(d.status),
+  );
+  config = resolveCommissionsConfig(configLogs);
+  ledger = resolveCommissionsLedger(ledgerLogs);
+}
+
+async function loadAll() {
+  const [sLogs, dLogs, cLogs, lLogs, skuList] = await Promise.all([
+    fetchLog(STAFF_LOG_PATH),
+    fetchLog(DELIVERY_LOG_PATH),
+    fetchLog(CONFIG_LOG_PATH),
+    fetchLog(LEDGER_LOG_PATH),
+    fetch('../delivery-planner/skus.json?v=2026-05-22-new-skus').then((r) => r.json()),
+  ]);
+  staffLogs = sLogs; deliveryLogs = dLogs; configLogs = cLogs; ledgerLogs = lLogs; skus = skuList;
+  recomputeAll();
+}
+
+async function refreshConfig() {
+  configLogs = await fetchLog(CONFIG_LOG_PATH);
+  config = resolveCommissionsConfig(configLogs);
+}
+
+async function refreshLedger() {
+  ledgerLogs = await fetchLog(LEDGER_LOG_PATH);
+  ledger = resolveCommissionsLedger(ledgerLogs);
+}
+
+// ── Customers & Pricing tab ──────────────────────────────────────────────────
+function getKnownWholesaleCustomers() {
+  const normalized = new Map();
+  wholesaleDeliveries.forEach((d) => {
+    const name = normalizeCustomerName(d.customer || '');
+    if (name) {
+      const key = name.toLowerCase();
+      if (!normalized.has(key)) normalized.set(key, name);
+    }
+  });
+  return [...normalized.values()].sort((a, b) => a.localeCompare(b));
+}
+
+function renderSkuRow(customer, sku) {
+  const key = pricingKey(customer, sku);
+  if (editingSkuKey === key) {
+    const draft = editingDraft;
+    return `
+      <tr class="sku-row-editing" data-sku="${esc(sku)}">
+        <td>${esc(sku)}</td>
+        <td><input type="number" step="0.01" min="0" id="sku-price-input" value="${draft.price}"></td>
+        <td>
+          <div id="tier-rows">${draft.tiers.map((t, i) => `
+            <div class="tier-row" data-idx="${i}">
+              <input type="number" step="0.01" min="0" class="tier-min" value="${t.minPrice}" placeholder="min $">
+              <span>&rarr;</span>
+              <input type="number" step="0.1" min="0" max="100" class="tier-pct" value="${t.pct}" placeholder="%">
+              <button type="button" class="tier-remove" data-idx="${i}">&#10005;</button>
+            </div>`).join('')}</div>
+          <button type="button" id="tier-add" class="btn-link">+ Add tier</button>
+        </td>
+        <td>
+          <button type="button" id="sku-save" class="btn btn-sm btn-red">Save</button>
+          <button type="button" id="sku-cancel" class="btn btn-sm btn-outline">Cancel</button>
+        </td>
+      </tr>`;
+  }
+  const pricing = config.pricingByCustomerSku[key];
+  return `
+    <tr data-sku="${esc(sku)}">
+      <td>${esc(sku)}</td>
+      <td>${pricing ? `$${Number(pricing.price).toFixed(2)}` : '<span class="badge-warn">not set</span>'}</td>
+      <td>${pricing && pricing.tiers.length ? pricing.tiers.map((t) => `&ge;$${Number(t.minPrice).toFixed(2)}&rarr;${t.pct}%`).join(', ') : '<span class="text-muted">none</span>'}</td>
+      <td><button type="button" class="sku-edit-btn btn btn-sm btn-outline" data-sku="${esc(sku)}">Edit</button></td>
+    </tr>`;
+}
+
+function syncEditingDraftFromDom() {
+  if (!editingDraft) return;
+  const priceInput = document.getElementById('sku-price-input');
+  if (priceInput) editingDraft.price = Number(priceInput.value) || 0;
+  const rows = [...document.querySelectorAll('#tier-rows .tier-row')];
+  if (rows.length) {
+    editingDraft.tiers = rows.map((row) => ({
+      minPrice: Number(row.querySelector('.tier-min').value) || 0,
+      pct: Number(row.querySelector('.tier-pct').value) || 0,
+    }));
+  }
+}
+
+function bindSkuRowEvents() {
+  document.querySelectorAll('.sku-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const { sku } = btn.dataset;
+      const key = pricingKey(selectedCustomer, sku);
+      const pricing = config.pricingByCustomerSku[key];
+      editingSkuKey = key;
+      editingDraft = pricing
+        ? { price: pricing.price, tiers: pricing.tiers.map((t) => ({ ...t })) }
+        : { price: 0, tiers: [] };
+      renderPricingTab();
+    });
+  });
+  const cancelBtn = document.getElementById('sku-cancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      editingSkuKey = null; editingDraft = null; renderPricingTab();
+    });
+  }
+  const addBtn = document.getElementById('tier-add');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      syncEditingDraftFromDom();
+      editingDraft.tiers.push({ minPrice: 0, pct: 0 });
+      renderPricingTab();
+    });
+  }
+  document.querySelectorAll('.tier-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      syncEditingDraftFromDom();
+      editingDraft.tiers.splice(Number(btn.dataset.idx), 1);
+      renderPricingTab();
+    });
+  });
+  const saveBtn = document.getElementById('sku-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      syncEditingDraftFromDom();
+      const { sku } = document.querySelector('tr.sku-row-editing').dataset;
+      saveSkuPricing(selectedCustomer, sku, editingDraft.price, editingDraft.tiers);
+    });
+  }
+}
+
+function renderPricingTab() {
+  const customers = getKnownWholesaleCustomers();
+  const list = document.getElementById('customer-list');
+  list.innerHTML = customers.length
+    ? customers.map((c) => `<button type="button" class="customer-item${c === selectedCustomer ? ' active' : ''}" data-customer="${esc(c)}">${esc(c)}${config.repByCustomer[c] ? '' : ' <span class="badge-warn">unassigned</span>'}</button>`).join('')
+    : '<div class="empty-hint">No confirmed wholesale deliveries yet.</div>';
+
+  const detail = document.getElementById('customer-detail');
+  if (!selectedCustomer || !customers.includes(selectedCustomer)) {
+    detail.innerHTML = '<div class="empty-hint">Select a customer to configure their rep and SKU pricing.</div>';
+    return;
+  }
+  const repCode = config.repByCustomer[selectedCustomer] || '';
+  detail.innerHTML = `
+    <h3>${esc(selectedCustomer)}</h3>
+    <div class="form-row">
+      <label>Assigned rep</label>
+      <select id="customer-rep-select">
+        <option value="">&mdash; Unassigned &mdash;</option>
+        ${getReps().map((r) => `<option value="${esc(r.id)}"${r.id === repCode ? ' selected' : ''}>${esc(r.label)}</option>`).join('')}
+      </select>
+    </div>
+    <table class="sku-table">
+      <thead><tr><th>SKU</th><th>Price</th><th>Tiers</th><th></th></tr></thead>
+      <tbody>${skus.map((sku) => renderSkuRow(selectedCustomer, sku)).join('')}</tbody>
+    </table>
+  `;
+  document.getElementById('customer-rep-select').addEventListener('change', (e) => saveCustomerRep(selectedCustomer, e.target.value));
+  bindSkuRowEvents();
+}
+
+async function saveCustomerRep(customer, repCode) {
+  try {
+    await appendLog(CONFIG_LOG_PATH, {
+      action: 'set_customer_rep', customer, repCode, updatedBy: session.code, timeStamp: new Date().toISOString(),
+    });
+    toast(`${customer} → ${repCode ? getRepLabel(repCode) : 'unassigned'}`);
+    await refreshConfig();
+    renderPricingTab();
+  } catch (err) {
+    toast(`Error saving rep assignment: ${err.message}`);
+  }
+}
+
+async function saveSkuPricing(customer, sku, price, tiers) {
+  try {
+    await appendLog(CONFIG_LOG_PATH, {
+      action: 'set_sku_pricing', customer, sku, price, tiers: JSON.stringify(tiers), updatedBy: session.code, timeStamp: new Date().toISOString(),
+    });
+    toast(`Saved pricing for ${sku}`);
+    editingSkuKey = null; editingDraft = null;
+    await refreshConfig();
+    renderPricingTab();
+  } catch (err) {
+    toast(`Error saving pricing: ${err.message}`);
+  }
+}
+
+// ── Event Commissions tab ────────────────────────────────────────────────────
+function renderEventsTab() {
+  const checklist = document.getElementById('event-reps-checklist');
+  const reps = getReps();
+  checklist.innerHTML = reps.length
+    ? reps.map((r) => `<label class="check-item"><input type="checkbox" class="event-rep-check" value="${esc(r.id)}"> ${esc(r.label)}</label>`).join('')
+    : '<div class="empty-hint">No reps have Sales CRM access yet.</div>';
+
+  const list = document.getElementById('event-list');
+  const sorted = [...ledger.events].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.timeStamp || '').localeCompare(a.timeStamp || ''));
+  list.innerHTML = sorted.length ? sorted.map((ev) => {
+    const total = (Number(ev.pretzelCount) || 0) * EVENT_RATE_PER_PRETZEL;
+    const share = ev.repsPresent.length ? total / ev.repsPresent.length : 0;
+    return `
+      <tr>
+        <td>${esc(ev.date || '')}</td>
+        <td>${esc(ev.label || '')}</td>
+        <td>${esc(ev.pretzelCount || '0')}</td>
+        <td>${ev.repsPresent.map((r) => esc(getRepLabel(r))).join(', ') || '&mdash;'}</td>
+        <td>$${total.toFixed(2)}</td>
+        <td>$${share.toFixed(2)} each</td>
+      </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty-hint">No events logged yet.</td></tr>';
+}
+
+// ── Adjustments tab ──────────────────────────────────────────────────────────
+function renderAdjustmentsTab() {
+  const select = document.getElementById('adj-rep-select');
+  select.innerHTML = getReps().map((r) => `<option value="${esc(r.id)}">${esc(r.label)}</option>`).join('');
+
+  const list = document.getElementById('adjustment-list');
+  const sorted = [...ledger.adjustments].sort((a, b) => (b.timeStamp || '').localeCompare(a.timeStamp || ''));
+  list.innerHTML = sorted.length ? sorted.map((adj) => `
+    <tr>
+      <td>${esc((adj.timeStamp || '').slice(0, 10))}</td>
+      <td>${esc(getRepLabel(adj.repCode))}</td>
+      <td class="${Number(adj.amount) < 0 ? 'text-neg' : ''}">$${Number(adj.amount).toFixed(2)}</td>
+      <td>${esc(adj.note || '')}</td>
+      <td>${esc(adj.enteredBy ? getRepLabel(adj.enteredBy) : '')}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty-hint">No adjustments logged yet.</td></tr>';
+}
+
+// ── Commission Preview tab ───────────────────────────────────────────────────
+function computeNeedsSetup() {
+  return processWholesaleCommissions({
+    deliveries: wholesaleDeliveries, existingWholesale: ledger.wholesale, config,
+  }).needsSetup;
+}
+
+// Guards against a "$-0.00" display when adjustments exactly (or almost
+// exactly, after float summation noise) cancel out a rep's total.
+function money(n) {
+  return (Math.abs(n) < 0.005 ? 0 : n).toFixed(2);
+}
+
+function renderPreviewTab() {
+  const needsSetup = computeNeedsSetup();
+  document.getElementById('needs-setup-list').innerHTML = needsSetup.length
+    ? needsSetup.map((n) => `<li>${esc(n.customer)} &mdash; ${esc(n.sku)} <span class="text-muted">(${[n.missingRep && 'no rep assigned', n.missingPricing && 'no pricing set'].filter(Boolean).join(', ')})</span></li>`).join('')
+    : '<li class="empty-hint">Nothing pending &mdash; every confirmed wholesale delivery is fully configured.</li>';
+
+  const summary = summarizeCommissions(ledger);
+  const repIds = Object.keys(summary).sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
+  const container = document.getElementById('preview-breakdown');
+  if (!repIds.length) {
+    container.innerHTML = '<div class="empty-hint">No commissions computed yet. Click "Compute new commissions" once pricing is set up.</div>';
+    return;
+  }
+  const deliveryById = Object.fromEntries(deliveries.map((d) => [d.deliveryId, d]));
+  let grandTotal = 0;
+  const cards = repIds.map((repId) => {
+    const bucket = summary[repId];
+    grandTotal += bucket.total;
+    const wholesaleRows = bucket.wholesale.map((w) => `
+      <tr><td>${esc(deliveryById[w.deliveryId]?.date || '')}</td><td>${esc(w.customer)}</td><td>${esc(w.sku)}</td><td>${w.qty}</td><td>$${Number(w.price).toFixed(2)}</td><td>${w.tierPct}%</td><td>$${Number(w.amount).toFixed(2)}</td></tr>
+    `).join('');
+    const eventRows = bucket.events.map((ev) => `
+      <tr><td>${esc(ev.date || '')}</td><td colspan="5">${esc(ev.label || '')} (${ev.repsPresent.length} rep${ev.repsPresent.length === 1 ? '' : 's'} present)</td><td>$${ev.share.toFixed(2)}</td></tr>
+    `).join('');
+    const adjRows = bucket.adjustments.map((adj) => `
+      <tr><td>${esc((adj.timeStamp || '').slice(0, 10))}</td><td colspan="5">${esc(adj.note || 'Adjustment')}</td><td>$${Number(adj.amount).toFixed(2)}</td></tr>
+    `).join('');
+    return `
+      <div class="rep-summary-card">
+        <div class="rep-summary-header"><h3>${esc(getRepLabel(repId))}</h3><div class="rep-total">$${money(bucket.total)}</div></div>
+        ${bucket.wholesale.length ? `<table class="preview-table"><thead><tr><th>Date</th><th>Customer</th><th>SKU</th><th>Qty</th><th>Price</th><th>Tier</th><th>Amount</th></tr></thead><tbody>${wholesaleRows}</tbody></table>` : ''}
+        ${bucket.events.length ? `<table class="preview-table"><thead><tr><th>Date</th><th colspan="5">Event</th><th>Amount</th></tr></thead><tbody>${eventRows}</tbody></table>` : ''}
+        ${bucket.adjustments.length ? `<table class="preview-table"><thead><tr><th>Date</th><th colspan="5">Adjustment</th><th>Amount</th></tr></thead><tbody>${adjRows}</tbody></table>` : ''}
+      </div>`;
+  }).join('');
+  container.innerHTML = `${cards}<div class="grand-total">Grand total across all reps: <strong>$${money(grandTotal)}</strong></div>`;
+}
+
+async function computeCommissions() {
+  const btn = document.getElementById('compute-btn');
+  btn.disabled = true; btn.textContent = 'Computing…';
+  let written = 0;
+  let error = null;
+  let skippedForSetup = 0;
+  try {
+    const { toWrite, needsSetup } = processWholesaleCommissions({
+      deliveries: wholesaleDeliveries, existingWholesale: ledger.wholesale, config,
+    });
+    skippedForSetup = needsSetup.length;
+    // Sequential writes with pacing — the sheet-logger backend has shown
+    // dropped/rate-limited writes under rapid consecutive POSTs.
+    for (const row of toWrite) {
+      // eslint-disable-next-line no-await-in-loop
+      await appendLog(LEDGER_LOG_PATH, row);
+      written += 1;
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(500);
+    }
+  } catch (err) {
+    error = err;
+  }
+  await refreshLedger();
+  renderPreviewTab();
+  btn.disabled = false; btn.textContent = 'Compute new commissions';
+  if (error) {
+    toast(`Error after computing ${written} commission${written === 1 ? '' : 's'}: ${error.message}`);
+  } else if (written) {
+    toast(`Computed ${written} new commission${written === 1 ? '' : 's'}.`);
+  } else {
+    toast(skippedForSetup
+      ? `Nothing new to compute — ${skippedForSetup} customer/SKU pair(s) still need setup.`
+      : 'Nothing new to compute — everything is already locked in.');
+  }
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+// Each tab's data can go stale while you're working in another one (saving
+// a customer's rep, logging an event, computing commissions) — re-render
+// on the way in rather than trying to track every cross-tab dependency.
+const TAB_RENDERERS = {
+  pricing: renderPricingTab,
+  events: renderEventsTab,
+  adjustments: renderAdjustmentsTab,
+  preview: renderPreviewTab,
+};
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `tab-${tab}`));
+  const render = TAB_RENDERERS[tab];
+  if (render) render();
+}
+
+// ── Bindings ─────────────────────────────────────────────────────────────────
+function bindAll() {
+  document.getElementById('logout-btn').addEventListener('click', logout);
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  document.getElementById('customer-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.customer-item');
+    if (!btn) return;
+    selectedCustomer = btn.dataset.customer;
+    editingSkuKey = null; editingDraft = null;
+    renderPricingTab();
+  });
+  document.getElementById('event-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const date = document.getElementById('event-date').value;
+    const label = document.getElementById('event-label').value.trim();
+    const pretzelCount = Number(document.getElementById('event-pretzels').value) || 0;
+    const repsPresent = [...document.querySelectorAll('.event-rep-check:checked')].map((c) => c.value);
+    if (!date || !label || pretzelCount <= 0 || !repsPresent.length) {
+      toast('Fill in date, label, pretzel count, and at least one rep.');
+      return;
+    }
+    try {
+      await appendLog(LEDGER_LOG_PATH, {
+        action: 'log_event_commission', date, label, pretzelCount, repsPresent: JSON.stringify(repsPresent), enteredBy: session.code, timeStamp: new Date().toISOString(),
+      });
+      toast('Event logged.');
+      e.target.reset();
+      await refreshLedger();
+      renderEventsTab();
+      renderPreviewTab();
+    } catch (err) {
+      toast(`Error logging event: ${err.message}`);
+    }
+  });
+  document.getElementById('adjustment-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const repCode = document.getElementById('adj-rep-select').value;
+    const amount = Number(document.getElementById('adj-amount').value);
+    const note = document.getElementById('adj-note').value.trim();
+    if (!repCode || Number.isNaN(amount) || !note) {
+      toast('Fill in rep, amount, and a note.');
+      return;
+    }
+    try {
+      await appendLog(LEDGER_LOG_PATH, {
+        action: 'log_adjustment', repCode, amount, note, enteredBy: session.code, timeStamp: new Date().toISOString(),
+      });
+      toast('Adjustment logged.');
+      e.target.reset();
+      await refreshLedger();
+      renderAdjustmentsTab();
+      renderPreviewTab();
+    } catch (err) {
+      toast(`Error logging adjustment: ${err.message}`);
+    }
+  });
+  document.getElementById('compute-btn').addEventListener('click', computeCommissions);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  bindAll();
+  session = await requireAccess('commissions-admin');
+  await loadAll();
+  document.getElementById('identity-name').textContent = session.name || session.code;
+  renderPricingTab();
+  renderEventsTab();
+  renderAdjustmentsTab();
+  renderPreviewTab();
+  document.getElementById('app').hidden = false;
+}
+
+init();
+</script>
+</body>
+</html>

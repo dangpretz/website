@@ -1113,6 +1113,7 @@
       isShapeOnlyDelivery,
       expandBoxLineItems,
       caseSizeOptionsFor,
+      normalizeCustomerName as normalizeCustomer,
     } from '../../scripts/inventory.js?v=2026-05-22-new-skus';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
 
@@ -1207,18 +1208,9 @@
       btn.addEventListener('click', syncFromSquare);
     });
 
-    // Maps known aliases (lowercase) → canonical name. null = exclude from customer list.
-    const CUSTOMER_ALIASES = {
-      'bees': 'The Bees',
-      'handle bar': 'Handle Bar',
-      'test': null,
-    };
-    function normalizeCustomer(name) {
-      if (!name) return null;
-      const key = name.trim().toLowerCase();
-      if (key in CUSTOMER_ALIASES) return CUSTOMER_ALIASES[key]; // null = excluded
-      return name.trim();
-    }
+    // CUSTOMER_ALIASES / normalizeCustomer now live in scripts/inventory.js
+    // (imported above as normalizeCustomer) — shared with the commissions
+    // engine so a customer name normalizes identically everywhere.
     const form = document.getElementById('delivery-form');
     const scheduleContainer = document.getElementById('schedule-container');
     const totalsBySkuList = document.getElementById('totals-by-sku');

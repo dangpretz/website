@@ -70,6 +70,7 @@ export const LINK_CATALOG = [
   { key: 'barcode-lookup', label: 'Barcode Lookup', url: '/static/barcode-lookup/index.html' },
   { key: 'delivery-planner', label: 'Delivery Planner', url: '/static/delivery-planner/index.html' },
   { key: 'sales-crm', label: 'Sales CRM', url: '/static/sales/index.html' },
+  { key: 'commissions-admin', label: 'Commissions Setup', url: '/static/commissions-admin/index.html' },
 ];
 
 const LEGACY_DEFAULT_LINKS = [
