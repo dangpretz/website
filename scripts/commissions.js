@@ -23,6 +23,14 @@
 // ║   ledger row — editing a customer's price/tiers afterward never changes ║
 // ║   what a past delivery already earned.                                  ║
 // ║                                                                          ║
+// ║ PRICE VS. TIERS                                                         ║
+// ║   Each customer negotiates their own PRICE per SKU (set_sku_pricing,    ║
+// ║   keyed by customer+sku) — but the TIER LADDER that turns a price into  ║
+// ║   a commission % is one shared schedule per SKU (set_sku_tiers, keyed   ║
+// ║   only by sku), the same for every customer buying that product. A     ║
+// ║   customer's commission % comes from looking their own price up in     ║
+// ║   their SKU's shared ladder — resolveTierPct(tiersBySku[sku], price).  ║
+// ║                                                                          ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
 export const EVENT_RATE_PER_PRETZEL = 0.50; // $/pretzel, split across reps present
@@ -32,22 +40,79 @@ export function pricingKey(customer, sku) {
 }
 
 // ── /dangpretz/commissions-config (manager-maintained reference data) ─────
+// Also carries `set_sku_alias` rows — see resolveConnectedSku() below for
+// why a raw delivery-planner item name isn't itself the pricing key — and
+// `set_sku_tiers` rows — see the PRICE VS. TIERS note above.
 export function resolveCommissionsConfig(logs) {
   const repByCustomer = {};
   const pricingByCustomerSku = {};
+  const tiersBySku = {};
+  const connectedSkuByItem = {};
   (Array.isArray(logs) ? logs : []).forEach((row) => {
     if (row.action === 'set_customer_rep' && row.customer) {
       repByCustomer[row.customer] = row.repCode;
     } else if (row.action === 'set_sku_pricing' && row.customer && row.sku) {
+      pricingByCustomerSku[pricingKey(row.customer, row.sku)] = { price: Number(row.price) || 0 };
+    } else if (row.action === 'set_sku_tiers' && row.sku) {
       let tiers = [];
       try { tiers = JSON.parse(row.tiers || '[]'); } catch (_) { /* malformed row, treat as no tiers */ }
-      pricingByCustomerSku[pricingKey(row.customer, row.sku)] = {
-        price: Number(row.price) || 0,
-        tiers: Array.isArray(tiers) ? tiers : [],
-      };
+      tiersBySku[row.sku] = Array.isArray(tiers) ? tiers : [];
+    } else if (row.action === 'set_sku_alias' && row.deliveryItem) {
+      // A blank connectedSku is a deliberate "not commissioned" mark (e.g. a
+      // drink, a catering box) — store it same as any other value so it
+      // overrides a stale prior mapping; resolveConnectedSku() treats an
+      // empty string the same as never having been set.
+      connectedSkuByItem[row.deliveryItem] = row.connectedSku || '';
     }
   });
-  return { repByCustomer, pricingByCustomerSku };
+  return {
+    repByCustomer, pricingByCustomerSku, tiersBySku, connectedSkuByItem,
+  };
+}
+
+// Delivery-planner line items carry whatever raw name Square/the planner
+// gave them ("6.5oz bbk", "7oz bbk", a stray old "BBK") — several of which
+// are really the same priced product under different names, and some
+// (drinks, catering boxes) are never commissioned at all. `set_sku_alias`
+// lets a manager fold raw item names onto one canonical "connected SKU",
+// which is what pricing/tiers are actually configured against. An item
+// with no alias row (or one deliberately set to '') is not eligible for
+// commission — resolveConnectedSku returns null and the caller skips it
+// silently rather than treating it as a setup gap.
+export function resolveConnectedSku(rawSku, connectedSkuByItem) {
+  return connectedSkuByItem[rawSku] || null;
+}
+
+// Every distinct raw line-item name seen in real wholesale deliveries, with
+// enough context (order count, last-ordered date) for a manager to tell a
+// live product from a stale one-off — feeds the SKU Mapping tab, which is
+// the ongoing "add new items later" surface: as Square/the planner starts
+// using a new item name, it shows up here automatically on next load.
+export function collectRawSkuUsage(deliveries) {
+  const usage = new Map();
+  (Array.isArray(deliveries) ? deliveries : []).forEach((d) => {
+    let items = [];
+    try { items = JSON.parse(d.lineItems || '[]'); } catch (_) { return; }
+    if (!Array.isArray(items)) return;
+    items.forEach((item) => {
+      if (!item.sku) return;
+      if (!usage.has(item.sku)) usage.set(item.sku, { count: 0, lastOrdered: '' });
+      const info = usage.get(item.sku);
+      info.count += 1;
+      if ((d.date || '') > info.lastOrdered) info.lastOrdered = d.date || '';
+    });
+  });
+  return [...usage.entries()]
+    .map(([rawSku, info]) => ({ rawSku, count: info.count, lastOrdered: info.lastOrdered }))
+    .sort((a, b) => a.rawSku.localeCompare(b.rawSku));
+}
+
+// Every connected SKU currently in use, for the Customers & Pricing tab's
+// per-SKU table — sourced from the alias mapping (i.e. only SKUs a manager
+// has actually connected something to), not a static catalog file.
+export function collectConnectedSkus(connectedSkuByItem) {
+  const skus = new Set(Object.values(connectedSkuByItem).filter(Boolean));
+  return [...skus].sort((a, b) => a.localeCompare(b));
 }
 
 // Highest breakpoint whose minPrice <= price wins (0% if price is below
@@ -107,29 +172,38 @@ export function processWholesaleCommissions({ deliveries, existingWholesale, con
       if (existingWholesale[id]) return; // already locked in
 
       const customer = d.customer || '';
-      const sku = item.sku || '';
+      const rawSku = item.sku || '';
       const qty = Number(item.quantity) || 0;
-      if (!customer || !sku || qty <= 0) return;
+      if (!customer || !rawSku || qty <= 0) return;
+
+      // Not mapped to a connected SKU = not a commissioned product at all
+      // (a drink, a catering box, a discontinued flavor) — skip silently,
+      // this is not a setup gap, it's a deliberate exclusion.
+      const sku = resolveConnectedSku(rawSku, config.connectedSkuByItem);
+      if (!sku) return;
 
       const repCode = config.repByCustomer[customer];
       const pricing = config.pricingByCustomerSku[pricingKey(customer, sku)];
-      if (!repCode || !pricing) {
+      const tiers = config.tiersBySku[sku];
+      if (!repCode || !pricing || !tiers || !tiers.length) {
         const gapKey = pricingKey(customer, sku);
         if (!seenGaps.has(gapKey)) {
           seenGaps.add(gapKey);
           needsSetup.push({
             customer,
             sku,
+            rawSku,
             deliveryId: d.deliveryId,
             date: d.date,
             missingRep: !repCode,
             missingPricing: !pricing,
+            missingTiers: !tiers || !tiers.length,
           });
         }
         return;
       }
 
-      const tierPct = resolveTierPct(pricing.tiers, pricing.price);
+      const tierPct = resolveTierPct(tiers, pricing.price);
       const amount = qty * pricing.price * (tierPct / 100);
       toWrite.push({
         action: 'log_wholesale_commission',
@@ -137,6 +211,7 @@ export function processWholesaleCommissions({ deliveries, existingWholesale, con
         deliveryId: d.deliveryId,
         customer,
         sku,
+        rawSku,
         qty,
         price: pricing.price,
         tierPct,
