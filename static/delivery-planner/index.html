@@ -296,6 +296,7 @@
     .month-order-chip:hover { opacity: 0.85; }
     /* Events get their own color so they're distinguishable from wholesale at a glance */
     .month-order-chip.month-order-chip-event { background: #E8CF82; color: #1A1A1A; }
+    .month-order-chip.month-order-chip-catering { background: #A8C8D8; color: #1A1A1A; }
     .month-more {
       font: 600 10px 'Manrope', sans-serif; color: #888; padding: 0 2px;
     }
@@ -471,6 +472,18 @@
       display: inline-block; margin-left: 6px;
       padding: 1px 6px; border-radius: 4px;
       background: #E8CF82; color: #1A1A1A;
+      font: 600 10px 'Manrope', sans-serif;
+      letter-spacing: 0.3px; text-transform: uppercase;
+      vertical-align: middle;
+    }
+    /* Catering order badge — same treatment as .event-badge, distinct
+       color so the two categories read apart at a glance. Catering orders
+       are shape-only: production's BFP tab skips them (see
+       isShapeOnlyDelivery in scripts/inventory.js). */
+    .catering-badge {
+      display: inline-block; margin-left: 6px;
+      padding: 1px 6px; border-radius: 4px;
+      background: #A8C8D8; color: #1A1A1A;
       font: 600 10px 'Manrope', sans-serif;
       letter-spacing: 0.3px; text-transform: uppercase;
       vertical-align: middle;
@@ -887,6 +900,7 @@
           <button class="view-toggle-btn active" id="cat-all" data-category="all">All</button>
           <button class="view-toggle-btn" id="cat-wholesale" data-category="wholesale">Wholesale</button>
           <button class="view-toggle-btn" id="cat-event" data-category="event">Events</button>
+          <button class="view-toggle-btn" id="cat-catering" data-category="catering">Catering</button>
         </div>
       </div>
       <div id="schedule-container">
@@ -963,6 +977,7 @@
           <select id="order-category" name="orderCategory">
             <option value="wholesale">Wholesale</option>
             <option value="event">Event</option>
+            <option value="catering">Catering</option>
           </select>
         </div>
         <div class="line-items-head">
@@ -1256,14 +1271,11 @@
     let currentDay = new Date();
     let customerSearchQuery = '';
 
-    // ── Category filter (All / Wholesale / Event) — applies to every list/grid view ──
-    let categoryFilter = localStorage.getItem('dp-category-filter') || 'all'; // 'all' | 'wholesale' | 'event'
+    // ── Category filter (All / Wholesale / Event / Catering) — applies to every list/grid view ──
+    let categoryFilter = localStorage.getItem('dp-category-filter') || 'all'; // 'all' | 'wholesale' | 'event' | 'catering'
     function filterByCategory(deliveries) {
       if (categoryFilter === 'all') return deliveries;
-      return deliveries.filter((row) => {
-        const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
-        return categoryFilter === 'event' ? isEvent : !isEvent;
-      });
+      return deliveries.filter((row) => (row.orderCategory || 'wholesale').toLowerCase() === categoryFilter);
     }
     document.querySelectorAll('#category-filter [data-category]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.category === categoryFilter); // reflect any persisted choice on load
@@ -2025,6 +2037,8 @@
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
       const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
       const eventBadge = isEvent ? '<span class="event-badge" title="Event order">🎪 Event</span>' : '';
+      const isCatering = (row.orderCategory || '').toLowerCase() === 'catering';
+      const cateringBadge = isCatering ? '<span class="catering-badge" title="Catering order — shape only, skips BFP">🥨 Catering</span>' : '';
       const isConfirmed = status === 'delivered' || status === 'picked_up';
       // Compact button label — full "Confirm Delivery" wrapped to two lines on
       // narrow columns. Type still visible via the subline + the icon.
@@ -2046,7 +2060,7 @@
       return `
         <div class="delivery-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="card-customer">
-            <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}</span>
+            <span>${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}${cateringBadge}</span>
             ${CAN_EDIT ? `<div class="overflow-wrap">
               <button type="button" class="overflow-btn" data-overflow-toggle>&#8943;</button>
               <div class="overflow-menu">
@@ -2099,10 +2113,12 @@
       const sqBadge = isSquare ? '<span class="sq-badge" title="Imported from Square">⬜ Square</span>' : '';
       const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
       const eventBadge = isEvent ? '<span class="event-badge" title="Event order">🎪 Event</span>' : '';
+      const isCatering = (row.orderCategory || '').toLowerCase() === 'catering';
+      const cateringBadge = isCatering ? '<span class="catering-badge" title="Catering order — shape only, skips BFP">🥨 Catering</span>' : '';
       return `
         <div class="daily-card status-${escapeHtml(status)}${cardCoverageClass(row)}" data-delivery-id="${id}">
           <div class="daily-main">
-            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}</div>
+            <div class="daily-customer">${escapeHtml(customer)}${recurrenceHtml}${sqBadge}${eventBadge}${cateringBadge}</div>
             <div class="card-subline">${covBadgeHtml}<span class="type-tag">${typeLabel}</span></div>
             ${pillsHtml}
             ${contactHtml}
@@ -2288,9 +2304,10 @@
         const overflow = dayOrders.length - MAX_SHOWN;
         // One line per order, customer name only — the point of month view is a fast visual scan, not detail
         const chipsHtml = shown.map((row) => {
-          const isEvent = (row.orderCategory || '').toLowerCase() === 'event';
+          const category = (row.orderCategory || '').toLowerCase();
+          const chipClass = category === 'event' ? ' month-order-chip-event' : category === 'catering' ? ' month-order-chip-catering' : '';
           const customer = row.customer || row.location || '—';
-          return `<span class="month-order-chip${isEvent ? ' month-order-chip-event' : ''}" data-month-edit="${escapeHtml(row.deliveryId || '')}" title="${escapeHtml(customer)}">${escapeHtml(customer)}</span>`;
+          return `<span class="month-order-chip${chipClass}" data-month-edit="${escapeHtml(row.deliveryId || '')}" title="${escapeHtml(customer)}">${escapeHtml(customer)}</span>`;
         }).join('');
         html += `<div class="month-cell${!isThisMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" data-month-date="${dateStr}">
           <div class="month-cell-date">${d.getDate()}</div>
@@ -2463,7 +2480,8 @@
       }
       form.date.value = row.date || '';
       form.type.value = (row.type || 'delivery').toLowerCase();
-      form.orderCategory.value = (row.orderCategory || 'wholesale').toLowerCase() === 'event' ? 'event' : 'wholesale';
+      const editCategory = (row.orderCategory || 'wholesale').toLowerCase();
+      form.orderCategory.value = ['event', 'catering'].includes(editCategory) ? editCategory : 'wholesale';
       clearLineItems();
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
@@ -2923,7 +2941,7 @@
       const customer = form.customer.value.trim();
       const date = form.date.value.trim();
       const type = form.type.value;
-      const orderCategory = form.orderCategory.value === 'event' ? 'event' : 'wholesale';
+      const orderCategory = ['event', 'catering'].includes(form.orderCategory.value) ? form.orderCategory.value : 'wholesale';
       const rows = lineItemsContainer.querySelectorAll('.line-item-row');
       const lineItems = [];
       let hasZeroQty = false;

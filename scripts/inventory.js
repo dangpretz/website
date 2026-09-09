@@ -258,8 +258,10 @@ export const BAKE_GROUPS = {
 //   - Catering boxes are baked + boxed fresh in the FOH store at fulfillment.
 //   - The "FOH Placeholder" customer represents FOH retail walk-in stock.
 // For those, shape team makes the dough; BFP team does NOT bake/freeze them.
-// Detection is automatic: ANY line item starting with "Catering:" OR a
-// customer name matching FOH_PLACEHOLDER_NAME (case-insensitive).
+// Detection is automatic — any of:
+//   - the order's category (delivery-planner's Order Category field) is "Catering"
+//   - any line item starting with "Catering:" (case-insensitive)
+//   - a customer name matching FOH_PLACEHOLDER_NAME (case-insensitive)
 
 export const FOH_PLACEHOLDER_NAME = 'FOH Placeholder';
 
@@ -283,11 +285,12 @@ export const DEFAULT_BOX_EXPANSIONS = {
 
 /**
  * True if a delivery should be classified as shape-only (skip BFP).
- * MUST be called BEFORE expanding box line items, since detection looks
- * at the original "Catering: ..." prefixes.
+ * MUST be called BEFORE expanding box line items, since the line-item
+ * check looks at the original "Catering: ..." prefixes.
  */
 export function isShapeOnlyDelivery(d) {
   if (!d) return false;
+  if ((d.orderCategory || '').trim().toLowerCase() === 'catering') return true;
   const customer = (d.customer || d.location || '').trim().toLowerCase();
   if (customer === FOH_PLACEHOLDER_NAME.toLowerCase()) return true;
   let items = [];
