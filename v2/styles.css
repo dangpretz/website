@@ -108,6 +108,10 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   text-align: center;
 }
 .answer-lede-dark { color: #ccc; }
+.answer-lede a,
+.story-card a,
+.location-info a.intent-link { color: #C41E1E; font-weight: 700; }
+.answer-lede-dark a { color: #fff; text-decoration: underline; font-weight: 700; }
 .answer-note {
   font: 400 14px/1.6 'Manrope', sans-serif;
   color: #666;
@@ -116,6 +120,12 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   text-align: center;
 }
 .answer-note a { color: #C41E1E; font-weight: 700; }
+.serve-card a {
+  color: #C41E1E;
+  font-weight: 700;
+  display: inline-block;
+  margin-top: 8px;
+}
 .value-card-dark {
   background: #2a2a2a;
 }
@@ -279,6 +289,7 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
 }
 .card-center { text-align: center; }
 .card-center p { color: #555; }
+.card a { color: #C41E1E; font-weight: 700; }
 
 /* Dark cards for dark sections */
 .card-dark {
