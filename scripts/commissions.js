@@ -23,6 +23,14 @@
 // ║   ledger row — editing a customer's price/tiers afterward never changes ║
 // ║   what a past delivery already earned.                                  ║
 // ║                                                                          ║
+// ║ PRICE VS. TIERS                                                         ║
+// ║   Each customer negotiates their own PRICE per SKU (set_sku_pricing,    ║
+// ║   keyed by customer+sku) — but the TIER LADDER that turns a price into  ║
+// ║   a commission % is one shared schedule per SKU (set_sku_tiers, keyed   ║
+// ║   only by sku), the same for every customer buying that product. A     ║
+// ║   customer's commission % comes from looking their own price up in     ║
+// ║   their SKU's shared ladder — resolveTierPct(tiersBySku[sku], price).  ║
+// ║                                                                          ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
 export const EVENT_RATE_PER_PRETZEL = 0.50; // $/pretzel, split across reps present
@@ -33,21 +41,22 @@ export function pricingKey(customer, sku) {
 
 // ── /dangpretz/commissions-config (manager-maintained reference data) ─────
 // Also carries `set_sku_alias` rows — see resolveConnectedSku() below for
-// why a raw delivery-planner item name isn't itself the pricing key.
+// why a raw delivery-planner item name isn't itself the pricing key — and
+// `set_sku_tiers` rows — see the PRICE VS. TIERS note above.
 export function resolveCommissionsConfig(logs) {
   const repByCustomer = {};
   const pricingByCustomerSku = {};
+  const tiersBySku = {};
   const connectedSkuByItem = {};
   (Array.isArray(logs) ? logs : []).forEach((row) => {
     if (row.action === 'set_customer_rep' && row.customer) {
       repByCustomer[row.customer] = row.repCode;
     } else if (row.action === 'set_sku_pricing' && row.customer && row.sku) {
+      pricingByCustomerSku[pricingKey(row.customer, row.sku)] = { price: Number(row.price) || 0 };
+    } else if (row.action === 'set_sku_tiers' && row.sku) {
       let tiers = [];
       try { tiers = JSON.parse(row.tiers || '[]'); } catch (_) { /* malformed row, treat as no tiers */ }
-      pricingByCustomerSku[pricingKey(row.customer, row.sku)] = {
-        price: Number(row.price) || 0,
-        tiers: Array.isArray(tiers) ? tiers : [],
-      };
+      tiersBySku[row.sku] = Array.isArray(tiers) ? tiers : [];
     } else if (row.action === 'set_sku_alias' && row.deliveryItem) {
       // A blank connectedSku is a deliberate "not commissioned" mark (e.g. a
       // drink, a catering box) — store it same as any other value so it
@@ -56,7 +65,9 @@ export function resolveCommissionsConfig(logs) {
       connectedSkuByItem[row.deliveryItem] = row.connectedSku || '';
     }
   });
-  return { repByCustomer, pricingByCustomerSku, connectedSkuByItem };
+  return {
+    repByCustomer, pricingByCustomerSku, tiersBySku, connectedSkuByItem,
+  };
 }
 
 // Delivery-planner line items carry whatever raw name Square/the planner
@@ -173,7 +184,8 @@ export function processWholesaleCommissions({ deliveries, existingWholesale, con
 
       const repCode = config.repByCustomer[customer];
       const pricing = config.pricingByCustomerSku[pricingKey(customer, sku)];
-      if (!repCode || !pricing) {
+      const tiers = config.tiersBySku[sku];
+      if (!repCode || !pricing || !tiers || !tiers.length) {
         const gapKey = pricingKey(customer, sku);
         if (!seenGaps.has(gapKey)) {
           seenGaps.add(gapKey);
@@ -185,12 +197,13 @@ export function processWholesaleCommissions({ deliveries, existingWholesale, con
             date: d.date,
             missingRep: !repCode,
             missingPricing: !pricing,
+            missingTiers: !tiers || !tiers.length,
           });
         }
         return;
       }
 
-      const tierPct = resolveTierPct(pricing.tiers, pricing.price);
+      const tierPct = resolveTierPct(tiers, pricing.price);
       const amount = qty * pricing.price * (tierPct / 100);
       toWrite.push({
         action: 'log_wholesale_commission',

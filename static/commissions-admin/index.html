@@ -154,6 +154,16 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
           </table>
         </div>
       </div>
+      <div class="card">
+        <div class="card-header">Commission Tier Schedules</div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">One shared price-to-commission ladder per SKU — the same schedule applies no matter which customer is buying. Each customer's own price (set on the Customers &amp; Pricing tab) is looked up against this ladder to get their commission %.</p>
+          <table class="sku-table">
+            <thead><tr><th>SKU</th><th>Tiers (min price &rarr; %)</th><th></th></tr></thead>
+            <tbody id="tier-schedule-list"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- ── Event Commissions ────────────────────────────────────────────── -->
@@ -240,7 +250,7 @@ import {
 import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
 import {
   resolveCommissionsConfig, resolveCommissionsLedger, processWholesaleCommissions,
-  summarizeCommissions, pricingKey, EVENT_RATE_PER_PRETZEL,
+  summarizeCommissions, pricingKey, resolveTierPct, EVENT_RATE_PER_PRETZEL,
   collectRawSkuUsage, collectConnectedSkus,
 } from '../../scripts/commissions.js';
 
@@ -258,11 +268,15 @@ let ledgerLogs = [];
 let staffDirectory = {};
 let deliveries = []; // full resolveDeliveries() output, ghosts included
 let wholesaleDeliveries = []; // confirmed, non-deleted, wholesale-category only — for pickers
-let config = { repByCustomer: {}, pricingByCustomerSku: {}, connectedSkuByItem: {} };
+let config = {
+  repByCustomer: {}, pricingByCustomerSku: {}, tiersBySku: {}, connectedSkuByItem: {},
+};
 let ledger = { wholesale: {}, events: [], adjustments: [] };
 let selectedCustomer = null;
 let editingSkuKey = null;
 let editingDraft = null;
+let editingTierSku = null;
+let editingTierDraft = null;
 
 // Reps are whichever PIN codes the hub's manager page has granted
 // sales-crm access to — same derivation static/sales/index.html uses. No
@@ -346,51 +360,39 @@ function getKnownWholesaleCustomers() {
   return [...normalized.values()].sort((a, b) => a.localeCompare(b));
 }
 
+// Tiers are a shared-per-SKU schedule (see Commission Tier Schedules on the
+// SKU Mapping tab), not something this row edits — this row only owns the
+// customer's own negotiated price. The % shown is a live preview of what
+// that price currently resolves to against the SKU's tier ladder, purely
+// informational (the real % is only ever locked in by "Compute new
+// commissions", using whatever's configured at that moment).
 function renderSkuRow(customer, sku) {
   const key = pricingKey(customer, sku);
+  const pricing = config.pricingByCustomerSku[key];
+  const tiers = config.tiersBySku[sku] || [];
   if (editingSkuKey === key) {
-    const draft = editingDraft;
     return `
       <tr class="sku-row-editing" data-sku="${esc(sku)}">
         <td>${esc(sku)}</td>
-        <td><input type="number" step="0.01" min="0" id="sku-price-input" value="${draft.price}"></td>
-        <td>
-          <div id="tier-rows">${draft.tiers.map((t, i) => `
-            <div class="tier-row" data-idx="${i}">
-              <input type="number" step="0.01" min="0" class="tier-min" value="${t.minPrice}" placeholder="min $">
-              <span>&rarr;</span>
-              <input type="number" step="0.1" min="0" max="100" class="tier-pct" value="${t.pct}" placeholder="%">
-              <button type="button" class="tier-remove" data-idx="${i}">&#10005;</button>
-            </div>`).join('')}</div>
-          <button type="button" id="tier-add" class="btn-link">+ Add tier</button>
-        </td>
+        <td><input type="number" step="0.01" min="0" id="sku-price-input" value="${editingDraft.price}"></td>
+        <td>${tiers.length ? '<span class="text-muted">save to see current %</span>' : '<span class="badge-warn">no tier schedule</span>'}</td>
         <td>
           <button type="button" id="sku-save" class="btn btn-sm btn-red">Save</button>
           <button type="button" id="sku-cancel" class="btn btn-sm btn-outline">Cancel</button>
         </td>
       </tr>`;
   }
-  const pricing = config.pricingByCustomerSku[key];
+  let pctCell = '<span class="badge-warn">no tier schedule</span>';
+  if (tiers.length) {
+    pctCell = pricing ? `${resolveTierPct(tiers, pricing.price)}%` : '<span class="text-muted">set price to see %</span>';
+  }
   return `
     <tr data-sku="${esc(sku)}">
       <td>${esc(sku)}</td>
       <td>${pricing ? `$${Number(pricing.price).toFixed(2)}` : '<span class="badge-warn">not set</span>'}</td>
-      <td>${pricing && pricing.tiers.length ? pricing.tiers.map((t) => `&ge;$${Number(t.minPrice).toFixed(2)}&rarr;${t.pct}%`).join(', ') : '<span class="text-muted">none</span>'}</td>
+      <td>${pctCell}</td>
       <td><button type="button" class="sku-edit-btn btn btn-sm btn-outline" data-sku="${esc(sku)}">Edit</button></td>
     </tr>`;
-}
-
-function syncEditingDraftFromDom() {
-  if (!editingDraft) return;
-  const priceInput = document.getElementById('sku-price-input');
-  if (priceInput) editingDraft.price = Number(priceInput.value) || 0;
-  const rows = [...document.querySelectorAll('#tier-rows .tier-row')];
-  if (rows.length) {
-    editingDraft.tiers = rows.map((row) => ({
-      minPrice: Number(row.querySelector('.tier-min').value) || 0,
-      pct: Number(row.querySelector('.tier-pct').value) || 0,
-    }));
-  }
 }
 
 function bindSkuRowEvents() {
@@ -400,9 +402,7 @@ function bindSkuRowEvents() {
       const key = pricingKey(selectedCustomer, sku);
       const pricing = config.pricingByCustomerSku[key];
       editingSkuKey = key;
-      editingDraft = pricing
-        ? { price: pricing.price, tiers: pricing.tiers.map((t) => ({ ...t })) }
-        : { price: 0, tiers: [] };
+      editingDraft = { price: pricing ? pricing.price : 0 };
       renderPricingTab();
     });
   });
@@ -412,27 +412,12 @@ function bindSkuRowEvents() {
       editingSkuKey = null; editingDraft = null; renderPricingTab();
     });
   }
-  const addBtn = document.getElementById('tier-add');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => {
-      syncEditingDraftFromDom();
-      editingDraft.tiers.push({ minPrice: 0, pct: 0 });
-      renderPricingTab();
-    });
-  }
-  document.querySelectorAll('.tier-remove').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      syncEditingDraftFromDom();
-      editingDraft.tiers.splice(Number(btn.dataset.idx), 1);
-      renderPricingTab();
-    });
-  });
   const saveBtn = document.getElementById('sku-save');
   if (saveBtn) {
     saveBtn.addEventListener('click', () => {
-      syncEditingDraftFromDom();
+      const price = Number(document.getElementById('sku-price-input').value) || 0;
       const { sku } = document.querySelector('tr.sku-row-editing').dataset;
-      saveSkuPricing(selectedCustomer, sku, editingDraft.price, editingDraft.tiers);
+      saveSkuPricing(selectedCustomer, sku, price);
     });
   }
 }
@@ -462,7 +447,7 @@ function renderPricingTab() {
     </div>
     ${connectedSkus.length ? `
     <table class="sku-table">
-      <thead><tr><th>SKU</th><th>Price</th><th>Tiers</th><th></th></tr></thead>
+      <thead><tr><th>SKU</th><th>Price</th><th>Current %</th><th></th></tr></thead>
       <tbody>${connectedSkus.map((sku) => renderSkuRow(selectedCustomer, sku)).join('')}</tbody>
     </table>` : '<div class="empty-hint">No connected SKUs yet — map delivery items to SKUs on the SKU Mapping tab first.</div>'}
   `;
@@ -483,12 +468,12 @@ async function saveCustomerRep(customer, repCode) {
   }
 }
 
-async function saveSkuPricing(customer, sku, price, tiers) {
+async function saveSkuPricing(customer, sku, price) {
   try {
     await appendLog(CONFIG_LOG_PATH, {
-      action: 'set_sku_pricing', customer, sku, price, tiers: JSON.stringify(tiers), updatedBy: session.code, timeStamp: new Date().toISOString(),
+      action: 'set_sku_pricing', customer, sku, price, updatedBy: session.code, timeStamp: new Date().toISOString(),
     });
-    toast(`Saved pricing for ${sku}`);
+    toast(`Saved price for ${sku}`);
     editingSkuKey = null; editingDraft = null;
     await refreshConfig();
     renderPricingTab();
@@ -515,6 +500,7 @@ function renderSkuMappingTab() {
   document.querySelectorAll('.sku-alias-input').forEach((input) => {
     input.addEventListener('change', () => saveSkuAlias(input.dataset.rawSku, input.value.trim()));
   });
+  renderTierSchedulesCard();
 }
 
 async function saveSkuAlias(rawSku, connectedSku) {
@@ -528,6 +514,113 @@ async function saveSkuAlias(rawSku, connectedSku) {
     renderSkuMappingTab();
   } catch (err) {
     toast(`Error saving SKU mapping: ${err.message}`);
+  }
+}
+
+// One shared tier ladder per SKU (not per customer — see the PRICE VS.
+// TIERS note in scripts/commissions.js). Same edit/save/cancel pattern as
+// the old per-customer tier editor, just without a customer dimension.
+function renderTierRow(sku) {
+  if (editingTierSku === sku) {
+    return `
+      <tr class="tier-row-editing" data-sku="${esc(sku)}">
+        <td>${esc(sku)}</td>
+        <td>
+          <div id="sku-tier-rows">${editingTierDraft.map((t, i) => `
+            <div class="tier-row" data-idx="${i}">
+              <input type="number" step="0.01" min="0" class="sku-tier-min" value="${t.minPrice}" placeholder="min $">
+              <span>&rarr;</span>
+              <input type="number" step="0.1" min="0" max="100" class="sku-tier-pct" value="${t.pct}" placeholder="%">
+              <button type="button" class="sku-tier-remove" data-idx="${i}">&#10005;</button>
+            </div>`).join('')}</div>
+          <button type="button" id="sku-tier-add" class="btn-link">+ Add tier</button>
+        </td>
+        <td>
+          <button type="button" id="sku-tier-save" class="btn btn-sm btn-red">Save</button>
+          <button type="button" id="sku-tier-cancel" class="btn btn-sm btn-outline">Cancel</button>
+        </td>
+      </tr>`;
+  }
+  const tiers = config.tiersBySku[sku] || [];
+  return `
+    <tr data-sku="${esc(sku)}">
+      <td>${esc(sku)}</td>
+      <td>${tiers.length ? tiers.map((t) => `&ge;$${Number(t.minPrice).toFixed(2)}&rarr;${t.pct}%`).join(', ') : '<span class="text-muted">none</span>'}</td>
+      <td><button type="button" class="sku-tier-edit-btn btn btn-sm btn-outline" data-sku="${esc(sku)}">Edit</button></td>
+    </tr>`;
+}
+
+function syncTierDraftFromDom() {
+  if (!editingTierDraft) return;
+  const rows = [...document.querySelectorAll('#sku-tier-rows .tier-row')];
+  if (rows.length) {
+    editingTierDraft = rows.map((row) => ({
+      minPrice: Number(row.querySelector('.sku-tier-min').value) || 0,
+      pct: Number(row.querySelector('.sku-tier-pct').value) || 0,
+    }));
+  }
+}
+
+function bindTierRowEvents() {
+  document.querySelectorAll('.sku-tier-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const { sku } = btn.dataset;
+      editingTierSku = sku;
+      editingTierDraft = (config.tiersBySku[sku] || []).map((t) => ({ ...t }));
+      renderTierSchedulesCard();
+    });
+  });
+  const cancelBtn = document.getElementById('sku-tier-cancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      editingTierSku = null; editingTierDraft = null; renderTierSchedulesCard();
+    });
+  }
+  const addBtn = document.getElementById('sku-tier-add');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      syncTierDraftFromDom();
+      editingTierDraft.push({ minPrice: 0, pct: 0 });
+      renderTierSchedulesCard();
+    });
+  }
+  document.querySelectorAll('.sku-tier-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      syncTierDraftFromDom();
+      editingTierDraft.splice(Number(btn.dataset.idx), 1);
+      renderTierSchedulesCard();
+    });
+  });
+  const saveBtn = document.getElementById('sku-tier-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      syncTierDraftFromDom();
+      const { sku } = document.querySelector('tr.tier-row-editing').dataset;
+      saveSkuTiers(sku, editingTierDraft);
+    });
+  }
+}
+
+function renderTierSchedulesCard() {
+  const connectedSkus = collectConnectedSkus(config.connectedSkuByItem);
+  const tbody = document.getElementById('tier-schedule-list');
+  tbody.innerHTML = connectedSkus.length
+    ? connectedSkus.map((sku) => renderTierRow(sku)).join('')
+    : '<tr><td colspan="3" class="empty-hint">No connected SKUs yet — map delivery items to SKUs above first.</td></tr>';
+  bindTierRowEvents();
+}
+
+async function saveSkuTiers(sku, tiers) {
+  try {
+    await appendLog(CONFIG_LOG_PATH, {
+      action: 'set_sku_tiers', sku, tiers: JSON.stringify(tiers), updatedBy: session.code, timeStamp: new Date().toISOString(),
+    });
+    toast(`Saved tier schedule for ${sku}`);
+    editingTierSku = null; editingTierDraft = null;
+    await refreshConfig();
+    renderTierSchedulesCard();
+  } catch (err) {
+    toast(`Error saving tier schedule: ${err.message}`);
   }
 }
 
@@ -589,7 +682,7 @@ function money(n) {
 function renderPreviewTab() {
   const needsSetup = computeNeedsSetup();
   document.getElementById('needs-setup-list').innerHTML = needsSetup.length
-    ? needsSetup.map((n) => `<li>${esc(n.customer)} &mdash; ${esc(n.sku)} <span class="text-muted">(from "${esc(n.rawSku)}"; ${[n.missingRep && 'no rep assigned', n.missingPricing && 'no pricing set'].filter(Boolean).join(', ')})</span></li>`).join('')
+    ? needsSetup.map((n) => `<li>${esc(n.customer)} &mdash; ${esc(n.sku)} <span class="text-muted">(from "${esc(n.rawSku)}"; ${[n.missingRep && 'no rep assigned', n.missingPricing && 'no price set', n.missingTiers && 'no tier schedule'].filter(Boolean).join(', ')})</span></li>`).join('')
     : '<li class="empty-hint">Nothing pending &mdash; every confirmed wholesale delivery is fully configured.</li>';
 
   const summary = summarizeCommissions(ledger);
