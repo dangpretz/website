@@ -1103,7 +1103,10 @@ function populateRepFilterDropdown(selectEl) {
 function showApp() {
   document.getElementById('app').removeAttribute('hidden');
   document.getElementById('identity-badge').textContent = getRepLabel(currentRepId);
-  acctViewMode = currentRepId === 'admin' ? 'all' : 'mine';
+  // Accounts default to "all" for every rep, not just admin — customers are
+  // shared team knowledge. A rep can still narrow to their own via the
+  // Mine/All toggle if they want to.
+  acctViewMode = 'all';
   const isAdmin = currentRepId === 'admin';
   document.getElementById('acct-rep-filter').style.display = isAdmin ? '' : 'none';
   document.getElementById('pipe-rep-filter').style.display = isAdmin ? '' : 'none';
@@ -1856,9 +1859,11 @@ function bindPipelineDragDrop() {
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 function renderTasks() {
-  const isAdmin = currentRepId === 'admin';
+  // Tasks are shared team knowledge, same as accounts — every rep sees every
+  // task here, not just their own (there's no per-rep filter/toggle for this
+  // view, unlike accounts). Per-rep task counts still show up on the
+  // dashboard's personal summary (renderDashboard's myTasks).
   const allTasks = [...STATE.tasks.values()]
-    .filter(t => isAdmin || t.repId === currentRepId || !t.repId)
     .sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
   const open = allTasks.filter(t => t.done !== 'true');
   const done = allTasks.filter(t => t.done === 'true').slice(0,5);
