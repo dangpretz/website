@@ -202,6 +202,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
           <form id="adjustment-form" class="entry-form">
             <div><label>Rep</label><select id="adj-rep-select"></select></div>
             <div><label>Amount ($)</label><input type="number" id="adj-amount" step="0.01" required></div>
+            <div><label>Effective date</label><input type="date" id="adj-date" required></div>
             <div class="full"><label>Note</label><input type="text" id="adj-note" placeholder="Why this adjustment" required></div>
             <div class="full"><button type="submit" class="btn btn-red">Log Adjustment</button></div>
           </form>
@@ -236,6 +237,12 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
         </div>
       </div>
       <div id="preview-breakdown"></div>
+      <div class="card">
+        <div class="card-header">Commission Breakdown by Month</div>
+        <div class="card-body">
+          <div id="monthly-breakdown"></div>
+        </div>
+      </div>
     </section>
   </main>
 </div>
@@ -250,8 +257,8 @@ import {
 import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
 import {
   resolveCommissionsConfig, resolveCommissionsLedger, processWholesaleCommissions,
-  summarizeCommissions, pricingKey, resolveTierPct, EVENT_RATE_PER_PRETZEL,
-  collectRawSkuUsage, collectConnectedSkus,
+  summarizeCommissions, summarizeCommissionsByMonth, pricingKey, resolveTierPct,
+  EVENT_RATE_PER_PRETZEL, collectRawSkuUsage, collectConnectedSkus,
 } from '../../scripts/commissions.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -653,12 +660,18 @@ function renderEventsTab() {
 function renderAdjustmentsTab() {
   const select = document.getElementById('adj-rep-select');
   select.innerHTML = getReps().map((r) => `<option value="${esc(r.id)}">${esc(r.label)}</option>`).join('');
+  const dateInput = document.getElementById('adj-date');
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
 
   const list = document.getElementById('adjustment-list');
-  const sorted = [...ledger.adjustments].sort((a, b) => (b.timeStamp || '').localeCompare(a.timeStamp || ''));
+  // `date` is the manager-chosen effective date (what the monthly breakdown
+  // groups by); `timeStamp` is server-assigned append time and can't be
+  // backdated — sheet-logger overwrites whatever value a client sends for
+  // it. Older rows logged before this field existed fall back to timeStamp.
+  const sorted = [...ledger.adjustments].sort((a, b) => (b.date || b.timeStamp || '').localeCompare(a.date || a.timeStamp || ''));
   list.innerHTML = sorted.length ? sorted.map((adj) => `
     <tr>
-      <td>${esc((adj.timeStamp || '').slice(0, 10))}</td>
+      <td>${esc(adj.date || (adj.timeStamp || '').slice(0, 10))}</td>
       <td>${esc(getRepLabel(adj.repCode))}</td>
       <td class="${Number(adj.amount) < 0 ? 'text-neg' : ''}">$${Number(adj.amount).toFixed(2)}</td>
       <td>${esc(adj.note || '')}</td>
@@ -688,6 +701,7 @@ function renderPreviewTab() {
   const summary = summarizeCommissions(ledger);
   const repIds = Object.keys(summary).sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
   const container = document.getElementById('preview-breakdown');
+  renderMonthlyBreakdown();
   if (!repIds.length) {
     container.innerHTML = '<div class="empty-hint">No commissions computed yet. Click "Compute new commissions" once pricing is set up.</div>';
     return;
@@ -715,6 +729,34 @@ function renderPreviewTab() {
       </div>`;
   }).join('');
   container.innerHTML = `${cards}<div class="grand-total">Grand total across all reps: <strong>$${money(grandTotal)}</strong></div>`;
+}
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function formatMonth(monthKey) {
+  const [y, m] = monthKey.split('-');
+  return `${MONTH_NAMES[Number(m) - 1] || m} ${y}`;
+}
+
+function renderMonthlyBreakdown() {
+  const deliveryDateById = Object.fromEntries(deliveries.map((d) => [d.deliveryId, d.date || '']));
+  const { months, reps, totals } = summarizeCommissionsByMonth(ledger, deliveryDateById);
+  const container = document.getElementById('monthly-breakdown');
+  if (!months.length) {
+    container.innerHTML = '<div class="empty-hint">No commissions computed yet.</div>';
+    return;
+  }
+  const sortedReps = [...reps].sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
+  const header = `<tr><th>Month</th>${sortedReps.map((r) => `<th>${esc(getRepLabel(r))}</th>`).join('')}<th>Total</th></tr>`;
+  const bodyRows = months.map((m) => {
+    const rowTotal = sortedReps.reduce((sum, r) => sum + (totals[m][r] || 0), 0);
+    const cells = sortedReps.map((r) => `<td>$${money(totals[m][r] || 0)}</td>`).join('');
+    return `<tr><td>${esc(formatMonth(m))}</td>${cells}<td><strong>$${money(rowTotal)}</strong></td></tr>`;
+  }).join('');
+  const colTotal = (r) => months.reduce((sum, m) => sum + (totals[m][r] || 0), 0);
+  const footerCells = sortedReps.map((r) => `<td><strong>$${money(colTotal(r))}</strong></td>`).join('');
+  const grandColTotal = sortedReps.reduce((sum, r) => sum + colTotal(r), 0);
+  const footer = `<tr><td><strong>All months</strong></td>${footerCells}<td><strong>$${money(grandColTotal)}</strong></td></tr>`;
+  container.innerHTML = `<table class="preview-table"><thead>${header}</thead><tbody>${bodyRows}${footer}</tbody></table>`;
 }
 
 async function computeCommissions() {
@@ -813,14 +855,15 @@ function bindAll() {
     e.preventDefault();
     const repCode = document.getElementById('adj-rep-select').value;
     const amount = Number(document.getElementById('adj-amount').value);
+    const date = document.getElementById('adj-date').value;
     const note = document.getElementById('adj-note').value.trim();
-    if (!repCode || Number.isNaN(amount) || !note) {
-      toast('Fill in rep, amount, and a note.');
+    if (!repCode || Number.isNaN(amount) || !date || !note) {
+      toast('Fill in rep, amount, effective date, and a note.');
       return;
     }
     try {
       await appendLog(LEDGER_LOG_PATH, {
-        action: 'log_adjustment', repCode, amount, note, enteredBy: session.code, timeStamp: new Date().toISOString(),
+        action: 'log_adjustment', repCode, amount, date, note, enteredBy: session.code, timeStamp: new Date().toISOString(),
       });
       toast('Adjustment logged.');
       e.target.reset();

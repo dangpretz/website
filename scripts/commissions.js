@@ -264,3 +264,49 @@ export function summarizeCommissions({ wholesale, events, adjustments }) {
 
   return byRep;
 }
+
+// Same three ledger sources as summarizeCommissions(), grouped by calendar
+// month (YYYY-MM) instead of by rep — for the Preview tab's month-by-month
+// view. Wholesale rows don't carry their own date (only a deliveryId), so
+// the caller passes deliveryDateById (deliveryId -> date) to look it up —
+// same lookup the per-rep itemized table already does for display.
+export function summarizeCommissionsByMonth(
+  { wholesale, events, adjustments },
+  deliveryDateById = {},
+) {
+  const totals = {}; // month -> repCode -> amount
+  const monthsSet = new Set();
+  const repsSet = new Set();
+
+  const addTo = (month, rep, amount) => {
+    if (!month || !rep) return;
+    monthsSet.add(month);
+    repsSet.add(rep);
+    if (!totals[month]) totals[month] = {};
+    totals[month][rep] = (totals[month][rep] || 0) + amount;
+  };
+
+  Object.values(wholesale).forEach((row) => {
+    if (!row.repCode) return;
+    const date = deliveryDateById[row.deliveryId] || '';
+    addTo(date.slice(0, 7), row.repCode, Number(row.amount) || 0);
+  });
+
+  events.forEach((ev) => {
+    const reps = ev.repsPresent.filter(Boolean);
+    if (!reps.length) return;
+    const share = ((Number(ev.pretzelCount) || 0) * EVENT_RATE_PER_PRETZEL) / reps.length;
+    reps.forEach((rep) => addTo((ev.date || '').slice(0, 7), rep, share));
+  });
+
+  adjustments.forEach((adj) => {
+    if (!adj.repCode) return;
+    // `date` is the manager-chosen effective date; sheet-logger overwrites
+    // whatever `timeStamp` a client sends with real append time, so it can
+    // never be backdated — fall back to it only for rows logged before the
+    // `date` field existed.
+    addTo((adj.date || adj.timeStamp || '').slice(0, 7), adj.repCode, Number(adj.amount) || 0);
+  });
+
+  return { months: [...monthsSet].sort(), reps: [...repsSet], totals };
+}
