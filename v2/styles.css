@@ -37,7 +37,8 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   font: 400 15px/1 'Manrope', sans-serif;
   transition: color 0.2s;
 }
-.nav-links a:hover { color: #C41E1E; }
+.nav-links a:hover,
+.nav-links a[aria-current="page"] { color: #C41E1E; }
 .btn-order {
   background: #C41E1E !important;
   color: #fff !important;
@@ -98,6 +99,28 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   max-width: 600px;
   margin: 0 auto 28px;
 }
+.hero-sub-wide { max-width: 720px; }
+.answer-lede {
+  font: 400 16px/1.65 'Manrope', sans-serif;
+  color: #444;
+  max-width: 720px;
+  margin: -8px auto 32px;
+  text-align: center;
+}
+.answer-lede-dark { color: #ccc; }
+.answer-note {
+  font: 400 14px/1.6 'Manrope', sans-serif;
+  color: #666;
+  max-width: 720px;
+  margin: 28px auto 0;
+  text-align: center;
+}
+.answer-note a { color: #C41E1E; font-weight: 700; }
+.value-card-dark {
+  background: #2a2a2a;
+}
+.value-card-dark h3 { color: #fff; }
+.value-card-dark p { color: #aaa; }
 .hero-info {
   color: rgba(255, 255, 255, 0.6);
   font: 400 14px 'Manrope', sans-serif;
