@@ -26,6 +26,9 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Intermountain](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-intermountain.html): SLC metro van; freight for the region. Mountain West is a listed distributor region.
 - [Distributor vs direct](https://www.dangerouspretzel.com/v2/distributor-vs-direct-wholesale.html): Stock one business, or carry the brand in a region.
 - [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html): Inquiry for distribution networks.
+- [Offices and campuses](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-offices.html): Standing orders, no kitchen build-out. Not catering.
+- [How wholesale reheat works](https://www.dangerouspretzel.com/v2/how-wholesale-reheat-works.html): Partner onboarding. Fully baked, then flash-frozen. No published temps or times.
+- [Become a wholesale customer](https://www.dangerouspretzel.com/v2/become-a-wholesale-customer.html): Start-here checklist that funnels to the inquiry form.
 
 ## Optional
 
