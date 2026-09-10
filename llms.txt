@@ -18,8 +18,12 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 
 - [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html): Flash-frozen foodservice for restaurants, bars, offices, grocery, and venues.
 - [Restaurants and bars](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-restaurants.html): Menu pretzel, back-of-house reheat. Not a raw-dough kit.
+- [Bars and breweries](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-bars.html): Taproom bombs and menu twists. No bakery staff.
+- [Grocery and retail](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-grocery.html): 3-day fresh retail shelf or flash-frozen hold.
+- [Event venues](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-venues.html): Concessions wholesale. Frozen cases to reheat, not the Pretzel Program station.
 - [Frozen foodservice](https://www.dangerouspretzel.com/v2/frozen-soft-pretzels.html): Fully baked, then flash-frozen. Fresh retail hold is described separately.
 - [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html): SLC metro van delivery; freight outside the metro.
+- [Intermountain](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-intermountain.html): SLC metro van; freight for the region. Mountain West is a listed distributor region.
 - [Distributor vs direct](https://www.dangerouspretzel.com/v2/distributor-vs-direct-wholesale.html): Stock one business, or carry the brand in a region.
 - [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html): Inquiry for distribution networks.
 
