@@ -1,0 +1,50 @@
+# Dangerous Pretzel Co. (full notes)
+
+> Soft pretzel shop in Salt Lake City. Fresh retail at the Post District counter, plus wholesale flash-frozen foodservice.
+
+This file restates facts already published on dangerouspretzel.com. It does not add case packs, MOQs, unpublished prices, or ratings.
+
+## Published shop facts
+
+- Site: https://www.dangerouspretzel.com/
+- Shop: 352 W 600 S, Salt Lake City, UT 84101 (Post District)
+- Hours (FAQ / location): Mon–Thu 11am–8pm; Fri–Sat 11am–9pm; Sun 11am–8pm
+- Phone: (801) 916-0275
+- Text: (385) 888-7603
+- Email: info@dangerouspretzel.com
+- Pickup ordering is linked from the site to Cash App
+- FAQ: pretzels and dips are vegetarian; some items contain dairy and eggs; gluten-free is not currently offered
+- FAQ: catering recommended at least 48 hours ahead; a week for events of 50+ people
+- Catering page: delivery is offered in the SLC metro area (fee listed on that page)
+
+## Published wholesale facts
+
+- Wholesale is fully baked in the Salt Lake City kitchen, then flash-frozen and vacuum-sealed. The site says they do not ship raw dough.
+- Audience listed on the wholesale hub: restaurants and bars, offices and campuses, grocery and retail, event venues
+- SLC metro: direct frozen delivery, including seven-day scheduling as described on the wholesale pages
+- Outside the metro: freight partnerships
+- Ordering: weekly standing orders or on-demand; minimums are set with the account, not posted as a public MOQ
+- Fresh retail: shop bakes fresh daily; a 3-day shelf option is described for retail partners
+- Assortment / case packs: confirmed when the account is set up; not published on the wholesale pages
+- Direct wholesale vs distributor: one business stocking for its own guests vs a network carrying the brand in a region
+- Pretzel Program: a separate venue lane (plug-in heated station), not the frozen-case wholesale path
+- New wholesale accounts: inquiry form on the wholesale page, info@dangerouspretzel.com, or the shop phone / text numbers above
+
+## Key pages (200 URLs)
+
+- [Home](https://www.dangerouspretzel.com/v2/index.html)
+- [Menu](https://www.dangerouspretzel.com/v2/menu.html)
+- [Catering](https://www.dangerouspretzel.com/v2/catering.html)
+- [Location](https://www.dangerouspretzel.com/v2/location.html)
+- [FAQ](https://www.dangerouspretzel.com/v2/faq.html)
+- [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html)
+- [Restaurants and bars](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-restaurants.html)
+- [Frozen foodservice](https://www.dangerouspretzel.com/v2/frozen-soft-pretzels.html)
+- [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html)
+- [Distributor vs direct](https://www.dangerouspretzel.com/v2/distributor-vs-direct-wholesale.html)
+- [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html)
+- [Our story](https://www.dangerouspretzel.com/v2/our-story.html)
+- [Reviews and press](https://www.dangerouspretzel.com/v2/reviews.html)
+- [Pretzel Program](https://www.dangerouspretzel.com/v2/pretzel-program.html)
+
+Pretty paths such as `/wholesale` 301 to the `/v2/*.html` files listed here.

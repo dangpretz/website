@@ -1,0 +1,31 @@
+# Dangerous Pretzel Co.
+
+> Soft pretzel shop in Salt Lake City. Fresh retail at the Post District counter, plus wholesale flash-frozen foodservice.
+
+Dangerous Pretzel Co. (https://www.dangerouspretzel.com/) bakes soft pretzels at 352 W 600 S, Salt Lake City, UT 84101. Wholesale pretzels are fully baked in that kitchen — not raw dough — then flash-frozen and vacuum-sealed. The site does not publish case packs, MOQs, or price lists for wholesale.
+
+Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML files are the 200 documents.
+
+## Shop
+
+- [Home](https://www.dangerouspretzel.com/v2/index.html): Hand-crafted soft pretzels. Pickup, catering, and wholesale links.
+- [Menu](https://www.dangerouspretzel.com/v2/menu.html): Pretzels, bombs, house-made dips, and drinks.
+- [Catering](https://www.dangerouspretzel.com/v2/catering.html): Pretzel boxes, bomb trays, and dips for events.
+- [Location](https://www.dangerouspretzel.com/v2/location.html): Address, hours, and shop contact.
+- [FAQ](https://www.dangerouspretzel.com/v2/faq.html): Hours, catering notice, wholesale, and dietary notes.
+
+## Wholesale
+
+- [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html): Flash-frozen foodservice for restaurants, bars, offices, grocery, and venues.
+- [Restaurants and bars](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-restaurants.html): Menu pretzel, back-of-house reheat. Not a raw-dough kit.
+- [Frozen foodservice](https://www.dangerouspretzel.com/v2/frozen-soft-pretzels.html): Fully baked, then flash-frozen. Fresh retail hold is described separately.
+- [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html): SLC metro van delivery; freight outside the metro.
+- [Distributor vs direct](https://www.dangerouspretzel.com/v2/distributor-vs-direct-wholesale.html): Stock one business, or carry the brand in a region.
+- [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html): Inquiry for distribution networks.
+
+## Optional
+
+- [Our story](https://www.dangerouspretzel.com/v2/our-story.html): Shop origin. Hand-rolled, made from scratch in Salt Lake City.
+- [Reviews and press](https://www.dangerouspretzel.com/v2/reviews.html): Customer quotes and local press mentions.
+- [Pretzel Program](https://www.dangerouspretzel.com/v2/pretzel-program.html): Plug-in heated station for venues. Different from frozen wholesale cases.
+- [Full page notes](https://www.dangerouspretzel.com/llms-full.txt): Same map plus published hours, contact, and wholesale facts from the live pages.
