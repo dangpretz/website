@@ -271,6 +271,7 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
 
     const DELIVERY_PATH  = '/dangpretz/delivery-planner';
     const RECEIVING_PATH = '/dangpretz/receiving';
@@ -287,34 +288,7 @@
       'Dangerous Dip Box', 'Honey Mustard Dip Box', 'Hot Ranch Dip Box', 'Sweet Cream Dip Box',
     ];
 
-    // ── Product catalog ──────────────────────────────────────────────────────
-    const PRODUCTS = [
-      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB'   },
-      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB'   },
-      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB'   },
-      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL'   },
-      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB'   },
-      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL'   },
-      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB'    },
-      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL'   },
-      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB'    },
-      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB'    },
-      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL'   },
-      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ'   },
-      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB'    },
-      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB'    },
-      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA'  },
-      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB'   },
-      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA' },
-      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB'   },
-      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB'    },
-      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB'    },
-      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB'  },
-      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB'    },
-      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB'    },
-      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ'   },
-      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB'   },
-    ];
+    // ── Product catalog — shared ingredient list (scripts/ingredient-catalog.js) ──
 
     // ── Utilities ────────────────────────────────────────────────────────────
     function escapeHtml(s) {
@@ -356,27 +330,10 @@
       return d.toISOString().slice(0, 10);
     }
 
-    // ── Dynamic products (new_product entries from receiving log) ────────────
-    function buildDynamicProducts(receivingLogs) {
-      const archived = new Set(
-        receivingLogs.filter((r) => r.action === 'archive_product').map((r) => r.productId),
-      );
-      for (let i = PRODUCTS.length - 1; i >= 0; i--) {
-        if (archived.has(PRODUCTS[i].id)) PRODUCTS.splice(i, 1);
-      }
-      receivingLogs.filter((r) => r.action === 'new_product').forEach((r) => {
-        if (!r.usFoodsCode || !r.productName) return;
-        const dynamicId = `new-${r.usFoodsCode}`;
-        if (archived.has(dynamicId)) return;
-        if (PRODUCTS.some((p) => p.id === dynamicId)) return;
-        PRODUCTS.push({ id: dynamicId, name: r.productName, packSize: r.packSize || '' });
-      });
-    }
-
     // ── Compute inventory (same as inventory page) ───────────────────────────
-    function computeInventory(receivingLogs, inventoryLogs) {
+    function computeInventory(products, receivingLogs, inventoryLogs) {
       const map = new Map();
-      for (const p of PRODUCTS) {
+      for (const p of products) {
         map.set(p.id, { productId: p.id, productName: p.name, packSize: p.packSize, stock: 0, par: null, lastReceived: null, lastUsed: null });
       }
       for (const r of receivingLogs) {
@@ -559,9 +516,8 @@
         allReceivingLogs = rLogs;
         allInventoryLogs = iLogs;
 
-        buildDynamicProducts(rLogs);
         ({ scaleMap, recipeMap, densityMap } = buildRecipeMaps(rcLogs));
-        inventoryMap = computeInventory(rLogs, iLogs);
+        inventoryMap = computeInventory(resolveIngredients(rLogs), rLogs, iLogs);
 
         const deliveries = resolveDeliveries(dLogs);
         forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap, densityMap);

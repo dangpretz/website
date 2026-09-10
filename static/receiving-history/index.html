@@ -428,6 +428,7 @@
 
   <script type="module">
     import { appendLog, fetchLog } from '../../scripts/sheet-logger.js';
+    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js';
 
     const LOG_PATH = '/dangpretz/receiving';
     const TEMP_THRESHOLD = 42;
@@ -498,35 +499,8 @@
     // To add a product: copy any line, fill in all fields, save the file.
     // usFoodsCode: the 7-digit product code at chars 7–13 of a US Foods barcode.
     // requiresTemp: true for all dairy, refrigerated, and fresh produce items.
-    // ─────────────────────────────────────────────────────────────
-    const PRODUCTS = [
-      { id: 'usf-0877506', name: 'Butter, Salted Solid AA Grd',               packSize: '36/1/LB',    requiresTemp: true,  usFoodsCode: '0877506' },
-      { id: 'usf-0033858', name: 'Salt, Sea KO Not Iodz Gran Box',             packSize: '12/3/LB',    requiresTemp: false, usFoodsCode: '0033858' },
-      { id: 'usf-1008416', name: 'Flour, Bread Enriched Bleached Big Loaf',    packSize: '1/50/LB',    requiresTemp: false, usFoodsCode: '1008416' },
-      { id: 'usf-4364063', name: 'Mustard, Yellow Plastic Jar Shelf Stable',   packSize: '4/1/GAL',    requiresTemp: false, usFoodsCode: '4364063' },
-      { id: 'usf-7016876', name: 'Sugar, Powdered Confectionary',              packSize: '1/50/LB',    requiresTemp: false, usFoodsCode: '7016876' },
-      { id: 'usf-7329113', name: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL',    requiresTemp: false, usFoodsCode: '7329113' },
-      { id: 'usf-0746479', name: 'Cheese, Pepper Jack Shredded Bag',           packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '0746479' },
-      { id: 'usf-1324079', name: 'Cream, Whipping Heavy 40%',                  packSize: '2/1/GAL',    requiresTemp: true,  usFoodsCode: '1324079' },
-      { id: 'usf-1492816', name: 'Cheese, Parmesan Shaved Bag',                packSize: '2/5/LB',     requiresTemp: true,  usFoodsCode: '1492816' },
-      { id: 'usf-3547205', name: 'Pepper, Chili, Fresno Red Fresh',            packSize: '1/5/LB',     requiresTemp: true,  usFoodsCode: '3547205' },
-      { id: 'usf-5328406', name: 'Dressing, Ranch, Buttermilk',                packSize: '1/1/GAL',    requiresTemp: true,  usFoodsCode: '5328406' },
-      { id: 'usf-6773394', name: 'Juice, Lemon Meyer Blend',                   packSize: '1/32/OZ',    requiresTemp: false, usFoodsCode: '6773394' },
-      { id: 'usf-7017429', name: 'Basil, Fresh Herb',                          packSize: '1/1/LB',     requiresTemp: true,  usFoodsCode: '7017429' },
-      { id: 'usf-8123322', name: 'Cheese, Cheddar Yellow Mild Shredded',       packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '8123322' },
-      { id: 'usf-5329420', name: 'Liner, 60 Gal',                              packSize: '1/100/EA',   requiresTemp: false, usFoodsCode: '5329420' },
-      { id: 'usf-8340861', name: 'Cheese, Cream Plain Loaf',                   packSize: '10/3/LB',    requiresTemp: true,  usFoodsCode: '8340861' },
-      { id: 'usf-7807993', name: 'Glove, Vinyl Medium',                        packSize: '10/100/EA',  requiresTemp: false, usFoodsCode: '7807993' },
-      { id: 'usf-3022647', name: 'Yeast, Dry Active',                          packSize: '20/1/LB',    requiresTemp: false, usFoodsCode: '3022647' },
-      { id: 'usf-6401780', name: 'Cheese, Cheddar Sharp Shredded',             packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '6401780' },
-      { id: 'usf-3737152', name: 'Honey, Amber Light',                         packSize: '1/5/LB',     requiresTemp: false, usFoodsCode: '3737152' },
-      { id: 'usf-7330202', name: 'Mustard, Dijon Whole Grain Can',             packSize: '1/8.6/LB',   requiresTemp: false, usFoodsCode: '7330202' },
-      { id: 'usf-1332642', name: 'Cheese, Cheddar Mild Shredded',              packSize: '4/5/LB',     requiresTemp: true,  usFoodsCode: '1332642' },
-      { id: 'usf-7326432', name: 'Parsley, Washed and Destemmed',              packSize: '1/1/LB',     requiresTemp: true,  usFoodsCode: '7326432' },
-      { id: 'usf-3330487', name: 'Garlic, Chopped in Water',                   packSize: '6/32/OZ',    requiresTemp: true,  usFoodsCode: '3330487' },
-      { id: 'usf-9929174', name: 'Pepper, Jalapeno #1 Fresh',                  packSize: '1/10/LB',    requiresTemp: true,  usFoodsCode: '9929174' },
-      // ── Add new products below this line ──────────────────────
-    ];
+    // ── Product catalog — shared ingredient list (scripts/ingredient-catalog.js) ──
+    let catalog = [...INGREDIENT_CATALOG];
 
     // ════════════════════════════════════════════════════════════
     // ENTRY FORM
@@ -576,10 +550,10 @@
     // on the Data Issues tab.
     function handleBarcode(raw) {
       hideAll();
-      let product = PRODUCTS.find((p) => p.barcode === raw) || null;
+      let product = catalog.find((p) => p.barcode === raw || p.usFoodsCode === raw) || null;
       if (!product && raw.length === 16) {
         const code = raw.slice(6, 13);
-        product = PRODUCTS.find((p) => p.usFoodsCode === code) || null;
+        product = catalog.find((p) => p.usFoodsCode === code) || null;
       }
       if (product) showProductCard(product, raw);
       else addPendingItem(raw);
@@ -597,7 +571,7 @@
     function showProductCard(product, barcode) {
       pendingProduct = product;
       pendingBarcode = barcode;
-      document.getElementById('product-name-display').textContent = product.name;
+      document.getElementById('product-name-display').textContent = product.orderName || product.name;
       document.getElementById('product-pack-display').textContent = product.packSize;
       tempArea.hidden = !product.requiresTemp;
       if (product.requiresTemp) { tempInput.value = ''; tempBadge.textContent = ''; tempBadge.className = 'temp-badge'; }
@@ -738,22 +712,10 @@
     }
 
     function buildSessions(logs) {
-      // Re-load any products added via the identify-later flow (Data Issues tab)
-      // or the legacy unknown-product form, keyed by either the full raw
-      // barcode (any supplier) or the 7-digit US Foods code.
-      logs.filter((r) => r.action === 'new_product').forEach((r) => {
-        const exists = PRODUCTS.some((p) => (r.usFoodsCode && p.usFoodsCode === r.usFoodsCode) || (r.barcode && p.barcode === r.barcode));
-        if (!exists && (r.usFoodsCode || r.barcode) && r.productName) {
-          PRODUCTS.push({
-            id:           `new-${r.usFoodsCode || r.barcode}`,
-            name:         r.productName,
-            packSize:     r.packSize    || '',
-            requiresTemp: r.requiresTemp === 'true',
-            ...(r.usFoodsCode ? { usFoodsCode: r.usFoodsCode } : {}),
-            ...(r.barcode     ? { barcode: r.barcode }         : {}),
-          });
-        }
-      });
+      // Shared catalog + every product ever added via receiving (identify-later
+      // flow or the legacy unknown-product form). includeArchived so a past
+      // receipt of a since-delisted item still resolves to a name.
+      catalog = resolveIngredients(logs, { includeArchived: true });
 
       const map = {};
       logs.filter((r) => r.action === 'receive').forEach((r, idx) => {
@@ -930,9 +892,9 @@
                 timeStamp: new Date().toISOString(), fixedByCode: currentPinCode,
               });
               // Also save as a reusable catalog entry, keyed by the raw barcode,
-              // so the next scan of the same product auto-identifies it.
-              if (item.barcode && !PRODUCTS.some((p) => p.barcode === item.barcode)) {
-                PRODUCTS.push({ id: `new-${item.barcode}`, name, packSize: pack, requiresTemp: reqTemp, barcode: item.barcode });
+              // so the next scan of the same product auto-identifies it. loadHistory()
+              // re-resolves the catalog from the log right after.
+              if (item.barcode && !catalog.some((p) => p.barcode === item.barcode)) {
                 await appendLog(LOG_PATH, { action: 'new_product', barcode: item.barcode, productName: name, packSize: pack, requiresTemp: String(reqTemp), timeStamp: new Date().toISOString() });
               }
               showToast('Item identified', 'success');
