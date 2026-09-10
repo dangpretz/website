@@ -351,11 +351,12 @@
           timeStamp: new Date().toISOString(),
         });
         await loadDirectory();
-        // A legacy/bootstrap code always falls back to its hardcoded
-        // default rather than disappearing (see resolveStaffDirectory) —
-        // it'll still be sitting right there afterward, reset. Say so
+        // The bootstrap manager code can't be fully removed — it always
+        // falls back to the built-in manager (see resolveStaffDirectory),
+        // so it'll still be sitting right there afterward, reset. Say so
         // explicitly instead of a generic "Removed" that reads as "did
-        // nothing" when the card obviously didn't vanish.
+        // nothing" when the card obviously didn't vanish. Every other code
+        // (legacy shared or manually added) genuinely disappears.
         if (directory[code]) {
           showToast(`${label} can't be fully removed — reset to default access instead`, 'success');
         } else {

@@ -26,17 +26,17 @@
 // ║   A token may carry an access level as `pageKey:view` — bare pageKey    ║
 // ║   means edit (see canEdit()/ACCESS_EDIT/ACCESS_VIEW below).             ║
 // ║   action: 'delete_staff' → { code, updatedBy, timeStamp } removes any   ║
-// ║   earlier set_staff for that code. For a legacy/bootstrap code this     ║
-// ║   just resets it back to its hardcoded default (see below) rather than  ║
-// ║   deleting it for good — those codes are always physically valid PINs. ║
+// ║   earlier set_staff for that code; a later set_staff re-adds it. A code  ║
+// ║   with no set_staff (or whose latest row is delete_staff) simply isn't  ║
+// ║   in the directory and the PIN gate rejects it.                         ║
 // ║                                                                          ║
-// ║ DEFAULTS — so nobody is locked out before real data exists:              ║
-// ║   - BOOTSTRAP_MANAGER_CODE is always a manager, even with zero rows in  ║
-// ║     the log, so someone can always reach the manager page. A real       ║
-// ║     set_staff row for that code overrides this fallback.                ║
-// ║   - The 9 other legacy shared codes are seeded with Production (+ its   ║
-// ║     role subsets) and Delivery Planner until a manager assigns real     ║
-// ║     names/access. A real row for any of them overrides the default.     ║
+// ║ THE ONE FALLBACK — BOOTSTRAP_MANAGER_CODE:                               ║
+// ║   Always resolves to a full manager, even with zero rows in the log,    ║
+// ║   so nobody can lock themselves out of the manager panel. A real        ║
+// ║   set_staff row for it overrides the fallback; a delete_staff on it     ║
+// ║   drops back to the fallback rather than removing it. Every other code  ║
+// ║   — including the shared codes that predate this system — gets exactly  ║
+// ║   the access its set_staff row grants, nothing by default.              ║
 // ║                                                                          ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
@@ -44,12 +44,9 @@ export const STAFF_LOG_PATH = '/dangpretz/staff-directory';
 export const HUB_URL = '/static/index.html';
 export const SESSION_KEY = 'dpc-unlock';
 
-// The bootstrap manager — keep this in sync with what the manager page shows
-// as the built-in fallback row.
+// The bootstrap manager — the only code with a built-in fallback (see the
+// header comment). Keep in sync with what the manager page shows.
 export const BOOTSTRAP_MANAGER_CODE = '8770';
-
-// The other 9 shared codes in use before this system existed.
-const LEGACY_DEFAULT_CODES = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '9709', '1377'];
 
 // Every grantable link. Production's role-scoped URLs each get their own
 // key so a Shape-only grant can't be bypassed by hand-editing ?role=manager.
@@ -71,12 +68,6 @@ export const LINK_CATALOG = [
   { key: 'delivery-planner', label: 'Delivery Planner', url: '/static/delivery-planner/index.html' },
   { key: 'sales-crm', label: 'Sales CRM', url: '/static/sales/index.html' },
   { key: 'commissions-admin', label: 'Commissions', url: '/static/commissions-admin/index.html' },
-];
-
-const LEGACY_DEFAULT_LINKS = [
-  'production:manager', 'production:shape', 'production:bfp',
-  'production:dips', 'production:stock', 'production:foh',
-  'delivery-planner',
 ];
 
 export function linkLabel(pageKey) {
@@ -148,6 +139,10 @@ export function resolveStaffDirectory(logs) {
     };
   });
 
+  // The one fallback: the bootstrap manager always resolves to a full
+  // manager so nobody can lock themselves out. A set_staff row overrides
+  // it; a delete_staff drops back here rather than removing it. No other
+  // code gets any access it wasn't explicitly granted.
   if (!directory[BOOTSTRAP_MANAGER_CODE]) {
     const links = LINK_CATALOG.map((l) => l.key);
     directory[BOOTSTRAP_MANAGER_CODE] = {
@@ -157,17 +152,6 @@ export function resolveStaffDirectory(logs) {
       levels: allEditLevels(links),
     };
   }
-
-  LEGACY_DEFAULT_CODES.forEach((code) => {
-    if (!directory[code]) {
-      directory[code] = {
-        name: '(unassigned)',
-        isManager: false,
-        links: [...LEGACY_DEFAULT_LINKS],
-        levels: allEditLevels(LEGACY_DEFAULT_LINKS),
-      };
-    }
-  });
 
   return directory;
 }
