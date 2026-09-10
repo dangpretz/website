@@ -43,7 +43,13 @@ export function pricingKey(customer, sku) {
 // Also carries `set_sku_alias` rows — see resolveConnectedSku() below for
 // why a raw delivery-planner item name isn't itself the pricing key — and
 // `set_sku_tiers` rows — see the PRICE VS. TIERS note above.
-export function resolveCommissionsConfig(logs) {
+//
+// `normalize` (delivery-planner's normalizeCustomerName) is injected so a
+// customer's rep/pricing rows are keyed the same way a delivery's customer
+// name is matched in processWholesaleCommissions — otherwise "Willies" on a
+// delivery would miss config filed under "Willies Lounge". Defaults to
+// identity so a caller that doesn't care keeps the old raw-key behaviour.
+export function resolveCommissionsConfig(logs, normalize = (x) => x) {
   const repByCustomer = {};
   const pricingByCustomerSku = {};
   const tiersBySku = {};
@@ -52,11 +58,13 @@ export function resolveCommissionsConfig(logs) {
   // (set_sku_rep_hidden). Default is visible — only an explicit `hidden:true`
   // row keeps a SKU off the rep view; a later `hidden:false` row un-hides it.
   const repHiddenSkus = {};
+  const cust = (name) => normalize(name) || name; // keep raw if normalize excludes it
   (Array.isArray(logs) ? logs : []).forEach((row) => {
     if (row.action === 'set_customer_rep' && row.customer) {
-      repByCustomer[row.customer] = row.repCode;
+      repByCustomer[cust(row.customer)] = row.repCode;
     } else if (row.action === 'set_sku_pricing' && row.customer && row.sku) {
-      pricingByCustomerSku[pricingKey(row.customer, row.sku)] = { price: Number(row.price) || 0 };
+      const k = pricingKey(cust(row.customer), row.sku);
+      pricingByCustomerSku[k] = { price: Number(row.price) || 0 };
     } else if (row.action === 'set_sku_tiers' && row.sku) {
       let tiers = [];
       try { tiers = JSON.parse(row.tiers || '[]'); } catch (_) { /* malformed row, treat as no tiers */ }
@@ -200,7 +208,15 @@ export function resolveCommissionsLedger(logs) {
 // Returns { toWrite, needsSetup } — toWrite is ready to appendLog() one at a
 // time; needsSetup is deduped per (customer, sku) so a manager sees each gap
 // once, not once per delivery.
-export function processWholesaleCommissions({ deliveries, existingWholesale, config }) {
+//
+// `normalize` is injected (delivery-planner's normalizeCustomerName) so a
+// delivery's customer name is matched against config the same way the CRM
+// files it — and a name normalize() maps to null (an event / placeholder
+// that isn't a wholesale customer) is skipped entirely, not flagged as a
+// setup gap. Defaults to identity for callers that pass raw names.
+export function processWholesaleCommissions({
+  deliveries, existingWholesale, config, normalize = (x) => x,
+}) {
   const toWrite = [];
   const needsSetup = [];
   const seenGaps = new Set();
@@ -216,7 +232,9 @@ export function processWholesaleCommissions({ deliveries, existingWholesale, con
       const id = `${d.deliveryId}:${idx}`;
       if (existingWholesale[id]) return; // already locked in
 
-      const customer = d.customer || '';
+      // normalize() → null means "not a wholesale customer" (event, placeholder):
+      // skip silently, same as an unmapped SKU — not a setup gap.
+      const customer = normalize(d.customer || '');
       const rawSku = item.sku || '';
       const qty = Number(item.quantity) || 0;
       if (!customer || !rawSku || qty <= 0) return;
