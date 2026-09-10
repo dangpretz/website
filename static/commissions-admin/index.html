@@ -74,6 +74,7 @@ main{max-width:1100px;margin:0 auto;padding:24px 28px 60px}
 .tier-block{margin-bottom:22px}
 .tier-block-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .tier-block-head strong{font-size:14px}
+.tier-rep-vis{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;margin-left:auto}
 .tier-block .sku-table{max-width:360px}
 .tier-block .tier-min,.tier-block .tier-pct{width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px}
 
@@ -174,7 +175,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
       <div class="card">
         <div class="card-header">Commission Tier Schedules</div>
         <div class="card-body">
-          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">One shared price-to-commission ladder per SKU — the same schedule applies no matter which customer is buying. Each customer's own price (set on the Customers &amp; Pricing tab) is looked up against this ladder to get their commission %. Edits here never change commissions already locked in by Compute.</p>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">One shared price-to-commission ladder per SKU — the same schedule applies no matter which customer is buying. Each customer's own price (set on the Customers &amp; Pricing tab) is looked up against this ladder to get their commission %. Edits here never change commissions already locked in by Compute. A SKU only becomes priceable once it has a ladder; use &ldquo;Visible to reps&rdquo; to keep a priceable SKU off the reps&rsquo; Customers &amp; Pricing tab.</p>
           <div id="tiers-list"></div>
         </div>
       </div>
@@ -285,7 +286,7 @@ let staffDirectory = {};
 let deliveries = []; // full resolveDeliveries() output, ghosts included
 let wholesaleDeliveries = []; // confirmed, non-deleted, wholesale-category only — for pickers
 let config = {
-  repByCustomer: {}, pricingByCustomerSku: {}, tiersBySku: {}, connectedSkuByItem: {},
+  repByCustomer: {}, pricingByCustomerSku: {}, tiersBySku: {}, connectedSkuByItem: {}, repHiddenSkus: {},
 };
 let ledger = { wholesale: {}, events: [], adjustments: [] };
 let selectedCustomer = null;
@@ -498,7 +499,14 @@ function renderPricingTab() {
     return;
   }
   const repCode = config.repByCustomer[selectedCustomer] || '';
-  const connectedSkus = collectConnectedSkus(config.connectedSkuByItem);
+  // Only SKUs that actually have a commission tier ladder are priceable —
+  // pricing a SKU with no ladder resolves to 0% anyway, so showing all of
+  // them just clutters every customer. Tier ladders are set on the Tiers tab.
+  // Reps additionally only see SKUs the manager hasn't hidden (the
+  // "Visible to reps" toggle on the Tiers tab).
+  const connectedSkus = collectConnectedSkus(config.connectedSkuByItem)
+    .filter((sku) => (config.tiersBySku[sku] || []).length)
+    .filter((sku) => isManager || !config.repHiddenSkus[sku]);
   const repField = isManager
     ? `<select id="customer-rep-select">
         <option value="">&mdash; Unassigned &mdash;</option>
@@ -515,7 +523,7 @@ function renderPricingTab() {
     <table class="sku-table">
       <thead><tr><th>SKU</th><th>Price</th><th>Current %</th><th></th></tr></thead>
       <tbody>${connectedSkus.map((sku) => renderSkuRow(selectedCustomer, sku)).join('')}</tbody>
-    </table>` : '<div class="empty-hint">No connected SKUs yet — a manager needs to map delivery items to SKUs first.</div>'}
+    </table>` : `<div class="empty-hint">No priceable SKUs yet${isManager ? ' — connect delivery items to SKUs on the SKU Mapping tab and give each a tier ladder on the Tiers tab.' : ' — ask a manager to finish SKU setup.'}</div>`}
   `;
   if (isManager) {
     document.getElementById('customer-rep-select').addEventListener('change', (e) => saveCustomerRep(selectedCustomer, e.target.value));
@@ -664,11 +672,14 @@ function renderTierTable(sku) {
       <td><button type="button" class="tier-remove" data-idx="${i}" title="Remove breakpoint">&#10005;</button></td>
     </tr>`).join('');
   const dirty = !tiersEqual(rows, config.tiersBySku[sku] || []);
+  const hasLadder = (config.tiersBySku[sku] || []).length > 0;
+  const visibleToReps = !config.repHiddenSkus[sku];
   return `
     <div class="tier-block" data-sku="${esc(sku)}">
       <div class="tier-block-head">
         <strong>${esc(sku)}</strong>
         <button type="button" class="btn btn-sm btn-red tier-save"${dirty ? '' : ' hidden'}>Save</button>
+        ${hasLadder ? `<label class="tier-rep-vis"><input type="checkbox" class="tier-rep-toggle"${visibleToReps ? ' checked' : ''}> Visible to reps</label>` : ''}
       </div>
       <table class="sku-table">
         <thead><tr><th>Min price</th><th>Commission %</th><th></th></tr></thead>
@@ -717,7 +728,26 @@ function bindTiersTab() {
         .sort((a, b) => a.minPrice - b.minPrice);
       saveSkuTiers(sku, cleaned);
     });
+    const repToggle = block.querySelector('.tier-rep-toggle');
+    if (repToggle) {
+      repToggle.addEventListener('change', (e) => saveSkuRepVisible(sku, !e.target.checked));
+    }
   });
+}
+
+// Manager toggle: whether reps see this SKU on their Customers & Pricing tab.
+// Default is visible; a `hidden:true` row keeps it off the rep view.
+async function saveSkuRepVisible(sku, hidden) {
+  try {
+    await appendLog(CONFIG_LOG_PATH, {
+      action: 'set_sku_rep_hidden', sku, hidden, updatedBy: session.code, timeStamp: new Date().toISOString(),
+    });
+    toast(hidden ? `${sku} hidden from reps` : `${sku} visible to reps`);
+    await refreshConfig();
+    renderTiersTab();
+  } catch (err) {
+    toast(`Error updating rep visibility: ${err.message}`);
+  }
 }
 
 async function saveSkuTiers(sku, tiers) {
