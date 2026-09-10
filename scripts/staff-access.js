@@ -26,17 +26,20 @@
 // ║   A token may carry an access level as `pageKey:view` — bare pageKey    ║
 // ║   means edit (see canEdit()/ACCESS_EDIT/ACCESS_VIEW below).             ║
 // ║   action: 'delete_staff' → { code, updatedBy, timeStamp } removes any   ║
-// ║   earlier set_staff for that code. For a legacy/bootstrap code this     ║
-// ║   just resets it back to its hardcoded default (see below) rather than  ║
-// ║   deleting it for good — those codes are always physically valid PINs. ║
+// ║   earlier set_staff for that code. A later set_staff re-adds it. The    ║
+// ║   BOOTSTRAP_MANAGER_CODE can't be deleted for good (see DEFAULTS) —     ║
+// ║   deleting it just resets it to the built-in manager fallback.          ║
 // ║                                                                          ║
 // ║ DEFAULTS — so nobody is locked out before real data exists:              ║
 // ║   - BOOTSTRAP_MANAGER_CODE is always a manager, even with zero rows in  ║
 // ║     the log, so someone can always reach the manager page. A real       ║
-// ║     set_staff row for that code overrides this fallback.                ║
+// ║     set_staff row for that code overrides this fallback; delete_staff   ║
+// ║     on it falls back here rather than disappearing.                     ║
 // ║   - The 9 other legacy shared codes are seeded with Production (+ its   ║
 // ║     role subsets) and Delivery Planner until a manager assigns real     ║
-// ║     names/access. A real row for any of them overrides the default.     ║
+// ║     names/access. A real row overrides the default; a delete_staff row  ║
+// ║     retires the code for good (no re-seed) until a set_staff re-adds    ║
+// ║     it.                                                                  ║
 // ║                                                                          ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
@@ -135,10 +138,12 @@ export function canEdit(session, pageKey) {
 // ── Directory resolution ────────────────────────────────────────────────
 export function resolveStaffDirectory(logs) {
   const directory = {};
+  const deleted = new Set(); // codes whose latest relevant row is delete_staff
   (Array.isArray(logs) ? logs : []).forEach((row) => {
     if (!row.code) return;
-    if (row.action === 'delete_staff') { delete directory[row.code]; return; }
+    if (row.action === 'delete_staff') { delete directory[row.code]; deleted.add(row.code); return; }
     if (row.action !== 'set_staff') return;
+    deleted.delete(row.code); // re-added after a delete
     const { links, levels } = parseLinksField(row.links);
     directory[row.code] = {
       name: row.name || '',
@@ -148,6 +153,8 @@ export function resolveStaffDirectory(logs) {
     };
   });
 
+  // Bootstrap manager: always available so nobody can lock themselves out —
+  // a delete_staff on it falls back here rather than removing it.
   if (!directory[BOOTSTRAP_MANAGER_CODE]) {
     const links = LINK_CATALOG.map((l) => l.key);
     directory[BOOTSTRAP_MANAGER_CODE] = {
@@ -158,8 +165,11 @@ export function resolveStaffDirectory(logs) {
     };
   }
 
+  // Legacy shared codes: seed a safe default UNTIL first assigned — but a
+  // delete_staff genuinely retires the code (removed from the directory, so
+  // the PIN gate rejects it) until a set_staff row brings it back.
   LEGACY_DEFAULT_CODES.forEach((code) => {
-    if (!directory[code]) {
+    if (!directory[code] && !deleted.has(code)) {
       directory[code] = {
         name: '(unassigned)',
         isManager: false,
