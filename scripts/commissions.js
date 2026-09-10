@@ -121,6 +121,19 @@ export function collectConnectedSkus(connectedSkuByItem) {
   return [...skus].sort((a, b) => a.localeCompare(b));
 }
 
+// The connected SKUs that are actually priceable for a customer: they need a
+// tier ladder (a SKU with no ladder resolves to 0% no matter the price), and
+// for a rep-facing view the manager must not have hidden them (set_sku_rep_
+// hidden). Shared by the commissions page and the CRM's pricing surfaces so
+// both show the same rows.
+export function priceableSkusFor(config, { forReps = false } = {}) {
+  const tiersBySku = (config && config.tiersBySku) || {};
+  const hidden = (config && config.repHiddenSkus) || {};
+  return collectConnectedSkus((config && config.connectedSkuByItem) || {})
+    .filter((sku) => (tiersBySku[sku] || []).length)
+    .filter((sku) => !forReps || !hidden[sku]);
+}
+
 // Every distinct customer name across ALL deliveries (any status/category) —
 // feeds the "add a customer" suggestions on the Customers & Pricing tab, so
 // a rep can pick a planner-known account before its first wholesale order.

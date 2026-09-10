@@ -45,25 +45,11 @@ main{max-width:1100px;margin:0 auto;padding:24px 28px 60px}
 .card-header{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
 .card-body{padding:18px}
 
-/* ── Customers & Pricing layout ── */
-.pricing-layout{display:grid;grid-template-columns:240px 1fr;gap:20px}
-.customer-col{display:flex;flex-direction:column;gap:8px}
-#customer-add-input{padding:7px 10px;border:1px dashed var(--border);border-radius:var(--radius);font:400 13px 'Manrope',sans-serif}
-#customer-list{display:flex;flex-direction:column;gap:2px}
-.customer-item{display:block;width:100%;text-align:left;padding:9px 10px;background:transparent;border:none;border-radius:4px;font:600 13px 'Manrope',sans-serif;color:var(--text);cursor:pointer}
-.customer-item:hover{background:var(--gray-1)}
-.customer-item.active{background:var(--red);color:#fff}
-#customer-detail h3{font-size:16px;margin-bottom:14px}
-.form-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.form-row label{font-weight:700;font-size:12px;color:var(--text2);min-width:100px}
-.form-row select,.form-row input{padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);font:400 13px 'Manrope',sans-serif}
-
 .sku-table{width:100%;border-collapse:collapse;font-size:13px}
 .sku-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
 .sku-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1);vertical-align:middle}
 .sku-alias-input{width:120px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font:400 13px 'Manrope',sans-serif}
 .sku-alias-input:placeholder-shown{border-style:dashed}
-.sku-row-editing td{vertical-align:top;padding-top:10px}
 .tier-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .tier-row input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px}
 .tier-remove{background:transparent;border:none;color:var(--gray-3);cursor:pointer;font-size:12px}
@@ -132,8 +118,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
   </header>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="pricing">Customers &amp; Pricing</button>
-    <button class="tab-btn" data-tab="sku-mapping" data-manager-only>SKU Mapping</button>
+    <button class="tab-btn active" data-tab="sku-mapping" data-manager-only>SKU Mapping</button>
     <button class="tab-btn" data-tab="tiers" data-manager-only>Tiers</button>
     <button class="tab-btn" data-tab="events">Event Commissions</button>
     <button class="tab-btn" data-tab="adjustments" data-manager-only>Adjustments</button>
@@ -141,27 +126,12 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
   </nav>
 
   <main>
-    <!-- ── Customers & Pricing ───────────────────────────────────────────── -->
-    <section class="tab-panel active" id="tab-pricing">
-      <div class="card">
-        <div class="card-header">Customers &amp; Pricing</div>
-        <div class="card-body pricing-layout">
-          <div class="customer-col">
-            <input id="customer-add-input" list="known-customers-datalist" placeholder="+ Add a customer…" autocomplete="off">
-            <datalist id="known-customers-datalist"></datalist>
-            <div id="customer-list"></div>
-          </div>
-          <div id="customer-detail"><div class="empty-hint">Select a customer to configure their rep and SKU pricing.</div></div>
-        </div>
-      </div>
-    </section>
-
     <!-- ── SKU Mapping ───────────────────────────────────────────────────── -->
-    <section class="tab-panel" id="tab-sku-mapping">
+    <section class="tab-panel active" id="tab-sku-mapping">
       <div class="card">
         <div class="card-header">SKU Mapping</div>
         <div class="card-body">
-          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Every item name that's actually shown up on a confirmed wholesale delivery, whether from Square or a manual entry. Connect it to a SKU to make it priceable on the Customers &amp; Pricing tab — leave it blank for anything that isn't a commissioned product (drinks, catering boxes, one-offs). New item names show up here automatically as new orders come in.</p>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Every item name that's actually shown up on a confirmed wholesale delivery, whether from Square or a manual entry. Connect it to a SKU to make it priceable in the Sales CRM's Pricing view — leave it blank for anything that isn't a commissioned product (drinks, catering boxes, one-offs). New item names show up here automatically as new orders come in.</p>
           <table class="sku-table">
             <thead><tr><th>Delivery Planner Item</th><th>Times Ordered</th><th>Last Ordered</th><th>Connected SKU</th></tr></thead>
             <tbody id="sku-mapping-list"></tbody>
@@ -175,7 +145,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
       <div class="card">
         <div class="card-header">Commission Tier Schedules</div>
         <div class="card-body">
-          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">One shared price-to-commission ladder per SKU — the same schedule applies no matter which customer is buying. Each customer's own price (set on the Customers &amp; Pricing tab) is looked up against this ladder to get their commission %. Edits here never change commissions already locked in by Compute. A SKU only becomes priceable once it has a ladder; use &ldquo;Visible to reps&rdquo; to keep a priceable SKU off the reps&rsquo; Customers &amp; Pricing tab.</p>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">One shared price-to-commission ladder per SKU — the same schedule applies no matter which customer is buying. Each customer's own price (set in the Sales CRM's Pricing view) is looked up against this ladder to get their commission %. Edits here never change commissions already locked in by Compute. A SKU only becomes priceable once it has a ladder; use &ldquo;Visible to reps&rdquo; to keep a priceable SKU out of the reps&rsquo; Pricing view.</p>
           <div id="tiers-list"></div>
         </div>
       </div>
@@ -266,9 +236,10 @@ import {
 import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
 import {
   resolveCommissionsConfig, resolveCommissionsLedger, processWholesaleCommissions,
-  summarizeCommissions, summarizeCommissionsByMonth, pricingKey, resolveTierPct,
-  EVENT_RATE_PER_PRETZEL, collectRawSkuUsage, collectConnectedSkus, collectCustomerNames,
+  summarizeCommissions, summarizeCommissionsByMonth,
+  EVENT_RATE_PER_PRETZEL, collectRawSkuUsage, collectConnectedSkus,
 } from '../../scripts/commissions.js';
+import { SALES_CRM_LOG_PATH, resolveAccounts, repByCustomerFromAccounts } from '../../scripts/sales-crm.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const DELIVERY_LOG_PATH = '/dangpretz/delivery-planner';
@@ -282,6 +253,7 @@ let staffLogs = [];
 let deliveryLogs = [];
 let configLogs = [];
 let ledgerLogs = [];
+let salesCrmLogs = [];
 let staffDirectory = {};
 let deliveries = []; // full resolveDeliveries() output, ghosts included
 let wholesaleDeliveries = []; // confirmed, non-deleted, wholesale-category only — for pickers
@@ -289,9 +261,6 @@ let config = {
   repByCustomer: {}, pricingByCustomerSku: {}, tiersBySku: {}, connectedSkuByItem: {}, repHiddenSkus: {},
 };
 let ledger = { wholesale: {}, events: [], adjustments: [] };
-let selectedCustomer = null;
-let editingSkuKey = null;
-let editingDraft = null;
 let tierDrafts = {}; // sku -> [{minPrice, pct}] working copy for the Tiers tab
 
 // Reps are whichever PIN codes the hub's manager page has granted
@@ -339,23 +308,36 @@ function recomputeAll() {
       && ['delivered', 'picked_up'].includes(d.status),
   );
   config = resolveCommissionsConfig(configLogs);
+  // A customer's rep is owned by its CRM account now (pricing + assignment
+  // moved to the Sales CRM). Legacy set_customer_rep rows — still parsed by
+  // resolveCommissionsConfig — fill any gap for a customer whose planner
+  // name doesn't yet match a CRM account. Account wins where both exist.
+  config.repByCustomer = {
+    ...config.repByCustomer,
+    ...repByCustomerFromAccounts(resolveAccounts(salesCrmLogs), normalizeCustomerName),
+  };
   ledger = resolveCommissionsLedger(ledgerLogs);
 }
 
 async function loadAll() {
-  const [sLogs, dLogs, cLogs, lLogs] = await Promise.all([
+  const [sLogs, dLogs, cLogs, lLogs, crmLogs] = await Promise.all([
     fetchLog(STAFF_LOG_PATH),
     fetchLog(DELIVERY_LOG_PATH),
     fetchLog(CONFIG_LOG_PATH),
     fetchLog(LEDGER_LOG_PATH),
+    fetchLog(SALES_CRM_LOG_PATH),
   ]);
-  staffLogs = sLogs; deliveryLogs = dLogs; configLogs = cLogs; ledgerLogs = lLogs;
+  staffLogs = sLogs; deliveryLogs = dLogs; configLogs = cLogs; ledgerLogs = lLogs; salesCrmLogs = crmLogs;
   recomputeAll();
 }
 
 async function refreshConfig() {
   configLogs = await fetchLog(CONFIG_LOG_PATH);
   config = resolveCommissionsConfig(configLogs);
+  config.repByCustomer = {
+    ...config.repByCustomer,
+    ...repByCustomerFromAccounts(resolveAccounts(salesCrmLogs), normalizeCustomerName),
+  };
 }
 
 async function refreshLedger() {
@@ -369,7 +351,7 @@ async function refreshNow() {
   const btn = document.getElementById('refresh-btn');
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Refreshing…';
-  editingSkuKey = null; editingDraft = null; tierDrafts = {};
+  tierDrafts = {};
   try {
     await loadAll();
     const active = document.querySelector('.tab-btn.active')?.dataset.tab;
@@ -380,217 +362,6 @@ async function refreshNow() {
     toast(`Refresh failed: ${err.message}`);
   } finally {
     btn.disabled = false; btn.textContent = label;
-  }
-}
-
-// ── Customers & Pricing tab ──────────────────────────────────────────────────
-function getKnownWholesaleCustomers() {
-  const normalized = new Map();
-  wholesaleDeliveries.forEach((d) => {
-    const name = normalizeCustomerName(d.customer || '');
-    if (name) {
-      const key = name.toLowerCase();
-      if (!normalized.has(key)) normalized.set(key, name);
-    }
-  });
-  return [...normalized.values()].sort((a, b) => a.localeCompare(b));
-}
-
-// Customers shown on the pricing tab: confirmed-wholesale history PLUS any
-// customer that already has a rep/pricing config row (so an account added
-// before its first order still appears). Reps see only their own.
-function getPricingCustomers() {
-  const seen = new Map();
-  const add = (raw) => {
-    const n = normalizeCustomerName(raw || '');
-    if (!n) return;
-    const k = n.toLowerCase();
-    if (!seen.has(k)) seen.set(k, n);
-  };
-  getKnownWholesaleCustomers().forEach(add);
-  Object.keys(config.repByCustomer).forEach(add);
-  let names = [...seen.values()].sort((a, b) => a.localeCompare(b));
-  if (!isManager) names = names.filter((c) => config.repByCustomer[c] === session.code);
-  return names;
-}
-
-// Case-insensitive lookup of an existing configured customer name.
-function findConfiguredCustomer(name) {
-  const k = name.toLowerCase();
-  return Object.keys(config.repByCustomer).find((c) => c.toLowerCase() === k) || null;
-}
-
-// Tiers are a shared-per-SKU schedule (see the Tiers tab), not something
-// this row edits — this row only owns the
-// customer's own negotiated price. The % shown is a live preview of what
-// that price currently resolves to against the SKU's tier ladder, purely
-// informational (the real % is only ever locked in by "Compute new
-// commissions", using whatever's configured at that moment).
-function renderSkuRow(customer, sku) {
-  const key = pricingKey(customer, sku);
-  const pricing = config.pricingByCustomerSku[key];
-  const tiers = config.tiersBySku[sku] || [];
-  if (editingSkuKey === key) {
-    return `
-      <tr class="sku-row-editing" data-sku="${esc(sku)}">
-        <td>${esc(sku)}</td>
-        <td><input type="number" step="0.01" min="0" id="sku-price-input" value="${editingDraft.price}"></td>
-        <td>${tiers.length ? '<span class="text-muted">save to see current %</span>' : '<span class="badge-warn">no tier schedule</span>'}</td>
-        <td>
-          <button type="button" id="sku-save" class="btn btn-sm btn-red">Save</button>
-          <button type="button" id="sku-cancel" class="btn btn-sm btn-outline">Cancel</button>
-        </td>
-      </tr>`;
-  }
-  let pctCell = '<span class="badge-warn">no tier schedule</span>';
-  if (tiers.length) {
-    pctCell = pricing ? `${resolveTierPct(tiers, pricing.price)}%` : '<span class="text-muted">set price to see %</span>';
-  }
-  return `
-    <tr data-sku="${esc(sku)}">
-      <td>${esc(sku)}</td>
-      <td>${pricing ? `$${Number(pricing.price).toFixed(2)}` : '<span class="badge-warn">not set</span>'}</td>
-      <td>${pctCell}</td>
-      <td><button type="button" class="sku-edit-btn btn btn-sm btn-outline" data-sku="${esc(sku)}">Edit</button></td>
-    </tr>`;
-}
-
-function bindSkuRowEvents() {
-  document.querySelectorAll('.sku-edit-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const { sku } = btn.dataset;
-      const key = pricingKey(selectedCustomer, sku);
-      const pricing = config.pricingByCustomerSku[key];
-      editingSkuKey = key;
-      editingDraft = { price: pricing ? pricing.price : 0 };
-      renderPricingTab();
-    });
-  });
-  const cancelBtn = document.getElementById('sku-cancel');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      editingSkuKey = null; editingDraft = null; renderPricingTab();
-    });
-  }
-  const saveBtn = document.getElementById('sku-save');
-  if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
-      const price = Number(document.getElementById('sku-price-input').value) || 0;
-      const { sku } = document.querySelector('tr.sku-row-editing').dataset;
-      saveSkuPricing(selectedCustomer, sku, price);
-    });
-  }
-}
-
-function renderPricingTab() {
-  const customers = getPricingCustomers();
-  document.getElementById('known-customers-datalist').innerHTML =
-    collectCustomerNames(deliveries, normalizeCustomerName)
-      .map((c) => `<option value="${esc(c)}"></option>`).join('');
-
-  const list = document.getElementById('customer-list');
-  list.innerHTML = customers.length
-    ? customers.map((c) => `<button type="button" class="customer-item${c === selectedCustomer ? ' active' : ''}" data-customer="${esc(c)}">${esc(c)}${config.repByCustomer[c] ? '' : ' <span class="badge-warn">unassigned</span>'}</button>`).join('')
-    : `<div class="empty-hint">${isManager ? 'No customers yet — add one above.' : 'No customers assigned to you yet — add one above.'}</div>`;
-
-  const detail = document.getElementById('customer-detail');
-  if (!selectedCustomer || !customers.includes(selectedCustomer)) {
-    detail.innerHTML = '<div class="empty-hint">Select a customer to configure their rep and SKU pricing.</div>';
-    return;
-  }
-  const repCode = config.repByCustomer[selectedCustomer] || '';
-  // Only SKUs that actually have a commission tier ladder are priceable —
-  // pricing a SKU with no ladder resolves to 0% anyway, so showing all of
-  // them just clutters every customer. Tier ladders are set on the Tiers tab.
-  // Reps additionally only see SKUs the manager hasn't hidden (the
-  // "Visible to reps" toggle on the Tiers tab).
-  const connectedSkus = collectConnectedSkus(config.connectedSkuByItem)
-    .filter((sku) => (config.tiersBySku[sku] || []).length)
-    .filter((sku) => isManager || !config.repHiddenSkus[sku]);
-  const repField = isManager
-    ? `<select id="customer-rep-select">
-        <option value="">&mdash; Unassigned &mdash;</option>
-        ${getReps().map((r) => `<option value="${esc(r.id)}"${r.id === repCode ? ' selected' : ''}>${esc(r.label)}</option>`).join('')}
-      </select>`
-    : `<span>${esc(getRepLabel(session.code))}</span>`;
-  detail.innerHTML = `
-    <h3>${esc(selectedCustomer)}</h3>
-    <div class="form-row">
-      <label>Assigned rep</label>
-      ${repField}
-    </div>
-    ${connectedSkus.length ? `
-    <table class="sku-table">
-      <thead><tr><th>SKU</th><th>Price</th><th>Current %</th><th></th></tr></thead>
-      <tbody>${connectedSkus.map((sku) => renderSkuRow(selectedCustomer, sku)).join('')}</tbody>
-    </table>` : `<div class="empty-hint">No priceable SKUs yet${isManager ? ' — connect delivery items to SKUs on the SKU Mapping tab and give each a tier ladder on the Tiers tab.' : ' — ask a manager to finish SKU setup.'}</div>`}
-  `;
-  if (isManager) {
-    document.getElementById('customer-rep-select').addEventListener('change', (e) => saveCustomerRep(selectedCustomer, e.target.value));
-  }
-  bindSkuRowEvents();
-}
-
-// Add (or select) a customer from the combobox. Reps claim it for
-// themselves; managers add it unassigned.
-async function addCustomer(rawName) {
-  const name = normalizeCustomerName(rawName || '');
-  if (!name) { toast('Enter a customer name.'); return; }
-
-  const configured = findConfiguredCustomer(name);
-  if (configured) {
-    const owner = config.repByCustomer[configured];
-    if (isManager || owner === session.code) {
-      selectedCustomer = configured; renderPricingTab(); return;
-    }
-    if (owner) {
-      toast(`${configured} is assigned to ${getRepLabel(owner)} — ask a manager to reassign.`);
-      return;
-    }
-  }
-  // Match an existing delivery-known (but unconfigured) customer's display form.
-  const known = getKnownWholesaleCustomers().find((c) => c.toLowerCase() === name.toLowerCase());
-  const cust = configured || known || name;
-  if (isManager && (configured || known)) { selectedCustomer = cust; renderPricingTab(); return; }
-
-  try {
-    await appendLog(CONFIG_LOG_PATH, {
-      action: 'set_customer_rep', customer: cust, repCode: isManager ? '' : session.code,
-      updatedBy: session.code, timeStamp: new Date().toISOString(),
-    });
-    toast(isManager ? `Added ${cust} (unassigned)` : `Added ${cust}`);
-    selectedCustomer = cust;
-    await refreshConfig();
-    renderPricingTab();
-  } catch (err) {
-    toast(`Error adding customer: ${err.message}`);
-  }
-}
-
-async function saveCustomerRep(customer, repCode) {
-  try {
-    await appendLog(CONFIG_LOG_PATH, {
-      action: 'set_customer_rep', customer, repCode, updatedBy: session.code, timeStamp: new Date().toISOString(),
-    });
-    toast(`${customer} → ${repCode ? getRepLabel(repCode) : 'unassigned'}`);
-    await refreshConfig();
-    renderPricingTab();
-  } catch (err) {
-    toast(`Error saving rep assignment: ${err.message}`);
-  }
-}
-
-async function saveSkuPricing(customer, sku, price) {
-  try {
-    await appendLog(CONFIG_LOG_PATH, {
-      action: 'set_sku_pricing', customer, sku, price, updatedBy: session.code, timeStamp: new Date().toISOString(),
-    });
-    toast(`Saved price for ${sku}`);
-    editingSkuKey = null; editingDraft = null;
-    await refreshConfig();
-    renderPricingTab();
-  } catch (err) {
-    toast(`Error saving pricing: ${err.message}`);
   }
 }
 
@@ -735,7 +506,7 @@ function bindTiersTab() {
   });
 }
 
-// Manager toggle: whether reps see this SKU on their Customers & Pricing tab.
+// Manager toggle: whether reps see this SKU in the Sales CRM's Pricing view.
 // Default is visible; a `hidden:true` row keeps it off the rep view.
 async function saveSkuRepVisible(sku, hidden) {
   try {
@@ -928,11 +699,10 @@ async function computeCommissions() {
 }
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
-// Each tab's data can go stale while you're working in another one (saving
-// a customer's rep, logging an event, computing commissions) — re-render
-// on the way in rather than trying to track every cross-tab dependency.
+// Each tab's data can go stale while you're working in another one (mapping
+// a SKU, logging an event, computing commissions) — re-render on the way in
+// rather than trying to track every cross-tab dependency.
 const TAB_RENDERERS = {
-  pricing: renderPricingTab,
   'sku-mapping': renderSkuMappingTab,
   tiers: renderTiersTab,
   events: renderEventsTab,
@@ -940,7 +710,10 @@ const TAB_RENDERERS = {
   preview: renderPreviewTab,
 };
 
+// Tabs a rep (commissions-admin:view) can't open — they land on Event
+// Commissions instead. Pricing + customer setup now lives in the Sales CRM.
 const MANAGER_TABS = ['sku-mapping', 'tiers', 'adjustments'];
+const REP_FALLBACK_TAB = 'events';
 
 // Show/hide every manager-only control based on the resolved session.
 function applyRoleVisibility() {
@@ -948,7 +721,7 @@ function applyRoleVisibility() {
 }
 
 function switchTab(tab) {
-  const target = (!isManager && MANAGER_TABS.includes(tab)) ? 'pricing' : tab;
+  const target = (!isManager && MANAGER_TABS.includes(tab)) ? REP_FALLBACK_TAB : tab;
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === target));
   document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `tab-${target}`));
   const render = TAB_RENDERERS[target];
@@ -961,18 +734,6 @@ function bindAll() {
   document.getElementById('refresh-btn').addEventListener('click', refreshNow);
   document.querySelectorAll('.tab-btn').forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-  document.getElementById('customer-list').addEventListener('click', (e) => {
-    const btn = e.target.closest('.customer-item');
-    if (!btn) return;
-    selectedCustomer = btn.dataset.customer;
-    editingSkuKey = null; editingDraft = null;
-    renderPricingTab();
-  });
-  document.getElementById('customer-add-input').addEventListener('change', (e) => {
-    const v = e.target.value.trim();
-    e.target.value = '';
-    if (v) addCustomer(v);
   });
   document.getElementById('event-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-void-event]');
@@ -1060,11 +821,11 @@ function bindAll() {
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   bindAll();
-  // Everyone here holds 'commissions-admin' — managers at edit level (full
-  // setup: SKU mapping, tier ladders, adjustments, Compute), reps at view
-  // level (a limited editor: their own customers + pricing, events, and a
-  // preview of their own numbers). A rep needs the grant explicitly; Sales
-  // CRM access alone no longer opens this page.
+  // Everyone here holds 'commissions-admin' — managers at edit level (SKU
+  // mapping, tier ladders, adjustments, Compute), reps at view level (Event
+  // Commissions + a preview of their own numbers). A rep needs the grant
+  // explicitly; Sales CRM access alone no longer opens this page. Per-customer
+  // pricing + rep assignment moved to the Sales CRM's Pricing view.
   session = await requireAccess('commissions-admin');
   isManager = canEdit(session, 'commissions-admin');
   await loadAll();
@@ -1072,7 +833,7 @@ async function init() {
 
   applyRoleVisibility();
   if (!isManager) document.querySelector('header h1').textContent = 'My Commissions';
-  switchTab('pricing'); // re-render-on-entry covers every other tab
+  switchTab(isManager ? 'sku-mapping' : REP_FALLBACK_TAB);
 
   document.getElementById('app').hidden = false;
 }

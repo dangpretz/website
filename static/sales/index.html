@@ -105,6 +105,18 @@ body{font-family:'Manrope',system-ui,sans-serif;font-size:14px;color:var(--text)
 .tbl tr.clickable{cursor:pointer}
 .tbl .totals td{font-weight:700;background:var(--gray-1);border-top:2px solid var(--border)}
 
+/* ── Pricing view ── */
+.muted{color:var(--gray-3);font-size:13px}
+.pricing-layout{display:grid;grid-template-columns:260px 1fr;gap:20px;align-items:start}
+.pricing-customer-list{display:flex;flex-direction:column;gap:2px;max-height:70vh;overflow:auto}
+.pricing-cust{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;padding:9px 11px;background:transparent;border:none;border-radius:6px;font:600 13px 'Manrope',sans-serif;color:var(--text);cursor:pointer}
+.pricing-cust:hover{background:var(--gray-1)}
+.pricing-cust.active{background:var(--red);color:#fff}
+.pricing-cust.active .badge{filter:brightness(1.9) saturate(.4)}
+.pricing-cust .flags{display:flex;gap:4px;flex-shrink:0}
+.price-tbl input{width:110px;padding:5px 8px}
+@media(max-width:760px){.pricing-layout{grid-template-columns:1fr}.pricing-customer-list{max-height:none}}
+
 /* ── Forms / inputs ── */
 .form-group{margin-bottom:16px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -306,6 +318,7 @@ textarea{resize:vertical;min-height:70px}
     <ul class="sidebar-nav" id="sidebar-nav">
       <li class="active" data-view="dashboard">📊 Dashboard</li>
       <li data-view="accounts">🏢 Accounts</li>
+      <li data-view="pricing">💲 Pricing</li>
       <li data-view="pipeline">📋 Pipeline</li>
       <li data-view="tasks">✅ Tasks</li>
       <li data-view="receipts">🧾 Receipts</li>
@@ -373,6 +386,27 @@ textarea{resize:vertical;min-height:70px}
     <!-- Account detail -->
     <div id="view-account-detail" class="view">
       <div id="detail-content"></div>
+    </div>
+
+    <!-- Pricing -->
+    <div id="view-pricing" class="view">
+      <div class="view-header">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div class="view-title">Pricing</div>
+          <div id="pricing-view-toggle" style="display:none;gap:4px">
+            <button class="btn btn-red btn-sm" id="pricing-mine-btn">Mine</button>
+            <button class="btn btn-outline btn-sm" id="pricing-all-btn">All</button>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" id="pricing-new-account-btn">+ New Account</button>
+      </div>
+      <div class="search-row">
+        <input type="search" class="search-input" id="pricing-search" placeholder="Search customers…">
+      </div>
+      <div class="pricing-layout">
+        <div id="pricing-customer-list" class="pricing-customer-list"></div>
+        <div id="pricing-detail" class="card"><div class="card-body"><div class="muted">Select a customer to see and edit their SKU pricing.</div></div></div>
+      </div>
     </div>
 
     <!-- Pipeline -->
@@ -849,12 +883,22 @@ import {
   requireAccess, resolveStaffDirectory, clearSessionUnlock,
   STAFF_LOG_PATH, HUB_URL,
 } from '../../scripts/staff-access.js';
+import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
+import {
+  resolveCommissionsConfig, pricingKey, resolveTierPct, collectCustomerNames, priceableSkusFor,
+} from '../../scripts/commissions.js';
+import { repByCustomerFromAccounts } from '../../scripts/sales-crm.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const LOG_PATH = '/dangpretz/sales-crm';
+// Per-customer SKU pricing lives in the commissions-config log and is read
+// against delivery-planner customer names — the Pricing view and the account
+// Pricing tab both read/write it here (single source, no CRM-side copy).
+const PRICING_LOG_PATH = '/dangpretz/commissions-config';
+const DELIVERY_LOG_PATH = '/dangpretz/delivery-planner';
 // Bump on every release — shown on the sidebar and Settings → About so a stale
 // browser-cached copy of this page is easy to spot.
-const CRM_VERSION = 'v1.9';
+const CRM_VERSION = 'v1.10';
 document.querySelectorAll('.crm-version').forEach(el => { el.textContent = CRM_VERSION; });
 const RISK_KEY = 'crm-risk-days';
 const REP_COLORS = [
@@ -909,6 +953,13 @@ let currentDetailTab = 'overview';
 let currentReportTab = 'revenue';
 let currentRepId = null; // a PIN code, or 'admin' for a hub-manager session
 let acctViewMode = 'mine'; // 'mine' | 'all'
+let pricingConfig = {
+  repByCustomer: {}, pricingByCustomerSku: {}, tiersBySku: {}, connectedSkuByItem: {}, repHiddenSkus: {},
+};
+let deliveries = []; // resolveDeliveries() output — for planner-known customer names
+let pricingViewMode = 'all'; // 'mine' | 'all' — Pricing view's own toggle
+let selectedPricingCustomer = null;
+let editingPriceSku = null; // sku key currently being edited in a pricing table
 let acctSortCol = 'name';
 let acctSortDir = 'asc';
 let pendingDragDeal = null;
@@ -1215,9 +1266,22 @@ function applyLogs(logs) {
 
 async function loadData() {
   try {
-    const logs = await fetchLog(LOG_PATH);
+    const [logs, cfgLogs, dpLogs] = await Promise.all([
+      fetchLog(LOG_PATH),
+      fetchLog(PRICING_LOG_PATH).catch(() => []),
+      fetchLog(DELIVERY_LOG_PATH).catch(() => []),
+    ]);
     if (Array.isArray(logs)) applyLogs(logs);
+    pricingConfig = resolveCommissionsConfig(Array.isArray(cfgLogs) ? cfgLogs : []);
+    deliveries = resolveDeliveries(Array.isArray(dpLogs) ? dpLogs : []);
   } catch (_) { /* network issue — data unavailable this load */ }
+}
+
+// Re-fetch just the pricing config after a price edit (mirrors the
+// commissions page's refreshConfig — the sales-crm log is untouched).
+async function refreshPricingConfig() {
+  const cfgLogs = await fetchLog(PRICING_LOG_PATH);
+  pricingConfig = resolveCommissionsConfig(Array.isArray(cfgLogs) ? cfgLogs : []);
 }
 
 // ── Computed metrics ──────────────────────────────────────────────────────────
@@ -1259,7 +1323,7 @@ function closeMobileSidebar() {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pipeline:'Pipeline', tasks:'Tasks', receipts:'Receipts', documents:'Documents', reports:'Reports', settings:'Settings' };
+const VIEW_TITLES = { dashboard:'Dashboard', accounts:'Accounts', 'account-detail':'Account', pricing:'Pricing', pipeline:'Pipeline', tasks:'Tasks', receipts:'Receipts', documents:'Documents', reports:'Reports', settings:'Settings' };
 
 function navigate(view, params = {}) {
   currentView = view;
@@ -1274,6 +1338,7 @@ function navigate(view, params = {}) {
   if (titleEl) titleEl.textContent = VIEW_TITLES[view] || '';
   if (view === 'dashboard') renderDashboard();
   else if (view === 'accounts') renderAccounts();
+  else if (view === 'pricing') renderPricing();
   else if (view === 'account-detail') { currentAccountId = params.id; renderAccountDetail(params.id); }
   else if (view === 'pipeline') renderPipeline();
   else if (view === 'tasks') renderTasks();
@@ -1513,6 +1578,216 @@ function renderAccounts() {
   });
 }
 
+// ── Pricing ───────────────────────────────────────────────────────────────────
+// Per-customer SKU pricing, stored in the commissions-config log (set_sku_pricing,
+// keyed by delivery-planner customer name). A customer's rep is resolved from its
+// CRM account first, then any legacy commissions set_customer_rep row. This view
+// and the account-detail Pricing tab share renderPricingTable / savePrice, so an
+// edit in one place shows in the other.
+
+function resolvedRepByCustomer() {
+  return {
+    ...pricingConfig.repByCustomer,
+    ...repByCustomerFromAccounts([...STATE.accounts.values()], normalizeCustomerName),
+  };
+}
+
+function accountForCustomer(name) {
+  const key = normalizeCustomerName(name);
+  if (!key) return null;
+  return [...STATE.accounts.values()].find(a => normalizeCustomerName(a.name) === key) || null;
+}
+
+// Every customer the pricing view knows about: CRM accounts ∪ customers seen
+// on a confirmed WHOLESALE delivery ∪ names that already have a pricing/rep
+// config row. (Event / catering / one-off names are left out — they're not
+// wholesale-priced.) Deduped by normalized name.
+function allPricingCustomers() {
+  const seen = new Map();
+  const add = (raw) => {
+    const n = normalizeCustomerName(raw || '');
+    if (n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
+  };
+  [...STATE.accounts.values()].forEach(a => add(a.name));
+  const wholesale = deliveries.filter(d => !d._deleted
+    && (d.orderCategory || 'wholesale') === 'wholesale'
+    && ['delivered', 'picked_up'].includes(d.status));
+  collectCustomerNames(wholesale, normalizeCustomerName).forEach(add);
+  Object.keys(pricingConfig.pricingByCustomerSku).forEach(k => add(k.split('::')[0]));
+  Object.keys(pricingConfig.repByCustomer).forEach(add);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
+function renderPricing() {
+  const isAdmin = currentRepId === 'admin';
+  const repByCust = resolvedRepByCustomer();
+
+  const toggle = document.getElementById('pricing-view-toggle');
+  if (toggle) toggle.style.display = isAdmin ? 'none' : 'flex';
+  document.getElementById('pricing-mine-btn')?.classList.toggle('btn-red', pricingViewMode === 'mine');
+  document.getElementById('pricing-mine-btn')?.classList.toggle('btn-outline', pricingViewMode !== 'mine');
+  document.getElementById('pricing-all-btn')?.classList.toggle('btn-red', pricingViewMode === 'all');
+  document.getElementById('pricing-all-btn')?.classList.toggle('btn-outline', pricingViewMode !== 'all');
+
+  const search = (document.getElementById('pricing-search')?.value || '').toLowerCase();
+  const showAll = isAdmin || pricingViewMode === 'all';
+  let names = allPricingCustomers();
+  if (!showAll) names = names.filter(n => repByCust[n] === currentRepId);
+  if (search) names = names.filter(n => n.toLowerCase().includes(search));
+
+  const listEl = document.getElementById('pricing-customer-list');
+  listEl.innerHTML = names.length ? names.map(n => {
+    const rep = repByCust[n];
+    const noAccount = !accountForCustomer(n);
+    const flags = [
+      rep ? '' : '<span class="badge badge-lead">unassigned</span>',
+      noAccount ? '<span class="badge badge-prospect">no CRM account</span>' : '',
+    ].join('');
+    return `<button type="button" class="pricing-cust${n === selectedPricingCustomer ? ' active' : ''}" data-cust="${esc(n)}">
+      <span>${esc(n)}</span><span class="flags">${flags}</span></button>`;
+  }).join('') : `<div class="muted" style="padding:8px 11px">${showAll ? 'No customers yet.' : 'No customers assigned to you.'}</div>`;
+
+  listEl.querySelectorAll('.pricing-cust').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedPricingCustomer = btn.dataset.cust;
+      editingPriceSku = null;
+      renderPricing();
+    });
+  });
+
+  renderPricingDetail();
+}
+
+function renderPricingDetail() {
+  const wrap = document.getElementById('pricing-detail');
+  const name = selectedPricingCustomer;
+  if (!name) {
+    wrap.innerHTML = '<div class="card-body"><div class="muted">Select a customer to see and edit their SKU pricing.</div></div>';
+    return;
+  }
+  const isAdmin = currentRepId === 'admin';
+  const acct = accountForCustomer(name);
+  const rep = resolvedRepByCustomer()[name] || '';
+  const editable = isAdmin || rep === currentRepId || !rep;
+
+  let repField;
+  if (isAdmin && acct) {
+    repField = `<select id="pricing-rep-select" data-acct="${esc(acct.id)}" style="max-width:220px">
+        <option value="admin"${(acct.repId || 'admin') === 'admin' ? ' selected' : ''}>Manager</option>
+        ${getReps().map(r => `<option value="${esc(r.id)}"${acct.repId === r.id ? ' selected' : ''}>${esc(r.label)}</option>`).join('')}
+      </select>`;
+  } else if (isAdmin) {
+    repField = '<span class="muted">Create a CRM account for this customer to assign a rep.</span>';
+  } else {
+    repField = `<span>${rep ? esc(getRepLabel(rep)) : 'Unassigned'}</span>`;
+  }
+
+  wrap.innerHTML = `<div class="card-body">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <h3 style="font-size:17px;font-weight:800">${esc(name)}</h3>
+      ${acct ? `<button class="btn btn-ghost btn-sm" id="pricing-open-account">Open account →</button>` : ''}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <label style="margin:0">Assigned rep</label>${repField}
+    </div>
+    ${renderPricingTable(name, { editable, ctx: 'view' })}
+  </div>`;
+
+  if (acct) {
+    document.getElementById('pricing-open-account')?.addEventListener('click', () => {
+      currentDetailTab = 'pricing';
+      navigate('account-detail', { id: acct.id });
+    });
+  }
+  const repSel = document.getElementById('pricing-rep-select');
+  if (repSel) {
+    repSel.addEventListener('change', async () => {
+      repSel.disabled = true;
+      try { await reassignAccount(repSel.dataset.acct, repSel.value); toast('Rep updated.'); }
+      catch (_) { toast('Failed to save.'); }
+      finally { repSel.disabled = false; renderPricing(); }
+    });
+  }
+  bindPricingTable('view', name, editable);
+}
+
+// Shared price table — used by the Pricing view and the account Pricing tab.
+// ctx ('view' | 'detail') keeps the two surfaces' inline editors independent.
+function renderPricingTable(customerName, { editable, ctx }) {
+  const isAdmin = currentRepId === 'admin';
+  const skus = priceableSkusFor(pricingConfig, { forReps: !isAdmin });
+  if (!skus.length) {
+    return `<div class="muted">No priceable SKUs yet${isAdmin ? ' — connect delivery items to SKUs and give each a tier ladder on the Commissions page.' : ' — ask a manager to finish SKU setup.'}</div>`;
+  }
+  const rows = skus.map(sku => {
+    const pricing = pricingConfig.pricingByCustomerSku[pricingKey(customerName, sku)];
+    const tiers = pricingConfig.tiersBySku[sku] || [];
+    const editKey = `${ctx}:${sku}`;
+    if (editingPriceSku === editKey) {
+      return `<tr data-sku="${esc(sku)}">
+        <td>${esc(sku)}</td>
+        <td><input type="number" step="0.01" min="0" class="price-input" value="${pricing ? pricing.price : 0}"></td>
+        <td>${tiers.length ? '<span class="muted">save to see %</span>' : '<span class="badge badge-pending">no ladder</span>'}</td>
+        <td><button class="btn btn-red btn-sm price-save">Save</button>
+            <button class="btn btn-outline btn-sm price-cancel">Cancel</button></td>
+      </tr>`;
+    }
+    const pctCell = tiers.length
+      ? (pricing ? `${resolveTierPct(tiers, pricing.price)}%` : '<span class="muted">set price</span>')
+      : '<span class="badge badge-pending">no ladder</span>';
+    return `<tr data-sku="${esc(sku)}">
+      <td>${esc(sku)}</td>
+      <td>${pricing ? `$${Number(pricing.price).toFixed(2)}` : '<span class="badge badge-lead">not set</span>'}</td>
+      <td>${pctCell}</td>
+      <td>${editable ? `<button class="btn btn-outline btn-sm price-edit" data-sku="${esc(sku)}">Edit</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  return `<table class="tbl price-tbl">
+    <thead><tr><th>SKU</th><th>Price</th><th>Current %</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function bindPricingTable(ctx, customerName, editable) {
+  const scope = ctx === 'view' ? document.getElementById('pricing-detail') : document.getElementById('detail-tab-content');
+  if (!scope) return;
+  const rerender = () => {
+    if (ctx === 'view') renderPricingDetail();
+    else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  };
+  scope.querySelectorAll('.price-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!editable) return;
+      editingPriceSku = `${ctx}:${btn.dataset.sku}`;
+      rerender();
+    });
+  });
+  const cancel = scope.querySelector('.price-cancel');
+  if (cancel) cancel.addEventListener('click', () => { editingPriceSku = null; rerender(); });
+  const save = scope.querySelector('.price-save');
+  if (save) save.addEventListener('click', async () => {
+    const tr = scope.querySelector('tr[data-sku] .price-input')?.closest('tr');
+    if (!tr) return;
+    const price = Number(tr.querySelector('.price-input').value) || 0;
+    await savePrice(customerName, tr.dataset.sku, price, ctx);
+  });
+}
+
+async function savePrice(customerName, sku, price, ctx) {
+  try {
+    await appendLog(PRICING_LOG_PATH, {
+      action: 'set_sku_pricing', customer: customerName, sku, price,
+      updatedBy: currentRepId, timeStamp: new Date().toISOString(),
+    });
+    toast(`Saved price for ${sku}`);
+    editingPriceSku = null;
+    await refreshPricingConfig();
+    if (ctx === 'view') renderPricing();
+    else if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
+  } catch (err) {
+    toast(`Error saving price: ${err.message}`);
+  }
+}
+
 // ── Account Detail ────────────────────────────────────────────────────────────
 function renderAccountDetail(id) {
   const a = STATE.accounts.get(id);
@@ -1522,7 +1797,7 @@ function renderAccountDetail(id) {
   const repLabel = getRepLabel(a.repId);
   const m = getAccountMetrics(id);
   const deal = getActiveDeal(id);
-  const tabs = ['overview','communications','orders','tasks','samples'];
+  const tabs = ['overview','communications','orders','tasks','samples','pricing'];
 
   document.getElementById('detail-content').innerHTML = `
     <div class="breadcrumb" id="back-to-accounts">← Accounts</div>
@@ -1758,6 +2033,19 @@ function renderDetailTab(tab, id, a, m, deal) {
         </table>
       </div></div>` : '<div class="empty"><div class="empty-icon">📦</div>No samples logged yet.</div>'}`;
   }
+  if (tab === 'pricing') {
+    const isAdmin = currentRepId === 'admin';
+    const canEdit = isAdmin || a.repId === currentRepId || !a.repId;
+    const custName = normalizeCustomerName(a.name) || a.name;
+    const hasAny = priceableSkusFor(pricingConfig, { forReps: !isAdmin })
+      .some(sku => pricingConfig.pricingByCustomerSku[pricingKey(custName, sku)]);
+    return `
+      <div class="muted" style="margin-bottom:12px">
+        Prices are filed under the customer name <strong>${esc(custName)}</strong> and shared with the Pricing view and commissions.
+        ${hasAny ? '' : 'No prices set for this name yet.'}
+      </div>
+      ${renderPricingTable(custName, { editable: canEdit, ctx: 'detail' })}`;
+  }
   return '';
 }
 
@@ -1794,6 +2082,14 @@ function bindDetailTabActions(id) {
     toast('Location deleted.');
     if (currentView === 'account-detail') renderAccountDetail(currentAccountId);
   }));
+  if (currentDetailTab === 'pricing') {
+    const a = STATE.accounts.get(id);
+    if (a) {
+      const isAdmin = currentRepId === 'admin';
+      const canEdit = isAdmin || a.repId === currentRepId || !a.repId;
+      bindPricingTable('detail', normalizeCustomerName(a.name) || a.name, canEdit);
+    }
+  }
 }
 
 
@@ -3082,6 +3378,12 @@ function bindAll() {
   // Account view toggle
   document.getElementById('acct-mine-btn').addEventListener('click', () => { acctViewMode = 'mine'; renderAccounts(); });
   document.getElementById('acct-all-btn').addEventListener('click', () => { acctViewMode = 'all'; renderAccounts(); });
+
+  // Pricing view
+  document.getElementById('pricing-search').addEventListener('input', renderPricing);
+  document.getElementById('pricing-mine-btn').addEventListener('click', () => { pricingViewMode = 'mine'; renderPricing(); });
+  document.getElementById('pricing-all-btn').addEventListener('click', () => { pricingViewMode = 'all'; renderPricing(); });
+  document.getElementById('pricing-new-account-btn').addEventListener('click', () => openAccountModal());
 
   // Pipeline filters
   document.getElementById('pipe-seg-filter').addEventListener('change', renderPipeline);
