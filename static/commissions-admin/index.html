@@ -92,10 +92,6 @@ table.list-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var
 table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
 
 /* ── Preview tab ── */
-#needs-setup-card .card-header{color:var(--red-dk)}
-#needs-setup-list{list-style:none;padding:0}
-#needs-setup-list li{padding:6px 0;border-bottom:1px solid var(--gray-1);font-size:13px}
-#needs-setup-list li:last-child{border-bottom:none}
 
 .rep-summary-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
 .rep-summary-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--gray-1)}
@@ -212,7 +208,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
         <div class="card-header">Adjustment History</div>
         <div class="card-body">
           <table class="list-table">
-            <thead><tr><th>Date</th><th>Rep</th><th>Amount</th><th>Note</th><th>Entered by</th></tr></thead>
+            <thead><tr><th>Date</th><th>Rep</th><th>Amount</th><th>Note</th><th>Entered by</th><th></th></tr></thead>
             <tbody id="adjustment-list"></tbody>
           </table>
         </div>
@@ -221,19 +217,13 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
 
     <!-- ── Commission Preview ───────────────────────────────────────────── -->
     <section class="tab-panel" id="tab-preview">
-      <div class="card">
+      <div class="card" id="compute-card">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
           <span>Compute</span>
           <button id="compute-btn" class="btn btn-red">Compute new commissions</button>
         </div>
         <div class="card-body">
           <p style="font-size:13px;color:var(--text2)">Scans confirmed wholesale deliveries and locks in commissions for any line item that isn't in the ledger yet, using whatever price/tiers are configured right now. Already-computed amounts are never changed.</p>
-        </div>
-      </div>
-      <div class="card" id="needs-setup-card">
-        <div class="card-header">Needs Setup</div>
-        <div class="card-body">
-          <ul id="needs-setup-list"></ul>
         </div>
       </div>
       <div id="preview-breakdown"></div>
@@ -252,7 +242,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
 <script type="module">
 import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
 import {
-  requireAccess, resolveStaffDirectory, clearSessionUnlock, STAFF_LOG_PATH, HUB_URL,
+  requireAnyAccess, canEdit, resolveStaffDirectory, clearSessionUnlock, STAFF_LOG_PATH, HUB_URL,
 } from '../../scripts/staff-access.js';
 import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
 import {
@@ -268,6 +258,7 @@ const LEDGER_LOG_PATH = '/dangpretz/commissions';
 
 // ── State ────────────────────────────────────────────────────────────────────
 let session = null;
+let isManager = false; // true = full setup view; false = rep sees only their own preview
 let staffLogs = [];
 let deliveryLogs = [];
 let configLogs = [];
@@ -676,16 +667,11 @@ function renderAdjustmentsTab() {
       <td class="${Number(adj.amount) < 0 ? 'text-neg' : ''}">$${Number(adj.amount).toFixed(2)}</td>
       <td>${esc(adj.note || '')}</td>
       <td>${esc(adj.enteredBy ? getRepLabel(adj.enteredBy) : '')}</td>
-    </tr>`).join('') : '<tr><td colspan="5" class="empty-hint">No adjustments logged yet.</td></tr>';
+      <td>${adj.id ? `<button type="button" class="btn btn-sm btn-outline" data-void-adj="${esc(adj.id)}" title="Delete this adjustment">&#10005;</button>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty-hint">No adjustments logged yet.</td></tr>';
 }
 
 // ── Commission Preview tab ───────────────────────────────────────────────────
-function computeNeedsSetup() {
-  return processWholesaleCommissions({
-    deliveries: wholesaleDeliveries, existingWholesale: ledger.wholesale, config,
-  }).needsSetup;
-}
-
 // Guards against a "$-0.00" display when adjustments exactly (or almost
 // exactly, after float summation noise) cancel out a rep's total.
 function money(n) {
@@ -693,17 +679,15 @@ function money(n) {
 }
 
 function renderPreviewTab() {
-  const needsSetup = computeNeedsSetup();
-  document.getElementById('needs-setup-list').innerHTML = needsSetup.length
-    ? needsSetup.map((n) => `<li>${esc(n.customer)} &mdash; ${esc(n.sku)} <span class="text-muted">(from "${esc(n.rawSku)}"; ${[n.missingRep && 'no rep assigned', n.missingPricing && 'no price set', n.missingTiers && 'no tier schedule'].filter(Boolean).join(', ')})</span></li>`).join('')
-    : '<li class="empty-hint">Nothing pending &mdash; every confirmed wholesale delivery is fully configured.</li>';
-
   const summary = summarizeCommissions(ledger);
-  const repIds = Object.keys(summary).sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
+  let repIds = Object.keys(summary).sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
+  if (!isManager) repIds = repIds.filter((r) => r === session.code); // reps see only themselves
   const container = document.getElementById('preview-breakdown');
   renderMonthlyBreakdown();
   if (!repIds.length) {
-    container.innerHTML = '<div class="empty-hint">No commissions computed yet. Click "Compute new commissions" once pricing is set up.</div>';
+    container.innerHTML = isManager
+      ? '<div class="empty-hint">No commissions computed yet. Click "Compute new commissions" once pricing is set up.</div>'
+      : '<div class="empty-hint">No commissions recorded for you yet.</div>';
     return;
   }
   const deliveryById = Object.fromEntries(deliveries.map((d) => [d.deliveryId, d]));
@@ -728,7 +712,8 @@ function renderPreviewTab() {
         ${bucket.adjustments.length ? `<table class="preview-table"><thead><tr><th>Date</th><th colspan="5">Adjustment</th><th>Amount</th></tr></thead><tbody>${adjRows}</tbody></table>` : ''}
       </div>`;
   }).join('');
-  container.innerHTML = `${cards}<div class="grand-total">Grand total across all reps: <strong>$${money(grandTotal)}</strong></div>`;
+  const totalLabel = isManager ? 'Grand total across all reps' : 'Your total';
+  container.innerHTML = `${cards}<div class="grand-total">${totalLabel}: <strong>$${money(grandTotal)}</strong></div>`;
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -741,21 +726,24 @@ function renderMonthlyBreakdown() {
   const deliveryDateById = Object.fromEntries(deliveries.map((d) => [d.deliveryId, d.date || '']));
   const { months, reps, totals } = summarizeCommissionsByMonth(ledger, deliveryDateById);
   const container = document.getElementById('monthly-breakdown');
-  if (!months.length) {
-    container.innerHTML = '<div class="empty-hint">No commissions computed yet.</div>';
+  let cols = [...reps].sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
+  if (!isManager) cols = cols.filter((r) => r === session.code); // reps: their column only
+  if (!months.length || !cols.length) {
+    container.innerHTML = `<div class="empty-hint">No commissions ${isManager ? 'computed' : 'recorded for you'} yet.</div>`;
     return;
   }
-  const sortedReps = [...reps].sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
-  const header = `<tr><th>Month</th>${sortedReps.map((r) => `<th>${esc(getRepLabel(r))}</th>`).join('')}<th>Total</th></tr>`;
+  // Managers get a Month × rep grid with a Total column; a rep gets Month × (their $).
+  const totalCol = isManager && cols.length > 1;
+  const header = `<tr><th>Month</th>${cols.map((r) => `<th>${esc(getRepLabel(r))}</th>`).join('')}${totalCol ? '<th>Total</th>' : ''}</tr>`;
+  const rowSum = (m) => cols.reduce((s, r) => s + (totals[m][r] || 0), 0);
   const bodyRows = months.map((m) => {
-    const rowTotal = sortedReps.reduce((sum, r) => sum + (totals[m][r] || 0), 0);
-    const cells = sortedReps.map((r) => `<td>$${money(totals[m][r] || 0)}</td>`).join('');
-    return `<tr><td>${esc(formatMonth(m))}</td>${cells}<td><strong>$${money(rowTotal)}</strong></td></tr>`;
+    const cells = cols.map((r) => `<td>$${money(totals[m][r] || 0)}</td>`).join('');
+    return `<tr><td>${esc(formatMonth(m))}</td>${cells}${totalCol ? `<td><strong>$${money(rowSum(m))}</strong></td>` : ''}</tr>`;
   }).join('');
-  const colTotal = (r) => months.reduce((sum, m) => sum + (totals[m][r] || 0), 0);
-  const footerCells = sortedReps.map((r) => `<td><strong>$${money(colTotal(r))}</strong></td>`).join('');
-  const grandColTotal = sortedReps.reduce((sum, r) => sum + colTotal(r), 0);
-  const footer = `<tr><td><strong>All months</strong></td>${footerCells}<td><strong>$${money(grandColTotal)}</strong></td></tr>`;
+  const colTotal = (r) => months.reduce((s, m) => s + (totals[m][r] || 0), 0);
+  const footerCells = cols.map((r) => `<td><strong>$${money(colTotal(r))}</strong></td>`).join('');
+  const grand = cols.reduce((s, r) => s + colTotal(r), 0);
+  const footer = `<tr><td><strong>All months</strong></td>${footerCells}${totalCol ? `<td><strong>$${money(grand)}</strong></td>` : ''}</tr>`;
   container.innerHTML = `<table class="preview-table"><thead>${header}</thead><tbody>${bodyRows}${footer}</tbody></table>`;
 }
 
@@ -874,20 +862,49 @@ function bindAll() {
       toast(`Error logging adjustment: ${err.message}`);
     }
   });
+  document.getElementById('adjustment-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-void-adj]');
+    if (!btn) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Delete this adjustment? This removes it from every rep total and the monthly breakdown.')) return;
+    try {
+      await appendLog(LEDGER_LOG_PATH, {
+        action: 'void_ledger', voidId: btn.dataset.voidAdj, reason: 'deleted via Adjustments tab', by: session.code, timeStamp: new Date().toISOString(),
+      });
+      toast('Adjustment deleted.');
+      await refreshLedger();
+      renderAdjustmentsTab();
+      renderPreviewTab();
+    } catch (err) {
+      toast(`Error deleting adjustment: ${err.message}`);
+    }
+  });
   document.getElementById('compute-btn').addEventListener('click', computeCommissions);
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   bindAll();
-  session = await requireAccess('commissions-admin');
+  // Managers hold 'commissions-admin' at edit level and see everything.
+  // A rep holds 'commissions-admin:view' (or just 'sales-crm') and gets a
+  // read-only view of their own numbers on the Preview tab.
+  session = await requireAnyAccess(['commissions-admin', 'sales-crm']);
+  isManager = canEdit(session, 'commissions-admin');
   await loadAll();
   document.getElementById('identity-name').textContent = session.name || session.code;
-  renderPricingTab();
-  renderSkuMappingTab();
-  renderEventsTab();
-  renderAdjustmentsTab();
-  renderPreviewTab();
+
+  if (!isManager) {
+    document.querySelector('header h1').textContent = 'My Commissions';
+    document.querySelector('nav.tabs').style.display = 'none';
+    document.getElementById('compute-card').style.display = 'none';
+    switchTab('preview'); // activates the panel + renders it
+  } else {
+    renderPricingTab();
+    renderSkuMappingTab();
+    renderEventsTab();
+    renderAdjustmentsTab();
+    renderPreviewTab();
+  }
   document.getElementById('app').hidden = false;
 }
 
