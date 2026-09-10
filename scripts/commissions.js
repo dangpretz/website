@@ -115,6 +115,23 @@ export function collectConnectedSkus(connectedSkuByItem) {
   return [...skus].sort((a, b) => a.localeCompare(b));
 }
 
+// Every distinct customer name across ALL deliveries (any status/category) —
+// feeds the "add a customer" suggestions on the Customers & Pricing tab, so
+// a rep can pick a planner-known account before its first wholesale order.
+// `normalize` is injected (delivery-planner's normalizeCustomerName) so the
+// list matches how commissions match customer names. Case-insensitive
+// de-dupe, first-seen display form wins.
+export function collectCustomerNames(deliveries, normalize = (x) => x) {
+  const seen = new Map();
+  (Array.isArray(deliveries) ? deliveries : []).forEach((d) => {
+    const n = normalize(d.customer || '');
+    if (!n) return;
+    const k = n.toLowerCase();
+    if (!seen.has(k)) seen.set(k, n);
+  });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
 // Highest breakpoint whose minPrice <= price wins (0% if price is below
 // every breakpoint — include a { minPrice: 0, pct } row if a customer+SKU
 // should always earn something).
