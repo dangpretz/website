@@ -254,14 +254,52 @@ export const BAKE_GROUPS = {
 };
 
 // ─── CUSTOMER NAME NORMALIZATION ───────────────────────────────────────────
-// Shared with delivery-planner AND the commissions engine — a typo'd/variant
-// customer name here would silently fail to match its configured price/rep
-// in commissions-config, so both sides must normalize identically.
-// Maps known aliases (lowercase) → canonical name. null = exclude from customer list.
+// Shared with delivery-planner AND the commissions/CRM pricing views — a
+// typo'd/variant customer name here would silently fail to match its
+// configured price/rep, so every consumer normalizes identically.
+// Maps known aliases (lowercase key) → canonical name. `null` = drop from the
+// customer list (planner dropdown + pricing pickers); it does NOT delete any
+// CRM account or delivery-planner history row.
+//
+// The bulk of these came out of the 2026-09-10 CRM ↔ delivery-planner
+// reconciliation: the canonical spellings match CRM account names that now
+// exist, and the excluded names are events / placeholders / one-off
+// individuals that were never wholesale accounts.
 export const CUSTOMER_ALIASES = {
-  bees: 'The Bees',
-  'handle bar': 'Handle Bar',
   test: null,
+
+  // ── spelling / variant → canonical CRM account name ──
+  bees: 'SLC Bees',
+  'the bees': 'SLC Bees',
+  'handle bar': 'HandleBar',
+  hopkins: 'Hopkins Brewing',
+  'thieve’s guild': "Thieve's Guild", // curly apostrophe in planner history
+  willies: 'Willies Lounge',
+  roha: 'RoHa Brewing',
+  'woodward park city': 'Woodward Park City', // planner had "WoodWard"
+  'base camp gj': 'Base Camp',
+  hk: 'HK Brewing',
+  alta: "Alta - Gold Miner's Daughter",
+  'sip-n highland': 'Twisted Sugar - Highland', // rebranded location
+  tf: 'TF Brewing',
+
+  // ── not a wholesale customer → drop from the customer list ──
+  'sip-n': null,
+  stadler: null,
+  'delta center event': null,
+  'mountain america': null,
+  'cassie · biomerieux': null,
+  'lindsay hunt': null,
+  'libby snethen': null,
+  'bianca soriano': null,
+  'kristina whitney': null,
+  'caitlin askew': null,
+  'ts - placeholder': null,
+  'offsite event': null,
+  'salt palace - event': null,
+  'salt palace': null,
+  daybreak: null,
+  'intermountain health': null,
 };
 export function normalizeCustomerName(name) {
   if (!name) return null;
