@@ -427,6 +427,16 @@ export function resolveDeliveries(logs, options = {}) {
       return;
     }
     if (row.action === 'barcodes') return;
+    if (row.action === 'note') {
+      // A note row carries only { deliveryId, deliveryNote } — no date, no
+      // lineItems. Without this branch it falls through to the generic
+      // handler below and REPLACES the whole delivery with those empty
+      // fields, so the order silently drops out of the schedule and every
+      // inventory calc. Mirror the delivery-planner's own reducer: attach
+      // the text, touch nothing else.
+      if (byId[id]) byId[id].deliveryNote = row.deliveryNote || '';
+      return;
+    }
     if (row.action === 'confirm') {
       if (byId[id]) {
         byId[id].status = (byId[id].type || 'delivery').toLowerCase() === 'pickup'
