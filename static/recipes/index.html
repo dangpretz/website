@@ -202,6 +202,7 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
 
     const RECIPES_PATH   = '/dangpretz/recipes';
     const RECEIVING_PATH = '/dangpretz/receiving';
@@ -216,28 +217,9 @@
       'Dangerous Dip Box', 'Honey Mustard Dip Box', 'Hot Ranch Dip Box', 'Sweet Cream Dip Box',
     ];
 
-    // ── Product catalog — populated dynamically from receiving log ───────────
-    const PRODUCTS = [];
-
-    function buildDynamicProducts(receivingLogs) {
-      const archived = new Set(
-        receivingLogs.filter((r) => r.action === 'archive_product').map((r) => r.productId),
-      );
-      receivingLogs
-        .filter((r) => r.action === 'new_product')
-        .forEach((r) => {
-          if (!r.usFoodsCode || !r.productName) return;
-          const dynamicId = `new-${r.usFoodsCode}`;
-          if (archived.has(dynamicId)) return;
-          if (PRODUCTS.some((p) => p.usFoodsCode === r.usFoodsCode)) return;
-          PRODUCTS.push({
-            id: dynamicId,
-            name: r.productName,
-            packSize: r.packSize || '',
-            usFoodsCode: r.usFoodsCode,
-          });
-        });
-    }
+    // ── Product catalog — the shared ingredient list (scripts/ingredient-catalog.js),
+    //    with the live receiving log applied. Filled in init().
+    let PRODUCTS = [];
 
     // ── Utilities ────────────────────────────────────────────────────────────
     function escapeHtml(s) {
@@ -479,10 +461,8 @@
       function renderDropdown(query) {
         const q = query.trim().toLowerCase();
         if (!q) { dropdown.hidden = true; return; }
-        const matches = PRODUCTS.filter((p) => {
-          const { unit } = parsePackSize(p.packSize);
-          return unit !== 'EA' && !addedIds.has(p.id) && p.name.toLowerCase().includes(q);
-        });
+        // Every catalog ingredient is selectable — no pack-size filter.
+        const matches = PRODUCTS.filter((p) => !addedIds.has(p.id) && p.name.toLowerCase().includes(q));
         if (!matches.length) { dropdown.hidden = true; return; }
         dropdown.innerHTML = matches.map((p) => `<div class="ingredient-option" data-product-id="${escapeHtml(p.id)}">
             <span class="ing-opt-name">${escapeHtml(p.name)}</span>
@@ -682,7 +662,7 @@
           fetchLog(RECIPES_PATH),
           fetchLog(RECEIVING_PATH),
         ]);
-        buildDynamicProducts(Array.isArray(receivingLogs) ? receivingLogs : []);
+        PRODUCTS = resolveIngredients(Array.isArray(receivingLogs) ? receivingLogs : []);
         buildRecipeMaps(Array.isArray(recipeLogs) ? recipeLogs : []);
         const defined = SKUS.filter((s) => recipeMap[s] && Object.keys(recipeMap[s]).length > 0).length;
         setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined · ${PRODUCTS.length} ingredients available`);
