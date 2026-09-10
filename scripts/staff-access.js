@@ -70,7 +70,7 @@ export const LINK_CATALOG = [
   { key: 'barcode-lookup', label: 'Barcode Lookup', url: '/static/barcode-lookup/index.html' },
   { key: 'delivery-planner', label: 'Delivery Planner', url: '/static/delivery-planner/index.html' },
   { key: 'sales-crm', label: 'Sales CRM', url: '/static/sales/index.html' },
-  { key: 'commissions-admin', label: 'Commissions Setup', url: '/static/commissions-admin/index.html' },
+  { key: 'commissions-admin', label: 'Commissions', url: '/static/commissions-admin/index.html' },
 ];
 
 const LEGACY_DEFAULT_LINKS = [
@@ -236,6 +236,22 @@ export function requireAccess(pageKey) {
     if (!session) { redirectToHub(); return; }
     if (!hasAccess(session, pageKey)) {
       renderDenied(pageKey, session);
+      return;
+    }
+    resolve(session);
+  });
+}
+
+// Same gate, but the session only needs ANY ONE of `pageKeys`. For a page
+// that serves two audiences — e.g. Commissions: a manager holds
+// 'commissions-admin' and sees everything; a rep holds only 'sales-crm'
+// and sees a filtered read-only view. Denial message names the first key.
+export function requireAnyAccess(pageKeys) {
+  return new Promise((resolve) => {
+    const session = getSessionUnlock();
+    if (!session) { redirectToHub(); return; }
+    if (!pageKeys.some((k) => hasAccess(session, k))) {
+      renderDenied(pageKeys[0], session);
       return;
     }
     resolve(session);

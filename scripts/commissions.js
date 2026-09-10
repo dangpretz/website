@@ -129,11 +129,20 @@ export function resolveTierPct(tiers, price) {
 }
 
 // ── /dangpretz/commissions (computed + manual ledger entries) ─────────────
+// `void_ledger` rows ({ voidId }) delete a prior entry by its id — used by
+// the Adjustments tab's ✕ button and for one-off cleanup. Works for any
+// ledger row: wholesale rows keyed by "<deliveryId>:<index>", events and
+// adjustments by their server-assigned id.
 export function resolveCommissionsLedger(logs) {
+  const rows = Array.isArray(logs) ? logs : [];
+  const voided = new Set(
+    rows.filter((r) => r.action === 'void_ledger' && r.voidId).map((r) => r.voidId),
+  );
   const wholesale = {}; // id -> row, last-write-wins (should never actually collide — see lock-in)
   const events = [];
   const adjustments = [];
-  (Array.isArray(logs) ? logs : []).forEach((row) => {
+  rows.forEach((row) => {
+    if (voided.has(row.id)) return;
     if (row.action === 'log_wholesale_commission' && row.id) {
       wholesale[row.id] = row;
     } else if (row.action === 'log_event_commission') {
