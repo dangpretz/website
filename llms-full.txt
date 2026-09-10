@@ -29,6 +29,9 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - Direct wholesale vs distributor: one business stocking for its own guests vs a network carrying the brand in a region
 - Pretzel Program: a separate venue lane (plug-in heated station), not the frozen-case wholesale path
 - New wholesale accounts: inquiry form on the wholesale page, info@dangerouspretzel.com, or the shop phone / text numbers above
+- Existing partners order at the wholesale portal (linked from the wholesale pages)
+- Distributor page publishes 15+ wholesale partners and 50K+ pretzels sold monthly
+- Spoke pages for grocery/retail, venues/concessions, bars/breweries, and Intermountain foodservice all use the same wholesale inquiry form
 
 ## Key pages (200 URLs)
 
@@ -39,8 +42,12 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html)
 - [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html)
 - [Restaurants and bars](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-restaurants.html)
+- [Bars and breweries](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-bars.html)
+- [Grocery and retail](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-grocery.html)
+- [Event venues](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-venues.html)
 - [Frozen foodservice](https://www.dangerouspretzel.com/v2/frozen-soft-pretzels.html)
 - [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html)
+- [Intermountain](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-intermountain.html)
 - [Distributor vs direct](https://www.dangerouspretzel.com/v2/distributor-vs-direct-wholesale.html)
 - [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html)
 - [Our story](https://www.dangerouspretzel.com/v2/our-story.html)

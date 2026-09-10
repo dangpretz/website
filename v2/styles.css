@@ -207,6 +207,40 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   justify-content: center;
   flex-wrap: wrap;
 }
+.cta-partner-note {
+  font: 400 13px/1.5 'Manrope', sans-serif;
+  color: #888;
+  text-align: center;
+  margin: 16px auto 0;
+  max-width: 640px;
+}
+.cta-partner-note a {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.cta-red .cta-partner-note { color: rgba(255, 255, 255, 0.8); }
+.trust-strip {
+  background: #1A1A1A;
+  border-top: 1px solid #333;
+  padding: 4px 5% 32px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px 40px;
+}
+.trust-item {
+  font: 400 13px/1.4 'Manrope', sans-serif;
+  color: #aaa;
+  text-align: center;
+  min-width: 140px;
+}
+.trust-item strong {
+  display: block;
+  font: 700 16px 'Paytone One', sans-serif;
+  color: #fff;
+  margin-bottom: 2px;
+}
 
 /* ─── Sections ─── */
 .section-dark {
