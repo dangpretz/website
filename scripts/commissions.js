@@ -48,6 +48,10 @@ export function resolveCommissionsConfig(logs) {
   const pricingByCustomerSku = {};
   const tiersBySku = {};
   const connectedSkuByItem = {};
+  // SKUs a manager has hidden from the reps' Customers & Pricing tab
+  // (set_sku_rep_hidden). Default is visible — only an explicit `hidden:true`
+  // row keeps a SKU off the rep view; a later `hidden:false` row un-hides it.
+  const repHiddenSkus = {};
   (Array.isArray(logs) ? logs : []).forEach((row) => {
     if (row.action === 'set_customer_rep' && row.customer) {
       repByCustomer[row.customer] = row.repCode;
@@ -57,6 +61,8 @@ export function resolveCommissionsConfig(logs) {
       let tiers = [];
       try { tiers = JSON.parse(row.tiers || '[]'); } catch (_) { /* malformed row, treat as no tiers */ }
       tiersBySku[row.sku] = Array.isArray(tiers) ? tiers : [];
+    } else if (row.action === 'set_sku_rep_hidden' && row.sku) {
+      repHiddenSkus[row.sku] = row.hidden === true || row.hidden === 'true';
     } else if (row.action === 'set_sku_alias' && row.deliveryItem) {
       // A blank connectedSku is a deliberate "not commissioned" mark (e.g. a
       // drink, a catering box) — store it same as any other value so it
@@ -66,7 +72,7 @@ export function resolveCommissionsConfig(logs) {
     }
   });
   return {
-    repByCustomer, pricingByCustomerSku, tiersBySku, connectedSkuByItem,
+    repByCustomer, pricingByCustomerSku, tiersBySku, connectedSkuByItem, repHiddenSkus,
   };
 }
 
