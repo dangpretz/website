@@ -1272,7 +1272,7 @@ async function loadData() {
       fetchLog(DELIVERY_LOG_PATH).catch(() => []),
     ]);
     if (Array.isArray(logs)) applyLogs(logs);
-    pricingConfig = resolveCommissionsConfig(Array.isArray(cfgLogs) ? cfgLogs : []);
+    pricingConfig = resolveCommissionsConfig(Array.isArray(cfgLogs) ? cfgLogs : [], normalizeCustomerName);
     deliveries = resolveDeliveries(Array.isArray(dpLogs) ? dpLogs : []);
   } catch (_) { /* network issue — data unavailable this load */ }
 }
@@ -1281,7 +1281,7 @@ async function loadData() {
 // commissions page's refreshConfig — the sales-crm log is untouched).
 async function refreshPricingConfig() {
   const cfgLogs = await fetchLog(PRICING_LOG_PATH);
-  pricingConfig = resolveCommissionsConfig(Array.isArray(cfgLogs) ? cfgLogs : []);
+  pricingConfig = resolveCommissionsConfig(Array.isArray(cfgLogs) ? cfgLogs : [], normalizeCustomerName);
 }
 
 // ── Computed metrics ──────────────────────────────────────────────────────────

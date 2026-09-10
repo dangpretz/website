@@ -307,7 +307,7 @@ function recomputeAll() {
       && (d.orderCategory || 'wholesale') === 'wholesale'
       && ['delivered', 'picked_up'].includes(d.status),
   );
-  config = resolveCommissionsConfig(configLogs);
+  config = resolveCommissionsConfig(configLogs, normalizeCustomerName);
   // A customer's rep is owned by its CRM account now (pricing + assignment
   // moved to the Sales CRM). Legacy set_customer_rep rows — still parsed by
   // resolveCommissionsConfig — fill any gap for a customer whose planner
@@ -333,7 +333,7 @@ async function loadAll() {
 
 async function refreshConfig() {
   configLogs = await fetchLog(CONFIG_LOG_PATH);
-  config = resolveCommissionsConfig(configLogs);
+  config = resolveCommissionsConfig(configLogs, normalizeCustomerName);
   config.repByCustomer = {
     ...config.repByCustomer,
     ...repByCustomerFromAccounts(resolveAccounts(salesCrmLogs), normalizeCustomerName),
@@ -669,7 +669,10 @@ async function computeCommissions() {
   let skippedForSetup = 0;
   try {
     const { toWrite, needsSetup } = processWholesaleCommissions({
-      deliveries: wholesaleDeliveries, existingWholesale: ledger.wholesale, config,
+      deliveries: wholesaleDeliveries,
+      existingWholesale: ledger.wholesale,
+      config,
+      normalize: normalizeCustomerName,
     });
     skippedForSetup = needsSetup.length;
     // Sequential writes with pacing — the sheet-logger backend has shown
