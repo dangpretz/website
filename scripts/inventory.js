@@ -492,9 +492,11 @@ export function resolveDeliveries(logs, options = {}) {
 
 /**
  * Reduce production-log rows into per-date state + global skuConfig + skuAliases.
- * Returns { state, skuConfig, skuAliases, latestInventoryTs, productionLogs }.
- * `productionLogs` is the input array — kept for callers that need raw rows
- * (e.g. timestamp-precise event accounting in getInventoryReport).
+ * Returns { state, skuConfig, skuAliases, latestInventoryTs, productionLogs,
+ * packedCases, deferrals }. `productionLogs` is the input array — kept for
+ * callers that need raw rows (e.g. timestamp-precise event accounting in
+ * getInventoryReport). `deferrals` maps `${team}|${sku}|${deliveryDate}` →
+ * the date shape/BFP work for that order was pushed to ('' = cleared).
  */
 export function resolveProductionLogs(logs) {
   const state = {};
@@ -679,8 +681,27 @@ export function resolveProductionLogs(logs) {
     }
   });
 
+  // Pass 4: defer events. NOT date-keyed — a defer decision applies to a
+  // (team, sku, deliveryDate) tuple regardless of the day it was logged.
+  // Last-write-wins by timeStamp; deferTo:'' is a tombstone that clears it.
+  const deferrals = {};
+  const deferralTs = {};
+  productionLogs.forEach((row) => {
+    if (row.action !== 'defer') return;
+    const team = (row.team || '').trim();
+    const sku = canonicalSku(row.sku);
+    const deliveryDate = (row.deliveryDate || '').trim();
+    if (!team || !sku || !deliveryDate) return;
+    const key = `${team}|${sku}|${deliveryDate}`;
+    const ts = row.timeStamp || '';
+    if (!(key in deferrals) || (deferralTs[key] || '') <= ts) {
+      deferrals[key] = (row.deferTo || '').trim();
+      deferralTs[key] = ts;
+    }
+  });
+
   return {
-    state, skuConfig, skuAliases, latestInventoryTs, productionLogs, packedCases,
+    state, skuConfig, skuAliases, latestInventoryTs, productionLogs, packedCases, deferrals,
   };
 }
 

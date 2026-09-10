@@ -687,6 +687,7 @@
       width: 5px; background: var(--wcard-stripe, var(--gray-3));
     }
     .wcard.status-overdue  { background: #FCEBEB; }
+    .wcard.status-morning  { background: #FFF3E0; }
     .wcard.status-pending  { background: var(--white); }
     .wcard.status-progress { background: #E6F1FB; }
     .wcard.status-done     { background: #EAF3DE; }
@@ -712,9 +713,26 @@
       white-space: nowrap;
     }
     .wcard-pill.overdue  { background: rgba(196,30,30,0.12); color: var(--red); }
+    .wcard-pill.morning  { background: rgba(214,138,20,0.16); color: #9a5b00; }
     .wcard-pill.pending  { background: rgba(0,0,0,0.06); color: var(--gray-4); }
     .wcard-pill.progress { background: rgba(12,68,124,0.12); color: #0C447C; }
     .wcard-pill.done     { background: rgba(42,122,42,0.18); color: var(--green); }
+
+    /* Defer-to-tomorrow row */
+    .wdefer-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-top: 10px;
+    }
+    .wdefer-btn, .wundo-defer-btn {
+      font: 700 12px 'Manrope', sans-serif;
+      padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--gray-2); background: var(--white);
+      color: var(--dark); cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .wdefer-btn:active, .wundo-defer-btn:active { background: var(--gray-1); }
+    .wdefer-btn:disabled, .wundo-defer-btn:disabled { opacity: 0.5; cursor: default; }
+    .wdefer-note { font: 600 11px 'Manrope', sans-serif; color: #9a5b00; }
 
     /* Twin metric boxes */
     .wcard-metrics {
@@ -1411,6 +1429,7 @@
   let skuConfig       = {}; // { sku: { batchSize, type } } — from sku_config log entries
   let skuAliases      = {}; // { oldSku: canonicalSku } — from sku_alias log entries
   let packedCases     = {}; // {deliveryId: {sku: {caseIndex: {packed, ts}}}} — from case_packed log entries
+  let deferrals       = {}; // {`${team}|${sku}|${deliveryDate}`: 'YYYY-MM-DD'|''} — from defer log entries ('' = cleared)
   let latestInventoryTs = null; // ISO timestamp of latest inventory snapshot
   let schedule        = { shape: {}, bfp: {}, overdue: [], foh: [], unconfigured: [] };
   let currentDate     = new Date();
@@ -1574,6 +1593,11 @@
       pill_pending:      'Pending',
       pill_progress:     'In progress',
       pill_done:         'Done',
+      pill_morning:      'Morning priority',
+      defer_tomorrow:    '→ Defer to tomorrow',
+      defer_undo:        '← Undo defer',
+      deferred_to:       ({ day }) => `Deferred to ${day}`,
+      morning_note:      'Prep window has closed — make this first',
       metric_tandas:     'BATCHES',
       metric_trays:      'TRAYS',
       metric_pretzels:   'PRETZELS',
@@ -1721,6 +1745,11 @@
       pill_pending:      'Pendiente',
       pill_progress:     'En progreso',
       pill_done:         'Listo',
+      pill_morning:      'Para la mañana',
+      defer_tomorrow:    '→ Aplazar a mañana',
+      defer_undo:        '← Deshacer aplazo',
+      deferred_to:       ({ day }) => `Aplazado al ${day}`,
+      morning_note:      'La ventana de preparación cerró — hacer esto primero',
       metric_tandas:     'TANDAS',
       metric_trays:      'BANDEJAS',
       metric_pretzels:   'PRETZELS',
@@ -2092,29 +2121,64 @@
       arr.forEach(item => { item.batches = Math.max(item.shapeLeft, item.bfpLeft); });
     });
 
-    // Build pools — overdue items are forced into today's window so they
-    // appear on today's schedule (with isOverdue flag) AND in the alert banner
+    // Build pools. Two things pull an item off its natural window onto a
+    // single forced day:
+    //   - the prep window already closed → "morning priority": still make it,
+    //     first thing tomorrow, flagged calmly instead of a red alarm.
+    //   - a staff "defer to tomorrow" (deferrals[]) → lands later in the
+    //     window, or, if pushed past the window end, also morning-priority.
+    // Forced-day items always fit (the daysLeft===0 deadline path).
     const overdue = [];
     const shapePool = [], bfpPool = [];
+
+    // Honour any defer log entry for one team's window on one delivery item.
+    // Returns { window, morningPriority, deferredTo, closed }.
+    const applyDefer = (team, natWindow, deliveryDate, sku) => {
+      const deferTo = deferrals[`${team}|${sku}|${deliveryDate}`] || '';
+      const closed  = natWindow.end < todayStr;
+      const pushedPastEnd = !!deferTo && deferTo > natWindow.end;
+      const deferElapsed  = !!deferTo && deferTo < todayStr;
+      const morningPriority = closed || pushedPastEnd || deferElapsed;
+      let window;
+      if (morningPriority) {
+        // Latest of {deferTo, window start, today}, never after the ship date.
+        let landing = [deferTo, natWindow.start, todayStr].filter(Boolean).sort().pop();
+        if (landing > deliveryDate) landing = deliveryDate;
+        window = { start: landing, end: landing };
+      } else if (deferTo && deferTo > natWindow.start) {
+        window = { start: deferTo, end: natWindow.end };
+      } else {
+        window = { ...natWindow };
+      }
+      return { window, morningPriority, deferredTo: deferTo || null, closed };
+    };
+
     Object.values(bySkuItems).flat().forEach(item => {
       if (item.shapeLeft > 0) {
-        const closed = item.shapeWindow.end < todayStr;
-        if (closed) overdue.push({ team: 'shape', sku: item.sku, batches: item.shapeLeft, windowEnd: item.shapeWindow.end, deliveryDate: item.deliveryDate });
+        const dfr = applyDefer('shape', item.shapeWindow, item.deliveryDate, item.sku);
+        if (dfr.closed) overdue.push({ team: 'shape', sku: item.sku, batches: item.shapeLeft, windowEnd: item.shapeWindow.end, deliveryDate: item.deliveryDate });
         shapePool.push({
           sku: item.sku, left: item.shapeLeft, deliveryDate: item.deliveryDate,
-          window: closed ? { start: todayStr, end: todayStr } : item.shapeWindow,
+          window: dfr.window,
           orders: item.orders, pretzels: item.pretzels,
-          isOverdue: closed,
+          isOverdue: dfr.closed,
+          morningPriority: dfr.morningPriority,
+          deferredTo: dfr.deferredTo,
         });
       }
       if (item.bfpLeft > 0) {
-        const closed = item.bfpWindow.end < todayStr;
-        if (closed) overdue.push({ team: 'bfp', sku: item.sku, batches: item.bfpLeft, windowEnd: item.bfpWindow.end, deliveryDate: item.deliveryDate });
+        // Deferring shape does NOT auto-defer BFP — each team owns its own
+        // defer. When shape slips, BFP's own window closes on a later render
+        // and it surfaces as morning-priority independently.
+        const dfr = applyDefer('bfp', item.bfpWindow, item.deliveryDate, item.sku);
+        if (dfr.closed) overdue.push({ team: 'bfp', sku: item.sku, batches: item.bfpLeft, windowEnd: item.bfpWindow.end, deliveryDate: item.deliveryDate });
         bfpPool.push({
           sku: item.sku, left: item.bfpLeft, deliveryDate: item.deliveryDate,
-          window: closed ? { start: todayStr, end: todayStr } : item.bfpWindow,
+          window: dfr.window,
           orders: item.orders, pretzels: item.pretzels,
-          isOverdue: closed,
+          isOverdue: dfr.closed,
+          morningPriority: dfr.morningPriority,
+          deferredTo: dfr.deferredTo,
         });
       }
     });
@@ -2198,6 +2262,7 @@
         const annotated = eligible
           .map(p => ({ ...p, daysLeft: daysBetween(dayStr, p.window.end), runSize: runSizes[p.sku] || 0 }))
           .sort((a, b) => {
+            if (!!a.morningPriority !== !!b.morningPriority) return a.morningPriority ? -1 : 1; // do-first
             if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;  // urgent first
             if (b.runSize  !== a.runSize)  return b.runSize  - a.runSize;   // large run first (consolidate)
             return a.deliveryDate.localeCompare(b.deliveryDate);             // earliest delivery tiebreak
@@ -2217,9 +2282,10 @@
           if (cap <= 0) break;
           let take = Math.min(a.left, cap);
 
-          // BFP dough constraint: cap take by available dough for this SKU
-          // (overdue items bypass — they're already a problem and need visibility)
-          if (type === 'bfp' && ctx && !a.isOverdue) {
+          // BFP dough constraint: cap take by available dough for this SKU.
+          // Overdue AND morning-priority items bypass — visibility of the
+          // deadline beats the dough model (the decrement below is floored).
+          if (type === 'bfp' && ctx && !a.isOverdue && !a.morningPriority) {
             const bs = getBatchSize(a.sku);
             const doughBatches = bs > 0 ? Math.floor((doughBalance[a.sku] || 0) / bs) : 0;
             take = Math.min(take, doughBatches);
@@ -2245,6 +2311,10 @@
             if (!existing.deliveryDates.includes(a.deliveryDate)) existing.deliveryDates.push(a.deliveryDate);
             existing.urgent    = existing.urgent || a.daysLeft === 0;
             existing.isOverdue = existing.isOverdue || !!a.isOverdue;
+            existing.morningPriority = existing.morningPriority || !!a.morningPriority;
+            if (a.deferredTo && (!existing.deferredTo || a.deferredTo > existing.deferredTo)) {
+              existing.deferredTo = a.deferredTo;
+            }
             a.orders.forEach(o => { if (!existing.orders.includes(o)) existing.orders.push(o); });
           } else {
             dayItems.push({
@@ -2253,6 +2323,8 @@
               urgent: a.daysLeft === 0,
               overloaded: isOverloaded,
               isOverdue: !!a.isOverdue,
+              morningPriority: !!a.morningPriority,
+              deferredTo: a.deferredTo || null,
               orders: [...a.orders],
             });
           }
@@ -2467,7 +2539,7 @@
     // Status grouping replaces the old BFP "Standard / + Coating step" split — the
     // cheese chip on each coating card already conveys the same info.
     const groups = {
-      pending:  items.filter(d => d.bucket === 'overdue' || d.bucket === 'pending'),
+      pending:  items.filter(d => d.bucket === 'morning' || d.bucket === 'overdue' || d.bucket === 'pending'),
       progress: items.filter(d => d.bucket === 'progress'),
       done:     items.filter(d => d.bucket === 'done'),
     };
@@ -2619,6 +2691,7 @@
           batches: 0, needBatches: 0, madeBatches: made,
           deliveryDates: [], orders: [],
           urgent: false, isOverdue: false, overloaded: false,
+          morningPriority: false, deferredTo: null,
         };
       }
     });
@@ -2658,6 +2731,7 @@
         const priorDate = priorLatestDate[d.sku] || null;
         let bucket;
         if (madeP >= origP - 0.5 && origP > 0)  bucket = 'done';
+        else if (d.morningPriority)              bucket = 'morning'; // window past — do first thing
         else if (d.madeBatches > 0)              bucket = 'progress';
         else if (d.isOverdue)                    bucket = 'overdue';
         else                                      bucket = 'pending';
@@ -2666,7 +2740,7 @@
 
     // Sort within each bucket by earliest delivery date
     return items.sort((a, b) => {
-      const order = { overdue: 0, pending: 1, progress: 2, done: 3 };
+      const order = { morning: -1, overdue: 0, pending: 1, progress: 2, done: 3 };
       if (order[a.bucket] !== order[b.bucket]) return order[a.bucket] - order[b.bucket];
       const ad = a.deliveryDates[0] || '9999';
       const bd = b.deliveryDates[0] || '9999';
@@ -2722,11 +2796,13 @@
     }
 
     // Status pill
-    const pillKey = d.bucket === 'overdue' ? 'pill_overdue'
+    const pillKey = d.bucket === 'morning'  ? 'pill_morning'
+                  : d.bucket === 'overdue'  ? 'pill_overdue'
                   : d.bucket === 'progress' ? 'pill_progress'
                   : d.bucket === 'done'     ? 'pill_done'
                                              : 'pill_pending';
-    const pillIcon = d.bucket === 'overdue' ? '🚨 '
+    const pillIcon = d.bucket === 'morning'  ? '🌅 '
+                   : d.bucket === 'overdue'  ? '🚨 '
                    : d.bucket === 'progress' ? '⏳ '
                    : d.bucket === 'done'     ? '✅ '
                                               : '';
@@ -2904,6 +2980,31 @@
       }
     }
 
+    // ── Defer to tomorrow / undo / morning-priority note ──────────────────
+    // Any production staff can defer, only from Today's view, and never onto
+    // or past the ship date. Each click pushes one more day off the current
+    // scheduled/deferred day.
+    const _today0       = toDateStr(new Date());
+    const earliestDeliv = (d.deliveryDates || []).slice().sort()[0] || null;
+    const nextDeferTo   = toDateStr(addDays(parseDate(d.deferredTo || _today0), 1));
+    const canDefer = d.bucket !== 'done'
+      && dateStr === _today0
+      && !!earliestDeliv
+      && nextDeferTo < earliestDeliv;
+    const fmtDayLabel = (ds) => `${fmtDay(parseDate(ds))} ${fmtShort(parseDate(ds))}`;
+    const deferBtnHtml = canDefer
+      ? `<button class="wdefer-btn" data-defer data-key="${esc(type)}|${esc(d.sku)}" data-deliveries="${esc((d.deliveryDates || []).join(','))}" data-defer-to="${esc(nextDeferTo)}">${t('defer_tomorrow')}</button>`
+      : '';
+    const undoDeferBtnHtml = d.deferredTo
+      ? `<button class="wundo-defer-btn" data-undo-defer data-key="${esc(type)}|${esc(d.sku)}" data-deliveries="${esc((d.deliveryDates || []).join(','))}">${t('defer_undo')}</button>`
+      : '';
+    const deferNoteHtml = d.deferredTo
+      ? `<span class="wdefer-note">${t('deferred_to', { day: fmtDayLabel(d.deferredTo) })}</span>`
+      : (d.bucket === 'morning' ? `<span class="wdefer-note">${t('morning_note')}</span>` : '');
+    const deferRowHtml = (deferBtnHtml || undoDeferBtnHtml || deferNoteHtml)
+      ? `<div class="wdefer-row">${deferBtnHtml}${undoDeferBtnHtml}${deferNoteHtml}</div>`
+      : '';
+
     return `<div class="wcard status-${d.bucket}" style="--wcard-stripe:${stripe}">
       <div class="wcard-head">
         <div>
@@ -2943,6 +3044,8 @@
         ${stepStatus}
       </div>
 
+      ${deferRowHtml}
+
       <div class="whelper">${esc(helper)}</div>
       <button class="wdetails-toggle" data-details-toggle data-sku="${esc(d.sku)}">ⓘ ${t('details_link')}</button>
       <div class="wdetails-panel" id="wdp-${esc(type)}-${esc(d.sku)}" style="display:none">
@@ -2972,7 +3075,7 @@
 
     // Group items by bucket
     const groups = {
-      pending:  items.filter(d => d.bucket === 'overdue' || d.bucket === 'pending'),
+      pending:  items.filter(d => d.bucket === 'morning' || d.bucket === 'overdue' || d.bucket === 'pending'),
       progress: items.filter(d => d.bucket === 'progress'),
       done:     items.filter(d => d.bucket === 'done'),
     };
@@ -4430,34 +4533,10 @@
   function render() {
     updateNav();
 
-    // Consolidated overdue panel (one block, merged by SKU, pretzel-first display).
-    // Filtered by role — team views only see their own team's overdue items.
-    let overdueHtml = '';
-    if (schedule.overdue.length > 0) {
-      const mergeBySku = (items) => {
-        const m = {};
-        items.forEach(o => { m[o.sku] = (m[o.sku] || 0) + o.batches; });
-        return Object.entries(m).map(([sku, b]) => {
-          const bs = getBatchSize(sku);
-          const p  = Math.round(b * bs);
-          return `${esc(skuDisplayName(sku))} · <strong>${p}</strong> pretzel${p !== 1 ? 's' : ''} (${b} batch${b !== 1 ? 'es' : ''})`;
-        }).join(' · ');
-      };
-      const showShape  = userRole === 'manager' || userRole === 'shape';
-      const showBfp    = userRole === 'manager' || userRole === 'bfp';
-      const shapeOver  = showShape ? schedule.overdue.filter(o => o.team === 'shape') : [];
-      const bfpOver    = showBfp   ? schedule.overdue.filter(o => o.team === 'bfp')   : [];
-      const visibleSet = new Set([...shapeOver, ...bfpOver].map(o => `${o.team}:${o.sku}`));
-      const groupHtml  = (items, label) => items.length === 0 ? '' :
-        `<div style="margin-top:6px"><span style="font:700 12px 'Manrope',sans-serif;text-transform:uppercase;letter-spacing:0.5px">${label}:</span> ${mergeBySku(items)}</div>`;
-      if (visibleSet.size > 0) {
-        overdueHtml = `<div class="overdue-banner">
-          <div style="font:800 14px 'Manrope',sans-serif;margin-bottom:2px">${t('overdue_title', { n: visibleSet.size })}</div>
-          ${groupHtml(shapeOver, t('shape_label'))}
-          ${groupHtml(bfpOver, t('bfp_label'))}
-        </div>`;
-      }
-    }
+    // Overdue / past-window work is no longer a separate banner — those cards
+    // now carry the "🌅 Morning priority" treatment and sort to the top of the
+    // pending list (see buildOptimalSchedule's applyDefer + buildWorkerItems).
+    // `schedule.overdue` is still populated for the schedule-change toast.
 
     // Unconfigured SKU warnings — manager only (configuring is an admin task)
     const unconfigHtml = userRole === 'manager'
@@ -4549,9 +4628,10 @@
       }
     }
 
-    // Worker views see no banners (calmer UX). Per-card 🚨 tag still surfaces overdue work.
+    // Worker views see no banners (calmer UX). Per-card 🌅 tag surfaces
+    // past-window work for everyone.
     const alertHtml = userRole === 'manager'
-      ? (overdueHtml + agingDoughHtml + overbakeHtml + unconfigHtml + dupHtml + unconfirmedHtml)
+      ? (agingDoughHtml + overbakeHtml + unconfigHtml + dupHtml + unconfirmedHtml)
       : '';
     document.getElementById('alert-area').innerHTML = alertHtml;
 
@@ -4606,6 +4686,34 @@
     });
     document.querySelectorAll('[data-pack-toggle]').forEach(btn => {
       btn.addEventListener('click', () => togglePackedCase(btn));
+    });
+    // Defer to tomorrow / undo — writes a `defer` log row per delivery date on
+    // the card, then reloads + reschedules. deferTo:'' clears the deferral.
+    const writeDefers = async (btn, deferTo) => {
+      const [team, sku] = btn.dataset.key.split('|');
+      const deliveries  = (btn.dataset.deliveries || '').split(',').filter(Boolean);
+      if (deliveries.length === 0) return;
+      btn.disabled = true;
+      try {
+        await Promise.all(deliveries
+          .filter(dd => !deferTo || deferTo <= dd) // never push past this ship date
+          .map(dd => appendLog(PRODUCTION_LOG, {
+            action: 'defer', team, sku, deliveryDate: dd,
+            deferTo, by: userRole, timeStamp: new Date().toISOString(),
+          })));
+        await loadProduction();
+        schedule = buildOptimalSchedule();
+        render();
+      } catch (err) {
+        btn.disabled = false;
+        alert((appLang === 'es' ? 'Error al aplazar: ' : 'Error deferring: ') + err.message);
+      }
+    };
+    document.querySelectorAll('[data-defer]').forEach(btn => {
+      btn.addEventListener('click', () => writeDefers(btn, btn.dataset.deferTo || ''));
+    });
+    document.querySelectorAll('[data-undo-defer]').forEach(btn => {
+      btn.addEventListener('click', () => writeDefers(btn, ''));
     });
     // Dips tab stepper — per-dip, single OR double batches, simpler than shape/bfp.
     document.querySelectorAll('[data-dip-step]').forEach(btn => {
@@ -5025,6 +5133,7 @@
     skuAliases        = resolved.skuAliases;
     latestInventoryTs = resolved.latestInventoryTs;
     packedCases       = resolved.packedCases || {};
+    deferrals         = resolved.deferrals || {};
   }
 
   async function loadSkus() {
