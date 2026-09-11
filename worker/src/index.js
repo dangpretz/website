@@ -305,6 +305,42 @@ async function handleFixFulfillment(request, env) {
 
 const SHEET_LOGGER_BASE = 'https://sheet-logger.david8603.workers.dev';
 const DELIVERY_LOG_PATH = '/dangpretz/delivery-planner';
+const FOH_SALES_LOG_PATH = '/dangpretz/foh-sales';
+
+// Append one row to a sheet-logger log. Same convention the rest of the
+// worker uses (fields as query-string params, empty POST body, server sets
+// the real timeStamp). Values are stringified; objects → JSON.
+async function sheetAppend(path, fields) {
+  const params = new URLSearchParams();
+  Object.entries(fields).forEach(([k, v]) => {
+    if (v === undefined || v === null) return;
+    params.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+  });
+  const resp = await fetch(`${SHEET_LOGGER_BASE}${path}?${params.toString()}`, { method: 'POST' });
+  return { ok: resp.ok, status: resp.status };
+}
+
+// Square webhook signing key: env secret first (if an operator ever sets one),
+// else the copy this worker persisted to KV via /admin/setup-sales-webhook —
+// which keeps webhook provisioning to a single `wrangler deploy` with no
+// follow-up `wrangler secret put`.
+async function resolveWebhookSigningKey(env) {
+  if (env.SQUARE_WEBHOOK_SIGNATURE_KEY) return env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+  if (env.FOH_CAL_STATE) {
+    try { return (await env.FOH_CAL_STATE.get('sq-webhook-sig-key')) || null; }
+    catch (_) { return null; }
+  }
+  return null;
+}
+
+// Is this Square order a real catering order (vs. a retail POS sale)?
+// Same test fetchSquareCateringOrders uses — lifted here so the webhook and
+// the /foh-sales scan can share it.
+function isCateringOrder(o) {
+  if (!o) return false;
+  return o.source?.name === 'DPC Website'
+    || (o.line_items || []).some((li) => /^catering:/i.test(li.name || ''));
+}
 
 // Square line-item display names → canonical SKUs in skus.json.
 // Keys are lowercase + trimmed. Add entries here when an unmapped name
@@ -555,10 +591,7 @@ async function fetchSquareCateringOrders(env, { sinceDays = 90 } = {}) {
   // Invoice-flow orders are handled separately by fetchSquareInvoiceOrders.
   const todayStr = new Date().toISOString().slice(0, 10);
   return all.filter((o) => {
-    const isCatering =
-      o.source?.name === 'DPC Website'
-      || (o.line_items || []).some((li) => /^catering:/i.test(li.name || ''));
-    if (!isCatering) return false;
+    if (!isCateringOrder(o)) return false;
     // Skip past fulfillments
     const ful = (o.fulfillments || []).find(
       (f) => f && (f.type === 'PICKUP' || f.type === 'DELIVERY'),
@@ -734,14 +767,9 @@ async function handleCleanupSquare(request, env) {
   });
 }
 
-async function handleImportCatering(request, env) {
-  const authErr = checkAdminToken(request, env);
-  if (authErr) return authErr;
-
-  const url = new URL(request.url);
-  const sinceDays  = Math.max(1, Math.min(365, parseInt(url.searchParams.get('days'), 10) || 90));
-  const futureDays = Math.max(1, Math.min(365, parseInt(url.searchParams.get('futureDays'), 10) || 60));
-
+// Core catering→planner import. Shared by the admin endpoint and the nightly
+// cron. Returns the summary object (no Response).
+async function importCateringOrders(env, { sinceDays = 90, futureDays = 60 } = {}) {
   // Two paths in parallel: catering-form orders + invoiced orders
   let orders = [];
   let invoiceItems = [];
@@ -789,7 +817,7 @@ async function handleImportCatering(request, env) {
   const failed  = results.filter((r) => r.error || r.ok === false).length;
   const allUnmapped = [...new Set(results.flatMap((r) => r.unmappedItems || []))];
 
-  return json({
+  return {
     sinceDays,
     futureDays,
     fetched: { orders: orders.length, invoices: invoiceItems.length },
@@ -799,7 +827,164 @@ async function handleImportCatering(request, env) {
     errors,
     unmappedNames: allUnmapped,
     results,
+  };
+}
+
+async function handleImportCatering(request, env) {
+  const authErr = checkAdminToken(request, env);
+  if (authErr) return authErr;
+  const url = new URL(request.url);
+  const sinceDays  = Math.max(1, Math.min(365, parseInt(url.searchParams.get('days'), 10) || 90));
+  const futureDays = Math.max(1, Math.min(365, parseInt(url.searchParams.get('futureDays'), 10) || 60));
+  return json(await importCateringOrders(env, { sinceDays, futureDays }));
+}
+
+// Square events the webhook needs: order.* keeps the /foh-sales feed fresh and
+// catches catering orders in real time; invoice.* covers invoiced caterings.
+const SALES_WEBHOOK_EVENTS = [
+  'order.created',
+  'order.updated',
+  'order.fulfillment.updated',
+  'invoice.created',
+  'invoice.updated',
+  'invoice.payment_made',
+];
+
+// One-time (idempotent) setup: point a Square webhook subscription at
+// …/webhooks/square with the events above, then persist its signing key to KV
+// so verifySquareSignature can read it without a wrangler secret. Safe to
+// re-run — it reuses an existing subscription and just refreshes the key.
+async function handleSetupSalesWebhook(request, env) {
+  const authErr = checkAdminToken(request, env);
+  if (authErr) return authErr;
+  if (!env.FOH_CAL_STATE) return json({ error: 'FOH_CAL_STATE KV not bound' }, 500);
+
+  const notificationUrl = `${new URL(request.url).origin}/webhooks/square`;
+  const sqHeaders = {
+    'Square-Version': '2025-01-23',
+    Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Find an existing subscription pointed at this worker
+  const listRes = await fetch(`${SQUARE_BASE}/webhooks/subscriptions`, { headers: sqHeaders });
+  const listData = await listRes.json();
+  if (!listRes.ok) return json({ error: 'list failed', raw: listData }, 502);
+  const existing = (listData.subscriptions || []).find(
+    (s) => (s.notification_url || '').replace(/\/$/, '') === notificationUrl,
+  );
+
+  let subscriptionId;
+  let signatureKey = null;
+  let mode;
+
+  if (existing) {
+    subscriptionId = existing.id;
+    mode = 'updated';
+    // Ensure enabled + our event set + correct URL
+    await fetch(`${SQUARE_BASE}/webhooks/subscriptions/${subscriptionId}`, {
+      method: 'PUT',
+      headers: sqHeaders,
+      body: JSON.stringify({
+        subscription: { enabled: true, event_types: SALES_WEBHOOK_EVENTS, notification_url: notificationUrl },
+      }),
+    });
+    // Rotate to obtain a signature key we can store
+    const keyRes = await fetch(`${SQUARE_BASE}/webhooks/subscriptions/${subscriptionId}/signature-key`, {
+      method: 'POST',
+      headers: sqHeaders,
+      body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+    });
+    const keyData = await keyRes.json();
+    signatureKey = keyData?.signature_key || null;
+  } else {
+    mode = 'created';
+    const createRes = await fetch(`${SQUARE_BASE}/webhooks/subscriptions`, {
+      method: 'POST',
+      headers: sqHeaders,
+      body: JSON.stringify({
+        idempotency_key: crypto.randomUUID(),
+        subscription: {
+          name: 'DPC FOH sales + catering sync',
+          event_types: SALES_WEBHOOK_EVENTS,
+          notification_url: notificationUrl,
+          api_version: '2025-01-23',
+          enabled: true,
+        },
+      }),
+    });
+    const createData = await createRes.json();
+    if (!createRes.ok) return json({ error: 'create failed', raw: createData }, 502);
+    subscriptionId = createData?.subscription?.id;
+    signatureKey = createData?.subscription?.signature_key || null;
+  }
+
+  if (!signatureKey) {
+    return json({ ok: false, mode, subscriptionId, error: 'no signature_key returned by Square' }, 502);
+  }
+  await env.FOH_CAL_STATE.put('sq-webhook-sig-key', signatureKey);
+
+  return json({
+    ok: true,
+    mode,
+    subscriptionId,
+    notificationUrl,
+    events: SALES_WEBHOOK_EVENTS,
+    signatureKeyStored: true,
   });
+}
+
+// Nightly reconciliation: snapshot yesterday's FOH sales to /dangpretz/foh-sales
+// (full totals) + a retail-only `foh_sale` row to /dangpretz/production (drives
+// dough / completed-dip drawdown), then run the catering catch-up. Idempotent
+// via a KV guard keyed on the sales date.
+async function runNightlySync(env) {
+  const out = { ok: true, steps: {} };
+
+  // Yesterday, Mountain time
+  const y = new Date(`${todayMountain()}T12:00:00-06:00`);
+  y.setUTCDate(y.getUTCDate() - 1);
+  const date = y.toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+
+  try {
+    const guardKey = `sq-foh-sync:${date}`;
+    const already = env.FOH_CAL_STATE ? await env.FOH_CAL_STATE.get(guardKey) : null;
+    if (already) {
+      out.steps.sales = { skipped: 'already synced', date };
+    } else {
+      const sales = await fetchSquareFohSales(env, 2);
+      const all = sales.byDate[date] || {};
+      const catering = sales.cateringByDate[date] || {};
+      const retail = subtractSkuMap(all, catering);
+      const orders = sales.ordersScanned;
+
+      await sheetAppend(FOH_SALES_LOG_PATH, {
+        action: 'sales_day', date, totals: all, orders,
+      });
+      const completions = Object.entries(retail).map(([sku, units]) => ({ sku, units }));
+      if (completions.length) {
+        await sheetAppend(PRODUCTION_LOG_PATH, {
+          action: 'foh_sale', date, completions,
+        });
+      }
+      if (env.FOH_CAL_STATE) {
+        await env.FOH_CAL_STATE.put(guardKey, new Date().toISOString(), { expirationTtl: 60 * 60 * 24 * 30 });
+      }
+      out.steps.sales = { date, skusAll: Object.keys(all).length, skusRetail: completions.length, orders };
+    }
+  } catch (err) {
+    out.ok = false;
+    out.steps.sales = { error: err.message };
+  }
+
+  try {
+    out.steps.catering = await importCateringOrders(env, { sinceDays: 7, futureDays: 60 });
+  } catch (err) {
+    out.ok = false;
+    out.steps.catering = { error: err.message };
+  }
+
+  return out;
 }
 
 // ─── Webhook signature verification ───────────────────────────────
@@ -824,17 +1009,18 @@ async function verifySquareSignature(request, signatureKey) {
 }
 
 async function handleSquareWebhook(request, env) {
-  if (!env.SQUARE_WEBHOOK_SIGNATURE_KEY) {
-    console.warn('[webhook] FAIL: SQUARE_WEBHOOK_SIGNATURE_KEY not configured');
+  const signingKey = await resolveWebhookSigningKey(env);
+  if (!signingKey) {
+    console.warn('[webhook] FAIL: no signing key (env secret or KV sq-webhook-sig-key) — run POST /admin/setup-sales-webhook');
     return json({ error: 'webhook key not configured' }, 503);
   }
-  const body = await verifySquareSignature(request, env.SQUARE_WEBHOOK_SIGNATURE_KEY);
+  const body = await verifySquareSignature(request, signingKey);
   if (!body) {
     // Persistent bad-signature usually means Square rotated the subscription's
-    // signing key without the env secret being updated. Re-rotate via
-    // POST /v2/webhooks/subscriptions/{id}/signature-key and `wrangler secret
-    // put SQUARE_WEBHOOK_SIGNATURE_KEY`.
-    console.warn('[webhook] FAIL: bad signature — secret in env may not match Square subscription key');
+    // signing key without the stored copy being updated. Re-run
+    // POST /admin/setup-sales-webhook (or /admin/rotate-webhook-key) to refresh
+    // the KV copy.
+    console.warn('[webhook] FAIL: bad signature — stored key may not match Square subscription key');
     return json({ error: 'bad signature' }, 401);
   }
 
@@ -893,6 +1079,14 @@ async function handleSquareWebhook(request, env) {
   }
 
   const order = sqData.order || sqData;
+
+  // Only catering orders belong in the Delivery Planner. The subscription is
+  // signed up for order.* events broadly (also feeding /foh-sales freshness),
+  // so retail POS sales reach here too — drop them.
+  if (!isCateringOrder(order)) {
+    return json({ ok: true, eventType: payload.type, skipped: 'not catering', orderId });
+  }
+
   let result;
   try {
     result = await syncSquareOrderToDelivery(order);
@@ -1173,6 +1367,154 @@ async function handleDipConsumption(request, env) {
       'Cache-Control': 'public, max-age=3600',
     },
   });
+}
+
+// ─── FOH sales feed (pretzels + dips sold through Square) ────────────────
+
+// 'YYYY-MM-DD' for an ISO timestamp in the shop's timezone (matches
+// todayMountain / the production app's day boundaries).
+function mountainDate(iso) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+}
+
+/**
+ * One Square scan → per-day, per-SKU units sold for every pretzel + dip SKU.
+ * Pretzels matched via mapSquareToCanonicalSku (same mapping the catering
+ * import uses); dips via the DIP_CONFIG squareNames/squareModifiers regexes
+ * (same matcher /dip-consumption uses — DIP_CONFIG wins, so "Dangerous Dip"
+ * is the retail 3oz cheese cup, not the bulk SKU).
+ *
+ * Returns { daysSampled, ordersScanned, byDate, cateringByDate, totals,
+ *           unmappedNames } where by*Date is { 'YYYY-MM-DD': { sku: units } }.
+ * cateringByDate is the subset from catering orders, so the caller can take
+ * retail = all − catering (catering draws down via the Delivery Planner).
+ */
+async function fetchSquareFohSales(env, daysSampled = 28) {
+  const locationId = env.SQUARE_LOCATION_ID || 'LEJ3PDZ9V6NYN';
+  const startAt = new Date(Date.now() - daysSampled * 86400e3).toISOString();
+  const orders = [];
+  let cursor;
+  let pageCount = 0;
+  do {
+    const res = await fetch(`${SQUARE_BASE}/orders/search`, {
+      method: 'POST',
+      headers: {
+        'Square-Version': '2025-01-23',
+        Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        location_ids: [locationId],
+        query: {
+          filter: {
+            date_time_filter: { created_at: { start_at: startAt } },
+            state_filter: { states: ['OPEN', 'COMPLETED'] }, // skip CANCELED
+          },
+          sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' },
+        },
+        limit: 500,
+        cursor,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(`Square search failed: ${JSON.stringify(data).slice(0, 300)}`);
+    orders.push(...(data.orders || []));
+    cursor = data.cursor;
+    pageCount += 1;
+    if (pageCount > 20) break;
+  } while (cursor);
+
+  const dipMatchers = Object.entries(DIP_CONFIG).map(([sku, cfg]) => ({
+    sku,
+    nameRes: cfg.squareNames || [],
+    modRes: cfg.squareModifiers || [],
+  }));
+
+  const byDate = {};
+  const cateringByDate = {};
+  const totals = {};
+  const unmapped = new Set();
+
+  const add = (bucket, date, sku, n) => {
+    if (!bucket[date]) bucket[date] = {};
+    bucket[date][sku] = (bucket[date][sku] || 0) + n;
+  };
+
+  orders.forEach((o) => {
+    const date = mountainDate(o.created_at || o.closed_at || new Date().toISOString());
+    const catering = isCateringOrder(o);
+    (o.line_items || []).forEach((li) => {
+      const name = (li.name || '').trim();
+      if (!name || name === 'Delivery Fee') return;
+      const qty = parseInt(li.quantity, 10) || 0;
+      if (qty <= 0) return;
+
+      // Dip line item?
+      let matchedSku = null;
+      for (const { sku, nameRes } of dipMatchers) {
+        if (nameRes.some((re) => re.test(name))) { matchedSku = sku; break; }
+      }
+      // Else a pretzel / dough product?
+      if (!matchedSku) {
+        const canon = mapSquareToCanonicalSku(name, li.variation_name);
+        if (canon) matchedSku = canon;
+      }
+      if (matchedSku) {
+        add(byDate, date, matchedSku, qty);
+        totals[matchedSku] = (totals[matchedSku] || 0) + qty;
+        if (catering) add(cateringByDate, date, matchedSku, qty);
+      } else {
+        unmapped.add(name);
+      }
+
+      // Dip-as-modifier (e.g. a pretzel ordered "with Dangerous Dip") — each
+      // modifier instance = parent qty units of that dip.
+      (li.modifiers || []).forEach((mod) => {
+        const mname = (mod.name || '').trim();
+        for (const { sku, modRes } of dipMatchers) {
+          if (modRes.some((re) => re.test(mname))) {
+            add(byDate, date, sku, qty);
+            totals[sku] = (totals[sku] || 0) + qty;
+            if (catering) add(cateringByDate, date, sku, qty);
+            break;
+          }
+        }
+      });
+    });
+  });
+
+  return {
+    daysSampled,
+    ordersScanned: orders.length,
+    byDate,
+    cateringByDate,
+    totals,
+    unmappedNames: [...unmapped].sort(),
+  };
+}
+
+async function handleFohSales(request, env) {
+  const url = new URL(request.url);
+  const days = Math.max(1, Math.min(90, parseInt(url.searchParams.get('days'), 10) || 28));
+  const result = await fetchSquareFohSales(env, days);
+  return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      ...CORS_HEADERS,
+      'Cache-Control': 'public, max-age=900',
+    },
+  });
+}
+
+// Subtract map b from map a ({sku:units}), flooring at 0, dropping zeros.
+function subtractSkuMap(a = {}, b = {}) {
+  const out = {};
+  Object.entries(a).forEach(([sku, n]) => {
+    const v = n - (b[sku] || 0);
+    if (v > 0) out[sku] = v;
+  });
+  return out;
 }
 
 // ─── iCalendar feed for FOH ──────────────────────────────────────────────
@@ -2017,6 +2359,24 @@ export default {
     }
 
     // ── Square catering sync ──
+    if (url.pathname === '/admin/setup-sales-webhook' && request.method === 'POST') {
+      try {
+        return await handleSetupSalesWebhook(request, env);
+      } catch (err) {
+        console.error('Setup sales webhook error:', err);
+        return json({ error: err.message || 'Setup failed' }, 500);
+      }
+    }
+    if (url.pathname === '/admin/run-nightly-sync' && request.method === 'POST') {
+      const authErr = checkAdminToken(request, env);
+      if (authErr) return authErr;
+      try {
+        return json(await runNightlySync(env));
+      } catch (err) {
+        console.error('Nightly sync error:', err);
+        return json({ error: err.message || 'Nightly sync failed' }, 500);
+      }
+    }
     if (url.pathname === '/admin/import-catering' && request.method === 'POST') {
       try {
         return await handleImportCatering(request, env);
@@ -2082,6 +2442,14 @@ export default {
         // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Dip consumption error:', err);
         return json({ error: err.message || 'Dip consumption failed' }, 500);
+      }
+    }
+    if (url.pathname === '/foh-sales' && request.method === 'GET') {
+      try { return await handleFohSales(request, env); }
+      catch (err) {
+        // eslint-disable-next-line no-console -- worker diagnostics
+        console.error('FOH sales error:', err);
+        return json({ error: err.message || 'FOH sales failed' }, 500);
       }
     }
     if (url.pathname === '/foh-cal.ics' && request.method === 'GET') {
@@ -2327,13 +2695,17 @@ export default {
     }
   },
 
-  // Cron entry point — DISABLED 2026-05-06. myecalendar requires a paid
-  // Magic Import subscription to consume external iCal URLs, so the email-
-  // invite path was abandoned. Pivoting to a self-hosted /foh-schedule page.
-  // Stub left in place (returns immediately, sends nothing) as a safety net
-  // in case Cloudflare's cron triggers are slow to fully unregister after
-  // the wrangler.toml `crons = []` change.
-  async scheduled(_event, _env, _ctx) {
-    console.log('FOH cal cron fired but is disabled — no-op');
+  // Cron entry point (wrangler.toml `crons`). Nightly: snapshot yesterday's
+  // FOH sales + write the retail drawdown row, then run the catering catch-up.
+  // (The old myecalendar iCal-invite cron was abandoned 2026-05-06.)
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil((async () => {
+      try {
+        const result = await runNightlySync(env);
+        console.log('[cron] nightly sync', JSON.stringify(result));
+      } catch (err) {
+        console.error('[cron] nightly sync failed', err);
+      }
+    })());
   },
 };
