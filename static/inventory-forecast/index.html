@@ -272,11 +272,13 @@
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
     import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
+    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js';
 
-    const DELIVERY_PATH  = '/dangpretz/delivery-planner';
-    const RECEIVING_PATH = '/dangpretz/receiving';
-    const INVENTORY_PATH = '/dangpretz/inventory';
-    const RECIPES_PATH   = '/dangpretz/recipes';
+    const DELIVERY_PATH   = '/dangpretz/delivery-planner';
+    const RECEIVING_PATH  = '/dangpretz/receiving';
+    const INVENTORY_PATH  = '/dangpretz/inventory';
+    const RECIPES_PATH    = '/dangpretz/recipes';
+    const PRODUCTION_PATH = '/dangpretz/production';
 
     // ── SKUs (from delivery planner) ────────────────────────────────────────
     const SKUS = [
@@ -330,33 +332,6 @@
       return d.toISOString().slice(0, 10);
     }
 
-    // ── Compute inventory (same as inventory page) ───────────────────────────
-    function computeInventory(products, receivingLogs, inventoryLogs) {
-      const map = new Map();
-      for (const p of products) {
-        map.set(p.id, { productId: p.id, productName: p.name, packSize: p.packSize, stock: 0, par: null, lastReceived: null, lastUsed: null });
-      }
-      for (const r of receivingLogs) {
-        if (r.action !== 'receive') continue;
-        const id = r.productId;
-        if (!map.has(id)) {
-          map.set(id, { productId: id, productName: r.productName || id, packSize: r.packSize || '', stock: 0, par: null, lastReceived: null, lastUsed: null });
-        }
-        const row = map.get(id);
-        row.stock += parsePackSize(r.packSize).innerUnitsPerCase;
-        if (r.date && (!row.lastReceived || r.date > row.lastReceived)) row.lastReceived = r.date;
-      }
-      for (const r of inventoryLogs) {
-        const id = r.productId;
-        if (!map.has(id)) continue;
-        const row = map.get(id);
-        if (r.action === 'use')    { row.stock -= Number(r.quantity) || 0; if (r.date && (!row.lastUsed || r.date > row.lastUsed)) row.lastUsed = r.date; }
-        if (r.action === 'adjust') { row.stock += Number(r.quantity) || 0; }
-        if (r.action === 'par')    { const v = Number(r.par); if (!isNaN(v)) row.par = v; }
-      }
-      return map;
-    }
-
     // ── Resolve deliveries (from delivery planner) ───────────────────────────
     function resolveDeliveries(logs) {
       const byId = {};
@@ -390,31 +365,7 @@
       return Object.values(byId).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.timeStamp || '').localeCompare(b.timeStamp || ''));
     }
 
-    // ── Build recipe maps ────────────────────────────────────────────────────
-    function buildRecipeMaps(recipeLogs) {
-      const scaleMap   = {};  // sku → { pretzelsPerTray, traysPerBatch }
-      const recipeMap  = {};  // sku → { productId → gramsPerBatch }
-      const densityMap = {};  // productId → gramsPerInnerUnit (for GAL products)
-      for (const r of recipeLogs) {
-        if (r.action === 'sku_scale') {
-          const ppt = Number(r.pretzelsPerTray);
-          const tpb = Number(r.traysPerBatch);
-          if (!isNaN(ppt) && !isNaN(tpb) && ppt > 0 && tpb > 0) {
-            scaleMap[r.sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
-          }
-        }
-        if (r.action === 'recipe_v2') {
-          if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
-          const v = Number(r.gramsPerBatch);
-          if (!isNaN(v)) recipeMap[r.sku][r.productId] = v;
-        }
-        if (r.action === 'ingredient_density') {
-          const v = Number(r.gramsPerInnerUnit);
-          if (!isNaN(v) && v > 0) densityMap[r.productId] = v;
-        }
-      }
-      return { scaleMap, recipeMap, densityMap };
-    }
+    // buildRecipeMaps → resolveRecipes (shared, scripts/inventory.js)
 
     // ── Compute forecast ─────────────────────────────────────────────────────
     function computeForecast(deliveries, recipeMap, scaleMap, inventoryMap, densityMap = {}) {
@@ -501,23 +452,33 @@
       wrapEl.hidden = true;
 
       try {
-        const [dRaw, rRaw, iRaw, rcRaw] = await Promise.all([
+        const [dRaw, rRaw, iRaw, rcRaw, pRaw] = await Promise.all([
           fetchLog(DELIVERY_PATH),
           fetchLog(RECEIVING_PATH),
           fetchLog(INVENTORY_PATH),
           fetchLog(RECIPES_PATH),
+          fetchLog(PRODUCTION_PATH).catch(() => []),
         ]);
         const dLogs  = Array.isArray(dRaw)  ? dRaw  : [];
         const rLogs  = Array.isArray(rRaw)  ? rRaw  : [];
         const iLogs  = Array.isArray(iRaw)  ? iRaw  : [];
         const rcLogs = Array.isArray(rcRaw) ? rcRaw : [];
+        const pLogs  = Array.isArray(pRaw)  ? pRaw  : [];
 
         allDeliveryLogs  = dLogs;
         allReceivingLogs = rLogs;
         allInventoryLogs = iLogs;
 
-        ({ scaleMap, recipeMap, densityMap } = buildRecipeMaps(rcLogs));
-        inventoryMap = computeInventory(resolveIngredients(rLogs), rLogs, iLogs);
+        ({ scaleMap, recipeMap, densityMap } = resolveRecipes(rcLogs));
+        const catalog = resolveIngredients(rLogs);
+        const usage = computeRecipeUsage({
+          productionLogs: pLogs, recipeMap, densityMap,
+          catalog: resolveIngredients(rLogs, { includeArchived: true }),
+        });
+        inventoryMap = computeIngredientStock({
+          catalog, receivingLogs: rLogs, inventoryLogs: iLogs,
+          usageEntriesByProduct: usage.usageEntriesByProduct,
+        });
 
         const deliveries = resolveDeliveries(dLogs);
         forecastMap = computeForecast(deliveries, recipeMap, scaleMap, inventoryMap, densityMap);

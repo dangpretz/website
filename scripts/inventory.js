@@ -1525,3 +1525,217 @@ export function scheduleCheese(args) {
 }
 
 export const CHEESE_KEY = CHEESE_SKU_KEY; // exported for callers that need the canonical SKU name
+
+// ─── INGREDIENT INVENTORY: RECIPE CONSUMPTION + STOCK ─────────────────────────
+// The ingredient-inventory pages (static/inventory/, static/inventory-forecast/)
+// draw stock down automatically as the shape team and dip maker log batches.
+//
+// Model (all derived, no per-batch writes):
+//   stock = { set_stock anchor, or 0 }
+//         + Σ receive packs after the anchor
+//         + Σ manual adjust after the anchor  − Σ manual use after the anchor
+//         − Σ recipe consumption of shape_done/cheese_done batches dated after
+//           max(anchor date, RECIPE_USAGE_SINCE)
+//   then floored at 0 — a physical count that reads low just means we miscounted.
+
+// Batches shaped/made before this date don't deduct — the feature went live
+// here, and applying it to all history would zero every ingredient out.
+export const RECIPE_USAGE_SINCE = '2026-09-11';
+
+const GRAMS_PER = { LB: 453.592, OZ: 28.3495 };
+
+// Grams in one stock unit of a pack. Stock unit = the pack's inner unit
+// (parsePackSize innerUnitLabel), e.g. one "1 LB" piece or one "50 LB" bag.
+// GAL needs a per-product density (ingredient_density recipe rows); count
+// units (EA/CT) and blank pack sizes can't be converted → 0.
+export function gramsPerStockUnit(packSize, density = 0) {
+  const parts = String(packSize || '').split('/');
+  if (parts.length < 3) return 0;
+  const qty = parseFloat(parts[1]);
+  const unit = parts[2].trim().toUpperCase();
+  if (!(qty > 0)) return 0;
+  if (GRAMS_PER[unit]) return qty * GRAMS_PER[unit];
+  if (unit === 'GAL') return density > 0 ? density : 0; // density is g per 1 GAL
+  return 0;
+}
+
+// Shared recipe-log reducer — was copy-pasted into the recipes and forecast
+// pages. { scaleMap: sku→{pretzelsPerTray,traysPerBatch},
+//          recipeMap: sku→{productId→gramsPerBatch},
+//          densityMap: productId→gramsPerInnerUnit }.
+export function resolveRecipes(recipeLogs) {
+  const scaleMap = {};
+  const recipeMap = {};
+  const densityMap = {};
+  (Array.isArray(recipeLogs) ? recipeLogs : []).forEach((r) => {
+    if (r.action === 'sku_scale' && r.sku) {
+      const ppt = Number(r.pretzelsPerTray);
+      const tpb = Number(r.traysPerBatch);
+      if (ppt > 0 && tpb > 0) scaleMap[r.sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
+    } else if (r.action === 'recipe_v2' && r.sku && r.productId) {
+      if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
+      const v = Number(r.gramsPerBatch);
+      if (!Number.isNaN(v)) recipeMap[r.sku][r.productId] = v;
+    } else if (r.action === 'ingredient_density' && r.productId) {
+      const v = Number(r.gramsPerInnerUnit);
+      if (v > 0) densityMap[r.productId] = v;
+    }
+  });
+  return { scaleMap, recipeMap, densityMap };
+}
+
+const SIZE_MULT = { single: 1, double: 2, triple: 3 };
+
+// Recipe consumption from the production log. Returns per-product usage as
+// [{date, units}] entries (not a single total) so the stock calc can drop the
+// ones that predate a product's manual-count anchor.
+//   { usageEntriesByProduct: { productId: [{date, units}] },
+//     untracked: Set<productId> }  — untracked = referenced by a batched recipe
+//   but with no gram→unit conversion (needs a pack size or density).
+export function computeRecipeUsage({
+  productionLogs, recipeMap = {}, densityMap = {}, catalog = [],
+  since = RECIPE_USAGE_SINCE, skuAliases = LEGACY_SKU_RENAMES,
+} = {}) {
+  const packById = {};
+  (Array.isArray(catalog) ? catalog : []).forEach((p) => { packById[p.id] = p.packSize || ''; });
+  const canonical = (raw) => {
+    const k = String(raw || '').trim();
+    return skuAliases[k] || k;
+  };
+
+  // productId -> date -> grams
+  const gramsByProductDate = {};
+  (Array.isArray(productionLogs) ? productionLogs : []).forEach((row) => {
+    if (row.action !== 'shape_done' && row.action !== 'cheese_done') return;
+    if (!row.date || row.date < since) return;
+    let completions = [];
+    try { completions = JSON.parse(row.completions || '[]'); } catch (_) { return; }
+    if (!Array.isArray(completions)) return;
+    completions.forEach((c) => {
+      const recipe = recipeMap[canonical(c.sku)];
+      if (!recipe) return;
+      const mult = (Number(c.batches) || 0) * (SIZE_MULT[c.size || 'single'] || 1);
+      if (!mult) return;
+      Object.entries(recipe).forEach(([pid, grams]) => {
+        if (!gramsByProductDate[pid]) gramsByProductDate[pid] = {};
+        gramsByProductDate[pid][row.date] = (gramsByProductDate[pid][row.date] || 0) + grams * mult;
+      });
+    });
+  });
+
+  const usageEntriesByProduct = {};
+  const untracked = new Set();
+  Object.entries(gramsByProductDate).forEach(([pid, byDate]) => {
+    const gpu = gramsPerStockUnit(packById[pid], densityMap[pid]);
+    const totalGrams = Object.values(byDate).reduce((s, g) => s + g, 0);
+    if (!(gpu > 0)) {
+      if (totalGrams > 0) untracked.add(pid);
+      return;
+    }
+    usageEntriesByProduct[pid] = Object.entries(byDate)
+      .map(([date, grams]) => ({ date, units: grams / gpu }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  });
+
+  return { usageEntriesByProduct, untracked };
+}
+
+// The ingredient-inventory table state. Replaces the copy of computeInventory()
+// that lived in both inventory pages.
+//   catalog: resolveIngredients(receivingLogs) output ({id,name,packSize,par?})
+//   receivingLogs: /dangpretz/receiving   inventoryLogs: /dangpretz/inventory
+//   usageEntriesByProduct: from computeRecipeUsage
+// Returns Map(productId -> { productId, productName, packSize, stock, par,
+//   lastReceived, lastUsed }). stock is floored at 0.
+export function computeIngredientStock({
+  catalog = [], receivingLogs = [], inventoryLogs = [],
+  usageEntriesByProduct = {}, since = RECIPE_USAGE_SINCE,
+} = {}) {
+  const map = new Map();
+  const seed = (id, extra) => {
+    if (!map.has(id)) {
+      map.set(id, {
+        productId: id,
+        productName: id,
+        packSize: '',
+        stock: 0,
+        par: null,
+        lastReceived: null,
+        lastUsed: null,
+        _anchorTs: '',
+        _anchorDate: '',
+      });
+    }
+    if (extra) Object.assign(map.get(id), extra);
+  };
+
+  (Array.isArray(catalog) ? catalog : []).forEach((p) => {
+    seed(p.id, {
+      productName: p.name || p.id,
+      packSize: p.packSize || '',
+      par: p.par !== undefined ? p.par : null,
+    });
+  });
+
+  // Pass 1 — latest set_stock anchor per product (a physical count that
+  // discards everything before it for that ingredient).
+  (Array.isArray(inventoryLogs) ? inventoryLogs : []).forEach((r) => {
+    if (r.action !== 'set_stock' || !r.productId) return;
+    seed(r.productId);
+    const row = map.get(r.productId);
+    const ts = r.timeStamp || '';
+    if (ts >= row._anchorTs) {
+      row._anchorTs = ts;
+      row._anchorDate = r.date || ts.slice(0, 10);
+      row.stock = Number(r.quantity) || 0;
+    }
+  });
+
+  // Pass 2 — receiving after the anchor.
+  (Array.isArray(receivingLogs) ? receivingLogs : []).forEach((r) => {
+    if (r.action !== 'receive' || !r.productId) return;
+    seed(r.productId, map.has(r.productId) ? null : { productName: r.productName || r.productId, packSize: r.packSize || '' });
+    const row = map.get(r.productId);
+    if ((r.timeStamp || '') <= row._anchorTs) return;
+    const parts = String(r.packSize || '').split('/');
+    row.stock += parts.length >= 3 && parseFloat(parts[0]) > 0 ? parseFloat(parts[0]) : 1;
+    if (r.date && (!row.lastReceived || r.date > row.lastReceived)) row.lastReceived = r.date;
+  });
+
+  // Pass 3 — manual use / adjust after the anchor; par any time.
+  (Array.isArray(inventoryLogs) ? inventoryLogs : []).forEach((r) => {
+    if (!r.productId || !map.has(r.productId)) return;
+    const row = map.get(r.productId);
+    if (r.action === 'par') {
+      const v = Number(r.par);
+      if (!Number.isNaN(v)) row.par = v;
+      return;
+    }
+    if ((r.timeStamp || '') <= row._anchorTs) return;
+    if (r.action === 'use') {
+      row.stock -= Number(r.quantity) || 0;
+      if (r.date && (!row.lastUsed || r.date > row.lastUsed)) row.lastUsed = r.date;
+    } else if (r.action === 'adjust') {
+      row.stock += Number(r.quantity) || 0;
+    }
+  });
+
+  // Pass 4 — recipe consumption after max(anchor date, RECIPE_USAGE_SINCE).
+  Object.entries(usageEntriesByProduct).forEach(([pid, entries]) => {
+    if (!map.has(pid)) return;
+    const row = map.get(pid);
+    const cut = row._anchorDate > since ? row._anchorDate : since;
+    entries.forEach((e) => {
+      if (e.date <= cut) return;
+      row.stock -= e.units;
+      if (!row.lastUsed || e.date > row.lastUsed) row.lastUsed = e.date;
+    });
+  });
+
+  map.forEach((row) => {
+    row.stock = Math.max(0, row.stock);
+    delete row._anchorTs;
+    delete row._anchorDate;
+  });
+  return map;
+}

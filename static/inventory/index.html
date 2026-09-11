@@ -201,6 +201,7 @@
 
     .table-status { text-align: center; padding: 40px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
     .table-status.error { color: #C41E1E; font-weight: 700; }
+    .untracked-note { margin-top: 14px; font: 400 12px 'Manrope', sans-serif; color: #8a6000; background: #fff8e6; border: 1px solid #f0d9a0; border-radius: 8px; padding: 10px 14px; line-height: 1.5; }
 
     /* ════════════════════════════════════════
        USAGE SECTION
@@ -303,6 +304,8 @@
           <tbody id="inv-tbody"></tbody>
         </table>
       </div>
+
+      <p id="untracked-note" class="untracked-note" hidden></p>
 
     </div>
   </div>
@@ -471,9 +474,12 @@
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
     import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
+    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js';
 
     const RECEIVING_PATH = '/dangpretz/receiving';
     const INVENTORY_PATH = '/dangpretz/inventory';
+    const PRODUCTION_PATH = '/dangpretz/production';
+    const RECIPES_PATH = '/dangpretz/recipes';
 
     // ── Product catalog — the shared ingredient list lives in
     //    scripts/ingredient-catalog.js (resolveIngredients applies the receiving log).
@@ -516,64 +522,9 @@
       };
     }
 
-    // ── Inventory computation ─────────────────────────────────────────────────
-    function computeInventory(products, receivingLogs, inventoryLogs) {
-      const map = new Map();
-
-      // Seed from the catalog
-      for (const p of products) {
-        map.set(p.id, {
-          productId: p.id,
-          productName: p.name,
-          packSize: p.packSize,
-          stock: 0,
-          par: p.par !== undefined ? p.par : null,
-          lastReceived: null,
-          lastUsed: null,
-        });
-      }
-
-      // Receiving: add stock
-      for (const r of receivingLogs) {
-        if (r.action !== 'receive') continue;
-        const id = r.productId;
-        if (!map.has(id)) {
-          map.set(id, {
-            productId: id,
-            productName: r.productName || id,
-            packSize: r.packSize || '',
-            stock: 0,
-            par: null,
-            lastReceived: null,
-            lastUsed: null,
-          });
-        }
-        const row = map.get(id);
-        row.stock += parsePackSize(r.packSize).innerUnitsPerCase;
-        if (r.date && (!row.lastReceived || r.date > row.lastReceived)) row.lastReceived = r.date;
-      }
-
-      // Inventory log: use / adjust / par
-      for (const r of inventoryLogs) {
-        const id = r.productId;
-        if (!map.has(id)) continue;
-        const row = map.get(id);
-        if (r.action === 'use') {
-          row.stock -= Number(r.quantity) || 0;
-          if (r.date && (!row.lastUsed || r.date > row.lastUsed)) row.lastUsed = r.date;
-        } else if (r.action === 'adjust') {
-          row.stock += Number(r.quantity) || 0;
-        } else if (r.action === 'par') {
-          const v = Number(r.par);
-          if (!isNaN(v)) row.par = v;
-        }
-      }
-
-      return map;
-    }
-
     // ── State ────────────────────────────────────────────────────────────────
     let inventoryMap = new Map();
+    let untrackedIngredients = []; // names of recipe ingredients with no gram→pack conversion
     let catalog = []; // resolveIngredients(receivingLogs) — the shared ingredient list
     let showLowOnly  = false;
     let filterQuery  = '';
@@ -590,14 +541,34 @@
       wrapEl.hidden = true;
 
       try {
-        const [rRaw, iRaw] = await Promise.all([
+        const [rRaw, iRaw, pRaw, recRaw] = await Promise.all([
           fetchLog(RECEIVING_PATH),
           fetchLog(INVENTORY_PATH),
+          fetchLog(PRODUCTION_PATH).catch(() => []),
+          fetchLog(RECIPES_PATH).catch(() => []),
         ]);
         const rLogs = Array.isArray(rRaw) ? rRaw : [];
         const iLogs = Array.isArray(iRaw) ? iRaw : [];
         catalog = resolveIngredients(rLogs);
-        inventoryMap = computeInventory(catalog, rLogs, iLogs);
+        // Recipe consumption uses the full catalog (incl. archived) for pack
+        // lookup so an archived-but-still-used ingredient converts; the stock
+        // table itself is the active catalog only.
+        const fullCatalog = resolveIngredients(rLogs, { includeArchived: true });
+        const { recipeMap, densityMap } = resolveRecipes(Array.isArray(recRaw) ? recRaw : []);
+        const usage = computeRecipeUsage({
+          productionLogs: Array.isArray(pRaw) ? pRaw : [],
+          recipeMap, densityMap, catalog: fullCatalog,
+        });
+        inventoryMap = computeIngredientStock({
+          catalog, receivingLogs: rLogs, inventoryLogs: iLogs,
+          usageEntriesByProduct: usage.usageEntriesByProduct,
+        });
+        const activeIds = new Set(catalog.map((p) => p.id));
+        const nameById = Object.fromEntries(fullCatalog.map((p) => [p.id, p.name]));
+        untrackedIngredients = [...usage.untracked]
+          .filter((id) => activeIds.has(id))
+          .map((id) => nameById[id] || id)
+          .sort();
         renderTable();
       } catch (err) {
         statusEl.className = 'table-status error';
@@ -662,6 +633,14 @@
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
         tbody.querySelectorAll('.stock-cell').forEach(wireStockAdj);
         tbody.querySelectorAll('.btn-row-delete').forEach(wireDeleteBtn);
+      }
+
+      const note = document.getElementById('untracked-note');
+      if (untrackedIngredients.length) {
+        note.hidden = false;
+        note.textContent = `Not auto-deducted when a batch is made (set a pack size on this page, or a density on the Recipes page): ${untrackedIngredients.join('; ')}.`;
+      } else {
+        note.hidden = true;
       }
 
       statusEl.hidden = true;
@@ -798,16 +777,20 @@
             input.focus();
             return;
           }
-          const delta = newVal - currentStock;
           saveBtn.disabled = true;
           saveBtn.textContent = 'Saving…';
           try {
+            // A physical count: set_stock is an absolute anchor — it discards
+            // every earlier receive / adjust / recipe deduction for this
+            // ingredient, so a low count just means we miscounted.
+            const now = new Date().toISOString();
             await appendLog(INVENTORY_PATH, {
-              action:    'adjust',
+              action:    'set_stock',
               productId,
-              quantity:  String(delta),
-              timeStamp: new Date().toISOString(),
-              note:      'inline stock set',
+              quantity:  String(newVal),
+              date:      now.slice(0, 10),
+              timeStamp: now,
+              note:      'physical count',
             });
             if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
             renderTable();
