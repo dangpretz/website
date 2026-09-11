@@ -1788,6 +1788,12 @@
     // bates" not "murciélago". Matches batch-tracking's existing Spanish
     // name for the same product.
     'bees bats': 'Bates de béisbol',
+    // 2026-09: hot-dog-bun-shaped loaf, same dough as the 7oz pretzels. EN
+    // calls the shape "hot dog", ES calls it "pan" — the shape name itself
+    // changes language, not just the flavor word.
+    '7oz hot dog plain': 'Pan Plain',
+    '7oz hot dog bbk': 'Pan BBK',
+    '7oz hot dog spicy bee': 'Pan Spicy Bee',
   };
   // Returns the display name for a SKU in the current language.
   const skuDisplayName = (sku) => (appLang === 'es' && SKU_NAMES_ES[sku]) ? SKU_NAMES_ES[sku] : sku;
@@ -5138,7 +5144,7 @@
 
   async function loadSkus() {
     try {
-      const r = await fetch('../delivery-planner/skus.json?v=2026-05-22-new-skus');
+      const r = await fetch('../delivery-planner/skus.json?v=2026-09-11-hot-dog-buns');
       allSkus = await r.json();
     } catch { allSkus = Object.keys(BATCH_SIZES); } // fallback to hardcoded list
   }
