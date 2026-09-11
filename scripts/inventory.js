@@ -145,6 +145,11 @@ export const BATCH_SIZES = {
   '7oz spicy bee': 72,
   '7oz bootlegger': 72,
   '7oz pepperoni': 72,
+  // 2026-09: hot-dog-bun shape — same dough recipe + batch/tray math as the
+  // matching 7oz pretzel flavor, just a different shape.
+  '7oz hot dog plain': 72,
+  '7oz hot dog bbk': 72,
+  '7oz hot dog spicy bee': 72,
   'plain bombs': 432,
   'bees bats': 48,
   '3oz cheese dip': CHEESE_BATCH_SIZE,
@@ -164,6 +169,9 @@ export const CASE_SIZES = {
   '7oz spicy bee': 72,
   '7oz bootlegger': 72,
   '7oz pepperoni': 72,
+  '7oz hot dog plain': 72,
+  '7oz hot dog bbk': 72,
+  '7oz hot dog spicy bee': 72,
   '4oz twist plain': 40,
   '4oz twist bbk': 40,
   '4oz twist spicy bee': 40,
@@ -201,6 +209,9 @@ export const CASE_SIZE_OPTIONS = {
   '7oz spicy bee': [72, 32],
   '7oz bootlegger': [72, 32],
   '7oz pepperoni': [72, 32],
+  '7oz hot dog plain': [72, 32],
+  '7oz hot dog bbk': [72, 32],
+  '7oz hot dog spicy bee': [72, 32],
   '4oz twist plain': [40],
   '4oz twist bbk': [40],
   '4oz twist spicy bee': [40],
@@ -228,6 +239,9 @@ export const TRAY_SIZES = {
   '7oz spicy bee': 9,
   '7oz bootlegger': 9,
   '7oz pepperoni': 9,
+  '7oz hot dog plain': 9,
+  '7oz hot dog bbk': 9,
+  '7oz hot dog spicy bee': 9,
   '4oz twist plain': 12,
   '4oz twist bbk': 12,
   '4oz twist spicy bee': 12,
@@ -250,7 +264,7 @@ export const FOH_SKUS = new Set([
 
 // SKUs that need a coating step at BFP (cheese on top during bake).
 export const BAKE_GROUPS = {
-  coating: ['10oz bbk', '7oz bbk', '4oz twist bbk'],
+  coating: ['10oz bbk', '7oz bbk', '4oz twist bbk', '7oz hot dog bbk'],
 };
 
 // ─── CUSTOMER NAME NORMALIZATION ───────────────────────────────────────────
