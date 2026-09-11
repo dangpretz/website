@@ -33,10 +33,10 @@ id = "3f111dbe5ac44c7e9b168f8049754b22"
 binding = "PRETZEL_OS"
 service = "pretzel-os"
 
-# Cron — every 30 min. Sends new/changed events as METHOD:REQUEST and
-# disappeared events as METHOD:CANCEL to getdangerous@myecalendar.com.
-# DISABLED 2026-05-06: Resend's MIME structure (attachment-only) isn't being
-# recognized by myecalendar. Investigating proper iMIP via raw-MIME provider
-# (Mailgun) OR pivot to Google Calendar share. Re-enable once delivery works.
+# Cron — nightly at 09:20 UTC (~03:20 America/Denver, after close). Runs
+# `scheduled()` → runNightlySync: snapshots the prior day's Square FOH sales to
+# /dangpretz/foh-sales + a retail-only `foh_sale` drawdown row to
+# /dangpretz/production, then runs the catering→planner catch-up.
+# (The old myecalendar iCal-invite cron was abandoned 2026-05-06.)
 [triggers]
-crons = []
+crons = ["20 9 * * *"]
