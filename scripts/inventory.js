@@ -762,6 +762,11 @@ export function getLatestInventory(productionState) {
   return { coldFerment: cf, frozen: fr, onHand: oh };
 }
 
+// FOH retail sales (Square) dated before this don't draw down inventory. The
+// nightly worker cron only writes `foh_sale` rows going forward, so this is a
+// backstop against a backfill double-applying. Parallels RECIPE_USAGE_SINCE.
+export const FOH_SALES_SINCE = '2026-09-11';
+
 /**
  * SINGLE SOURCE OF TRUTH for inventory state. Returns the current effective
  * state plus the FIFO dough age queue, "since-snapshot" flow breakdown, and
@@ -823,6 +828,20 @@ export function getInventoryReport(args) {
   // combined. Like overbake: clamps at 0 but records the deficit so the
   // manager can reconcile (typo on input vs. truly missing inventory).
   const fohOverPullEvents = [];
+  // Audit trail of FOH retail sales that exceeded the dough / completed-dip
+  // on hand. Clamps at 0; the deficit means the count was optimistic or the
+  // batch wasn't logged.
+  const fohSaleShortfallEvents = [];
+
+  // `foh_sale` rows are one-per-day snapshots from the worker cron; a re-run
+  // appends a fresh row for the same date. Keep only the latest timestamp per
+  // date so a replay doesn't double-deduct.
+  const fohSaleLatestTsByDate = {};
+  (productionLogs || []).forEach((row) => {
+    if (row.action !== 'foh_sale' || !row.date) return;
+    const ts = row.timeStamp || '';
+    if (ts >= (fohSaleLatestTsByDate[row.date] || '')) fohSaleLatestTsByDate[row.date] = ts;
+  });
 
   // Walk events in TIMESTAMP order (defensive against out-of-order log writes)
   const sortedLogs = [...(productionLogs || [])].sort(
@@ -986,6 +1005,56 @@ export function getInventoryReport(args) {
         }
         // FIFO-consume the dough-age queue for the cf portion only. Frozen
         // pretzels don't carry an age queue (shelf life resets at freeze).
+        if (!doughQueue[key]) doughQueue[key] = [];
+        let toConsume = fromCf;
+        while (toConsume > 0 && doughQueue[key].length > 0) {
+          const oldest = doughQueue[key][0];
+          const take = Math.min(oldest.pretzels, toConsume);
+          oldest.pretzels -= take;
+          toConsume -= take;
+          if (oldest.pretzels <= 0) doughQueue[key].shift();
+        }
+      });
+    } else if (row.action === 'foh_sale') {
+      // Nightly snapshot of FOH retail units sold through Square (one row per
+      // day; catering already excluded upstream). Pretzels draw down dough
+      // (cold-ferment) ONLY — never frozen cases. Dips draw down completed-dip
+      // stock: cold-ferment first (the fresh walk-in batch cheese_done credits),
+      // then on-hand. cf-first for dips deliberately mirrors nothing — it just
+      // keeps the deduction off the on-hand pool that confirmed deliveries
+      // drain oh-first, so a FOH sale isn't silently absorbed by a delivery's
+      // 0-floor. Both clamp at 0; any shortfall is recorded for the manager.
+      if (row.date && row.date < FOH_SALES_SINCE) return;
+      if (row.date && (row.timeStamp || '') !== (fohSaleLatestTsByDate[row.date] || '')) return;
+      let sales = []; try { sales = JSON.parse(row.completions || '[]'); } catch { return; }
+      sales.forEach((c) => {
+        let key = (c.sku || '').trim();
+        if (!key) return;
+        if (skuAliases[key]) key = skuAliases[key];
+        const units = Number(c.units) || 0;
+        if (units <= 0) return;
+        const isDip = !!DIP_CONFIG[key] || key.toLowerCase().includes('dip');
+
+        const cfAvail = Math.max(0, cf[key] || 0);
+        const fromCf = Math.min(cfAvail, units);
+        const ohAvail = isDip ? Math.max(0, oh[key] || 0) : 0;
+        const fromOh = Math.min(ohAvail, units - fromCf);
+        const deficit = units - fromCf - fromOh;
+        cf[key] = cfAvail - fromCf;
+        if (isDip) oh[key] = ohAvail - fromOh;
+        flowFoh[key] = (flowFoh[key] || 0) + units;
+        if (deficit > 0) {
+          fohSaleShortfallEvents.push({
+            sku: key,
+            date: row.date || '',
+            soldUnits: units,
+            availableCf: cfAvail,
+            availableOh: ohAvail,
+            deficit,
+            ts: ts || '',
+          });
+        }
+        // FIFO-consume the dough-age queue for the cf portion.
         if (!doughQueue[key]) doughQueue[key] = [];
         let toConsume = fromCf;
         while (toConsume > 0 && doughQueue[key].length > 0) {
@@ -1192,7 +1261,12 @@ export function getInventoryReport(args) {
     flowsSinceSnapshot: {
       shape: flowShape, bfp: flowBfp, foh: flowFoh, delivered: flowDelivered,
     },
-    alerts: { agingDough, bfpOverbake: bfpOverbakeEvents, fohOverPull: fohOverPullEvents },
+    alerts: {
+      agingDough,
+      bfpOverbake: bfpOverbakeEvents,
+      fohOverPull: fohOverPullEvents,
+      fohSaleShortfall: fohSaleShortfallEvents,
+    },
     snapshot: { date: latestInvDate, timestamp: latestInventoryTs, raw: snapshotRaw },
     // Per-delivery decision trail: each entry says whether this delivery
     // deducted inventory and why (or why it was skipped). Powers the
