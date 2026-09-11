@@ -31,7 +31,9 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - New wholesale accounts: inquiry form on the wholesale page, info@dangerouspretzel.com, or the shop phone / text numbers above
 - Existing partners order at the wholesale portal (linked from the wholesale pages)
 - Distributor page publishes 15+ wholesale partners and 50K+ pretzels sold monthly
-- Spoke pages for grocery/retail, venues/concessions, bars/breweries, and Intermountain foodservice all use the same wholesale inquiry form
+- Spoke pages for grocery/retail, venues/concessions, bars/breweries, Intermountain foodservice, offices/campuses, reheat onboarding, and the become-a-customer checklist all use the same wholesale inquiry form
+- Reheat: partners reheat from frozen; the site does not publish oven temperatures, times, or frozen shelf-life days. The process is dialed in with each partner.
+- Offices and campuses: listed wholesale audience; standing orders; no kitchen build-out. A one-off corporate lunch is catering, not wholesale.
 
 ## Key pages (200 URLs)
 
@@ -53,5 +55,8 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Our story](https://www.dangerouspretzel.com/v2/our-story.html)
 - [Reviews and press](https://www.dangerouspretzel.com/v2/reviews.html)
 - [Pretzel Program](https://www.dangerouspretzel.com/v2/pretzel-program.html)
+- [Offices and campuses](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-offices.html)
+- [How wholesale reheat works](https://www.dangerouspretzel.com/v2/how-wholesale-reheat-works.html)
+- [Become a wholesale customer](https://www.dangerouspretzel.com/v2/become-a-wholesale-customer.html)
 
 Pretty paths such as `/wholesale` 301 to the `/v2/*.html` files listed here.
