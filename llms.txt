@@ -29,6 +29,9 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Offices and campuses](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-offices.html): Standing orders, no kitchen build-out. Not catering.
 - [How wholesale reheat works](https://www.dangerouspretzel.com/v2/how-wholesale-reheat-works.html): Partner onboarding. Fully baked, then flash-frozen. No published temps or times.
 - [Become a wholesale customer](https://www.dangerouspretzel.com/v2/become-a-wholesale-customer.html): Start-here checklist that funnels to the inquiry form.
+- [Wholesale vs mall pretzel](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-vs-mall.html): Shop pretzel for foodservice. Fully baked in SLC, flash-frozen. Not a mall pretzel or a commodity case.
+- [Catering vs wholesale](https://www.dangerouspretzel.com/v2/catering-vs-wholesale.html): One event is catering (boxes, trays, dips). Standing or on-demand cases is wholesale.
+- [Add to a restaurant menu](https://www.dangerouspretzel.com/v2/add-soft-pretzels-to-restaurant-menu.html): Inquiry, assortment, reheat. Then it plates. No bakery staff.
 
 ## Optional
 
