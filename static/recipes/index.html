@@ -203,6 +203,7 @@
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
     import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
+    import { resolveRecipes } from '../../scripts/inventory.js';
 
     const RECIPES_PATH   = '/dangpretz/recipes';
     const RECEIVING_PATH = '/dangpretz/receiving';
@@ -258,31 +259,10 @@
     }
     function fmt3(n) { return isNaN(n) ? '—' : (Math.round(n * 1000) / 1000).toFixed(3); }
 
-    // ── Recipe maps ──────────────────────────────────────────────────────────
+    // ── Recipe maps (resolveRecipes — shared, scripts/inventory.js) ───────────
     let scaleMap   = {}; // { sku: { pretzelsPerTray, traysPerBatch } }
     let recipeMap  = {}; // { sku: { productId: gramsPerBatch } }
     let densityMap = {}; // { productId: gramsPerInnerUnit } — for GAL products
-
-    function buildRecipeMaps(logs) {
-      scaleMap   = {};
-      recipeMap  = {};
-      densityMap = {};
-      for (const r of logs) {
-        if (r.action === 'sku_scale' && r.sku) {
-          scaleMap[r.sku] = {
-            pretzelsPerTray: parseFloat(r.pretzelsPerTray) || 0,
-            traysPerBatch:   parseFloat(r.traysPerBatch)   || 0,
-          };
-        }
-        if (r.action === 'recipe_v2' && r.sku && r.productId) {
-          if (!recipeMap[r.sku]) recipeMap[r.sku] = {};
-          recipeMap[r.sku][r.productId] = parseFloat(r.gramsPerBatch) ?? 0;
-        }
-        if (r.action === 'ingredient_density' && r.productId) {
-          densityMap[r.productId] = parseFloat(r.gramsPerInnerUnit) || 0;
-        }
-      }
-    }
 
     // ── Render ───────────────────────────────────────────────────────────────
     function renderAll() {
@@ -669,7 +649,7 @@
           fetchLog(RECEIVING_PATH),
         ]);
         PRODUCTS = resolveIngredients(Array.isArray(receivingLogs) ? receivingLogs : []);
-        buildRecipeMaps(Array.isArray(recipeLogs) ? recipeLogs : []);
+        ({ scaleMap, recipeMap, densityMap } = resolveRecipes(Array.isArray(recipeLogs) ? recipeLogs : []));
         const defined = SKUS.filter((s) => recipeMap[s] && Object.keys(recipeMap[s]).length > 0).length;
         setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined · ${PRODUCTS.length} ingredients available`);
         renderAll();
