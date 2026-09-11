@@ -100,6 +100,7 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   margin: 0 auto 28px;
 }
 .hero-sub-wide { max-width: 720px; }
+.hero-sub a { color: #fff; font-weight: 700; text-decoration: underline; }
 .answer-lede {
   font: 400 16px/1.65 'Manrope', sans-serif;
   color: #444;
@@ -627,6 +628,7 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
 .form-dark textarea::placeholder {
   color: #888;
 }
+.form-dark .form-sub a { color: #fff; font-weight: 700; text-decoration: underline; }
 
 /* ─── Location ─── */
 .location-grid {

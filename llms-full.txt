@@ -40,7 +40,7 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Home](https://www.dangerouspretzel.com/v2/index.html)
 - [Menu](https://www.dangerouspretzel.com/v2/menu.html)
 - [Catering](https://www.dangerouspretzel.com/v2/catering.html)
-- [Location](https://www.dangerouspretzel.com/v2/location.html)
+- [Location](https://www.dangerouspretzel.com/v2/location.html): Post District shop NAP and hours. Same kitchen that bakes SLC metro wholesale.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html)
 - [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html)
 - [Restaurants and bars](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-restaurants.html)

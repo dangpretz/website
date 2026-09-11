@@ -11,7 +11,7 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Home](https://www.dangerouspretzel.com/v2/index.html): Hand-crafted soft pretzels. Pickup, catering, and wholesale links.
 - [Menu](https://www.dangerouspretzel.com/v2/menu.html): Pretzels, bombs, house-made dips, and drinks.
 - [Catering](https://www.dangerouspretzel.com/v2/catering.html): Pretzel boxes, bomb trays, and dips for events.
-- [Location](https://www.dangerouspretzel.com/v2/location.html): Address, hours, and shop contact.
+- [Location](https://www.dangerouspretzel.com/v2/location.html): 352 W 600 S, Post District. Hours, shop contact, and the kitchen that bakes SLC metro wholesale.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html): Hours, catering notice, wholesale, and dietary notes.
 
 ## Wholesale
@@ -22,10 +22,10 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Grocery and retail](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-grocery.html): 3-day fresh retail shelf or flash-frozen hold.
 - [Event venues](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-venues.html): Concessions wholesale. Frozen cases to reheat, not the Pretzel Program station.
 - [Frozen foodservice](https://www.dangerouspretzel.com/v2/frozen-soft-pretzels.html): Fully baked, then flash-frozen. Fresh retail hold is described separately.
-- [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html): SLC metro van delivery; freight outside the metro.
+- [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html): Soft pretzel wholesale for Salt Lake City foodservice. SLC metro van; freight for the rest of Utah. Walk-in retail is a separate account.
 - [Intermountain](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-intermountain.html): SLC metro van; freight for the region. Mountain West is a listed distributor region.
 - [Distributor vs direct](https://www.dangerouspretzel.com/v2/distributor-vs-direct-wholesale.html): Stock one business, or carry the brand in a region.
-- [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html): Inquiry for distribution networks.
+- [Become a distributor](https://www.dangerouspretzel.com/v2/distributor.html): Carry the brand in a region. Stocking one business is direct wholesale — two inquiry forms.
 - [Offices and campuses](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-offices.html): Standing orders, no kitchen build-out. Not catering.
 - [How wholesale reheat works](https://www.dangerouspretzel.com/v2/how-wholesale-reheat-works.html): Partner onboarding. Fully baked, then flash-frozen. No published temps or times.
 - [Become a wholesale customer](https://www.dangerouspretzel.com/v2/become-a-wholesale-customer.html): Start-here checklist that funnels to the inquiry form.
