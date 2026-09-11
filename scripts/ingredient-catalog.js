@@ -135,6 +135,33 @@ export const INGREDIENT_CATALOG = [
   { id: 'usf-761346', name: 'Vanilla Flavoring', packSize: '1/1/GAL', usFoodsCode: '761346', requiresTemp: false, par: 1 },
   { id: 'sysco-wrap-paper', name: 'Wrap Paper 12 x 12', packSize: '1/1000/CT', requiresTemp: false, par: 1000 },
   { id: 'usf-3022647', name: 'Yeast', orderName: 'Yeast, Dry Active', packSize: '20/1/LB', usFoodsCode: '3022647', requiresTemp: false, par: 27 },
+
+  // ── Recipe ingredients not previously stocked as their own line (2026-09,
+  //    added for the Recipes tool). Pack sizes are best-guess, no US Foods
+  //    code — set the real pack size on the Inventory page. resolveIngredients
+  //    re-sorts the whole list by name, so these need not be in order here.
+  { id: 'recipe-water', name: 'Water', packSize: '', requiresTemp: false },
+  { id: 'recipe-chocolate-chips', name: 'Chocolate Chips', packSize: '1/25/LB', requiresTemp: false },
+  { id: 'recipe-cocoa-powder', name: 'Cocoa Powder', packSize: '1/5/LB', requiresTemp: false },
+  { id: 'recipe-oreo-crumbs', name: 'Oreo Crumbs', packSize: '1/5/LB', requiresTemp: false },
+  { id: 'recipe-pumpkin-puree', name: 'Pumpkin Puree', packSize: '6/10/LB', requiresTemp: false },
+  { id: 'recipe-mango-puree', name: 'Mango Puree', packSize: '1/5/LB', requiresTemp: true },
+  { id: 'recipe-tajin', name: 'Tajin', packSize: '1/5/LB', requiresTemp: false },
+  { id: 'recipe-bacon-diced', name: 'Bacon, Diced', packSize: '2/5/LB', requiresTemp: true },
+  { id: 'recipe-bourbon', name: 'Bourbon', packSize: '1/1/L', requiresTemp: false },
+  { id: 'recipe-maple-syrup', name: 'Maple Syrup', packSize: '1/1/GAL', requiresTemp: false },
+  { id: 'recipe-pickles-chopped', name: 'Pickles, Chopped', packSize: '4/1/GAL', requiresTemp: true },
+  { id: 'recipe-herb-dill', name: 'Herb, Dill, Fresh', packSize: '1/1/LB', requiresTemp: true },
+  { id: 'recipe-onion-yellow', name: 'Onion, Yellow', packSize: '1/50/LB', requiresTemp: false },
+  { id: 'recipe-tomatoes-san-marzano', name: 'Tomatoes, San Marzano Canned', packSize: '6/1/GAL', requiresTemp: false },
+  { id: 'recipe-tomato-paste', name: 'Tomato Paste', packSize: '6/1/GAL', requiresTemp: false },
+  { id: 'recipe-vinegar-red-wine', name: 'Vinegar, Red Wine', packSize: '4/1/GAL', requiresTemp: false },
+  { id: 'recipe-spice-black-pepper', name: 'Spice, Black Pepper, Ground', packSize: '1/1/LB', requiresTemp: false },
+  { id: 'recipe-spice-fennel-seed', name: 'Spice, Fennel Seed', packSize: '1/1/LB', requiresTemp: false },
+  { id: 'recipe-spice-oregano-dried', name: 'Spice, Oregano, Dried', packSize: '1/1/LB', requiresTemp: false },
+  { id: 'recipe-spice-basil-dried', name: 'Spice, Basil, Dried', packSize: '1/1/LB', requiresTemp: false },
+  { id: 'recipe-spice-chili-flake', name: 'Spice, Chili Flake', packSize: '1/1/LB', requiresTemp: false },
+  { id: 'recipe-spice-allspice', name: 'Spice, Allspice, Ground', packSize: '1/1/LB', requiresTemp: false },
 ];
 
 // The live catalog: INGREDIENT_CATALOG with the receiving log applied —
