@@ -153,6 +153,16 @@ export const BATCH_SIZES = {
   'plain bombs': 432,
   'bees bats': 48,
   '3oz cheese dip': CHEESE_BATCH_SIZE,
+  // 2026-09: the other FOH-made retail dips were missing here, which made
+  // attributeDeliveryCoverage() treat them as FOH/unconfigured (getBatchSize
+  // === 0) and skip them entirely — their delivery-planner line items showed
+  // the generic "not produced in-house" gray pill instead of a real
+  // ready/baking/partial/unstarted readiness indicator. Same fix as cheese
+  // dip got: reference each dip's own DIP_CONFIG.singleBatchSize.
+  'hot ranch dip': DIP_CONFIG['hot ranch dip'].singleBatchSize,
+  'sweet cream dip': DIP_CONFIG['sweet cream dip'].singleBatchSize,
+  'house mustard dip': DIP_CONFIG['house mustard dip'].singleBatchSize,
+  'honey mustard dip': DIP_CONFIG['honey mustard dip'].singleBatchSize,
 };
 
 // Pretzels per case — wholesale shipping unit. Default per SKU; managers
