@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FOH Sales | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 9999; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+    .nav-links a.active { color: #C41E1E; font-weight: 700; }
+
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
+    .hero h1 { font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif; color: #fff; margin: 0; }
+    .hero p { color: #888; font: 400 14px 'Manrope', sans-serif; margin-top: 10px; }
+
+    .section-cream { background: #F5F0E8; padding: clamp(32px, 5vw, 60px) 5%; min-height: 60vh; }
+    .max-1100 { max-width: 1100px; margin: 0 auto; }
+
+    .controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .seg { display: inline-flex; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; }
+    .seg button { font: 700 12px 'Manrope', sans-serif; padding: 8px 16px; border: none; background: transparent; color: #888; cursor: pointer; transition: all 0.15s; }
+    .seg button.active { background: #1A1A1A; color: #fff; }
+    .seg button:not(.active):hover { color: #1A1A1A; }
+    .btn-refresh { background: transparent; border: 2px solid #ccc; color: #888; font: 700 12px 'Manrope', sans-serif; border-radius: 6px; padding: 7px 14px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .btn-refresh:hover:not(:disabled) { border-color: #C41E1E; color: #C41E1E; }
+    .btn-refresh:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .status { text-align: center; padding: 48px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
+    .status.error { color: #C41E1E; font-weight: 700; }
+
+    .feed-note { margin-bottom: 16px; font: 400 12px 'Manrope', sans-serif; color: #8a6000; background: #fff8e6; border: 1px solid #f0d9a0; border-radius: 8px; padding: 10px 14px; line-height: 1.5; }
+
+    .table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    table.sales { width: 100%; border-collapse: collapse; background: #fff; }
+    table.sales th, table.sales td { font: 400 13px 'Manrope', sans-serif; padding: 10px 14px; border-bottom: 1px solid #f2efe9; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+    table.sales th { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: 0.6px; text-transform: uppercase; border-bottom: 2px solid #ece7df; }
+    table.sales th.sku-col, table.sales td.sku-col { text-align: left; font-weight: 600; color: #1A1A1A; position: sticky; left: 0; background: #fff; }
+    table.sales th.sku-col { z-index: 1; }
+    table.sales td.total-col, table.sales th.total-col { font-weight: 700; color: #1A1A1A; border-left: 2px solid #ece7df; }
+    table.sales tr.group-row td { background: #1A1A1A; color: #fff; font: 700 10px 'Manrope', sans-serif; letter-spacing: 1px; text-transform: uppercase; text-align: left; }
+    table.sales tr.group-row td.sku-col { background: #1A1A1A; color: #fff; }
+    table.sales tr.total-row td { border-top: 2px solid #1A1A1A; border-bottom: none; font-weight: 800; background: #faf8f4; }
+    table.sales tr.total-row td.sku-col { background: #faf8f4; }
+    table.sales td.zero { color: #ccc; }
+    table.sales tbody tr:not(.group-row):not(.total-row):hover td { background: #faf8f5; }
+    table.sales tbody tr:not(.group-row):not(.total-row):hover td.sku-col { background: #faf8f5; }
+    .col-today { background: #fff6f6; }
+    th.col-today { color: #C41E1E; }
+
+    .summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+    .stat { background: #fff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); flex: 1; min-width: 150px; }
+    .stat .n { font: 800 26px 'Manrope', sans-serif; color: #1A1A1A; font-variant-numeric: tabular-nums; }
+    .stat .l { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 4px; }
+
+    .updated { margin-top: 14px; font: 400 12px 'Manrope', sans-serif; color: #999; text-align: right; }
+
+    @media (max-width: 680px) {
+      .nav-links { display: none; }
+      table.sales th, table.sales td { padding: 8px 10px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links">
+        <a href="../v2/menu.html">Menu</a>
+        <a href="../v2/catering.html">Catering</a>
+        <a href="../v2/index.html">Home</a>
+        <a href="../delivery-planner/index.html">Delivery Planner</a>
+        <a href="../shape-ingredients/index.html">Ingredient Log</a>
+        <a href="../inventory/index.html">Inventory</a>
+        <a href="../inventory-forecast/index.html">Forecast</a>
+        <a href="../foh-sales/index.html" class="active">FOH Sales</a>
+        <a href="../recipes/index.html">Recipes</a>
+        <a href="../batch-tracking/index.html">Batch Tracking</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>FOH SALES.</h1>
+    <p>Pretzels &amp; dips sold through Square, by day and by week.</p>
+  </section>
+
+  <div class="section-cream">
+    <div class="max-1100">
+
+      <div class="controls">
+        <div class="seg" id="range-seg">
+          <button data-mode="day" class="active">Daily &middot; 14d</button>
+          <button data-mode="week">Weekly &middot; 8wk</button>
+        </div>
+        <button class="btn-refresh" id="refresh-btn">&#8635; Refresh</button>
+      </div>
+
+      <p id="feed-note" class="feed-note" hidden></p>
+
+      <div id="summary" class="summary" hidden></div>
+
+      <div id="status" class="status">Loading sales…</div>
+
+      <div id="table-wrap" class="table-wrap" hidden>
+        <table class="sales">
+          <thead><tr id="head-row"></tr></thead>
+          <tbody id="body"></tbody>
+        </table>
+      </div>
+
+      <p id="updated" class="updated" hidden></p>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog } from '../../scripts/sheet-logger.js';
+    import { requireAccess } from '../../scripts/staff-access.js';
+
+    const WORKER_BASE = 'https://dpc-catering-checkout.drew-f39.workers.dev';
+    const FOH_SALES_PATH = '/dangpretz/foh-sales';
+
+    let mode = 'day';           // 'day' | 'week'
+    let salesByDate = {};       // { 'YYYY-MM-DD': { sku: units } }
+    let liveOk = false;
+    let ordersScanned = null;
+
+    const $ = (id) => document.getElementById(id);
+    const isDip = (sku) => /dip/i.test(sku);
+
+    // ── date helpers (local shop calendar) ──
+    function ymd(d) { return d.toLocaleDateString('en-CA'); }
+    function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+    // Monday-anchored ISO-ish week key
+    function weekStart(dateStr) {
+      const d = new Date(`${dateStr}T12:00:00`);
+      const dow = (d.getDay() + 6) % 7; // Mon=0
+      return ymd(addDays(d, -dow));
+    }
+    function fmtDay(dateStr) {
+      const d = new Date(`${dateStr}T12:00:00`);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    function fmtWeek(dateStr) {
+      const d = new Date(`${dateStr}T12:00:00`);
+      return `wk ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    }
+
+    async function loadData() {
+      $('status').hidden = false;
+      $('status').classList.remove('error');
+      $('status').textContent = 'Loading sales…';
+      $('table-wrap').hidden = true;
+      $('refresh-btn').disabled = true;
+
+      let logRows = [];
+      let live = null;
+      try {
+        [logRows, live] = await Promise.all([
+          fetchLog(FOH_SALES_PATH).catch(() => []),
+          fetch(`${WORKER_BASE}/foh-sales?days=90`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        ]);
+      } catch (_) { /* handled below */ }
+
+      salesByDate = {};
+
+      // Permanent history: latest sales_day row per date wins.
+      const latestTsByDate = {};
+      (Array.isArray(logRows) ? logRows : []).forEach((r) => {
+        if (r.action !== 'sales_day' || !r.date) return;
+        const ts = r.timeStamp || '';
+        if (ts < (latestTsByDate[r.date] || '')) return;
+        latestTsByDate[r.date] = ts;
+        let totals = {};
+        try { totals = JSON.parse(r.totals || '{}'); } catch (_) { totals = {}; }
+        salesByDate[r.date] = { ...totals };
+      });
+
+      // Live feed (last 90d from Square) is authoritative where present.
+      liveOk = !!(live && live.byDate);
+      ordersScanned = liveOk ? live.ordersScanned : null;
+      if (liveOk) {
+        Object.entries(live.byDate).forEach(([date, skus]) => {
+          salesByDate[date] = { ...skus };
+        });
+      }
+
+      $('feed-note').hidden = liveOk;
+      if (!liveOk) {
+        $('feed-note').textContent = 'Live Square feed unavailable — showing saved daily history only. Recent days may be missing until the nightly sync runs.';
+      }
+
+      if (!Object.keys(salesByDate).length) {
+        $('status').textContent = liveOk
+          ? 'No FOH sales recorded yet.'
+          : 'No saved sales history yet, and the live feed is unavailable.';
+        $('refresh-btn').disabled = false;
+        $('summary').hidden = true;
+        $('updated').hidden = true;
+        return;
+      }
+
+      render();
+      $('refresh-btn').disabled = false;
+    }
+
+    function buckets() {
+      const today = new Date();
+      if (mode === 'day') {
+        const cols = [];
+        for (let i = 13; i >= 0; i -= 1) {
+          const ds = ymd(addDays(today, -i));
+          cols.push({ key: ds, label: fmtDay(ds), isToday: i === 0, dates: [ds] });
+        }
+        return cols;
+      }
+      // weekly — last 8 weeks
+      const cols = [];
+      const thisWeek = weekStart(ymd(today));
+      for (let i = 7; i >= 0; i -= 1) {
+        const wk = weekStart(ymd(addDays(new Date(`${thisWeek}T12:00:00`), -i * 7)));
+        cols.push({ key: wk, label: fmtWeek(wk), isToday: i === 0, dates: null });
+      }
+      return cols;
+    }
+
+    function unitsFor(sku, col) {
+      if (col.dates) {
+        return col.dates.reduce((s, d) => s + (salesByDate[d]?.[sku] || 0), 0);
+      }
+      // week column — sum every date whose weekStart matches
+      let total = 0;
+      Object.entries(salesByDate).forEach(([d, skus]) => {
+        if (weekStart(d) === col.key) total += skus[sku] || 0;
+      });
+      return total;
+    }
+
+    function render() {
+      const cols = buckets();
+
+      // Which SKUs have any sales in the visible window?
+      const seen = new Set();
+      cols.forEach((c) => {
+        if (c.dates) {
+          c.dates.forEach((d) => Object.keys(salesByDate[d] || {}).forEach((s) => seen.add(s)));
+        } else {
+          Object.entries(salesByDate).forEach(([d, skus]) => {
+            if (weekStart(d) === c.key) Object.keys(skus).forEach((s) => seen.add(s));
+          });
+        }
+      });
+      const pretzels = [...seen].filter((s) => !isDip(s)).sort();
+      const dips = [...seen].filter(isDip).sort();
+
+      // header
+      const head = $('head-row');
+      head.innerHTML = '';
+      const th0 = document.createElement('th');
+      th0.className = 'sku-col';
+      th0.textContent = 'Item';
+      head.appendChild(th0);
+      cols.forEach((c) => {
+        const th = document.createElement('th');
+        th.textContent = c.label;
+        if (c.isToday) th.classList.add('col-today');
+        head.appendChild(th);
+      });
+      const thT = document.createElement('th');
+      thT.className = 'total-col';
+      thT.textContent = 'Total';
+      head.appendChild(thT);
+
+      // body
+      const body = $('body');
+      body.innerHTML = '';
+      const colTotals = cols.map(() => 0);
+      let grand = 0;
+
+      const addGroup = (label, skus) => {
+        if (!skus.length) return;
+        const gr = document.createElement('tr');
+        gr.className = 'group-row';
+        const td = document.createElement('td');
+        td.className = 'sku-col';
+        td.colSpan = cols.length + 2;
+        td.textContent = label;
+        gr.appendChild(td);
+        body.appendChild(gr);
+
+        skus.forEach((sku) => {
+          const tr = document.createElement('tr');
+          const tdName = document.createElement('td');
+          tdName.className = 'sku-col';
+          tdName.textContent = sku;
+          tr.appendChild(tdName);
+          let rowTotal = 0;
+          cols.forEach((c, i) => {
+            const n = unitsFor(sku, c);
+            rowTotal += n;
+            colTotals[i] += n;
+            const td = document.createElement('td');
+            td.textContent = n || '0';
+            if (!n) td.classList.add('zero');
+            if (c.isToday) td.classList.add('col-today');
+            tr.appendChild(td);
+          });
+          grand += rowTotal;
+          const tdT = document.createElement('td');
+          tdT.className = 'total-col';
+          tdT.textContent = rowTotal;
+          tr.appendChild(tdT);
+          body.appendChild(tr);
+        });
+      };
+
+      addGroup('Pretzels', pretzels);
+      addGroup('Dips', dips);
+
+      // totals row
+      const totRow = document.createElement('tr');
+      totRow.className = 'total-row';
+      const tdL = document.createElement('td');
+      tdL.className = 'sku-col';
+      tdL.textContent = 'All items';
+      totRow.appendChild(tdL);
+      cols.forEach((c, i) => {
+        const td = document.createElement('td');
+        td.textContent = colTotals[i];
+        if (c.isToday) td.classList.add('col-today');
+        totRow.appendChild(td);
+      });
+      const tdG = document.createElement('td');
+      tdG.className = 'total-col';
+      tdG.textContent = grand;
+      totRow.appendChild(tdG);
+      body.appendChild(totRow);
+
+      // summary stats
+      const today = ymd(new Date());
+      const last7 = Array.from({ length: 7 }, (_, i) => ymd(addDays(new Date(), -i)))
+        .reduce((s, d) => s + Object.values(salesByDate[d] || {}).reduce((a, b) => a + b, 0), 0);
+      const todayTotal = Object.values(salesByDate[today] || {}).reduce((a, b) => a + b, 0);
+      const summary = $('summary');
+      summary.hidden = false;
+      summary.innerHTML = `
+        <div class="stat"><div class="n">${todayTotal}</div><div class="l">Sold today</div></div>
+        <div class="stat"><div class="n">${last7}</div><div class="l">Last 7 days</div></div>
+        <div class="stat"><div class="n">${Math.round(last7 / 7)}</div><div class="l">Avg / day (7d)</div></div>
+        <div class="stat"><div class="n">${pretzels.length + dips.length}</div><div class="l">Active SKUs</div></div>`;
+
+      $('status').hidden = true;
+      $('table-wrap').hidden = false;
+
+      const upd = $('updated');
+      upd.hidden = false;
+      upd.textContent = liveOk
+        ? `Live from Square — ${ordersScanned} orders scanned (last 90 days). Older weeks from saved daily history.`
+        : 'Saved daily history only.';
+    }
+
+    $('range-seg').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      mode = btn.dataset.mode;
+      [...$('range-seg').children].forEach((b) => b.classList.toggle('active', b === btn));
+      if (Object.keys(salesByDate).length) render();
+    });
+    $('refresh-btn').addEventListener('click', loadData);
+
+    (async () => {
+      await requireAccess('foh-sales');
+      await loadData();
+    })();
+  </script>
+</body>
+</html>

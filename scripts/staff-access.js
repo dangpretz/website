@@ -62,6 +62,7 @@ export const LINK_CATALOG = [
   { key: 'receiving-history', label: 'Receiving History', url: '/static/receiving-history/index.html' },
   { key: 'inventory', label: 'Ingredient Inventory', url: '/static/inventory/index.html' },
   { key: 'inventory-forecast', label: 'Inventory Forecast', url: '/static/inventory-forecast/index.html' },
+  { key: 'foh-sales', label: 'FOH Sales', url: '/static/foh-sales/index.html' },
   { key: 'recipes', label: 'Recipes', url: '/static/recipes/index.html' },
   { key: 'batch-tracking', label: 'Batch Tracking', url: '/static/batch-tracking/index.html' },
   { key: 'barcode-lookup', label: 'Barcode Lookup', url: '/static/barcode-lookup/index.html' },
