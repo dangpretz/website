@@ -31,12 +31,15 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - New wholesale accounts: inquiry form on the wholesale page, info@dangerouspretzel.com, or the shop phone / text numbers above
 - Existing partners order at the wholesale portal (linked from the wholesale pages)
 - Distributor page publishes 15+ wholesale partners and 50K+ pretzels sold monthly
-- Spoke pages for grocery/retail, venues/concessions, bars/breweries, Intermountain foodservice, offices/campuses, reheat onboarding, the become-a-customer checklist, catering-vs-wholesale, vs-mall, and add-to-menu all use the same wholesale inquiry form (on-page or the hub form)
+- Spoke pages for grocery/retail, venues/concessions, bars/breweries, Intermountain foodservice, offices/campuses, reheat onboarding, the become-a-customer checklist, catering-vs-wholesale, vs-mall, add-to-menu, foodservice supplier, pretzel bombs, and Salt Lake restaurant wholesale all use the same wholesale inquiry form (on-page or the hub form)
 - Reheat: partners reheat from frozen; the site does not publish oven temperatures, times, or frozen shelf-life days. The process is dialed in with each partner.
 - Offices and campuses: listed wholesale audience; standing orders; no kitchen build-out. A one-off corporate lunch is catering, not wholesale.
 - Catering vs wholesale: catering is pretzel boxes, bomb trays, and dips for a single event (FAQ: 48 hours; a week for 50+). Wholesale is standing or on-demand frozen cases for a business stocking its own service.
 - Vs mall / commodity: the hub already positions wholesale as “not a mall pretzel.” The shop pretzel is fully baked in SLC, flash-frozen, and vacuum-sealed; partners reheat. The site does not name competing brands or invent their specs.
 - Adding pretzels to a restaurant menu: inquiry → assortment confirmed with the account → reheat dialed in with the line → standing or on-demand orders. Not catering, not the Pretzel Program station.
+- Foodservice supplier: same wholesale product (fully baked, flash-frozen, vacuum-sealed). Direct path is SLC metro van or regional freight. Distributor inquiry lists SLC metro, Utah statewide, Mountain West, and national as application regions — not a published coverage map.
+- Pretzel bombs: listed wholesale SKU family — bite-size for concessions, taprooms, and grab-and-go. Distributor product range includes 5 bomb varieties. A catering bomb tray is a one-off event order, not wholesale cases.
+- Salt Lake restaurant wholesale: restaurant/bar menu job in the SLC metro (direct van from 352 W 600 S). The Utah page is metro-vs-freight logistics for any foodservice account. Walk-in retail remains a separate account.
 
 ## Key pages (200 URLs)
 
@@ -64,5 +67,8 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Wholesale vs mall pretzel](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-vs-mall.html)
 - [Catering vs wholesale](https://www.dangerouspretzel.com/v2/catering-vs-wholesale.html)
 - [Add to a restaurant menu](https://www.dangerouspretzel.com/v2/add-soft-pretzels-to-restaurant-menu.html)
+- [Foodservice supplier](https://www.dangerouspretzel.com/v2/soft-pretzel-foodservice-supplier.html)
+- [Pretzel bombs wholesale](https://www.dangerouspretzel.com/v2/pretzel-bombs-wholesale.html)
+- [Salt Lake restaurant wholesale](https://www.dangerouspretzel.com/v2/salt-lake-restaurant-pretzel-wholesale.html)
 
 Pretty paths such as `/wholesale` 301 to the `/v2/*.html` files listed here.

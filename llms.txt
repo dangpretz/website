@@ -32,6 +32,9 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Wholesale vs mall pretzel](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-vs-mall.html): Shop pretzel for foodservice. Fully baked in SLC, flash-frozen. Not a mall pretzel or a commodity case.
 - [Catering vs wholesale](https://www.dangerouspretzel.com/v2/catering-vs-wholesale.html): One event is catering (boxes, trays, dips). Standing or on-demand cases is wholesale.
 - [Add to a restaurant menu](https://www.dangerouspretzel.com/v2/add-soft-pretzels-to-restaurant-menu.html): Inquiry, assortment, reheat. Then it plates. No bakery staff.
+- [Foodservice supplier](https://www.dangerouspretzel.com/v2/soft-pretzel-foodservice-supplier.html): SLC bakery that supplies flash-frozen pretzels to foodservice. Metro van or freight. National is a distributor application region, not a coverage map.
+- [Pretzel bombs wholesale](https://www.dangerouspretzel.com/v2/pretzel-bombs-wholesale.html): Bite-size for concessions, taprooms, and grab-and-go. 5 bomb varieties in the published range. Not a catering tray.
+- [Salt Lake restaurant wholesale](https://www.dangerouspretzel.com/v2/salt-lake-restaurant-pretzel-wholesale.html): Menu pretzel for SLC restaurants. Metro van from 352 W 600 S. Utah page is logistics; this page is the kitchen.
 
 ## Optional
 
