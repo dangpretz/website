@@ -2427,7 +2427,11 @@ function renderReceipts() {
                 <td>${esc(catLabel[r.category]||r.category||'—')}</td>
                 <td>${fmt$(r.amount)}</td>
                 <td style="max-width:180px;color:var(--gray-4)">${esc(r.description||'—')}</td>
-                ${isAdmin ? `<td><span class="badge" style="${repBadgeStyle(r.repId||'admin')}">${esc(getRepLabel(r.repId))}</span></td>` : ''}
+                ${isAdmin ? `<td><select class="rep-inline-select" data-reassign-receipt="${esc(r.id)}" style="font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(r.repId||'admin')}">
+                    ${isKnownRepId(r.repId||'admin') ? '' : `<option value="${esc(r.repId)}" selected>${esc(getRepLabel(r.repId))}</option>`}
+                    <option value="admin"${(r.repId||'admin')==='admin'?' selected':''}>Manager</option>
+                    ${getReps().map(rp => `<option value="${rp.id}"${r.repId===rp.id?' selected':''}>${esc(rp.label)}</option>`).join('')}
+                  </select></td>` : ''}
                 <td><span class="badge badge-${esc(r.status)}">${esc(capitalize(r.status))}</span></td>
                 <td>${hasPhoto ? `<button class="btn-ghost btn-sm" data-view-photo="${esc(r.id)}">📷 View</button>` : '—'}</td>
                 <td style="white-space:nowrap">
@@ -2462,6 +2466,19 @@ function renderReceipts() {
     });
     wrap.querySelectorAll('[data-edit-receipt]').forEach(btn => {
       btn.addEventListener('click', () => openReceiptModal(btn.dataset.editReceipt));
+    });
+    wrap.querySelectorAll('[data-reassign-receipt]').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const newRepId = sel.value;
+        const id = sel.dataset.reassignReceipt;
+        sel.disabled = true;
+        try {
+          await reassignExpense('receipt', id, newRepId);
+          sel.style.cssText = `font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(newRepId)}`;
+          toast('Rep updated.');
+        } catch (e) { toast('Failed to save.'); }
+        sel.disabled = false;
+      });
     });
     wrap.querySelectorAll('[data-approve-receipt]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('receipt', btn.dataset.approveReceipt, 'approved'));
@@ -2507,7 +2524,11 @@ function renderReceipts() {
                 <td style="max-width:140px;color:var(--gray-4)">${esc(m.purpose||'—')}</td>
                 <td>$${Number(m.rate||0).toFixed(3)}/mi</td>
                 <td><strong>${fmt$(m.reimbursement)}</strong></td>
-                ${isAdmin ? `<td><span class="badge" style="${repBadgeStyle(m.repId||'admin')}">${esc(getRepLabel(m.repId))}</span></td>` : ''}
+                ${isAdmin ? `<td><select class="rep-inline-select" data-reassign-mileage="${esc(m.id)}" style="font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(m.repId||'admin')}">
+                    ${isKnownRepId(m.repId||'admin') ? '' : `<option value="${esc(m.repId)}" selected>${esc(getRepLabel(m.repId))}</option>`}
+                    <option value="admin"${(m.repId||'admin')==='admin'?' selected':''}>Manager</option>
+                    ${getReps().map(rp => `<option value="${rp.id}"${m.repId===rp.id?' selected':''}>${esc(rp.label)}</option>`).join('')}
+                  </select></td>` : ''}
                 <td><span class="badge badge-${esc(m.status)}">${esc(capitalize(m.status))}</span></td>
                 <td style="white-space:nowrap">
                   ${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-mileage="${esc(m.id)}" style="margin-right:4px">Edit</button>` : ''}
@@ -2534,6 +2555,19 @@ function renderReceipts() {
 
     wrap.querySelectorAll('[data-edit-mileage]').forEach(btn => {
       btn.addEventListener('click', () => openMileageModal(btn.dataset.editMileage));
+    });
+    wrap.querySelectorAll('[data-reassign-mileage]').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const newRepId = sel.value;
+        const id = sel.dataset.reassignMileage;
+        sel.disabled = true;
+        try {
+          await reassignExpense('mileage', id, newRepId);
+          sel.style.cssText = `font:600 12px Manrope,sans-serif;border-radius:20px;padding:2px 8px;border:1.5px solid #ddd;cursor:pointer;background:#fff;${repBadgeStyle(newRepId)}`;
+          toast('Rep updated.');
+        } catch (e) { toast('Failed to save.'); }
+        sel.disabled = false;
+      });
     });
     wrap.querySelectorAll('[data-approve-mileage]').forEach(btn => {
       btn.addEventListener('click', () => updateExpenseStatus('mileage', btn.dataset.approveMileage, 'approved'));
@@ -3015,6 +3049,17 @@ async function saveAccount(data) {
 
 async function reassignAccount(accountId, newRepId) {
   const entry = { action: 'reassign_account', id: accountId, repId: newRepId, timeStamp: new Date().toISOString() };
+  await appendLog(LOG_PATH, entry);
+  applyLogs([entry]);
+}
+
+// Manager-only fix for a receipt/mileage row stuck under a stale or legacy
+// rep id (e.g. a rep's session predates a PIN reassignment and keeps
+// submitting under the old one — see isKnownRepId). update_receipt/
+// update_mileage merge shallowly onto the existing row, so only repId changes.
+async function reassignExpense(type, id, newRepId) {
+  const action = type === 'receipt' ? 'update_receipt' : 'update_mileage';
+  const entry = { action, id, repId: newRepId, timeStamp: new Date().toISOString() };
   await appendLog(LOG_PATH, entry);
   applyLogs([entry]);
 }
