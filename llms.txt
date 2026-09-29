@@ -11,7 +11,7 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Home](https://www.dangerouspretzel.com/v2/index.html): Hand-crafted soft pretzels. Pickup, catering, and wholesale links.
 - [Menu](https://www.dangerouspretzel.com/v2/menu.html): Pretzels, bombs, house-made dips, and drinks.
 - [Catering](https://www.dangerouspretzel.com/v2/catering.html): Pretzel boxes, bomb trays, and dips for events. Order form notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice.
-- [Location](https://www.dangerouspretzel.com/v2/location.html): 352 W 600 S, Post District. Hours, shop contact, and the kitchen that bakes SLC metro wholesale.
+- [Location](https://www.dangerouspretzel.com/v2/location.html): 352 W 600 S, Post District. Friday–Sunday 11am–8pm. Closed Monday–Thursday. Shop contact, and the kitchen that bakes SLC metro wholesale.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html): Hours, catering notice, wholesale, and dietary notes.
 
 ## Wholesale
