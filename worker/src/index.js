@@ -1120,16 +1120,26 @@ async function sendOrderAlert({
   if (fulfillment.type === 'delivery' && fulfillment.address) {
     formData.append('Delivery Address', fulfillment.address);
   }
+  if (customer.business) formData.append('Business', customer.business);
+  if (customer.headcount) formData.append('Headcount', customer.headcount);
   if (customer.notes) {
     formData.append('Notes', customer.notes);
   }
   formData.append('Order ID', orderId);
   formData.append('_template', 'table');
+  formData.append('_captcha', 'false');
+  // info@ is the already-activated FormSubmit inbox. Paul is CC'd and must
+  // click FormSubmit's one-time confirmation before those copies deliver.
+  formData.append('_cc', 'paul@dangerouspretzel.com');
 
-  await fetch('https://formsubmit.co/ajax/info@dangerouspretzel.com', {
+  const res = await fetch('https://formsubmit.co/ajax/info@dangerouspretzel.com', {
     method: 'POST',
+    headers: { Accept: 'application/json' },
     body: formData,
   });
+  if (!res.ok) {
+    throw new Error(`Lead email failed (${res.status})`);
+  }
 }
 
 // ─── FOH cheese-dip consumption + iCalendar feed ─────────────────────────
@@ -2672,21 +2682,32 @@ export default {
       const rawOrder = sqData.related_resources?.orders?.[0];
       const orderId = typeof rawOrder === 'string' ? rawOrder : rawOrder?.id || null;
 
-      // Send email alert to the team (fire-and-forget)
+      // Email the team before returning. `alerted` tells the page not to
+      // send a second copy. If this fails, the page sends the backup.
       const itemSummary = items.map((i) => `${i.name || i.variationId} x${i.quantity}`).join(', ');
-      sendOrderAlert({
-        customer,
-        fulfillment,
-        itemSummary,
-        orderId: orderId || 'N/A',
-      }).catch((err) => {
+      let alerted = false;
+      try {
+        await Promise.race([
+          sendOrderAlert({
+            customer,
+            fulfillment,
+            itemSummary,
+            orderId: orderId || 'N/A',
+          }),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Lead email timed out')), 5000);
+          }),
+        ]);
+        alerted = true;
+      } catch (err) {
         // eslint-disable-next-line no-console -- worker diagnostics
         console.error('Email alert failed:', err);
-      });
+      }
 
       return json({
         checkout_url: sqData.payment_link.url,
         order_id: orderId,
+        alerted,
       });
     } catch (err) {
       // eslint-disable-next-line no-console -- worker diagnostics
