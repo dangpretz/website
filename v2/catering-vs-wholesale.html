@@ -64,7 +64,7 @@
           "name": "Which page should I use?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "One event: the catering page — order online, or send a custom catering inquiry. FAQ recommends at least 48 hours for standard catering, and a week for events of 50+ people. Delivery for catering is offered in the SLC metro. Standing inventory: the wholesale inquiry on this page. Existing wholesale partners order at the portal."
+            "text": "One event: the catering page — order online, or send a custom catering inquiry. Notice on the order form: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. Delivery for catering is offered in the SLC metro. Standing inventory: the wholesale inquiry on this page. Existing wholesale partners order at the portal."
           }
         },
         {
@@ -120,7 +120,7 @@
     <div class="card-grid">
       <div class="card card-center">
         <h3>Catering</h3>
-        <p>Pretzel boxes, bomb trays, and dips for events, offices, and celebrations. Order online and pay instantly, or send a custom inquiry for a big event. FAQ: at least 48 hours; a week for 50+ people. Catering delivery is offered in the SLC metro.</p>
+        <p>Pretzel boxes, bomb trays, and dips for events, offices, and celebrations. Order online and pay instantly, or send a custom inquiry for a big event. Order form notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. Catering delivery is offered in the SLC metro.</p>
         <a href="./catering.html" class="btn btn-red btn-full">CATERING PAGE</a>
       </div>
       <div class="card card-center">
@@ -139,7 +139,7 @@
     <div class="value-grid">
       <div class="value-card value-card-dark">
         <h3>Catering Notice</h3>
-        <p>At least 48 hours for standard catering. A week’s notice for events of 50+ people. That’s the FAQ — not a wholesale lead time.</p>
+        <p>Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. That’s the order form — not a wholesale lead time.</p>
       </div>
       <div class="value-card value-card-dark">
         <h3>Wholesale Cadence</h3>
@@ -166,7 +166,7 @@
       </details>
       <details class="faq-item">
         <summary>Which page should I use?</summary>
-        <p>One event: the <a href="./catering.html">catering page</a> — order online, or send a custom catering inquiry. FAQ recommends at least 48 hours for standard catering, and a week for events of 50+ people. Delivery for catering is offered in the SLC metro. Standing inventory: the wholesale inquiry on this page. Existing wholesale partners order at the <a href="https://dpc-orders.vercel.app" rel="noopener">portal</a>.</p>
+        <p>One event: the <a href="./catering.html">catering page</a> — order online, or send a custom catering inquiry. Notice on the order form: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. Delivery for catering is offered in the SLC metro. Standing inventory: the wholesale inquiry on this page. Existing wholesale partners order at the <a href="https://dpc-orders.vercel.app" rel="noopener">portal</a>.</p>
       </details>
       <details class="faq-item">
         <summary>Is a corporate lunch wholesale?</summary>
@@ -191,6 +191,7 @@
     <p class="form-sub" style="color:#aaa">Standing cases for your own service. One event? Use <a href="./catering.html" style="color:#fff">catering</a> instead.</p>
     <form action="https://formsubmit.co/info@dangerouspretzel.com" method="POST">
       <input type="hidden" name="_subject" value="Wholesale Inquiry">
+      <input type="hidden" name="_cc" value="paul@dangerouspretzel.com">
       <div class="form-row">
         <input name="business" placeholder="Business Name" required>
         <input name="contact" placeholder="Contact Name" required>
@@ -280,5 +281,6 @@ document.querySelector('.hamburger').addEventListener('click', function() {
   this.nextElementSibling.classList.toggle('open');
 });
 </script>
+<script src="./weekday-order.js"></script>
 </body>
 </html>

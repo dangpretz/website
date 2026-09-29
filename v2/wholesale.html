@@ -46,26 +46,6 @@
         "postalCode": "84101",
         "addressCountry": "US"
       },
-      "openingHoursSpecification": [
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday"],
-          "opens": "11:00",
-          "closes": "20:00"
-        },
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Friday", "Saturday"],
-          "opens": "11:00",
-          "closes": "21:00"
-        },
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": "Sunday",
-          "opens": "11:00",
-          "closes": "20:00"
-        }
-      ],
       "contactPoint": [
         {
           "@type": "ContactPoint",
@@ -300,7 +280,7 @@
       <div class="serve-card">
         <h3>Restaurants &amp; Bars</h3>
         <p>A unique menu item that actually gets reordered. One bar partner put it simply: customers order them on repeat.</p>
-        <a href="/soft-pretzel-wholesale-restaurants">Soft pretzel wholesale for restaurants →</a>
+        <a href="./soft-pretzel-wholesale-restaurants.html">Soft pretzel wholesale for restaurants →</a>
       </div>
       <div class="serve-card">
         <h3>Offices &amp; Campuses</h3>
@@ -329,7 +309,7 @@
       <div class="serve-card">
         <h3>Restaurants &amp; Bars</h3>
         <p>Menu pretzel, not mall pretzel. No bakery staff.</p>
-        <a href="/soft-pretzel-wholesale-restaurants">Soft pretzel wholesale for restaurants →</a>
+        <a href="./soft-pretzel-wholesale-restaurants.html">Soft pretzel wholesale for restaurants →</a>
       </div>
       <div class="serve-card">
         <h3>Bars &amp; Breweries</h3>
@@ -349,7 +329,7 @@
       <div class="serve-card">
         <h3>Frozen Foodservice</h3>
         <p>Fully baked, then flash-frozen. The reheat story.</p>
-        <a href="/frozen-soft-pretzels">Frozen soft pretzels →</a>
+        <a href="./frozen-soft-pretzels.html">Frozen soft pretzels →</a>
       </div>
       <div class="serve-card">
         <h3>Salt Lake / Utah</h3>
@@ -374,7 +354,7 @@
       <div class="serve-card">
         <h3>Distributor vs Direct</h3>
         <p>Stock your own service, or carry the brand in a region.</p>
-        <a href="/distributor-vs-direct-wholesale">Which path →</a>
+        <a href="./distributor-vs-direct-wholesale.html">Which path →</a>
       </div>
       <div class="serve-card">
         <h3>Offices &amp; Campuses</h3>
@@ -399,6 +379,7 @@
       <div class="serve-card">
         <h3>Catering vs Wholesale</h3>
         <p>One event, or standing cases.</p>
+        <a href="./catering.html">Order catering →</a>
         <a href="./catering-vs-wholesale.html">Which door →</a>
       </div>
       <div class="serve-card">
@@ -527,6 +508,7 @@
     <p class="form-sub" style="color:#aaa">Tell us about your business and we’ll be in touch.</p>
     <form action="https://formsubmit.co/info@dangerouspretzel.com" method="POST">
       <input type="hidden" name="_subject" value="Wholesale Inquiry">
+      <input type="hidden" name="_cc" value="paul@dangerouspretzel.com">
       <div class="form-row">
         <input name="business" placeholder="Business Name" required>
         <input name="contact" placeholder="Contact Name" required>
@@ -589,5 +571,6 @@ document.querySelector('.hamburger').addEventListener('click', function() {
   this.nextElementSibling.classList.toggle('open');
 });
 </script>
+<script src="./weekday-order.js"></script>
 </body>
 </html>
