@@ -758,3 +758,63 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
 }
 #tw:hover { transform: scale(1.1); }
 #tw svg { fill: #fff; width: 28px; height: 28px; }
+
+/* ─── Weekday closed note (Mon–Thu only; injected by weekday-order.js) ─── */
+.weekday-closed-bar {
+  max-width: 1200px;
+  margin: 8px auto 0;
+  font: 400 13px/1.4 'Manrope', sans-serif;
+  color: #F5F0E8;
+  text-align: center;
+}
+.weekday-closed-bar a {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.weekday-closed-note {
+  font: 400 13px/1.4 'Manrope', sans-serif;
+  color: #1A1A1A;
+  margin: 8px 0 0;
+}
+.weekday-closed-note a {
+  color: #C41E1E;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.btn-group > .weekday-closed-note {
+  flex: 1 0 100%;
+  text-align: center;
+  margin: 4px 0 0;
+}
+.hero .weekday-closed-note,
+.section-dark > .weekday-closed-note,
+.cta-red .weekday-closed-note,
+.trust-strip .weekday-closed-note {
+  color: #F5F0E8;
+}
+.hero .weekday-closed-note a,
+.cta-red .weekday-closed-note a {
+  color: #fff;
+}
+.section-dark .weekday-closed-note { color: #F5F0E8; }
+.section-dark .weekday-closed-note a { color: #fff; }
+.section-dark .card .weekday-closed-note { color: #666; }
+.section-dark .card .weekday-closed-note a { color: #C41E1E; }
+.card-dark .weekday-closed-note,
+.section-dark .card-dark .weekday-closed-note { color: #ccc; }
+.card-dark .weekday-closed-note a,
+.section-dark .card-dark .weekday-closed-note a { color: #fff; }
+.card .weekday-closed-note { margin-top: 10px; }
+.site-footer .weekday-closed-note {
+  color: #ccc;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.site-footer .weekday-closed-note a {
+  display: inline;
+  color: #fff;
+  font: 700 13px/1.4 'Manrope', sans-serif;
+  text-decoration: underline;
+}
