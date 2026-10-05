@@ -670,6 +670,17 @@ async function computeCommissions() {
   let error = null;
   let skippedForSetup = 0;
   try {
+    // Pricing, rep assignments (Sales CRM) and deliveries are edited on other
+    // pages — this tab's copy was loaded at page open. Re-read them so Compute
+    // sees the current state, not a snapshot from before the edit.
+    const [dLogs, cLogs, crmLogs, lLogs] = await Promise.all([
+      fetchLog(DELIVERY_LOG_PATH),
+      fetchLog(CONFIG_LOG_PATH),
+      fetchLog(SALES_CRM_LOG_PATH),
+      fetchLog(LEDGER_LOG_PATH),
+    ]);
+    deliveryLogs = dLogs; configLogs = cLogs; salesCrmLogs = crmLogs; ledgerLogs = lLogs;
+    recomputeAll();
     const { toWrite, needsSetup } = processWholesaleCommissions({
       deliveries: wholesaleDeliveries,
       existingWholesale: ledger.wholesale,
