@@ -404,6 +404,9 @@ textarea{resize:vertical;min-height:70px}
       </div>
       <div class="search-row">
         <input type="search" class="search-input" id="pricing-search" placeholder="Search customers…">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);white-space:nowrap;cursor:pointer">
+          <input type="checkbox" id="pricing-unassigned-only"> Unassigned only
+        </label>
       </div>
       <div class="pricing-layout">
         <div id="pricing-customer-list" class="pricing-customer-list"></div>
@@ -1178,7 +1181,12 @@ function showApp() {
   document.getElementById('receipt-rep-filter').style.display = isAdmin ? '' : 'none';
   document.getElementById('doc-rep-filter').style.display = isAdmin ? '' : 'none';
   if (isAdmin) {
-    populateRepFilterDropdown(document.getElementById('acct-rep-filter'));
+    const acctRepFilter = document.getElementById('acct-rep-filter');
+    populateRepFilterDropdown(acctRepFilter);
+    // "Unassigned" (repId missing or still 'admin') — not a real rep, so
+    // populateRepFilterDropdown (which only lists getReps()) can't surface
+    // it; add it once, right after "All Reps".
+    acctRepFilter.add(new Option('Unassigned', '__unassigned__'), 1);
     populateRepFilterDropdown(document.getElementById('pipe-rep-filter'));
     populateRepFilterDropdown(document.getElementById('receipt-rep-filter'));
     populateRepFilterDropdown(document.getElementById('doc-rep-filter'));
@@ -1479,7 +1487,8 @@ function renderAccounts() {
   if (search) accounts = accounts.filter(a => a.name?.toLowerCase().includes(search) || a.contactName?.toLowerCase().includes(search));
   if (seg) accounts = accounts.filter(a => a.segment === seg);
   if (status) accounts = accounts.filter(a => a.status === status);
-  if (repFilter) accounts = accounts.filter(a => (a.repId || 'admin') === repFilter);
+  if (repFilter === '__unassigned__') accounts = accounts.filter(a => (a.repId || 'admin') === 'admin');
+  else if (repFilter) accounts = accounts.filter(a => (a.repId || 'admin') === repFilter);
   accounts.sort((a, b) => {
     const ma = getAccountMetrics(a.id);
     const mb = getAccountMetrics(b.id);
@@ -1630,11 +1639,16 @@ function renderPricing() {
   document.getElementById('pricing-mine-btn')?.classList.toggle('btn-outline', pricingViewMode !== 'mine');
   document.getElementById('pricing-all-btn')?.classList.toggle('btn-red', pricingViewMode === 'all');
   document.getElementById('pricing-all-btn')?.classList.toggle('btn-outline', pricingViewMode !== 'all');
+  const unassignedToggle = document.getElementById('pricing-unassigned-only');
+  const unassignedLabel = unassignedToggle?.closest('label');
+  if (unassignedLabel) unassignedLabel.style.display = isAdmin ? '' : 'none';
 
   const search = (document.getElementById('pricing-search')?.value || '').toLowerCase();
+  const unassignedOnly = isAdmin && !!unassignedToggle?.checked;
   const showAll = isAdmin || pricingViewMode === 'all';
   let names = allPricingCustomers();
   if (!showAll) names = names.filter(n => repByCust[n] === currentRepId);
+  if (unassignedOnly) names = names.filter(n => !repByCust[n]);
   if (search) names = names.filter(n => n.toLowerCase().includes(search));
 
   const listEl = document.getElementById('pricing-customer-list');
@@ -3428,6 +3442,7 @@ function bindAll() {
 
   // Pricing view
   document.getElementById('pricing-search').addEventListener('input', renderPricing);
+  document.getElementById('pricing-unassigned-only').addEventListener('change', renderPricing);
   document.getElementById('pricing-mine-btn').addEventListener('click', () => { pricingViewMode = 'mine'; renderPricing(); });
   document.getElementById('pricing-all-btn').addEventListener('click', () => { pricingViewMode = 'all'; renderPricing(); });
   document.getElementById('pricing-new-account-btn').addEventListener('click', () => openAccountModal());
