@@ -40,6 +40,8 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - Foodservice supplier: same wholesale product (fully baked, flash-frozen, vacuum-sealed). Direct path is SLC metro van or regional freight. Distributor inquiry lists SLC metro, Utah statewide, Mountain West, and national as application regions — not a published coverage map.
 - Pretzel bombs: listed wholesale SKU family — bite-size for concessions, taprooms, and grab-and-go. Distributor product range includes 5 bomb varieties. A catering bomb tray is a one-off event order, not wholesale cases.
 - Salt Lake restaurant wholesale: restaurant/bar menu job in the SLC metro (direct van from 352 W 600 S). The Utah page is metro-vs-freight logistics for any foodservice account. Walk-in retail remains a separate account.
+- US Foods: Dangerous Pretzel Co. is listed in US Foods catalogs for Northern Utah and Boise. US Foods customers in those areas can order through their US Foods rep. The site does not publish US Foods item codes or prices.
+- Ski resorts: wholesale page for ski resorts. Dangerous Pretzel already serves the Goldminer's Daughter at Alta, Brighton, Powder Mountain, and the Delta Center Level 5A. Paul or Emery from the team can drop off samples.
 
 ## Key pages (200 URLs)
 
@@ -70,5 +72,6 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Foodservice supplier](https://www.dangerouspretzel.com/v2/soft-pretzel-foodservice-supplier.html)
 - [Pretzel bombs wholesale](https://www.dangerouspretzel.com/v2/pretzel-bombs-wholesale.html)
 - [Salt Lake restaurant wholesale](https://www.dangerouspretzel.com/v2/salt-lake-restaurant-pretzel-wholesale.html)
+- [Ski resorts](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-ski-resorts.html)
 
 Pretty paths such as `/wholesale` 301 to the `/v2/*.html` files listed here.

@@ -2,7 +2,7 @@
 
 > Soft pretzel shop in Salt Lake City. Fresh retail at the Post District counter, plus wholesale flash-frozen foodservice.
 
-Dangerous Pretzel Co. (https://www.dangerouspretzel.com/) bakes soft pretzels at 352 W 600 S, Salt Lake City, UT 84101. Wholesale pretzels are fully baked in that kitchen — not raw dough — then flash-frozen and vacuum-sealed. The site does not publish case packs, MOQs, or price lists for wholesale.
+Dangerous Pretzel Co. (https://www.dangerouspretzel.com/) bakes soft pretzels at 352 W 600 S, Salt Lake City, UT 84101. Wholesale pretzels are fully baked in that kitchen — not raw dough — then flash-frozen and vacuum-sealed. The site does not publish case packs, MOQs, or price lists for wholesale. Dangerous Pretzel Co. is listed in US Foods catalogs for Northern Utah and Boise. US Foods customers in those areas can order it through their US Foods rep. The site does not publish US Foods item codes or prices.
 
 Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML files are the 200 documents.
 
@@ -21,6 +21,7 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Bars and breweries](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-bars.html): Taproom bombs and menu twists. No bakery staff.
 - [Grocery and retail](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-grocery.html): 3-day fresh retail shelf or flash-frozen hold.
 - [Event venues](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-venues.html): Concessions wholesale. Frozen cases to reheat, not the Pretzel Program station.
+- [Ski resorts](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-ski-resorts.html): Wholesale for ski resorts. Already serves the Goldminer's Daughter at Alta, Brighton, Powder Mountain, and the Delta Center Level 5A. US Foods customers in Northern Utah and Boise can order through their US Foods rep. Paul or Emery from the team can drop off samples.
 - [Frozen foodservice](https://www.dangerouspretzel.com/v2/frozen-soft-pretzels.html): Fully baked, then flash-frozen. Fresh retail hold is described separately.
 - [Utah / Salt Lake](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-utah.html): Soft pretzel wholesale for Salt Lake City foodservice. SLC metro van; freight for the rest of Utah. Walk-in retail is a separate account.
 - [Intermountain](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-intermountain.html): SLC metro van; freight for the region. Mountain West is a listed distributor region.
