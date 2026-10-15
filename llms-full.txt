@@ -16,6 +16,8 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - FAQ: pretzels and dips are vegetarian; some items contain dairy and eggs; gluten-free is not currently offered
 - Catering order form notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice
 - Catering page: delivery is offered in the SLC metro area (fee listed on that page)
+- Wedding catering: pretzel boxes, bomb trays, and dips for cocktail hour, a late-night snack, rehearsal dinners, and receptions. Pickup at 352 W 600 S, or SLC metro delivery. The request is on the catering page and can be used any day for a future date. A closed shop counter does not block it. Notice is 12, 24, or 48 hours depending on order size.
+- Office and corporate catering: one-off catering for meetings, team events, office parties, and client events in Salt Lake City. Same request form, pickup, SLC metro delivery, and notice as the catering page.
 
 ## Published wholesale facts
 
@@ -42,12 +44,15 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - Salt Lake restaurant wholesale: restaurant/bar menu job in the SLC metro (direct van from 352 W 600 S). The Utah page is metro-vs-freight logistics for any foodservice account. Walk-in retail remains a separate account.
 - US Foods: Dangerous Pretzel Co. is listed in US Foods catalogs for Northern Utah and Boise. US Foods customers in those areas can order through their US Foods rep. The site does not publish US Foods item codes or prices.
 - Ski resorts: wholesale page for ski resorts. Dangerous Pretzel already serves the Goldminer's Daughter at Alta, Brighton, Powder Mountain, and the Delta Center Level 5A. Paul or Emery from the team can drop off samples.
+- Family entertainment: wholesale page for arcades, bowling alleys, roller rinks, trampoline parks, and family entertainment centers. Fully baked, flash-frozen, vacuum-sealed; the account reheats. The published accounts (Goldminer's Daughter at Alta, Brighton, Powder Mountain, Delta Center Level 5A) are not a list of arcades or bowling alleys. US Foods customers in Northern Utah and Boise can order through their US Foods rep. Paul or Emery from the team can drop off samples. Case packs and MOQs are not published.
 
 ## Key pages (200 URLs)
 
 - [Home](https://www.dangerouspretzel.com/v2/index.html)
 - [Menu](https://www.dangerouspretzel.com/v2/menu.html)
 - [Catering](https://www.dangerouspretzel.com/v2/catering.html)
+- [Wedding catering](https://www.dangerouspretzel.com/v2/wedding-pretzel-catering.html)
+- [Office and corporate catering](https://www.dangerouspretzel.com/v2/office-pretzel-catering.html)
 - [Location](https://www.dangerouspretzel.com/v2/location.html): Post District shop NAP and hours. Same kitchen that bakes SLC metro wholesale.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html)
 - [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html)
@@ -73,5 +78,6 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Pretzel bombs wholesale](https://www.dangerouspretzel.com/v2/pretzel-bombs-wholesale.html)
 - [Salt Lake restaurant wholesale](https://www.dangerouspretzel.com/v2/salt-lake-restaurant-pretzel-wholesale.html)
 - [Ski resorts](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-ski-resorts.html)
+- [Family entertainment](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-family-entertainment.html)
 
 Pretty paths such as `/wholesale` 301 to the `/v2/*.html` files listed here.
