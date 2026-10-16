@@ -43,6 +43,10 @@
     .range-label { text-align: center; flex: 1; min-width: 180px; }
     .range-label .main { font: 800 clamp(20px, 3vw, 26px) 'Manrope', sans-serif; color: #1A1A1A; }
     .range-label .sub { font: 600 12px 'Manrope', sans-serif; color: #888; margin-top: 2px; letter-spacing: 0.4px; }
+    .lang-pill { display: inline-flex; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; }
+    .lang-pill button { font: 700 12px 'Manrope', sans-serif; padding: 8px 12px; border: none; background: transparent; color: #888; cursor: pointer; }
+    .lang-pill button.active { background: #C41E1E; color: #fff; }
+    .tools { display: flex; align-items: center; gap: 8px; }
     .btn-refresh { background: transparent; border: 2px solid #ccc; color: #888; font: 700 12px 'Manrope', sans-serif; border-radius: 6px; padding: 7px 14px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
     .btn-refresh:hover:not(:disabled) { border-color: #C41E1E; color: #C41E1E; }
     .btn-refresh:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -98,14 +102,14 @@
     <div class="nav-wrap">
       <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
       <div class="nav-links">
-        <a href="../index.html">&larr; Staff Hub</a>
+        <a href="../index.html" id="hub-link">&larr; Staff Hub</a>
       </div>
     </div>
   </nav>
 
   <section class="hero">
-    <h1>WHOLESALE COUNTS.</h1>
-    <p>Cases and pretzels needed for wholesale deliveries.</p>
+    <h1 id="hero-title">WHOLESALE COUNTS.</h1>
+    <p id="hero-sub">Cases and pretzels needed for wholesale deliveries.</p>
   </section>
 
   <div class="section-cream">
@@ -113,8 +117,8 @@
 
       <div class="controls">
         <div class="seg" id="mode-seg">
-          <button data-mode="day" class="active">Day</button>
-          <button data-mode="week">Week</button>
+          <button data-mode="day" class="active" id="mode-day">Day</button>
+          <button data-mode="week" id="mode-week">Week</button>
         </div>
         <div class="nav-group">
           <button class="nav-btn" id="prev-btn" aria-label="Previous">&#8249;</button>
@@ -125,7 +129,12 @@
           <div class="main" id="range-main"></div>
           <div class="sub" id="range-sub"></div>
         </div>
-        <button class="btn-refresh" id="refresh-btn">&#8635; Refresh</button>
+        <div class="tools">
+          <div class="lang-pill" id="lang-pill" role="group" aria-label="Language">
+            <button data-lang="en">EN</button><button data-lang="es">ES</button>
+          </div>
+          <button class="btn-refresh" id="refresh-btn">&#8635; Refresh</button>
+        </div>
       </div>
 
       <div id="status" class="status">Loading deliveries…</div>
@@ -140,12 +149,11 @@
     import { fetchLog } from '../../scripts/sheet-logger.js';
     import { requireAccess } from '../../scripts/staff-access.js';
     import {
-      resolveDeliveries, resolveProductionLogs, CASE_SIZES, LEGACY_SKU_RENAMES,
-    } from '../../scripts/inventory.js';
+      resolveDeliveries, resolveProductionLogs, CASE_SIZES, LEGACY_SKU_RENAMES, SKU_NAMES_ES,
+    } from '../../scripts/inventory.js?v=2026-10-16-sku-names-es';
 
     const DELIVERY_LOG = '/dangpretz/delivery-planner';
     const PRODUCTION_LOG = '/dangpretz/production';
-    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     let mode = 'day';          // 'day' | 'week'
     let anchor = new Date();   // the day shown (day mode) or any day in the week shown (week mode)
@@ -154,15 +162,66 @@
 
     const $ = (id) => document.getElementById(id);
 
+    // ── Language ── EN/ES. Order of precedence: ?lang=, the choice saved from
+    // either this page or the production app (same storage key, so the team
+    // picks once), then the browser's language.
+    const LANG_KEY = 'prod-lang';
+    let lang = (() => {
+      const q = new URLSearchParams(location.search).get('lang');
+      let saved = null;
+      try { saved = localStorage.getItem(LANG_KEY); } catch (_) { /* storage blocked */ }
+      if (['en', 'es'].includes(q)) return q;
+      if (['en', 'es'].includes(saved)) return saved;
+      return (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+    })();
+    const STR = {
+      en: {
+        title: 'Wholesale Counts | Dangerous Pretzel Co.', hub: '← Staff Hub', hero: 'WHOLESALE COUNTS.',
+        heroSub: 'Cases and pretzels needed for wholesale deliveries.',
+        day: 'Day', week: 'Week', today: 'Today', refresh: '↻ Refresh', prev: 'Previous', next: 'Next',
+        loading: 'Loading deliveries…', loadFail: (m) => `Couldn't load deliveries: ${m}`,
+        todayCap: 'TODAY', thisWeek: 'THIS WEEK', weekOf: (d) => `WEEK OF ${d}`,
+        pzCases: 'Pretzel cases', pzNeeded: 'Pretzels needed', delivery: 'Delivery', deliveries: 'Deliveries',
+        moreDips: (n) => `+ ${n} dips`,
+        none: (d) => `No wholesale deliveries ${d ? 'on this day' : 'this week'}.`,
+        item: 'Item', cases: 'Cases', pzNeededHead: 'Pretzels needed', weekHead: 'Week', pzTotal: 'Pretzel total',
+        case1: 'case', caseN: 'cases', cs: 'cs', loose: 'loose', pretzels: 'pretzels', dips: 'dips',
+        gPretzels: 'Pretzels', gDips: 'Dips', gOther: 'Catering boxes & other',
+        legend: 'Each day: cases on top, total pretzels underneath', openDay: 'Open this day',
+        foot: 'Cases come from what each order recorded; where an order only listed a quantity, the standard case size is used and any remainder shows as loose. Includes scheduled and already-delivered wholesale orders.',
+      },
+      es: {
+        title: 'Conteo Mayoreo | Dangerous Pretzel Co.', hub: '← Centro del personal', hero: 'CONTEO MAYOREO.',
+        heroSub: 'Cajas y pretzels necesarios para entregas de mayoreo.',
+        day: 'Día', week: 'Semana', today: 'Hoy', refresh: '↻ Actualizar', prev: 'Anterior', next: 'Siguiente',
+        loading: 'Cargando entregas…', loadFail: (m) => `No se pudieron cargar las entregas: ${m}`,
+        todayCap: 'HOY', thisWeek: 'ESTA SEMANA', weekOf: (d) => `SEMANA DEL ${d}`,
+        pzCases: 'Cajas de pretzels', pzNeeded: 'Pretzels necesarios', delivery: 'Entrega', deliveries: 'Entregas',
+        moreDips: (n) => `+ ${n} salsas`,
+        none: (d) => `No hay entregas de mayoreo ${d ? 'este día' : 'esta semana'}.`,
+        item: 'Producto', cases: 'Cajas', pzNeededHead: 'Pretzels necesarios', weekHead: 'Semana', pzTotal: 'Total de pretzels',
+        case1: 'caja', caseN: 'cajas', cs: 'cj', loose: 'sueltos', pretzels: 'pretzels', dips: 'salsas',
+        gPretzels: 'Pretzels', gDips: 'Salsas', gOther: 'Cajas de catering y otros',
+        legend: 'Cada día: cajas arriba, total de pretzels abajo', openDay: 'Abrir este día',
+        foot: 'Las cajas salen de lo que registró cada pedido; si un pedido solo tiene cantidad, se usa el tamaño de caja estándar y el resto aparece como sueltos. Incluye pedidos de mayoreo programados y ya entregados.',
+      },
+    };
+    const L = (k, ...a) => { const v = STR[lang][k]; return typeof v === 'function' ? v(...a) : v; };
+    // Spanish display name where the product has one (shared with production)
+    const skuName = (sku) => (lang === 'es' && SKU_NAMES_ES[sku]) || sku;
+    const locale = () => (lang === 'es' ? 'es-MX' : 'en-US');
+
     // ── date helpers (local calendar, noon-anchored so DST can't shift a day) ──
     const pad = (n) => String(n).padStart(2, '0');
     const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     const parse = (s) => new Date(`${s}T12:00:00`);
     const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
     const weekStart = (d) => addDays(d, -((d.getDay() + 6) % 7)); // Monday
-    const fmtLong = (d) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    const fmtShort = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const num = (n) => Number(n).toLocaleString('en-US');
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const fmtLong = (d) => cap(d.toLocaleDateString(locale(), { weekday: 'long', month: 'long', day: 'numeric' }));
+    const fmtShort = (d) => d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' });
+    const num = (n) => Number(n).toLocaleString(locale());
+    const dayName = (d) => cap(d.toLocaleDateString(locale(), { weekday: 'short' }).replace('.', ''));
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // Which table group a SKU belongs in. Pretzels are what the team shapes
@@ -173,7 +232,7 @@
       if (s.includes('dip')) return 'dips';
       return 'pretzels';
     }
-    const GROUP_LABEL = { pretzels: 'Pretzels', dips: 'Dips', other: 'Catering boxes & other' };
+    const GROUP_LABEL = { pretzels: 'gPretzels', dips: 'gDips', other: 'gOther' };
     const GROUP_ORDER = ['pretzels', 'dips', 'other'];
 
     // Pretzel-size ordering so the list reads the same every day: biggest
@@ -191,7 +250,7 @@
     async function load() {
       $('status').hidden = false;
       $('status').classList.remove('error');
-      $('status').textContent = 'Loading deliveries…';
+      $('status').textContent = L('loading');
       $('refresh-btn').disabled = true;
       try {
         const [dLogs, pLogs] = await Promise.all([
@@ -232,7 +291,7 @@
         render();
       } catch (err) {
         $('status').classList.add('error');
-        $('status').textContent = `Couldn't load deliveries: ${err.message}`;
+        $('status').textContent = L('loadFail', err.message);
         $('summary').hidden = true; $('content').hidden = true; $('footnote').hidden = true;
       } finally {
         $('refresh-btn').disabled = false;
@@ -256,11 +315,11 @@
     function casesHtml(t) {
       if (!t || (t.cases === 0 && t.loose === 0)) return '<span class="zero">—</span>';
       const parts = [];
-      if (t.cases > 0) parts.push(`<span class="big">${num(t.cases)}</span><span class="unit">${t.cases === 1 ? 'case' : 'cases'}</span>`);
+      if (t.cases > 0) parts.push(`<span class="big">${num(t.cases)}</span><span class="unit">${t.cases === 1 ? L('case1') : L('caseN')}</span>`);
       const sizes = Object.entries(t.sizes);
       const notes = [];
       if (sizes.length > 1) notes.push(sizes.map(([s, c]) => `${c}×${s}`).join(' + '));
-      if (t.loose > 0) notes.push(`${t.cases > 0 ? '+ ' : ''}${num(t.loose)} loose`);
+      if (t.loose > 0) notes.push(`${t.cases > 0 ? '+ ' : ''}${num(t.loose)} ${L('loose')}`);
       return parts.join('') + (notes.length ? `<span class="note">${notes.join(' · ')}</span>` : '');
     }
 
@@ -278,11 +337,11 @@
       // header label
       if (mode === 'day') {
         $('range-main').textContent = fmtLong(anchor);
-        $('range-sub').textContent = ymd(anchor) === todayStr ? 'TODAY' : '';
+        $('range-sub').textContent = ymd(anchor) === todayStr ? L('todayCap') : '';
       } else {
         const ws = weekStart(anchor); const we = addDays(ws, 6);
         $('range-main').textContent = `${fmtShort(ws)} – ${fmtShort(we)}`;
-        $('range-sub').textContent = dateStrs.includes(todayStr) ? 'THIS WEEK' : `WEEK OF ${fmtShort(ws).toUpperCase()}`;
+        $('range-sub').textContent = dateStrs.includes(todayStr) ? L('thisWeek') : L('weekOf', fmtShort(ws).toUpperCase());
       }
 
       const totals = totalsFor(dateStrs);
@@ -292,7 +351,7 @@
       if (!skus.length) {
         $('summary').hidden = true; $('footnote').hidden = true;
         $('content').hidden = false;
-        $('content').innerHTML = `<div class="empty">No wholesale deliveries ${mode === 'day' ? 'on this day' : 'this week'}.</div>`;
+        $('content').innerHTML = `<div class="empty">${L('none', mode === 'day')}</div>`;
         return;
       }
 
@@ -301,9 +360,9 @@
       const dips = sumGroup(totals, 'dips');
       $('summary').hidden = false;
       $('summary').innerHTML = `
-        <div class="stat"><div class="n">${num(pz.cases)}</div><div class="l">Pretzel cases</div></div>
-        <div class="stat"><div class="n">${num(pz.qty)}</div><div class="l">Pretzels needed</div></div>
-        <div class="stat"><div class="n">${num(deliveries)}</div><div class="l">${deliveries === 1 ? 'Delivery' : 'Deliveries'}</div>${dips.qty ? `<div class="s">+ ${num(dips.qty)} dips</div>` : ''}</div>`;
+        <div class="stat"><div class="n">${num(pz.cases)}</div><div class="l">${L('pzCases')}</div></div>
+        <div class="stat"><div class="n">${num(pz.qty)}</div><div class="l">${L('pzNeeded')}</div></div>
+        <div class="stat"><div class="n">${num(deliveries)}</div><div class="l">${deliveries === 1 ? L('delivery') : L('deliveries')}</div>${dips.qty ? `<div class="s">${L('moreDips', num(dips.qty))}</div>` : ''}</div>`;
 
       $('content').hidden = false;
       $('content').innerHTML = mode === 'day' ? dayTable(totals) : weekTable(days, dateStrs, todayStr);
@@ -312,7 +371,7 @@
       });
 
       $('footnote').hidden = false;
-      $('footnote').textContent = 'Cases come from what each order recorded; where an order only listed a quantity, the standard case size is used and any remainder shows as loose. Includes scheduled and already-delivered wholesale orders.';
+      $('footnote').textContent = L('foot');
     }
 
     function groupedSkus(skus) {
@@ -323,19 +382,19 @@
       const groups = groupedSkus(Object.keys(totals));
       let body = '';
       groups.forEach(([g, list]) => {
-        body += `<tr class="group-row"><td colspan="3">${GROUP_LABEL[g]}</td></tr>`;
+        body += `<tr class="group-row"><td colspan="3">${L(GROUP_LABEL[g])}</td></tr>`;
         list.forEach((sku) => {
-          const t = totals[sku];
-          const showCases = g === 'pretzels';
-          body += `<tr><td class="sku-col">${esc(sku)}</td>
-            <td>${showCases ? casesHtml(t) : '<span class="zero">—</span>'}</td>
-            <td><span class="big">${num(t.qty)}</span><span class="unit">${g === 'dips' ? 'dips' : (g === 'other' ? '' : 'pretzels')}</span></td></tr>`;
+          const tot = totals[sku];
+          const unit = g === 'dips' ? L('dips') : (g === 'other' ? '' : L('pretzels'));
+          body += `<tr><td class="sku-col">${esc(skuName(sku))}</td>
+            <td>${g === 'pretzels' ? casesHtml(tot) : '<span class="zero">—</span>'}</td>
+            <td><span class="big">${num(tot.qty)}</span><span class="unit">${unit}</span></td></tr>`;
         });
       });
       const pz = sumGroup(totals, 'pretzels');
-      body += `<tr class="total-row"><td class="sku-col">Pretzel total</td><td><span class="big">${num(pz.cases)}</span><span class="unit">cases</span></td><td><span class="big">${num(pz.qty)}</span><span class="unit">pretzels</span></td></tr>`;
+      body += `<tr class="total-row"><td class="sku-col">${L('pzTotal')}</td><td><span class="big">${num(pz.cases)}</span><span class="unit">${L('caseN')}</span></td><td><span class="big">${num(pz.qty)}</span><span class="unit">${L('pretzels')}</span></td></tr>`;
       return `<div class="table-wrap"><table class="counts">
-        <thead><tr><th class="sku-col">Item</th><th>Cases</th><th>Pretzels needed</th></tr></thead>
+        <thead><tr><th class="sku-col">${L('item')}</th><th>${L('cases')}</th><th>${L('pzNeededHead')}</th></tr></thead>
         <tbody>${body}</tbody></table></div>`;
     }
 
@@ -343,35 +402,63 @@
       const perDay = dateStrs.map((d) => totalsFor([d]));
       const weekTotals = totalsFor(dateStrs);
       const groups = groupedSkus(Object.keys(weekTotals));
-      const head = days.map((d, i) => `<th class="day-head${dateStrs[i] === todayStr ? ' is-today' : ''}" data-jump="${dateStrs[i]}" title="Open this day">${DAY_NAMES[d.getDay()]}<span class="dnum">${d.getDate()}</span></th>`).join('');
-      const cell = (t, g) => {
-        if (!t) return '<span class="zero">—</span>';
-        const top = g === 'pretzels' && t.cases > 0 ? `${num(t.cases)} cs` : num(t.qty);
-        const sub = g === 'pretzels' && t.cases > 0 ? num(t.qty) : '';
-        return `${top}${sub ? `<span class="pz">${sub}</span>` : ''}`;
+      const head = days.map((d, i) => `<th class="day-head${dateStrs[i] === todayStr ? ' is-today' : ''}" data-jump="${dateStrs[i]}" title="${L('openDay')}">${dayName(d)}<span class="dnum">${d.getDate()}</span></th>`).join('');
+      const cell = (tot, g) => {
+        if (!tot) return '<span class="zero">—</span>';
+        const withCases = g === 'pretzels' && tot.cases > 0;
+        return `${withCases ? `${num(tot.cases)} ${L('cs')}` : num(tot.qty)}${withCases ? `<span class="pz">${num(tot.qty)}</span>` : ''}`;
       };
       let body = '';
       groups.forEach(([g, list]) => {
-        body += `<tr class="group-row"><td colspan="${days.length + 2}">${GROUP_LABEL[g]}</td></tr>`;
+        body += `<tr class="group-row"><td colspan="${days.length + 2}">${L(GROUP_LABEL[g])}</td></tr>`;
         list.forEach((sku) => {
-          const cells = perDay.map((t, i) => `<td class="cell${dateStrs[i] === todayStr ? ' is-today' : ''}">${cell(t[sku], g)}</td>`).join('');
+          const cells = perDay.map((day, i) => `<td class="cell${dateStrs[i] === todayStr ? ' is-today' : ''}">${cell(day[sku], g)}</td>`).join('');
           const wt = weekTotals[sku];
           const totalCell = g === 'pretzels' && wt.cases > 0
-            ? `<span class="big">${num(wt.cases)}</span><span class="unit">cases</span><span class="note">${num(wt.qty)} pretzels</span>`
+            ? `<span class="big">${num(wt.cases)}</span><span class="unit">${L('caseN')}</span><span class="note">${num(wt.qty)} ${L('pretzels')}</span>`
             : `<span class="big">${num(wt.qty)}</span>`;
-          body += `<tr><td class="sku-col">${esc(sku)}</td>${cells}<td class="total-col">${totalCell}</td></tr>`;
+          body += `<tr><td class="sku-col">${esc(skuName(sku))}</td>${cells}<td class="total-col">${totalCell}</td></tr>`;
         });
       });
-      const pzDay = perDay.map((t, i) => { const s = sumGroup(t, 'pretzels'); return `<td class="cell${dateStrs[i] === todayStr ? ' is-today' : ''}">${s.qty ? `${num(s.cases)} cs<span class="pz">${num(s.qty)}</span>` : '<span class="zero">—</span>'}</td>`; }).join('');
+      const pzDay = perDay.map((day, i) => {
+        const sm = sumGroup(day, 'pretzels');
+        return `<td class="cell${dateStrs[i] === todayStr ? ' is-today' : ''}">${sm.qty ? `${num(sm.cases)} ${L('cs')}<span class="pz">${num(sm.qty)}</span>` : '<span class="zero">—</span>'}</td>`;
+      }).join('');
       const pzWeek = sumGroup(weekTotals, 'pretzels');
-      body += `<tr class="total-row"><td class="sku-col">Pretzel total</td>${pzDay}<td class="total-col"><span class="big">${num(pzWeek.cases)}</span><span class="unit">cases</span><span class="note">${num(pzWeek.qty)} pretzels</span></td></tr>`;
-      return `<div class="legend"><span>Each day: cases on top, total pretzels underneath</span></div>
+      body += `<tr class="total-row"><td class="sku-col">${L('pzTotal')}</td>${pzDay}<td class="total-col"><span class="big">${num(pzWeek.cases)}</span><span class="unit">${L('caseN')}</span><span class="note">${num(pzWeek.qty)} ${L('pretzels')}</span></td></tr>`;
+      return `<div class="legend"><span>${L('legend')}</span></div>
         <div class="table-wrap"><table class="counts">
-        <thead><tr><th class="sku-col">Item</th>${head}<th class="total-col">Week</th></tr></thead>
+        <thead><tr><th class="sku-col">${L('item')}</th>${head}<th class="total-col">${L('weekHead')}</th></tr></thead>
         <tbody>${body}</tbody></table></div>`;
     }
 
     // ── Controls ──
+    // Static text + toggle state; called on load and every language change.
+    function applyLang() {
+      document.documentElement.lang = lang;
+      document.title = L('title');
+      $('hub-link').innerHTML = L('hub').replace('←', '&larr;');
+      $('hero-title').textContent = L('hero');
+      $('hero-sub').textContent = L('heroSub');
+      $('mode-day').textContent = L('day');
+      $('mode-week').textContent = L('week');
+      $('today-btn').textContent = L('today');
+      $('refresh-btn').textContent = L('refresh');
+      $('prev-btn').setAttribute('aria-label', L('prev'));
+      $('next-btn').setAttribute('aria-label', L('next'));
+      [...$('lang-pill').children].forEach((b) => b.classList.toggle('active', b.dataset.lang === lang));
+    }
+    function setLang(next) {
+      lang = next;
+      try { localStorage.setItem(LANG_KEY, lang); } catch (_) { /* storage blocked */ }
+      applyLang();
+      if (!$('status').hidden && !$('status').classList.contains('error')) $('status').textContent = L('loading');
+      if (rows.length || Object.keys(deliveryCountByDate).length) render();
+    }
+    $('lang-pill').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (b) setLang(b.dataset.lang);
+    });
+
     function syncMode() {
       [...$('mode-seg').children].forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     }
@@ -392,6 +479,7 @@
     // Keep a long-open tab current: refetch when it regains focus.
     document.addEventListener('visibilitychange', () => { if (!document.hidden && rows.length) load(); });
 
+    applyLang();
     (async () => {
       await requireAccess('wholesale-counts');
       await load();
