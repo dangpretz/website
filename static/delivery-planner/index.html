@@ -593,13 +593,6 @@
       .week-nav-label .week-dates { font-size: 11px; }
       .view-toggle { width: 100%; order: 10; }
 
-      /* ── Modals: slide up from bottom ── */
-      .modal-content { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0;
-        min-height: 60vh; padding: 20px 16px; align-self: flex-end; }
-      .confirm-modal { width: 100%; max-width: 100%; margin: 0; border-radius: 12px 12px 0 0;
-        min-height: 50vh; padding: 20px 16px; }
-      .modal-overlay.open, .confirm-overlay.open { align-items: flex-end; }
-
       /* ── Daily view ── */
       .daily-card { flex-direction: column; gap: 12px; padding: 16px; }
       .daily-card .daily-customer { font-size: 15px; }
@@ -672,6 +665,7 @@
     .modal-overlay {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
       z-index: 10000; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain; /* don't scroll the page behind the sheet */
     }
     .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
     .modal-content {
@@ -688,7 +682,7 @@
     }
 
     /* Confirmation modal specifics */
-    .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10001; overflow-y: auto; }
+    .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10001; overflow-y: auto; overscroll-behavior: contain; }
     .confirm-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
     .confirm-modal {
       background: #fff; border-radius: 12px; width: 95%; max-width: 480px;
@@ -717,6 +711,26 @@
     .confirm-modal .confirm-actions { display: flex; gap: 12px; margin-top: 8px; }
     .confirm-modal .confirm-actions .btn { flex: 1; text-align: center; }
     .confirm-modal .confirm-error { color: #C41E1E; font-size: 0.9rem; margin-top: 8px; }
+
+    /* ── Modals on phones: bottom sheet that scrolls when tall ──
+       Kept AFTER the base .modal-content/.confirm-modal rules on purpose — the
+       earlier phone media block sits above them, so its margin/width/padding
+       lost the cascade and only align-self: flex-end took effect. That
+       flex-end lets a tall sheet (an order with many SKU rows) overflow ABOVE
+       the top edge of the scrolling overlay, where it can't be reached: the
+       header and close button disappeared. Here the sheet is pushed down with
+       an auto top margin instead, which collapses to 0 once the sheet is
+       taller than the screen — it then starts at the top and scrolls
+       normally. Bottom padding keeps the last buttons clear of the phone's
+       toolbar / home bar. */
+    @media (max-width: 768px) {
+      .modal-content, .confirm-modal {
+        width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 12px 12px 0 0;
+        padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
+      }
+      .modal-content { min-height: 60vh; }
+      .confirm-modal { min-height: 50vh; }
+    }
 
     /* ── Barcode scanning ── */
     .scan-btn {
