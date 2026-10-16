@@ -189,6 +189,22 @@ export const CASE_SIZES = {
   'bees bats': 0,
 };
 
+// English → Spanish display names for SKUs whose Spanish name differs from
+// the SKU string (shared by the production app and the wholesale counts page).
+export const SKU_NAMES_ES = {
+  '7oz bootlegger': '7oz Tocino',
+  // "Bats" here means baseball bats (the shape), not the animal — "bate/
+  // bates" not "murciélago". Matches batch-tracking's existing Spanish
+  // name for the same product.
+  'bees bats': 'Bates de béisbol',
+  // 2026-09: hot-dog-bun-shaped loaf, same dough as the 7oz pretzels. EN
+  // calls the shape "hot dog", ES calls it "pan" — the shape name itself
+  // changes language, not just the flavor word.
+  '7oz hot dog plain': 'Pan Plain',
+  '7oz hot dog bbk': 'Pan BBK',
+  '7oz hot dog spicy bee': 'Pan Spicy Bee',
+};
+
 // Static legacy → canonical renames, always active regardless of any
 // admin-configured sku_alias log entries. Used when a SKU's canonical name
 // changes outright (not just merged with another SKU) so every historical
