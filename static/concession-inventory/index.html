@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex, nofollow">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Concession Stand | Dangerous Pretzel Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Paytone+One&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { font-family: 'Manrope', sans-serif; color: #1A1A1A; background: #1A1A1A; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    button, input, select { font-family: inherit; }
+
+    .site-nav { background: #1A1A1A; padding: 14px 5%; position: sticky; top: 0; z-index: 9999; border-bottom: 1px solid #333; }
+    .nav-wrap { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { height: 46px; }
+    .nav-links a { color: #fff; font: 400 15px/1 'Manrope', sans-serif; transition: color 0.2s; }
+    .nav-links a:hover { color: #C41E1E; }
+
+    .hero { background: #1A1A1A; text-align: center; padding: clamp(30px, 4vw, 50px) 5% clamp(16px, 3vw, 28px); }
+    .hero h1 { font: 900 italic clamp(32px, 5vw, 52px)/1.05 Georgia, serif; color: #fff; margin: 0; }
+    .hero p { color: #888; font: 400 14px 'Manrope', sans-serif; margin-top: 10px; }
+
+    .section-cream { background: #F5F0E8; padding: clamp(24px, 4vw, 48px) 5% 80px; min-height: 60vh; }
+    .max-900 { max-width: 900px; margin: 0 auto; }
+
+    /* ── Toolbar ── */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .seg { display: inline-flex; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; }
+    .seg button { font: 700 13px 'Manrope', sans-serif; padding: 9px 16px; border: none; background: transparent; color: #888; cursor: pointer; }
+    .seg button.active { background: #1A1A1A; color: #fff; }
+    .seg.lang button.active { background: #C41E1E; }
+    .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn { font: 700 13px 'Manrope', sans-serif; padding: 9px 16px; border-radius: 8px; border: 2px solid #1A1A1A; background: #1A1A1A; color: #fff; cursor: pointer; transition: all .15s; }
+    .btn:hover:not(:disabled) { background: #C41E1E; border-color: #C41E1E; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.ghost { background: transparent; color: #1A1A1A; }
+    .btn.ghost:hover:not(:disabled) { background: #1A1A1A; border-color: #1A1A1A; color: #fff; }
+    .btn.small { padding: 6px 12px; font-size: 12px; }
+
+    .status { text-align: center; padding: 48px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
+    .status.error { color: #C41E1E; font-weight: 700; }
+
+    .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .stat { background: #fff; border-radius: 10px; padding: 14px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); flex: 1; min-width: 130px; }
+    .stat .n { font: 800 30px 'Manrope', sans-serif; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .stat .n.warn { color: #C41E1E; }
+    .stat .l { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: .8px; text-transform: uppercase; margin-top: 4px; }
+
+    /* ── Item list ── */
+    .group { margin-bottom: 22px; }
+    .group-title { font: 700 11px 'Manrope', sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #999; margin: 0 4px 8px; }
+    .item { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-bottom: 8px; overflow: hidden; border-left: 5px solid #ddd; }
+    .item.s-ok { border-left-color: #2a7a2a; }
+    .item.s-low { border-left-color: #e0a030; }
+    .item.s-out { border-left-color: #C41E1E; }
+    .item-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; width: 100%; background: none; border: none; text-align: left; }
+    .item-name { flex: 1; min-width: 0; }
+    .item-name .nm { font: 700 16px 'Manrope', sans-serif; color: #1A1A1A; overflow-wrap: anywhere; }
+    .item-name .meta { font: 400 12px 'Manrope', sans-serif; color: #999; margin-top: 2px; }
+    .stock { text-align: right; flex-shrink: 0; }
+    .stock .qty { font: 800 26px 'Manrope', sans-serif; font-variant-numeric: tabular-nums; line-height: 1; }
+    .stock .of { font: 600 11px 'Manrope', sans-serif; color: #999; margin-top: 3px; }
+    .pill { display: inline-block; font: 700 10px 'Manrope', sans-serif; letter-spacing: .5px; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; margin-top: 4px; }
+    .pill.ok { background: #e6f4e6; color: #2a7a2a; }
+    .pill.low { background: #fff3cc; color: #8a6000; }
+    .pill.out { background: #fde8e8; color: #C41E1E; }
+    .pill.none { background: #f0f0f0; color: #999; }
+    .need { font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-top: 3px; }
+
+    .item-body { padding: 0 16px 16px; border-top: 1px solid #f2efe9; }
+    .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .act label { display: block; font: 700 10px 'Manrope', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #999; margin-bottom: 6px; }
+    .act .inline { display: flex; gap: 6px; }
+    .act input { flex: 1; min-width: 0; font: 700 18px 'Manrope', sans-serif; padding: 10px 12px; border: 2px solid #ddd; border-radius: 8px; outline: none; text-align: center; -moz-appearance: textfield; }
+    .act input::-webkit-outer-spin-button, .act input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .act input:focus { border-color: #C41E1E; }
+    .hist { margin-top: 12px; font: 400 12px/1.5 'Manrope', sans-serif; color: #999; }
+    .mgr { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e8e0d5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .mgr label { font: 700 10px 'Manrope', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #999; }
+    .mgr input { width: 84px; font: 700 15px 'Manrope', sans-serif; padding: 7px 10px; border: 2px solid #ddd; border-radius: 8px; text-align: center; outline: none; }
+    .mgr input:focus { border-color: #C41E1E; }
+    .mgr .spacer { flex: 1; }
+    .linkbtn { background: none; border: none; color: #C41E1E; font: 700 12px 'Manrope', sans-serif; cursor: pointer; padding: 6px 4px; }
+
+    .empty { text-align: center; padding: 48px 20px; font: 600 15px 'Manrope', sans-serif; color: #999; background: #fff; border-radius: 10px; }
+
+    /* ── Add-item / resupply-list panels ── */
+    .panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 18px; margin-bottom: 18px; }
+    .panel h3 { font: 800 16px 'Manrope', sans-serif; margin-bottom: 12px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font: 700 10px 'Manrope', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #999; margin-bottom: 5px; }
+    .field input, .field select { width: 100%; font: 600 15px 'Manrope', sans-serif; padding: 10px 12px; border: 2px solid #ddd; border-radius: 8px; background: #fff; outline: none; }
+    .field input:focus, .field select:focus { border-color: #C41E1E; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .panel-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+    pre.list { white-space: pre-wrap; font: 600 14px/1.6 'Manrope', sans-serif; background: #faf8f4; border-radius: 8px; padding: 14px; margin-bottom: 12px; max-height: 50vh; overflow: auto; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1A1A; color: #fff; font: 700 14px 'Manrope', sans-serif; padding: 12px 22px; border-radius: 8px; z-index: 20000; box-shadow: 0 4px 16px rgba(0,0,0,.3); transition: opacity .4s; }
+    .toast.success { background: #2a7a2a; } .toast.error { background: #C41E1E; } .toast.fade { opacity: 0; }
+    .view-note { font: 600 12px 'Manrope', sans-serif; color: #8a6000; background: #fff8e6; border: 1px solid #f0d9a0; border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; }
+
+    @media (max-width: 520px) {
+      .item-head { padding: 12px; gap: 10px; }
+      .stock .qty { font-size: 24px; }
+      .row-actions { grid-template-columns: 1fr; }
+      .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-wrap">
+      <a href="../v2/index.html"><img src="https://www.dangerouspretzel.com/images/logos/svg-logo.svg" alt="Dangerous Pretzel Co." class="nav-logo"></a>
+      <div class="nav-links"><a href="../index.html" id="hub-link">&larr; Staff Hub</a></div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1 id="hero-title">CONCESSION STAND.</h1>
+    <p id="hero-sub">Delta Center — pretzels, dips and supplies on hand. Separate from the shop's inventory.</p>
+  </section>
+
+  <div class="section-cream">
+    <div class="max-900">
+
+      <div class="toolbar">
+        <div class="seg" id="filter-seg">
+          <button data-filter="all" class="active" id="f-all">All</button>
+          <button data-filter="need" id="f-need">Needs resupply</button>
+        </div>
+        <div class="tools">
+          <button class="btn ghost small" id="list-btn">Resupply list</button>
+          <button class="btn small" id="add-btn" hidden>+ Add item</button>
+          <div class="seg lang" id="lang-pill"><button data-lang="en">EN</button><button data-lang="es">ES</button></div>
+        </div>
+      </div>
+
+      <p class="view-note" id="view-note" hidden></p>
+      <div id="status" class="status">Loading…</div>
+      <div id="summary" class="summary" hidden></div>
+
+      <div id="add-panel" class="panel" hidden></div>
+      <div id="list-panel" class="panel" hidden></div>
+      <div id="items" hidden></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+    import { requireAccess, canEdit } from '../../scripts/staff-access.js';
+    import { SKU_NAMES_ES } from '../../scripts/inventory.js?v=2026-10-16-sku-names-es';
+
+    // Its own log — nothing here reads or writes the shop's /dangpretz/inventory
+    // or the production app's stock snapshots, so the two never mix.
+    const LOG_PATH = '/dangpretz/concession-inventory';
+    const SKU_LIST_URL = '../delivery-planner/skus.json?v=2026-09-11-hot-dog-buns';
+    const PAR_DEFAULT = 0;
+
+    let session = null;
+    let canWrite = false;       // may count / log resupply
+    let isManager = false;      // may add/remove items and set pars
+    let logs = [];
+    let items = [];             // resolved, sorted
+    let allSkus = [];
+    let filter = 'all';
+    let openId = null;
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const isDipSku = (s) => /dip/i.test(s);
+
+    // ── Language (EN/ES), shared with the production app's saved choice ──
+    const LANG_KEY = 'prod-lang';
+    let lang = (() => {
+      const q = new URLSearchParams(location.search).get('lang');
+      let saved = null;
+      try { saved = localStorage.getItem(LANG_KEY); } catch (_) { /* storage blocked */ }
+      if (['en', 'es'].includes(q)) return q;
+      if (['en', 'es'].includes(saved)) return saved;
+      return (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+    })();
+    const STR = {
+      en: {
+        title: 'Concession Stand | Dangerous Pretzel Co.', hub: '← Staff Hub', hero: 'CONCESSION STAND.',
+        heroSub: 'Delta Center — pretzels, dips and supplies on hand. Separate from the shop\'s inventory.',
+        all: 'All', need: 'Needs resupply', listBtn: 'Resupply list', addBtn: '+ Add item', loading: 'Loading…',
+        loadFail: (m) => `Couldn't load: ${m}`, viewOnly: 'View only — you can see stock but not change it.',
+        gPretzels: 'Pretzels', gDips: 'Dips', gSupplies: 'Supplies',
+        sTracked: 'Items tracked', sLow: 'Low or out', sNeed: 'Units to resupply',
+        ok: 'OK', low: 'Low', out: 'Out', noPar: 'No par',
+        par: (n) => `Par ${n}`, needN: (n) => `Send ${n}`,
+        counted: (d, by) => `Counted ${d}${by ? ` by ${by}` : ''}`, notCounted: 'Not counted yet',
+        resupplied: (n, d) => `Last resupply: +${n} on ${d}`,
+        countNow: 'Count now', countHint: 'What’s on the shelf', save: 'Save', addResupply: 'Resupplied', resupplyHint: 'Amount received',
+        setPar: 'Par level', remove: 'Remove from stand', confirmRemove: 'Tap again to remove',
+        none: 'Nothing here yet.', noneNeed: 'Nothing needs resupply right now. 🎉', noItems: 'No items yet. A manager can add pretzels, dips and supplies with “+ Add item”.',
+        addTitle: 'Add item', fromList: 'Pretzel or dip', newSupply: 'New supply…', pick: 'Choose…',
+        name: 'Name', unit: 'Unit', unitHint: 'e.g. sleeves, cases, boxes', parLabel: 'Par (stock to keep)', cancel: 'Cancel', add: 'Add',
+        needName: 'Enter a name', needPick: 'Choose an item', dup: 'That item is already on the list',
+        listTitle: 'Resupply list', copy: 'Copy', close: 'Close', copied: 'Copied', listEmpty: 'Nothing needs resupply.',
+        listHead: (d) => `Concession stand resupply — ${d}`, saved: 'Saved', failed: (m) => `Failed: ${m}`,
+        invalid: 'Enter a number 0 or more', unit_ea: 'ea',
+      },
+      es: {
+        title: 'Puesto Delta Center | Dangerous Pretzel Co.', hub: '← Centro del personal', hero: 'PUESTO DE CONCESIÓN.',
+        heroSub: 'Delta Center — pretzels, salsas y suministros en existencia. Separado del inventario de la tienda.',
+        all: 'Todo', need: 'Falta surtir', listBtn: 'Lista de surtido', addBtn: '+ Agregar', loading: 'Cargando…',
+        loadFail: (m) => `No se pudo cargar: ${m}`, viewOnly: 'Solo lectura — puedes ver el inventario pero no cambiarlo.',
+        gPretzels: 'Pretzels', gDips: 'Salsas', gSupplies: 'Suministros',
+        sTracked: 'Productos', sLow: 'Bajos o agotados', sNeed: 'Unidades por surtir',
+        ok: 'OK', low: 'Bajo', out: 'Agotado', noPar: 'Sin mínimo',
+        par: (n) => `Mínimo ${n}`, needN: (n) => `Enviar ${n}`,
+        counted: (d, by) => `Contado ${d}${by ? ` por ${by}` : ''}`, notCounted: 'Aún sin contar',
+        resupplied: (n, d) => `Último surtido: +${n} el ${d}`,
+        countNow: 'Contar ahora', countHint: 'Lo que hay en el estante', save: 'Guardar', addResupply: 'Surtido', resupplyHint: 'Cantidad recibida',
+        setPar: 'Nivel mínimo', remove: 'Quitar del puesto', confirmRemove: 'Toca otra vez para quitar',
+        none: 'Aún no hay nada.', noneNeed: 'No falta surtir nada por ahora. 🎉', noItems: 'Aún no hay productos. Un gerente puede agregar pretzels, salsas y suministros con “+ Agregar”.',
+        addTitle: 'Agregar producto', fromList: 'Pretzel o salsa', newSupply: 'Nuevo suministro…', pick: 'Elegir…',
+        name: 'Nombre', unit: 'Unidad', unitHint: 'ej. bolsas, cajas, paquetes', parLabel: 'Mínimo (cantidad a mantener)', cancel: 'Cancelar', add: 'Agregar',
+        needName: 'Escribe un nombre', needPick: 'Elige un producto', dup: 'Ese producto ya está en la lista',
+        listTitle: 'Lista de surtido', copy: 'Copiar', close: 'Cerrar', copied: 'Copiado', listEmpty: 'No falta surtir nada.',
+        listHead: (d) => `Surtido del puesto de concesión — ${d}`, saved: 'Guardado', failed: (m) => `Error: ${m}`,
+        invalid: 'Escribe un número de 0 o más', unit_ea: 'pz',
+      },
+    };
+    const L = (k, ...a) => { const v = STR[lang][k]; return typeof v === 'function' ? v(...a) : v; };
+    const dispName = (it) => (it.kind === 'sku' && lang === 'es' && SKU_NAMES_ES[it.name]) || it.name;
+    const fmtDate = (iso) => { if (!iso) return ''; const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso); return d.toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric' }); };
+    const num = (n) => Number(n).toLocaleString(lang === 'es' ? 'es-MX' : 'en-US');
+
+    // ── Reducer: log rows → current items ──
+    // track_item {itemId,name,unit,kind,group}   add an item to the stand list
+    // untrack_item {itemId}                      remove it (history cleared)
+    // set_par {itemId,par}                       stock to keep on hand
+    // count {itemId,quantity,date,countedBy}     physical count — REPLACES stock
+    // resupply {itemId,quantity,date,by}         received from the shop — ADDS to stock
+    // Stock = latest count + every resupply logged after that count.
+    function resolveItems(rows) {
+      const sorted = [...rows].sort((a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || ''));
+      const byId = {};
+      sorted.forEach((r) => {
+        const id = r.itemId;
+        if (!id) return;
+        if (r.action === 'track_item') {
+          byId[id] = {
+            id, name: r.name || id, unit: r.unit || '', kind: r.kind || 'supply', group: r.group || 'supplies',
+            par: byId[id]?.par ?? PAR_DEFAULT, stock: byId[id]?.stock ?? null, count: byId[id]?.count || null, lastResupply: byId[id]?.lastResupply || null,
+          };
+        } else if (r.action === 'untrack_item') {
+          delete byId[id];
+        } else if (!byId[id]) {
+          // events for an item that isn't on the list (removed, or out of order) are ignored
+        } else if (r.action === 'set_par') {
+          const v = Number(r.par); if (!Number.isNaN(v) && v >= 0) byId[id].par = v;
+        } else if (r.action === 'count') {
+          const v = Number(r.quantity); if (Number.isNaN(v) || v < 0) return;
+          byId[id].stock = v;
+          byId[id].count = { at: r.date || (r.timeStamp || '').slice(0, 10), by: r.countedBy || '' };
+        } else if (r.action === 'resupply') {
+          const v = Number(r.quantity); if (Number.isNaN(v) || v <= 0) return;
+          byId[id].stock = (byId[id].stock || 0) + v;
+          byId[id].lastResupply = { qty: v, at: r.date || (r.timeStamp || '').slice(0, 10) };
+        }
+      });
+      const order = { pretzels: 0, dips: 1, supplies: 2 };
+      return Object.values(byId).sort((a, b) => (order[a.group] - order[b.group]) || a.name.localeCompare(b.name));
+    }
+    const statusOf = (it) => {
+      if (it.stock === null) return it.par > 0 ? 'out' : 'none';
+      if (it.par <= 0) return 'none';
+      if (it.stock <= 0) return 'out';
+      return it.stock < it.par ? 'low' : 'ok';
+    };
+    const needOf = (it) => (it.par > 0 ? Math.max(0, it.par - (it.stock || 0)) : 0);
+
+    // ── Data ──
+    async function load() {
+      $('status').hidden = false; $('status').classList.remove('error'); $('status').textContent = L('loading');
+      try {
+        const [rows, skus] = await Promise.all([
+          fetchLog(LOG_PATH).catch((e) => { if (/404/.test(e.message)) return []; throw e; }),
+          fetch(SKU_LIST_URL).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        ]);
+        logs = Array.isArray(rows) ? rows : [];
+        allSkus = Array.isArray(skus) ? skus : [];
+        $('status').hidden = true;
+        render();
+      } catch (err) {
+        $('status').classList.add('error'); $('status').textContent = L('loadFail', err.message);
+      }
+    }
+    function rebuild() { items = resolveItems(logs); }
+
+    async function write(entry) {
+      const row = { ...entry, timeStamp: new Date().toISOString() };
+      await appendLog(LOG_PATH, row);
+      logs.push(row);
+      render();
+    }
+    function toast(msg, kind = 'success') {
+      const t = document.createElement('div'); t.className = `toast ${kind}`; t.textContent = msg; document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 2200);
+    }
+    const who = () => session?.name || session?.code || '';
+    const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const GROUP_LABEL = { pretzels: 'gPretzels', dips: 'gDips', supplies: 'gSupplies' };
+
+    // ── Render ──
+    function render() {
+      rebuild();
+      const shown = items.filter((it) => (filter === 'need' ? needOf(it) > 0 || statusOf(it) === 'out' : true));
+      const low = items.filter((it) => ['low', 'out'].includes(statusOf(it))).length;
+      const unitsNeeded = items.reduce((s, it) => s + needOf(it), 0);
+      $('summary').hidden = !items.length;
+      $('summary').innerHTML = `
+        <div class="stat"><div class="n">${num(items.length)}</div><div class="l">${L('sTracked')}</div></div>
+        <div class="stat"><div class="n ${low ? 'warn' : ''}">${num(low)}</div><div class="l">${L('sLow')}</div></div>
+        <div class="stat"><div class="n ${unitsNeeded ? 'warn' : ''}">${num(unitsNeeded)}</div><div class="l">${L('sNeed')}</div></div>`;
+
+      const host = $('items'); host.hidden = false;
+      if (!shown.length) {
+        host.innerHTML = `<div class="empty">${items.length ? L('noneNeed') : L('noItems')}</div>`;
+        return;
+      }
+      let html = '';
+      ['pretzels', 'dips', 'supplies'].forEach((g) => {
+        const list = shown.filter((it) => it.group === g);
+        if (!list.length) return;
+        html += `<div class="group"><div class="group-title">${L(GROUP_LABEL[g])}</div>${list.map(itemHtml).join('')}</div>`;
+      });
+      host.innerHTML = html;
+      wire(host);
+    }
+
+    function itemHtml(it) {
+      const st = statusOf(it); const need = needOf(it);
+      const unit = it.unit === 'ea' ? L('unit_ea') : it.unit;
+      const open = openId === it.id;
+      const meta = it.count ? L('counted', fmtDate(it.count.at), it.count.by) : L('notCounted');
+      let body = '';
+      if (open) {
+        body = `<div class="item-body">
+          ${canWrite ? `<div class="row-actions">
+            <div class="act"><label>${L('countNow')}</label><div class="inline"><input type="number" inputmode="numeric" min="0" step="1" placeholder="${L('countHint')}" data-count-in="${esc(it.id)}"><button class="btn small" data-count-save="${esc(it.id)}">${L('save')}</button></div></div>
+            <div class="act"><label>${L('addResupply')}</label><div class="inline"><input type="number" inputmode="numeric" min="1" step="1" placeholder="${L('resupplyHint')}" data-resup-in="${esc(it.id)}"><button class="btn small" data-resup-save="${esc(it.id)}">${L('save')}</button></div></div>
+          </div>` : ''}
+          <div class="hist">${meta}${it.lastResupply ? ` · ${L('resupplied', num(it.lastResupply.qty), fmtDate(it.lastResupply.at))}` : ''}</div>
+          ${isManager ? `<div class="mgr"><label>${L('setPar')}</label><input type="number" inputmode="numeric" min="0" step="1" value="${it.par}" data-par-in="${esc(it.id)}"><button class="btn ghost small" data-par-save="${esc(it.id)}">${L('save')}</button><span class="spacer"></span><button class="linkbtn" data-remove="${esc(it.id)}">${L('remove')}</button></div>` : ''}
+        </div>`;
+      }
+      return `<div class="item s-${st}">
+        <button class="item-head" data-toggle="${esc(it.id)}" aria-expanded="${open}">
+          <div class="item-name"><div class="nm">${esc(dispName(it))}</div><div class="meta">${esc(unit)}${unit && it.par > 0 ? ' · ' : ''}${it.par > 0 ? L('par', num(it.par)) : ''}</div></div>
+          <div class="stock"><div class="qty">${it.stock === null ? '—' : num(it.stock)}</div>
+            <span class="pill ${st}">${L(st === 'none' ? 'noPar' : st)}</span>${need > 0 ? `<div class="need">${L('needN', num(need))}</div>` : ''}</div>
+        </button>${body}</div>`;
+    }
+
+    function readNum(sel, min) {
+      const el = document.querySelector(sel); const v = el ? el.value.trim() : '';
+      const n = Number(v);
+      if (v === '' || Number.isNaN(n) || n < min || !Number.isFinite(n)) { toast(L('invalid'), 'error'); el?.focus(); return null; }
+      return Math.round(n);
+    }
+    function wire(host) {
+      host.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => { openId = openId === b.dataset.toggle ? null : b.dataset.toggle; render(); }));
+      const guard = (btn, fn) => async () => {
+        btn.disabled = true;
+        try { await fn(); toast(L('saved')); } catch (e) { toast(L('failed', e.message), 'error'); btn.disabled = false; }
+      };
+      host.querySelectorAll('[data-count-save]').forEach((b) => b.addEventListener('click', () => {
+        const id = b.dataset.countSave; const q = readNum(`[data-count-in="${CSS.escape(id)}"]`, 0); if (q === null) return;
+        guard(b, () => write({ action: 'count', itemId: id, quantity: String(q), date: today(), countedBy: who() }))();
+      }));
+      host.querySelectorAll('[data-resup-save]').forEach((b) => b.addEventListener('click', () => {
+        const id = b.dataset.resupSave; const q = readNum(`[data-resup-in="${CSS.escape(id)}"]`, 1); if (q === null) return;
+        guard(b, () => write({ action: 'resupply', itemId: id, quantity: String(q), date: today(), by: who() }))();
+      }));
+      host.querySelectorAll('[data-par-save]').forEach((b) => b.addEventListener('click', () => {
+        const id = b.dataset.parSave; const q = readNum(`[data-par-in="${CSS.escape(id)}"]`, 0); if (q === null) return;
+        guard(b, () => write({ action: 'set_par', itemId: id, par: String(q), updatedBy: who() }))();
+      }));
+      host.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
+        // First tap arms the button for 4s; a second tap removes. (Native
+        // confirm() dialogs get silently suppressed on some phones.)
+        if (!b.dataset.armed) {
+          b.dataset.armed = '1'; b.textContent = L('confirmRemove');
+          setTimeout(() => { delete b.dataset.armed; b.textContent = L('remove'); }, 4000);
+          return;
+        }
+        const id = b.dataset.remove; openId = null;
+        guard(b, () => write({ action: 'untrack_item', itemId: id, updatedBy: who() }))();
+      }));
+      host.querySelectorAll('input[type=number]').forEach((inp) => inp.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        inp.closest('.inline, .mgr')?.querySelector('button')?.click();
+      }));
+    }
+
+    // ── Add item (managers) ──
+    function openAdd() {
+      $('list-panel').hidden = true;
+      const tracked = new Set(items.map((i) => i.id));
+      const opts = allSkus.filter((s) => !tracked.has(`sku:${s}`)).map((s) => `<option value="${esc(s)}">${esc((lang === 'es' && SKU_NAMES_ES[s]) || s)}</option>`).join('');
+      $('add-panel').hidden = false;
+      $('add-panel').innerHTML = `<h3>${L('addTitle')}</h3>
+        <div class="field"><label>${L('fromList')}</label><select id="add-pick"><option value="">${L('pick')}</option>${opts}<option value="__new__">${L('newSupply')}</option></select></div>
+        <div id="add-new" hidden>
+          <div class="field-row">
+            <div class="field"><label>${L('name')}</label><input id="add-name" type="text" autocomplete="off"></div>
+            <div class="field"><label>${L('unit')}</label><input id="add-unit" type="text" placeholder="${L('unitHint')}" autocomplete="off"></div>
+          </div>
+        </div>
+        <div class="field"><label>${L('parLabel')}</label><input id="add-par" type="number" inputmode="numeric" min="0" step="1" value="0"></div>
+        <div class="panel-actions"><button class="btn ghost small" id="add-cancel">${L('cancel')}</button><button class="btn small" id="add-save">${L('add')}</button></div>`;
+      $('add-pick').addEventListener('change', () => { $('add-new').hidden = $('add-pick').value !== '__new__'; });
+      $('add-cancel').addEventListener('click', () => { $('add-panel').hidden = true; });
+      $('add-save').addEventListener('click', async () => {
+        const pick = $('add-pick').value; const par = Math.max(0, Math.round(Number($('add-par').value) || 0));
+        let entry;
+        if (!pick) { toast(L('needPick'), 'error'); return; }
+        if (pick === '__new__') {
+          const name = $('add-name').value.trim();
+          if (!name) { toast(L('needName'), 'error'); return; }
+          const id = `supply:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || Date.now()}`;
+          if (items.some((i) => i.id === id)) { toast(L('dup'), 'error'); return; }
+          entry = { action: 'track_item', itemId: id, name, unit: $('add-unit').value.trim(), kind: 'supply', group: 'supplies', updatedBy: who() };
+        } else {
+          entry = { action: 'track_item', itemId: `sku:${pick}`, name: pick, unit: 'ea', kind: 'sku', group: isDipSku(pick) ? 'dips' : 'pretzels', updatedBy: who() };
+        }
+        $('add-save').disabled = true;
+        try {
+          await write(entry);
+          if (par > 0) await write({ action: 'set_par', itemId: entry.itemId, par: String(par), updatedBy: who() });
+          $('add-panel').hidden = true; toast(L('saved'));
+        } catch (e) { toast(L('failed', e.message), 'error'); $('add-save').disabled = false; }
+      });
+    }
+
+    // ── Resupply list ──
+    function openList() {
+      $('add-panel').hidden = true;
+      const lines = items.filter((it) => needOf(it) > 0).map((it) => {
+        const unit = it.unit && it.unit !== 'ea' ? ` ${it.unit}` : '';
+        return `• ${dispName(it)} — ${num(needOf(it))}${unit}  (${num(it.stock || 0)} / ${num(it.par)})`;
+      });
+      const text = lines.length ? `${L('listHead', fmtDate(today()))}\n${lines.join('\n')}` : L('listEmpty');
+      $('list-panel').hidden = false;
+      $('list-panel').innerHTML = `<h3>${L('listTitle')}</h3><pre class="list">${esc(text)}</pre>
+        <div class="panel-actions"><button class="btn ghost small" id="list-close">${L('close')}</button>${lines.length ? `<button class="btn small" id="list-copy">${L('copy')}</button>` : ''}</div>`;
+      $('list-close').addEventListener('click', () => { $('list-panel').hidden = true; });
+      $('list-copy')?.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(text); toast(L('copied')); } catch (_) { toast(text, 'error'); }
+      });
+    }
+
+    // ── Static text + controls ──
+    function applyLang() {
+      document.documentElement.lang = lang; document.title = L('title');
+      $('hub-link').innerHTML = L('hub').replace('←', '&larr;');
+      $('hero-title').textContent = L('hero'); $('hero-sub').textContent = L('heroSub');
+      $('f-all').textContent = L('all'); $('f-need').textContent = L('need');
+      $('list-btn').textContent = L('listBtn'); $('add-btn').textContent = L('addBtn');
+      $('view-note').textContent = L('viewOnly');
+      [...$('lang-pill').children].forEach((b) => b.classList.toggle('active', b.dataset.lang === lang));
+    }
+    $('lang-pill').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      lang = b.dataset.lang;
+      try { localStorage.setItem(LANG_KEY, lang); } catch (_) { /* storage blocked */ }
+      applyLang(); $('add-panel').hidden = true; $('list-panel').hidden = true;
+      if (!$('status').hidden && !$('status').classList.contains('error')) $('status').textContent = L('loading'); else render();
+    });
+    $('filter-seg').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      filter = b.dataset.filter; [...$('filter-seg').children].forEach((x) => x.classList.toggle('active', x === b)); render();
+    });
+    $('add-btn').addEventListener('click', openAdd);
+    $('list-btn').addEventListener('click', openList);
+    // keep a long-open tab current
+    document.addEventListener('visibilitychange', () => {
+      const typing = document.activeElement && document.activeElement.matches('input');
+      if (!document.hidden && session && !typing) load();
+    });
+
+    applyLang();
+    (async () => {
+      session = await requireAccess('concession-inventory');
+      canWrite = canEdit(session, 'concession-inventory');
+      isManager = !!session.isManager && canWrite;
+      $('add-btn').hidden = !isManager;
+      $('view-note').hidden = canWrite;
+      await load();
+    })();
+  </script>
+</body>
+</html>
