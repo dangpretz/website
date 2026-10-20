@@ -4,6 +4,6 @@ Disallow: /static/
 Disallow: /v2/signage/
 Disallow: /v2/sales/
 
-Sitemap: https://www.dangerouspretzel.com/sitemap.xml
-Sitemap: https://www.dangerouspretzel.com/v2/sitemap.xml
 Sitemap: https://www.dangerouspretzel.com/sitemap-index.xml
+Sitemap: https://www.dangerouspretzel.com/v2/sitemap.xml
+Sitemap: https://www.dangerouspretzel.com/sitemap.xml
