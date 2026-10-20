@@ -121,6 +121,27 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   text-align: center;
 }
 .answer-note a { color: #C41E1E; font-weight: 700; }
+.proof-where {
+  background: #fff;
+  padding: clamp(28px, 4vw, 48px) 5%;
+  border-bottom: 1px solid #e4ddd2;
+}
+.proof-where h2 {
+  font: 900 italic clamp(28px, 4vw, 48px)/1.1 Georgia, serif;
+  color: #1A1A1A;
+  text-align: center;
+  margin: 0 0 16px;
+}
+.proof-list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 560px;
+  text-align: center;
+  font: 400 16px/1.7 'Manrope', sans-serif;
+  color: #1A1A1A;
+}
+.proof-where .answer-note { margin-top: 12px; }
 .serve-card a {
   color: #C41E1E;
   font-weight: 700;
