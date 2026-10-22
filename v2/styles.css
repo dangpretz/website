@@ -141,6 +141,7 @@ img { max-width: 100%; height: auto; display: block; border-radius: 0; }
   font: 400 16px/1.7 'Manrope', sans-serif;
   color: #1A1A1A;
 }
+.proof-list a { color: #C41E1E; font-weight: 700; }
 .proof-where .answer-note { margin-top: 12px; }
 .serve-card a {
   color: #C41E1E;

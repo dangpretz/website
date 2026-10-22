@@ -24,6 +24,55 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Paytone+One&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./styles.css">
 <script defer type="text/javascript" src="https://ot.aem.live/.rum/@adobe/helix-rum-js@^2/dist/rum-standalone.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Restaurant",
+      "@id": "https://www.dangerouspretzel.com/#organization",
+      "name": "Dangerous Pretzel Co.",
+      "url": "https://www.dangerouspretzel.com/v2/index.html",
+      "image": "https://www.dangerouspretzel.com/images/backgrounds/dipped-bbk-with-cheese.jpg",
+      "telephone": "+1-801-916-0275",
+      "servesCuisine": "Soft pretzels",
+      "menu": "https://www.dangerouspretzel.com/v2/menu.html",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "352 W 600 S",
+        "addressLocality": "Salt Lake City",
+        "addressRegion": "UT",
+        "postalCode": "84101",
+        "addressCountry": "US"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Friday", "Saturday", "Sunday"],
+          "opens": "11:00",
+          "closes": "20:00"
+        }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.dangerouspretzel.com/#website",
+      "url": "https://www.dangerouspretzel.com/v2/index.html",
+      "name": "Dangerous Pretzel Co.",
+      "publisher": { "@id": "https://www.dangerouspretzel.com/#organization" }
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.dangerouspretzel.com/v2/index.html#webpage",
+      "url": "https://www.dangerouspretzel.com/v2/index.html",
+      "name": "Dangerous Pretzel Co. | Hand-Crafted Soft Pretzels | Salt Lake City",
+      "description": "Hand-crafted soft pretzels with ridiculous flavors. Order online, catering, wholesale. Salt Lake City, UT.",
+      "isPartOf": { "@id": "https://www.dangerouspretzel.com/#website" },
+      "about": { "@id": "https://www.dangerouspretzel.com/#organization" }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 <nav class="site-nav">

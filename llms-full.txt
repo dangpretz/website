@@ -6,7 +6,8 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 
 ## Published shop facts
 
-- Site: https://www.dangerouspretzel.com/
+- Site: https://www.dangerouspretzel.com/v2/index.html
+- Canonical host: https://www.dangerouspretzel.com (https://dangerouspretzel.com 301s to www; `/` 301s to `/v2/index.html`; short paths such as `/menu` and `/catering-menu` 301 to the `.html` URL)
 - Shop: 352 W 600 S, Salt Lake City, UT 84101 (Post District)
 - Hours (FAQ / location): Friday–Sunday 11am–8pm. Closed Monday–Thursday.
 - Phone: (801) 916-0275
@@ -17,7 +18,7 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - Catering order form notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice
 - Catering page: delivery is offered in the SLC metro area (fee listed on that page)
 - Wedding catering: pretzel boxes, bomb trays, and dips for cocktail hour, a late-night snack, rehearsal dinners, and receptions. Pickup at 352 W 600 S, or SLC metro delivery. The request is on the catering page and can be used any day for a future date. A closed shop counter does not block it. Notice is 12, 24, or 48 hours depending on order size.
-- Office and corporate catering: one-off catering for meetings, team events, office parties, and client events in Salt Lake City. Same request form, pickup, SLC metro delivery, and notice as the catering page.
+- Office and corporate catering: one-off catering for meetings, team events, office parties, and client events in Salt Lake City. Pretzel boxes (15 per box), bomb trays (100 pretzel bombs per tray, 4–6 per serving, feeds 16–25), and dips. Pickup at 352 W 600 S, or SLC metro delivery ($75). Same request form and notice as the catering page. Not a standing wholesale account.
 - Game-day catering: pretzel boxes, bomb trays, and dips for football and basketball watch parties, tailgates, team parties, and Jazz, Utes, or Real Salt Lake-style game nights at homes and offices in Salt Lake City. Pickup at 352 W 600 S, or SLC metro delivery ($75, listed on the catering page). Same request form. Notice on the catering page: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice.
 - Holiday party catering: pretzel boxes, bomb trays, and dips for holiday parties, company and office holiday parties, end-of-year team events, and family gatherings in Salt Lake City. Pickup at 352 W 600 S, or SLC metro delivery ($75, listed on the catering page). Same request form. Notice on the catering page: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. December dates are sent on that request when the party is on the calendar. The page does not add a separate December cutoff.
 
@@ -59,7 +60,7 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Office and corporate catering](https://www.dangerouspretzel.com/v2/office-pretzel-catering.html)
 - [Game-day catering](https://www.dangerouspretzel.com/v2/game-day-pretzel-catering.html)
 - [Holiday party catering](https://www.dangerouspretzel.com/v2/holiday-party-pretzel-catering.html)
-- [Location](https://www.dangerouspretzel.com/v2/location.html): Post District shop NAP and hours. Same kitchen that bakes SLC metro wholesale.
+- [Location](https://www.dangerouspretzel.com/v2/location.html): Post District shop NAP and hours. Same kitchen that bakes SLC metro wholesale. Delta Center (Levy) Level 5A is a wholesale account, not the shop counter and not catering.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html)
 - [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html)
 - [Restaurants and bars](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-restaurants.html)
