@@ -2,9 +2,9 @@
 
 > Soft pretzel shop in Salt Lake City. Fresh retail at the Post District counter, plus wholesale flash-frozen foodservice.
 
-Dangerous Pretzel Co. (https://www.dangerouspretzel.com/) bakes soft pretzels at 352 W 600 S, Salt Lake City, UT 84101. Wholesale pretzels are fully baked in that kitchen — not raw dough — then flash-frozen and vacuum-sealed. The site does not publish case packs, MOQs, or price lists for wholesale. Dangerous Pretzel Co. is listed in US Foods catalogs for Northern Utah and Boise. US Foods customers in those areas can order it through their US Foods rep. The site does not publish US Foods item codes or prices.
+Dangerous Pretzel Co. (https://www.dangerouspretzel.com/v2/index.html) bakes soft pretzels at 352 W 600 S, Salt Lake City, UT 84101. Wholesale pretzels are fully baked in that kitchen — not raw dough — then flash-frozen and vacuum-sealed. The site does not publish case packs, MOQs, or price lists for wholesale. Dangerous Pretzel Co. is listed in US Foods catalogs for Northern Utah and Boise. US Foods customers in those areas can order it through their US Foods rep. The site does not publish US Foods item codes or prices.
 
-Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML files are the 200 documents.
+Canonical host is https://www.dangerouspretzel.com. https://dangerouspretzel.com 301s to www. Pretty paths such as `/menu` and `/catering-menu` 301 to the `/v2/*.html` URLs below. Those HTML files are the 200 documents. `/` 301s to `/v2/index.html`.
 
 ## Shop
 
@@ -12,10 +12,10 @@ Pretty paths such as `/wholesale` 301 to the `/v2/*.html` URLs below. Those HTML
 - [Menu](https://www.dangerouspretzel.com/v2/menu.html): Pretzels, bombs, house-made dips, and drinks.
 - [Catering](https://www.dangerouspretzel.com/v2/catering.html): Pretzel boxes, bomb trays, and dips for events. Order form notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice.
 - [Wedding catering](https://www.dangerouspretzel.com/v2/wedding-pretzel-catering.html): Wedding and event-venue catering in Salt Lake City. Cocktail hour, late-night snack, rehearsal dinners, and receptions. Pickup at 352 W 600 S, or SLC metro delivery ($75). Request form on the catering page. Shop counter Friday–Sunday 11am–8pm; catering requests for future dates any day, with 12, 24, or 48 hours notice depending on order size.
-- [Office and corporate catering](https://www.dangerouspretzel.com/v2/office-pretzel-catering.html): Office catering in Salt Lake City and corporate event catering in SLC. Meetings, team events, office parties, and client events. One-off catering. Request form on the catering page.
+- [Office and corporate catering](https://www.dangerouspretzel.com/v2/office-pretzel-catering.html): Office pretzel catering in Salt Lake City. Pretzel boxes (15 per box), bomb trays (100 pretzel bombs per tray, 4–6 per serving, feeds 16–25), and dips for one meeting, team event, office party, or client event. Pickup at 352 W 600 S, or SLC metro delivery ($75). Request form on the catering page. Notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. Not a standing wholesale account.
 - [Game-day catering](https://www.dangerouspretzel.com/v2/game-day-pretzel-catering.html): Watch parties, tailgates, team parties, and Jazz, Utes, or Real Salt Lake-style game nights at homes and offices in Salt Lake City. Pretzel boxes, bomb trays, and dips. Pickup at 352 W 600 S, or SLC metro delivery ($75). Request form on the catering page. Notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice.
 - [Holiday party catering](https://www.dangerouspretzel.com/v2/holiday-party-pretzel-catering.html): Holiday parties, company and office holiday parties, end-of-year team events, and family gatherings in Salt Lake City. Pretzel boxes, bomb trays, and dips. Pickup at 352 W 600 S, or SLC metro delivery ($75). Request form on the catering page. Notice: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. Send December dates when the party is on the calendar. The published notice is the one on the catering page.
-- [Location](https://www.dangerouspretzel.com/v2/location.html): 352 W 600 S, Post District. Friday–Sunday 11am–8pm. Closed Monday–Thursday. Shop contact, and the kitchen that bakes SLC metro wholesale.
+- [Location](https://www.dangerouspretzel.com/v2/location.html): 352 W 600 S, Post District. Friday–Sunday 11am–8pm. Closed Monday–Thursday. Shop contact, and the kitchen that bakes SLC metro wholesale. Delta Center (Levy) Level 5A is a wholesale account on the same published list as the Goldminer’s Daughter at Alta, Brighton, Powder Mountain, and Fisher Brewing — not the shop counter and not catering.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html): Hours, catering notice, wholesale, and dietary notes.
 
 ## Wholesale

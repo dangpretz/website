@@ -41,7 +41,7 @@
       "@type": "BreadcrumbList",
       "@id": "https://www.dangerouspretzel.com/v2/catering.html#breadcrumb",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.dangerouspretzel.com/" },
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.dangerouspretzel.com/v2/index.html" },
         { "@type": "ListItem", "position": 2, "name": "Catering", "item": "https://www.dangerouspretzel.com/v2/catering.html" }
       ]
     },
@@ -94,74 +94,90 @@
       ]
     },
     {
-      "@type": "Product",
-      "name": "Salty Pretzel Box",
-      "description": "The OG. Sea salt, warm dough, crowd-pleaser. $4/pretzel · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "60.00", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "BBK Pretzel Box",
-      "description": "Parmesan, garlic, herbs. The flavor bomb. $4.25/pretzel · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "63.75", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Spicy Bee Pretzel Box",
-      "description": "Hot honey, candied jalapeños. Sweet heat. $4.25/pretzel · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "63.75", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Devil's Delight Pretzel Box",
-      "description": "Pepperjack and pepperoni. Office destroyer. $4.25/pretzel · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "63.75", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Saint Pretzel Box",
-      "description": "Cinnamon sugar. Enough to forgive anything. $4.25/pretzel · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "63.75", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Salty Bomb Tray",
-      "description": "Sea salt bombs. Warm, shareable, zero regrets. $0.50/bomb · 100 per tray.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "50.00", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Saint Bomb Tray",
-      "description": "Cinnamon sugar bombs. Sweet, sinful, gone fast. $0.60/bomb · 100 per tray.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "60.00", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Dangerous Dip Box",
-      "description": "House beer cheese. Bold, sharp, dangerously good. $1.75/cup · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "26.25", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Honey Mustard Dip Box",
-      "description": "Sweet, tangy, crowd-approved. $1.75/cup · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "26.25", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
-    },
-    {
-      "@type": "Product",
-      "name": "Hot Ranch Dip Box",
-      "description": "Creamy ranch with a cayenne kick. $1.75/cup · 15 per box.",
-      "brand": { "@type": "Brand", "name": "Dangerous Pretzel Co." },
-      "offers": { "@type": "Offer", "price": "26.25", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+      "@type": "Menu",
+      "@id": "https://www.dangerouspretzel.com/v2/catering.html#menu",
+      "name": "Pretzel catering menu",
+      "url": "https://www.dangerouspretzel.com/v2/catering.html",
+      "hasMenuSection": [
+        {
+          "@type": "MenuSection",
+          "name": "Pretzel boxes",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Salty Pretzel Box",
+              "description": "The OG. Sea salt, warm dough, crowd-pleaser. $4/pretzel · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "60.00", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "BBK Pretzel Box",
+              "description": "Parmesan, garlic, herbs. The flavor bomb. $4.25/pretzel · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "63.75", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Spicy Bee Pretzel Box",
+              "description": "Hot honey, candied jalapeños. Sweet heat. $4.25/pretzel · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "63.75", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Devil's Delight Pretzel Box",
+              "description": "Pepperjack and pepperoni. Office destroyer. $4.25/pretzel · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "63.75", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Saint Pretzel Box",
+              "description": "Cinnamon sugar. Enough to forgive anything. $4.25/pretzel · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "63.75", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            }
+          ]
+        },
+        {
+          "@type": "MenuSection",
+          "name": "Bomb trays",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Salty Bomb Tray",
+              "description": "Sea salt bombs. Warm, shareable, zero regrets. $0.50/bomb · 100 per tray.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "50.00", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Saint Bomb Tray",
+              "description": "Cinnamon sugar bombs. Sweet, sinful, gone fast. $0.60/bomb · 100 per tray.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "60.00", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            }
+          ]
+        },
+        {
+          "@type": "MenuSection",
+          "name": "Dips",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Dangerous Dip Box",
+              "description": "Dangerous Dip. Bold, sharp, dangerously good. $1.75/cup · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "26.25", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Honey Mustard Dip Box",
+              "description": "Sweet, tangy, crowd-approved. $1.75/cup · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "26.25", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Hot Ranch Dip Box",
+              "description": "Creamy ranch with a cayenne kick. $1.75/cup · 15 per box.",
+              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "price": "26.25", "priceCurrency": "USD", "url": "https://www.dangerouspretzel.com/v2/catering.html" }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
@@ -681,7 +697,7 @@ body.cart-open #tw { bottom: 90px; }
         <div class="order-card-info">
           <h3>Dangerous Dip</h3>
           <p class="price">$26.25</p>
-          <p class="order-desc">House beer cheese. Bold, sharp, dangerously good.</p>
+          <p class="order-desc">Dangerous Dip. Bold, sharp, dangerously good.</p>
           <p class="order-unit">$1.75/cup &middot; 15 per box</p>
         </div>
         <div class="qty-controls">
