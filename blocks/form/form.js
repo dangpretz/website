@@ -61,6 +61,9 @@ async function handleSubmit(form) {
       },
     });
     if (response.ok) {
+      if (typeof window.dpcTrackGenerateLead === 'function') {
+        window.dpcTrackGenerateLead(form.getAttribute('name') || form.id || 'contact');
+      }
       if (form.dataset.confirmation) {
         window.location.href = form.dataset.confirmation;
       }

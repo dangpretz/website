@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Google tag (gtag.js) -->
+<script src="/scripts/analytics.js" defer></script>
 <title>Pretzel Catering in Salt Lake City | Dangerous Pretzel Co.</title>
 <meta name="description" content="Order pretzel catering in Salt Lake City. Boxes, bomb trays, and dips for offices, schools, and events. Pickup at 352 W 600 S, or delivery in the SLC metro.">
 <link rel="canonical" href="https://www.dangerouspretzel.com/v2/catering.html">
@@ -1269,6 +1271,9 @@ body.cart-open #tw { bottom: 90px; }
         } catch (e) { /* checkout still proceeds; worker is the other path */ }
       }
 
+      if (typeof window.dpcTrackGenerateLead === 'function') {
+        window.dpcTrackGenerateLead('catering_order');
+      }
       window.location.href = data.checkout_url;
 
     } catch (err) {
@@ -1297,6 +1302,9 @@ body.cart-open #tw { bottom: 90px; }
       }
 
       if (sent) {
+        if (typeof window.dpcTrackGenerateLead === 'function') {
+          window.dpcTrackGenerateLead('catering_request');
+        }
         errorEl.style.color = '#fff';
         errorEl.textContent = 'Card checkout did not open. Your catering request was sent — we will follow up by email.';
         errorEl.style.display = 'block';

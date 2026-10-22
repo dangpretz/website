@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Google tag (gtag.js) -->
+<script src="/scripts/analytics.js" defer></script>
 <title>The Pretzel Program | Dangerous Pretzel Co.</title>
 <meta name="description" content="Your venue could sell $1,000–$10,000/month in pretzels. Zero kitchen. Zero training. We set up a heated pretzel station — your staff just serves.">
 <link rel="canonical" href="https://www.dangerouspretzel.com/v2/pretzel-program.html">
@@ -214,6 +216,9 @@ document.getElementById('pretzel-program-form').addEventListener('submit', async
       body: JSON.stringify(data)
     });
     if (res.ok) {
+      if (typeof window.dpcTrackGenerateLead === 'function') {
+        window.dpcTrackGenerateLead('pretzel_program');
+      }
       msg.className = 'form-msg success';
       msg.textContent = "Got it — Drew will reach out within 24 hours. If you need him sooner: 801.916.9122.";
       msg.style.display = 'block';
