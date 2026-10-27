@@ -21,6 +21,7 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - Office and corporate catering: one-off catering for meetings, team events, office parties, and client events in Salt Lake City. Pretzel boxes (15 per box), bomb trays (100 pretzel bombs per tray, 4–6 per serving, feeds 16–25), and dips. Pickup at 352 W 600 S, or SLC metro delivery ($75). Same request form and notice as the catering page. Not a standing wholesale account.
 - Game-day catering: pretzel boxes, bomb trays, and dips for football and basketball watch parties, tailgates, team parties, and Jazz, Utes, or Real Salt Lake-style game nights at homes and offices in Salt Lake City. Pickup at 352 W 600 S, or SLC metro delivery ($75, listed on the catering page). Same request form. Notice on the catering page: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice.
 - Holiday party catering: pretzel boxes, bomb trays, and dips for holiday parties, company and office holiday parties, end-of-year team events, and family gatherings in Salt Lake City. Pickup at 352 W 600 S, or SLC metro delivery ($75, listed on the catering page). Same request form. Notice on the catering page: Under $200: 12hr notice · $200–$500: 24hr notice · $500+: 48hr notice. December dates are sent on that request when the party is on the calendar. The page does not add a separate December cutoff.
+- Party catering: pretzel boxes, bomb trays, and dips for birthdays, baby showers, bridal showers, graduations, and similar private parties in Salt Lake City. Pickup at 352 W 600 S, or SLC metro delivery ($75, listed on the catering page). Same request form. Notice is 12, 24, or 48 hours depending on order size. The catering page lists which notice applies. The page does not restate the size tiers.
 
 ## Published wholesale facts
 
@@ -50,6 +51,8 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - Family entertainment: wholesale page for arcades, bowling alleys, roller rinks, trampoline parks, and family entertainment centers. Fully baked, flash-frozen, vacuum-sealed; the account reheats. The published accounts (Goldminer's Daughter at Alta, Brighton, Powder Mountain, Delta Center (Levy) Level 5A, Fisher Brewing) are not a list of arcades or bowling alleys. US Foods customers in Northern Utah and Boise can order through their US Foods rep. Paul or Emery from the team can drop off samples. Case packs and MOQs are not published.
 - Ice rinks and arenas: wholesale page for ice rinks, speed-skating ovals, arenas, sports complexes, and rec-center concessions in Utah and Boise. Fully baked, flash-frozen, vacuum-sealed; the account reheats. Delta Center (Levy) Level 5A is the arena proof. The published accounts are not a map of every rink. US Foods customers in Northern Utah and Boise can order through their US Foods rep. Sample drop-off is requested on the wholesale inquiry. Paul or Emery from the team can drop off samples. Case packs and minimums are not published.
 - Movie theaters: wholesale page for movie theater and cinema concession stands in Utah and Boise. Fully baked, flash-frozen, vacuum-sealed; the account reheats. A hot, easy-to-hold snack for a captive crowd that pairs with concessions. The published accounts (Goldminer's Daughter at Alta, Brighton, Powder Mountain, Delta Center (Levy) Level 5A, Fisher Brewing) are not a list of theaters. US Foods customers in Northern Utah and Boise can order through their US Foods rep. Sample drop-off is requested on the wholesale inquiry. Paul or Emery from the team can drop off samples. Case packs and minimums are not published.
+- Recreation centers: wholesale page for city recreation centers, rec snack bars, and municipal concessions in Utah. Fully baked, flash-frozen, vacuum-sealed; the account reheats. Audience is rec center and municipal concession managers, including when a city issues a vendor RFP or keeps an approved vendor list. No recreation center or city is named as a customer. The published accounts are not a list of recreation centers or cities. US Foods customers in Northern Utah and Boise can order through their US Foods rep. Sample drop-off is requested on the wholesale inquiry. Paul or Emery from the team can drop off samples. Case packs and minimums are not published.
+- Become a wholesale customer, samples and contact: How do I get samples? Request a sample drop-off on the wholesale inquiry form on that page. Paul or Emery from the team can drop off samples. Who should contact Dangerous Pretzel / who handles food purchasing? The person who handles food purchasing for the business. The inquiry asks for the business name, a contact name, and the city.
 
 ## Key pages (200 URLs)
 
@@ -60,6 +63,7 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Office and corporate catering](https://www.dangerouspretzel.com/v2/office-pretzel-catering.html)
 - [Game-day catering](https://www.dangerouspretzel.com/v2/game-day-pretzel-catering.html)
 - [Holiday party catering](https://www.dangerouspretzel.com/v2/holiday-party-pretzel-catering.html)
+- [Party catering](https://www.dangerouspretzel.com/v2/party-pretzel-catering.html)
 - [Location](https://www.dangerouspretzel.com/v2/location.html): Post District shop NAP and hours. Same kitchen that bakes SLC metro wholesale. Delta Center (Levy) Level 5A is a wholesale account, not the shop counter and not catering.
 - [FAQ](https://www.dangerouspretzel.com/v2/faq.html)
 - [Soft pretzel wholesale](https://www.dangerouspretzel.com/v2/wholesale.html)
@@ -88,5 +92,6 @@ This file restates facts already published on dangerouspretzel.com. It does not 
 - [Family entertainment](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-family-entertainment.html)
 - [Ice rinks and arenas](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-ice-rinks-arenas.html)
 - [Movie theaters](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-movie-theaters.html)
+- [Recreation centers](https://www.dangerouspretzel.com/v2/soft-pretzel-wholesale-recreation-centers.html)
 
 Pretty paths such as `/wholesale` 301 to the `/v2/*.html` files listed here.
