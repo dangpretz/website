@@ -164,6 +164,7 @@
     right: var(--space-3);
     z-index: 2;
   }
+  .out-of-stock { opacity: 0.5; }
   .card-a__body {
     padding: var(--space-4);
     flex: 1;
@@ -326,6 +327,8 @@
   }
   .pill--new { background: var(--color-accent); color: var(--color-text-on-dark); }
   .pill--save { background: var(--color-card-cream); color: var(--color-text-on-cream); }
+  .pill--out { background: var(--color-accent); color: var(--color-text-on-dark); }
+  .card-b__label .pill--out { margin-left: var(--space-2); vertical-align: middle; }
 
   /* ═══ HOUSE MOVE Callout (italic serif lives here only) ═══ */
   .house-move {
@@ -477,10 +480,10 @@
           </div>
         </div>
 
-        <div class="card-a">
+        <div class="card-a out-of-stock">
           <div class="card-a__image-wrap">
             <img class="card-a__image" src="./bootlegger.png" alt="Bootlegger">
-            <span class="card-a__pill pill pill--new">New</span>
+            <span class="card-a__pill pill pill--out">Out</span>
           </div>
           <div class="card-a__body">
             <div class="card-a__head">
@@ -587,9 +590,10 @@
           </div>
         </div>
 
-        <div class="card-a">
+        <div class="card-a out-of-stock">
           <div class="card-a__image-wrap">
             <img class="card-a__image" src="https://www.dangerouspretzel.com/images/menu-photos/for-the-kids.jpg" alt="For The Kids">
+            <span class="card-a__pill pill pill--out">Out</span>
           </div>
           <div class="card-a__body">
             <div class="card-a__head">
@@ -600,10 +604,10 @@
           </div>
         </div>
 
-        <div class="card-a">
+        <div class="card-a out-of-stock">
           <div class="card-a__image-wrap">
             <img class="card-a__image" src="https://www.dangerouspretzel.com/images/menu-photos/smore-bombs.jpg" alt="S'more Bombs">
-            <span class="card-a__pill pill pill--new">New</span>
+            <span class="card-a__pill pill pill--out">Out</span>
           </div>
           <div class="card-a__body">
             <div class="card-a__head">
@@ -686,13 +690,13 @@
           <span class="card-b__sub">Stone ground classic. Sweet and tangy.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Devil's Delight &middot; Salty</span>
         </div>
-        <div class="card-b__row card-b__row--3col card-b__row--dip">
-          <span class="card-b__label">Hot Ranch</span>
+        <div class="card-b__row card-b__row--3col card-b__row--dip out-of-stock">
+          <span class="card-b__label">Hot Ranch <span class="pill pill--out">Out</span></span>
           <span class="card-b__sub">Our take on buffalo ranch.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Spicy Bee &middot; Devil's Delight</span>
         </div>
-        <div class="card-b__row card-b__row--3col card-b__row--dip">
-          <span class="card-b__label">Sweet Cream</span>
+        <div class="card-b__row card-b__row--3col card-b__row--dip out-of-stock">
+          <span class="card-b__label">Sweet Cream <span class="pill pill--out">Out</span></span>
           <span class="card-b__sub">Sweet + cream + cheese.</span>
           <span class="card-b__pairs"><small>Pairs With</small>Saint &middot; Saint Bombs</span>
         </div>
@@ -700,21 +704,11 @@
     </div>
 
     <div class="section">
-      <p class="section-label">Suds &amp; Sodas</p>
+      <p class="section-label">Sodas &amp; Non-Alcoholic</p>
       <div class="card-b card-b--dark">
         <div class="card-b__row card-b__row--3col">
-          <span class="card-b__label">Draft Beer</span>
-          <span class="card-b__sub">Rotating local Utah taps. Ask us what's pouring.</span>
-          <span class="card-b__value">$7&ndash;$9</span>
-        </div>
-        <div class="card-b__row card-b__row--3col">
-          <span class="card-b__label">Cans &amp; Bottles</span>
-          <span class="card-b__sub">Local craft beer, cider, ros&eacute; bubbles, hard root beer.</span>
-          <span class="card-b__value">$8&ndash;$10</span>
-        </div>
-        <div class="card-b__row card-b__row--3col">
           <span class="card-b__label">Non-Alcoholic</span>
-          <span class="card-b__sub">Sodas, Brigham's Brew root beer, NA beer, kombucha.</span>
+          <span class="card-b__sub">Sodas, Brigham's Brew root beer, and kombucha.</span>
           <span class="card-b__value">$2&ndash;$6</span>
         </div>
       </div>
@@ -748,6 +742,30 @@
       document.body.classList.add(cls);
     })();
 
+    let originalHTML;
+    let checkingForUpdates = false;
+    async function refreshIfNeeded() {
+      if (checkingForUpdates) return;
+      checkingForUpdates = true;
+      try {
+        const response = await fetch(window.location.href, { cache: 'reload' });
+        if (!response.ok) throw new Error(`Failed to check signage page: HTTP ${response.status}`);
+        const html = await response.text();
+        if (originalHTML === undefined) {
+          originalHTML = html;
+        } else if (html !== originalHTML) {
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error('Signage update check failed', error);
+      } finally {
+        checkingForUpdates = false;
+      }
+    }
+
+    refreshIfNeeded();
+    document.body.addEventListener('click', refreshIfNeeded);
+    setInterval(refreshIfNeeded, 60_000);
   </script>
 </body>
 </html>
