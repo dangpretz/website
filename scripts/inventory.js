@@ -322,6 +322,8 @@ export const CUSTOMER_ALIASES = {
   alta: "Alta - Gold Miner's Daughter",
   'sip-n highland': 'Twisted Sugar - Highland', // rebranded location
   tf: 'TF Brewing',
+  'the lab': 'The Lab', // planner has "The LAB"; CRM account is "The Lab" (Emery)
+  'talisman brewing': 'Talisman Taproom', // planner name; CRM account is "Talisman Taproom" (Emery)
 
   // ── not a wholesale customer → drop from the customer list ──
   'sip-n': null,
