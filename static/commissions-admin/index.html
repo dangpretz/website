@@ -101,6 +101,11 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
 .preview-table th{text-align:left;padding:7px 12px;color:var(--gray-3);font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--gray-1)}
 .preview-table td{padding:7px 12px;border-bottom:1px solid var(--gray-1)}
 .grand-total{text-align:right;font-size:16px;font-weight:800;padding:14px 4px}
+.preview-table tr.month-subtotal td{background:#faf8f4;font-weight:800;border-top:1px solid var(--gray-1)}
+.preview-table tr.month-subtotal td:last-child{text-align:right}
+.preview-table td.order-items{color:var(--gray-4);max-width:360px}
+.order-count{padding:8px 12px 12px;font-size:12px;color:var(--gray-3)}
+.order-note{font-size:12px;color:var(--gray-3);padding:0 4px 24px;line-height:1.5}
 
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:#fff;padding:10px 20px;border-radius:var(--radius);font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:999}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -125,6 +130,7 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
     <button class="tab-btn" data-tab="events">Event Commissions</button>
     <button class="tab-btn" data-tab="adjustments" data-manager-only>Adjustments</button>
     <button class="tab-btn" data-tab="preview">Commission Preview</button>
+    <button class="tab-btn" data-tab="order-summary">Order Summary</button>
   </nav>
 
   <main>
@@ -225,6 +231,11 @@ table.list-table td{padding:8px 10px;border-bottom:1px solid var(--gray-1)}
         </div>
       </div>
     </section>
+
+    <!-- ── Order Summary ────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-order-summary">
+      <div id="order-summary-content"></div>
+    </section>
   </main>
 </div>
 
@@ -238,7 +249,7 @@ import {
 import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventory.js';
 import {
   resolveCommissionsConfig, resolveCommissionsLedger, processWholesaleCommissions,
-  summarizeCommissions, summarizeCommissionsByMonth,
+  summarizeCommissions, summarizeCommissionsByMonth, summarizeOrdersByRep,
   EVENT_RATE_PER_PRETZEL, collectRawSkuUsage, collectConnectedSkus,
 } from '../../scripts/commissions.js';
 import { SALES_CRM_LOG_PATH, resolveAccounts, repByCustomerFromAccounts } from '../../scripts/sales-crm.js';
@@ -632,6 +643,70 @@ function renderPreviewTab() {
   container.innerHTML = `${cards}<div class="grand-total">${totalLabel}: <strong>$${money(grandTotal)}</strong></div>`;
 }
 
+// ── Order Summary tab ────────────────────────────────────────────────────────
+// Total VALUE of orders (qty × the customer's price) per rep, one line per
+// order with a subtotal after each month. Same visibility as Commission
+// Preview: managers see every rep, a rep sees only their own. Built from the
+// locked-in wholesale ledger, so an order shows up here once it has been
+// computed on the Preview tab.
+function renderOrderSummaryTab() {
+  const container = document.getElementById('order-summary-content');
+  const deliveryById = Object.fromEntries(deliveries.map((d) => [d.deliveryId, d]));
+  const dateById = Object.fromEntries(deliveries.map((d) => [d.deliveryId, d.date || '']));
+  const summary = summarizeOrdersByRep(ledger.wholesale, dateById);
+  let repIds = Object.keys(summary).sort((a, b) => getRepLabel(a).localeCompare(getRepLabel(b)));
+  if (!isManager) repIds = repIds.filter((r) => r === session.code);
+  if (!repIds.length) {
+    container.innerHTML = `<div class="empty-hint">No orders ${isManager ? 'computed' : 'recorded for you'} yet.${isManager ? ' Orders appear here once they\'re computed on the Commission Preview tab.' : ''}</div>`;
+    return;
+  }
+  const monthLabel = (m) => (m ? formatMonth(m) : 'No date');
+
+  // Manager overview: month × rep grid of order value.
+  let overview = '';
+  if (isManager) {
+    const months = [...new Set(repIds.flatMap((r) => Object.keys(summary[r].months)))].sort();
+    const head = `<tr><th>Month</th>${repIds.map((r) => `<th>${esc(getRepLabel(r))}</th>`).join('')}${repIds.length > 1 ? '<th>Total</th>' : ''}</tr>`;
+    const rows = months.map((m) => {
+      const vals = repIds.map((r) => summary[r].months[m]?.value || 0);
+      return `<tr><td>${esc(monthLabel(m))}</td>${vals.map((v) => `<td>$${money(v)}</td>`).join('')}${repIds.length > 1 ? `<td><strong>$${money(vals.reduce((a, b) => a + b, 0))}</strong></td>` : ''}</tr>`;
+    }).join('');
+    const totals = repIds.map((r) => summary[r].total);
+    const foot = `<tr><td><strong>All months</strong></td>${totals.map((v) => `<td><strong>$${money(v)}</strong></td>`).join('')}${repIds.length > 1 ? `<td><strong>$${money(totals.reduce((a, b) => a + b, 0))}</strong></td>` : ''}</tr>`;
+    overview = `<div class="card"><div class="card-header">Order Value by Month</div><div class="card-body"><table class="preview-table"><thead>${head}</thead><tbody>${rows}${foot}</tbody></table></div></div>`;
+  }
+
+  let grand = 0;
+  let grandCount = 0;
+  const cards = repIds.map((repId) => {
+    const rep = summary[repId];
+    grand += rep.total; grandCount += rep.count;
+    let body = '';
+    let currentMonth = null;
+    const flush = () => {
+      if (currentMonth === null) return;
+      const m = rep.months[currentMonth];
+      body += `<tr class="month-subtotal"><td colspan="3">${esc(monthLabel(currentMonth))} &mdash; ${m.orders} order${m.orders === 1 ? '' : 's'}</td><td>$${money(m.value)}</td></tr>`;
+    };
+    rep.orders.forEach((o) => {
+      const month = (o.date || '').slice(0, 7);
+      if (month !== currentMonth) { flush(); currentMonth = month; }
+      const items = o.items.map((it) => `${esc(it.rawSku || it.sku)} &times;${it.qty}`).join(', ');
+      body += `<tr><td>${esc(o.date || '')}</td><td>${esc(deliveryById[o.deliveryId]?.customer || o.customer)}</td><td class="order-items">${items}</td><td>$${money(o.value)}</td></tr>`;
+    });
+    flush();
+    return `
+      <div class="rep-summary-card">
+        <div class="rep-summary-header"><h3>${esc(getRepLabel(repId))}</h3><div class="rep-total">$${money(rep.total)}</div></div>
+        <table class="preview-table"><thead><tr><th>Date</th><th>Customer</th><th>Items</th><th>Order value</th></tr></thead><tbody>${body}</tbody></table>
+        <div class="order-count">${rep.count} order${rep.count === 1 ? '' : 's'}</div>
+      </div>`;
+  }).join('');
+  const totalLabel = isManager ? 'Total order value across all reps' : 'Your total order value';
+  container.innerHTML = `${overview}${cards}<div class="grand-total">${totalLabel}: <strong>$${money(grand)}</strong> &middot; ${grandCount} order${grandCount === 1 ? '' : 's'}</div>
+    <p class="order-note">Order value is quantity &times; the customer's price. Only orders already computed on the Commission Preview tab are counted &mdash; an order still waiting on pricing or a rep isn't included yet.</p>`;
+}
+
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function formatMonth(monthKey) {
   const [y, m] = monthKey.split('-');
@@ -724,6 +799,7 @@ const TAB_RENDERERS = {
   events: renderEventsTab,
   adjustments: renderAdjustmentsTab,
   preview: renderPreviewTab,
+  'order-summary': renderOrderSummaryTab,
 };
 
 // Tabs a rep (commissions-admin:view) can't open — they land on Event

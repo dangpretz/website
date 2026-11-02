@@ -373,3 +373,57 @@ export function summarizeCommissionsByMonth(
 
   return { months: [...monthsSet].sort(), reps: [...repsSet], totals };
 }
+
+// ── Order values by rep ─────────────────────────────────────────────────────
+// Total VALUE of orders (qty × the customer's price), not the commission on
+// them — one entry per delivery per rep, built from the wholesale ledger rows
+// (so only orders already computed/locked in are counted). Month comes from
+// the delivery's date; an order whose delivery can't be found lands in ''.
+// Returns { [repCode]: { orders, months, total, count } } where
+//   orders: [{ deliveryId, date, customer, items:[{sku,qty,price,value}], value }]
+//           sorted by date,
+//   months: { 'YYYY-MM': { orders, value } }.
+export function summarizeOrdersByRep(wholesale, deliveryDateById = {}) {
+  const byRep = {};
+  Object.values(wholesale || {}).forEach((row) => {
+    if (!row.repCode) return;
+    const qty = Number(row.qty) || 0;
+    const price = Number(row.price) || 0;
+    const value = qty * price;
+    if (!byRep[row.repCode]) {
+      byRep[row.repCode] = {
+        orders: {}, months: {}, total: 0, count: 0,
+      };
+    }
+    const rep = byRep[row.repCode];
+    const order = rep.orders[row.deliveryId] || (rep.orders[row.deliveryId] = {
+      deliveryId: row.deliveryId,
+      date: deliveryDateById[row.deliveryId] || '',
+      customer: row.customer || '',
+      items: [],
+      value: 0,
+    });
+    order.items.push({
+      sku: row.sku,
+      rawSku: row.rawSku,
+      qty,
+      price,
+      value,
+    });
+    order.value += value;
+  });
+  Object.values(byRep).forEach((rep) => {
+    const list = Object.values(rep.orders)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.customer.localeCompare(b.customer));
+    list.forEach((o) => {
+      const month = (o.date || '').slice(0, 7);
+      const m = rep.months[month] || (rep.months[month] = { orders: 0, value: 0 });
+      m.orders += 1;
+      m.value += o.value;
+      rep.total += o.value;
+      rep.count += 1;
+    });
+    rep.orders = list;
+  });
+  return byRep;
+}
