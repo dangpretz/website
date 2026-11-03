@@ -2,6 +2,59 @@
 <html>
 
 <head>
+  <script>
+    // Interim allowlist until the Helix redirects sheet can be published.
+    // Source paths match case-insensitively, with a single trailing slash tolerated.
+    // Any other path falls through and this 404 page renders unchanged.
+    (function () {
+      const destinations = {
+        '/index.html': '/v2/index.html',
+        '/wholesale.html': '/v2/wholesale.html',
+        '/menu.html': '/v2/menu.html',
+        '/catering.html': '/v2/catering.html',
+        '/distributor.html': '/v2/distributor.html',
+        '/pretzel-program.html': '/v2/pretzel-program.html',
+        '/faq.html': '/v2/faq.html',
+        '/location.html': '/v2/location.html',
+        '/our-story.html': '/v2/our-story.html',
+        '/reviews.html': '/v2/reviews.html',
+        '/soft-pretzel-wholesale-restaurants.html': '/v2/soft-pretzel-wholesale-restaurants.html',
+        '/frozen-soft-pretzels.html': '/v2/frozen-soft-pretzels.html',
+        '/soft-pretzel-wholesale-utah.html': '/v2/soft-pretzel-wholesale-utah.html',
+        '/distributor-vs-direct-wholesale.html': '/v2/distributor-vs-direct-wholesale.html',
+        '/soft-pretzel-wholesale-grocery.html': '/v2/soft-pretzel-wholesale-grocery.html',
+        '/soft-pretzel-wholesale-venues.html': '/v2/soft-pretzel-wholesale-venues.html',
+        '/soft-pretzel-wholesale-bars.html': '/v2/soft-pretzel-wholesale-bars.html',
+        '/soft-pretzel-wholesale-intermountain.html': '/v2/soft-pretzel-wholesale-intermountain.html',
+        '/soft-pretzel-wholesale-offices.html': '/v2/soft-pretzel-wholesale-offices.html',
+        '/how-wholesale-reheat-works.html': '/v2/how-wholesale-reheat-works.html',
+        '/become-a-wholesale-customer.html': '/v2/become-a-wholesale-customer.html',
+        '/soft-pretzel-wholesale-vs-mall.html': '/v2/soft-pretzel-wholesale-vs-mall.html',
+        '/catering-vs-wholesale.html': '/v2/catering-vs-wholesale.html',
+        '/add-soft-pretzels-to-restaurant-menu.html': '/v2/add-soft-pretzels-to-restaurant-menu.html',
+        '/soft-pretzel-foodservice-supplier.html': '/v2/soft-pretzel-foodservice-supplier.html',
+        '/pretzel-bombs-wholesale.html': '/v2/pretzel-bombs-wholesale.html',
+        '/salt-lake-restaurant-pretzel-wholesale.html': '/v2/salt-lake-restaurant-pretzel-wholesale.html',
+        '/soft-pretzel-wholesale-ski-resorts.html': '/v2/soft-pretzel-wholesale-ski-resorts.html',
+        '/wedding-pretzel-catering.html': '/v2/wedding-pretzel-catering.html',
+        '/office-pretzel-catering.html': '/v2/office-pretzel-catering.html',
+        '/soft-pretzel-wholesale-family-entertainment.html': '/v2/soft-pretzel-wholesale-family-entertainment.html',
+        '/soft-pretzel-wholesale-ice-rinks-arenas.html': '/v2/soft-pretzel-wholesale-ice-rinks-arenas.html',
+        '/game-day-pretzel-catering.html': '/v2/game-day-pretzel-catering.html',
+        '/soft-pretzel-wholesale-movie-theaters.html': '/v2/soft-pretzel-wholesale-movie-theaters.html',
+        '/holiday-party-pretzel-catering.html': '/v2/holiday-party-pretzel-catering.html',
+        '/soft-pretzel-wholesale-recreation-centers.html': '/v2/soft-pretzel-wholesale-recreation-centers.html',
+        '/party-pretzel-catering.html': '/v2/party-pretzel-catering.html',
+        '/careers': '/v2/index.html',
+        '/jobs': '/v2/index.html',
+      };
+      let path = window.location.pathname.toLowerCase();
+      if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+      const dest = destinations[path];
+      if (!dest) return;
+      location.replace(dest + window.location.search + window.location.hash);
+    }());
+  </script>
   <title>Page not found</title>
   <script type="text/javascript">
     window.isErrorPage = true;
