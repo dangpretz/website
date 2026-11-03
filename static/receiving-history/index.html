@@ -203,7 +203,8 @@
     .pin-dot.filled { background: #C41E1E; border-color: #C41E1E; }
     .pin-error { min-height: 18px; font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-bottom: 8px; text-align: center; }
     .pin-keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 14px; margin-top: 8px; }
-    .pin-keypad button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444; background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .pin-keypad button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444; background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; }
     .pin-keypad button:hover { background: #3a3a3a; border-color: #C41E1E; }
     .pin-keypad button.pin-key-sub { font: 700 12px 'Manrope', sans-serif; color: #999; }
     .pin-gate.pin-shake .pin-dots { animation: pin-shake 0.35s; }

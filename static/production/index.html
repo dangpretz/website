@@ -1050,6 +1050,8 @@
       width: 64px; height: 64px; border-radius: 50%; border: 1px solid #444;
       background: #2a2a2a; color: #fff; font: 700 20px 'Manrope', sans-serif;
       cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      touch-action: manipulation; /* two quick taps must not trigger iOS double-tap zoom */
+      -webkit-tap-highlight-color: transparent; user-select: none;
     }
     .pin-keypad button:hover { background: #3a3a3a; border-color: var(--red); }
     .pin-keypad button.pin-key-sub { font: 700 12px 'Manrope', sans-serif; color: #999; }
