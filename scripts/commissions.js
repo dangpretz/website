@@ -23,6 +23,13 @@
 // ║   ledger row — editing a customer's price/tiers afterward never changes ║
 // ║   what a past delivery already earned.                                  ║
 // ║                                                                          ║
+// ║ COMMISSION START DATE                                                   ║
+// ║   `set_commission_start` ({ customer, startDate }) keeps a customer's   ║
+// ║   older deliveries out of the commission run: only deliveries dated on  ║
+// ║   or after startDate are computed. Used when a customer is newly        ║
+// ║   assigned to a rep and should earn going forward only. Blank startDate ║
+// ║   clears it. Orders before it are skipped silently (not a setup gap).   ║
+// ║                                                                          ║
 // ║ PRICE VS. TIERS                                                         ║
 // ║   Each customer negotiates their own PRICE per SKU (set_sku_pricing,    ║
 // ║   keyed by customer+sku) — but the TIER LADDER that turns a price into  ║
@@ -58,6 +65,8 @@ export function resolveCommissionsConfig(logs, normalize = (x) => x) {
   // (set_sku_rep_hidden). Default is visible — only an explicit `hidden:true`
   // row keeps a SKU off the rep view; a later `hidden:false` row un-hides it.
   const repHiddenSkus = {};
+  // customer -> 'YYYY-MM-DD' (set_commission_start); see COMMISSION START DATE.
+  const commissionStartByCustomer = {};
   const cust = (name) => normalize(name) || name; // keep raw if normalize excludes it
   (Array.isArray(logs) ? logs : []).forEach((row) => {
     if (row.action === 'set_customer_rep' && row.customer) {
@@ -71,6 +80,8 @@ export function resolveCommissionsConfig(logs, normalize = (x) => x) {
       tiersBySku[row.sku] = Array.isArray(tiers) ? tiers : [];
     } else if (row.action === 'set_sku_rep_hidden' && row.sku) {
       repHiddenSkus[row.sku] = row.hidden === true || row.hidden === 'true';
+    } else if (row.action === 'set_commission_start' && row.customer) {
+      commissionStartByCustomer[cust(row.customer)] = row.startDate || '';
     } else if (row.action === 'set_sku_alias' && row.deliveryItem) {
       // A blank connectedSku is a deliberate "not commissioned" mark (e.g. a
       // drink, a catering box) — store it same as any other value so it
@@ -80,7 +91,12 @@ export function resolveCommissionsConfig(logs, normalize = (x) => x) {
     }
   });
   return {
-    repByCustomer, pricingByCustomerSku, tiersBySku, connectedSkuByItem, repHiddenSkus,
+    repByCustomer,
+    pricingByCustomerSku,
+    tiersBySku,
+    connectedSkuByItem,
+    repHiddenSkus,
+    commissionStartByCustomer,
   };
 }
 
@@ -238,6 +254,11 @@ export function processWholesaleCommissions({
       const rawSku = item.sku || '';
       const qty = Number(item.quantity) || 0;
       if (!customer || !rawSku || qty <= 0) return;
+
+      // Customer only earns from its commission start date on — older
+      // deliveries are skipped silently, not flagged as a setup gap.
+      const startDate = (config.commissionStartByCustomer || {})[customer];
+      if (startDate && (d.date || '') < startDate) return;
 
       // Not mapped to a connected SKU = not a commissioned product at all
       // (a drink, a catering box, a discontinued flavor) — skip silently,
