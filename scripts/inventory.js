@@ -324,6 +324,7 @@ export const CUSTOMER_ALIASES = {
   tf: 'TF Brewing',
   'the lab': 'The Lab', // planner has "The LAB"; CRM account is "The Lab" (Emery)
   'talisman brewing': 'Talisman Taproom', // planner name; CRM account is "Talisman Taproom" (Emery)
+  'us foods - warehouse': 'US Foods', // planner name; CRM account is "US Foods"
 
   // ── not a wholesale customer → drop from the customer list ──
   'sip-n': null,
