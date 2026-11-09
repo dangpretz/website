@@ -331,7 +331,8 @@ body.cart-open #tw { bottom: 90px; }
 /* Stack form rows (Date+Time, Email+Phone) on phones so fields don't get
    crushed into two narrow columns. */
 @media (max-width: 600px) {
-  .fulfillment-wrap .form-row { grid-template-columns: 1fr; gap: 10px; }
+  .fulfillment-wrap .form-row,
+  .inquiry-wrap .form-row { grid-template-columns: 1fr; gap: 10px; }
 }
 
 /* ─── Fulfillment Section ─── */
@@ -384,6 +385,16 @@ body.cart-open #tw { bottom: 90px; }
   color: #1A1A1A;
   margin: 0 0 6px;
   display: block;
+}
+.field-label .req { color: #ff8a8a; }
+.field-label .optional {
+  font-weight: 400;
+  color: #999;
+}
+.form-required-note {
+  font: 400 13px/1.4 'Manrope', sans-serif;
+  color: #bbb;
+  margin: 0 0 16px;
 }
 
 /* ─── Custom Inquiry Multi-Step ─── */
@@ -751,31 +762,38 @@ body.cart-open #tw { bottom: 90px; }
   <h2>DETAILS.</h2>
   <div class="fulfillment-wrap">
 
-    <label class="field-label" style="color:#fff">How do you want it?</label>
-    <div class="toggle-group">
-      <button class="toggle-btn active" data-type="pickup">PICKUP</button>
-      <button class="toggle-btn" data-type="delivery">DELIVERY (+$75)</button>
+    <p class="form-required-note">Required fields are marked with *.</p>
+
+    <label class="field-label" for="cust-name" style="color:#fff">Your name <span class="req" aria-hidden="true">*</span></label>
+    <input type="text" id="cust-name" autocomplete="name" placeholder="First and last name" aria-required="true" class="inquiry-input" style="text-align:left">
+
+    <div class="form-row">
+      <div>
+        <label class="field-label" for="cust-email" style="color:#fff">Email <span class="req" aria-hidden="true">*</span></label>
+        <input type="email" id="cust-email" autocomplete="email" placeholder="you@email.com" aria-required="true" class="inquiry-input" style="text-align:left">
+      </div>
+      <div>
+        <label class="field-label" for="cust-phone" style="color:#fff">Phone <span class="req" aria-hidden="true">*</span></label>
+        <input type="tel" id="cust-phone" autocomplete="tel" placeholder="Mobile number" aria-required="true" class="inquiry-input" style="text-align:left">
+      </div>
     </div>
 
-    <div class="delivery-fields" id="delivery-fields">
-      <div class="delivery-fee-note">Delivery fee: $75 flat rate within SLC metro area.</div>
-      <label class="field-label" style="color:#fff">Delivery Address</label>
-      <input type="text" id="address" placeholder="123 Main St, Salt Lake City, UT" class="inquiry-input" style="text-align:left;margin-bottom:16px">
-    </div>
+    <label class="field-label" for="cust-business" style="color:#fff">Business or organization <span class="optional">(optional)</span></label>
+    <input type="text" id="cust-business" autocomplete="organization" placeholder="Company, school, or group" class="inquiry-input" style="text-align:left">
 
     <div class="lead-time-note" id="lead-time-note" style="background:#2a2a2a;color:#ccc;border:1px solid #444">
       Under $200: 12hr notice &middot; $200&ndash;$500: 24hr notice &middot; $500+: 48hr notice
     </div>
 
-    <div class="form-row" style="margin-bottom:12px">
+    <div class="form-row">
       <div>
-        <label class="field-label" style="color:#fff">Date</label>
-        <input type="text" id="order-date" class="inquiry-input" placeholder="MM/DD/YYYY" inputmode="numeric" autocomplete="off" style="text-align:left">
+        <label class="field-label" for="order-date" style="color:#fff">Event date <span class="req" aria-hidden="true">*</span></label>
+        <input type="text" id="order-date" class="inquiry-input" placeholder="MM/DD/YYYY" inputmode="numeric" autocomplete="off" aria-required="true" style="text-align:left">
       </div>
       <div>
-        <label class="field-label" style="color:#fff">Time</label>
-        <select id="order-time" class="inquiry-input" style="text-align:left">
-          <option value="">Select time...</option>
+        <label class="field-label" for="order-time" style="color:#fff">Time <span class="req" aria-hidden="true">*</span></label>
+        <select id="order-time" class="inquiry-input" aria-required="true" style="text-align:left">
+          <option value="">Choose a time</option>
           <option>8:00 AM</option><option>8:30 AM</option>
           <option>9:00 AM</option><option>9:30 AM</option>
           <option>10:00 AM</option><option>10:30 AM</option>
@@ -793,17 +811,23 @@ body.cart-open #tw { bottom: 90px; }
       </div>
     </div>
 
-    <label class="field-label" style="color:#fff">Your Info</label>
-    <input type="text" id="cust-name" placeholder="Full Name" class="inquiry-input" style="text-align:left;margin-bottom:8px">
-    <div class="form-row" style="margin-bottom:8px">
-      <input type="email" id="cust-email" placeholder="Email" class="inquiry-input" style="text-align:left">
-      <input type="tel" id="cust-phone" placeholder="Phone" class="inquiry-input" style="text-align:left">
+    <label class="field-label" for="cust-headcount" style="color:#fff">Headcount <span class="optional">(optional)</span></label>
+    <input type="number" id="cust-headcount" placeholder="About how many people" min="1" class="inquiry-input" style="text-align:left">
+
+    <label class="field-label" id="fulfillment-type-label" style="color:#fff">Pickup or delivery</label>
+    <div class="toggle-group" role="group" aria-labelledby="fulfillment-type-label">
+      <button class="toggle-btn active" data-type="pickup" type="button">PICKUP</button>
+      <button class="toggle-btn" data-type="delivery" type="button">DELIVERY (+$75)</button>
     </div>
-    <div class="form-row" style="margin-bottom:8px">
-      <input type="text" id="cust-business" placeholder="Business (optional)" class="inquiry-input" style="text-align:left">
-      <input type="number" id="cust-headcount" placeholder="Headcount (optional)" min="1" class="inquiry-input" style="text-align:left">
+
+    <div class="delivery-fields" id="delivery-fields">
+      <div class="delivery-fee-note">Delivery fee: $75 flat rate within SLC metro area.</div>
+      <label class="field-label" for="address" style="color:#fff">Delivery address <span class="req" aria-hidden="true">*</span></label>
+      <input type="text" id="address" autocomplete="street-address" placeholder="Street, city, ZIP" aria-required="true" class="inquiry-input" style="text-align:left">
     </div>
-    <textarea id="cust-notes" placeholder="Special requests, allergies, setup instructions..." class="inquiry-input" style="text-align:left;height:70px;resize:vertical"></textarea>
+
+    <label class="field-label" for="cust-notes" style="color:#fff">Notes <span class="optional">(optional)</span></label>
+    <textarea id="cust-notes" placeholder="Allergies, setup, or anything else we should know" class="inquiry-input" style="text-align:left;height:70px;resize:vertical"></textarea>
 
   </div>
 </section>
@@ -820,51 +844,53 @@ body.cart-open #tw { bottom: 90px; }
       <input type="hidden" name="_captcha" value="false">
       <input type="hidden" name="_cc" value="paul@dangerouspretzel.com">
       <input type="hidden" name="Items" id="req-items" value="">
-      <label class="field-label" style="color:#fff">Name</label>
-      <input type="text" name="Name" id="req-name" class="inquiry-input" placeholder="Full name" required style="text-align:left">
+      <input type="hidden" name="Lead source" id="req-lead-source" value="">
+      <p class="form-required-note">Required fields are marked with *.</p>
+      <label class="field-label" for="req-name" style="color:#fff">Your name <span class="req" aria-hidden="true">*</span></label>
+      <input type="text" name="Name" id="req-name" class="inquiry-input" placeholder="First and last name" autocomplete="name" required style="text-align:left">
       <div class="form-row">
         <div>
-          <label class="field-label" style="color:#fff">Email</label>
-          <input type="email" name="Email" id="req-email" class="inquiry-input" placeholder="Email" required style="text-align:left">
+          <label class="field-label" for="req-email" style="color:#fff">Email <span class="req" aria-hidden="true">*</span></label>
+          <input type="email" name="Email" id="req-email" class="inquiry-input" placeholder="you@email.com" autocomplete="email" required style="text-align:left">
         </div>
         <div>
-          <label class="field-label" style="color:#fff">Phone</label>
-          <input type="tel" name="Phone" id="req-phone" class="inquiry-input" placeholder="Phone" required style="text-align:left">
+          <label class="field-label" for="req-phone" style="color:#fff">Phone <span class="req" aria-hidden="true">*</span></label>
+          <input type="tel" name="Phone" id="req-phone" class="inquiry-input" placeholder="Mobile number" autocomplete="tel" required style="text-align:left">
         </div>
       </div>
-      <label class="field-label" style="color:#fff">Business</label>
-      <input type="text" name="Business" id="req-business" class="inquiry-input" placeholder="Company or organization" required style="text-align:left">
-      <label class="field-label" style="color:#fff">Occasion</label>
+      <label class="field-label" for="req-business" style="color:#fff">Business or organization <span class="req" aria-hidden="true">*</span></label>
+      <input type="text" name="Business" id="req-business" class="inquiry-input" placeholder="Company, school, or group" autocomplete="organization" required style="text-align:left">
+      <label class="field-label" for="req-occasion" style="color:#fff">Occasion <span class="optional">(optional)</span></label>
       <select name="Occasion" id="req-occasion" class="inquiry-input" style="text-align:left">
-        <option value="">Select...</option>
-        <option value="Corporate Event">Corporate</option>
+        <option value="">Choose an occasion</option>
+        <option value="Corporate Event">Corporate event</option>
         <option value="Wedding">Wedding</option>
-        <option value="Birthday Party">Birthday</option>
-        <option value="Festival / Market">Festival</option>
-        <option value="School / Nonprofit">School</option>
+        <option value="Birthday Party">Birthday party</option>
+        <option value="Festival / Market">Festival or market</option>
+        <option value="School / Nonprofit">School or nonprofit</option>
       </select>
       <div class="form-row">
         <div>
-          <label class="field-label" style="color:#fff">Event date</label>
-          <input type="text" name="Event date" id="req-date" class="inquiry-input" placeholder="MM/DD/YYYY or a date range" required style="text-align:left">
+          <label class="field-label" for="req-date" style="color:#fff">Event date <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" name="Event date" id="req-date" class="inquiry-input" placeholder="MM/DD/YYYY or a date range" autocomplete="off" required style="text-align:left">
         </div>
         <div>
-          <label class="field-label" style="color:#fff">Headcount</label>
-          <input type="number" name="Headcount" id="req-headcount" class="inquiry-input" placeholder="e.g. 65" min="1" required style="text-align:left">
+          <label class="field-label" for="req-headcount" style="color:#fff">Headcount <span class="req" aria-hidden="true">*</span></label>
+          <input type="number" name="Headcount" id="req-headcount" class="inquiry-input" placeholder="About how many people" min="1" required style="text-align:left">
         </div>
       </div>
-      <label class="field-label" style="color:#fff">Pickup or delivery</label>
+      <label class="field-label" for="req-fulfillment" style="color:#fff">Pickup or delivery <span class="req" aria-hidden="true">*</span></label>
       <select name="Pickup or delivery" id="req-fulfillment" class="inquiry-input" required style="text-align:left">
-        <option value="">Select...</option>
+        <option value="">Choose pickup or delivery</option>
         <option value="Pickup">Pickup</option>
         <option value="Delivery">Delivery</option>
       </select>
       <div id="req-address-wrap" style="display:none">
-        <label class="field-label" style="color:#fff">Delivery address</label>
-        <input type="text" name="Delivery address" id="req-address" class="inquiry-input" placeholder="Street, city" style="text-align:left">
+        <label class="field-label" for="req-address" style="color:#fff">Delivery address</label>
+        <input type="text" name="Delivery address" id="req-address" class="inquiry-input" placeholder="Street, city, ZIP" autocomplete="street-address" style="text-align:left">
       </div>
-      <label class="field-label" style="color:#fff">Notes</label>
-      <textarea name="Notes" id="req-notes" class="inquiry-input" placeholder="Flavors, timing, allergies, setup..." style="text-align:left;height:90px;resize:vertical"></textarea>
+      <label class="field-label" for="req-notes" style="color:#fff">Notes <span class="optional">(optional)</span></label>
+      <textarea name="Notes" id="req-notes" class="inquiry-input" placeholder="Allergies, timing, or setup" style="text-align:left;height:90px;resize:vertical"></textarea>
       <p id="req-error" style="display:none;color:#ff6b6b;font:400 14px 'Manrope',sans-serif;margin:0 0 12px"></p>
       <button type="submit" class="btn btn-red" id="req-submit" style="width:100%">SEND REQUEST</button>
     </form>
@@ -959,6 +985,11 @@ body.cart-open #tw { bottom: 90px; }
   // info@ is the activated FormSubmit inbox. _cc adds Paul; he must confirm
   // FormSubmit's one-time activation email before copies arrive there.
   const LEAD_URL = 'https://formsubmit.co/ajax/info@dangerouspretzel.com';
+
+  function currentLeadSource() {
+    if (typeof window.dpcLeadSource !== 'function') return '';
+    return window.dpcLeadSource();
+  }
 
   async function sendLead(fields) {
     const formData = new FormData();
@@ -1243,6 +1274,8 @@ body.cart-open #tw { bottom: 90px; }
             business: business || undefined,
             headcount: headcount || undefined,
           },
+          // Worker copies this onto the FormSubmit email. It is not a Square field.
+          lead_source: currentLeadSource(),
           promo_token: promoToken || undefined,
         }),
       });
@@ -1272,6 +1305,7 @@ body.cart-open #tw { bottom: 90px; }
             Items: items.map((i) => (i.name || i.variationId) + ' x' + i.quantity).join(', '),
             Notes: notes,
             'Order ID': data.order_id || 'N/A',
+            'Lead source': currentLeadSource(),
           });
         } catch (e) { /* checkout still proceeds; worker is the other path */ }
       }
@@ -1300,6 +1334,7 @@ body.cart-open #tw { bottom: 90px; }
           Items: itemSummary,
           Notes: notes,
           'Checkout error': err.message || 'Failed to create checkout',
+          'Lead source': currentLeadSource(),
         });
         sent = true;
       } catch (sendErr) {
@@ -1352,6 +1387,8 @@ body.cart-open #tw { bottom: 90px; }
       reqForm.appendChild(reply);
     }
     reply.value = document.getElementById('req-email').value.trim();
+    const lead = document.getElementById('req-lead-source');
+    if (lead) lead.value = currentLeadSource();
   });
 
   function prefillCateringRequest(data) {

@@ -1103,11 +1103,17 @@ async function handleSquareWebhook(request, env) {
   return json({ ok: true, eventType: payload.type, ...result });
 }
 
+function cleanLeadSource(value) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+
 async function sendOrderAlert({
   customer,
   fulfillment,
   itemSummary,
   orderId,
+  leadSource,
 }) {
   const formData = new FormData();
   formData.append('_subject', `New Catering Order — ${customer.name}`);
@@ -1125,6 +1131,8 @@ async function sendOrderAlert({
   if (customer.notes) {
     formData.append('Notes', customer.notes);
   }
+  const source = cleanLeadSource(leadSource);
+  if (source) formData.append('Lead source', source);
   formData.append('Order ID', orderId);
   formData.append('_template', 'table');
   formData.append('_captcha', 'false');
@@ -2481,7 +2489,9 @@ export default {
 
     try {
       const body = await request.json();
-      const { items, fulfillment, customer, promo_token } = body;
+      const {
+        items, fulfillment, customer, promo_token, lead_source: leadSource,
+      } = body;
 
       // Validate required fields
       if (!items?.length) return json({ error: 'No items in order' }, 400);
@@ -2684,6 +2694,7 @@ export default {
 
       // Email the team before returning. `alerted` tells the page not to
       // send a second copy. If this fails, the page sends the backup.
+      // lead_source is attribution for that email only — not a Square field.
       const itemSummary = items.map((i) => `${i.name || i.variationId} x${i.quantity}`).join(', ');
       let alerted = false;
       try {
@@ -2693,6 +2704,7 @@ export default {
             fulfillment,
             itemSummary,
             orderId: orderId || 'N/A',
+            leadSource,
           }),
           new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Lead email timed out')), 5000);

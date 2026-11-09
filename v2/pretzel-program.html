@@ -135,6 +135,7 @@
     <p class="form-sub" style="color:#aaa">We'll follow up within 24 hours. Drew does all the calls himself.</p>
     <div class="form-msg" id="form-msg"></div>
     <form id="pretzel-program-form">
+      <input type="hidden" name="Lead source" value="">
       <div class="form-row">
         <input name="venue_name" placeholder="Venue Name" required>
         <input name="contact_name" placeholder="Your Name" required>
@@ -208,6 +209,10 @@ document.getElementById('pretzel-program-form').addEventListener('submit', async
   const msg = document.getElementById('form-msg');
   btn.textContent = 'SENDING...';
   btn.disabled = true;
+  const lead = this.querySelector('input[name="Lead source"]');
+  if (lead && typeof window.dpcLeadSource === 'function') {
+    lead.value = window.dpcLeadSource();
+  }
   const data = Object.fromEntries(new FormData(this));
   try {
     const res = await fetch('https://pretzel-os.drew-f39.workers.dev/account/lead-capture', {

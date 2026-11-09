@@ -51,6 +51,18 @@ async function handleSubmit(form) {
     form.setAttribute('data-submitting', 'true');
     submit.disabled = true;
 
+    // Hidden attribution field. Same name the FormSubmit emails use.
+    let leadSource = form.querySelector('input[name="Lead source"]');
+    if (!leadSource) {
+      leadSource = document.createElement('input');
+      leadSource.type = 'hidden';
+      leadSource.name = 'Lead source';
+      form.append(leadSource);
+    }
+    if (typeof window.dpcLeadSource === 'function') {
+      leadSource.value = window.dpcLeadSource();
+    }
+
     // create payload
     const payload = generatePayload(form);
     const response = await fetch(form.dataset.action, {
