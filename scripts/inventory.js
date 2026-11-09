@@ -318,7 +318,8 @@ export const CUSTOMER_ALIASES = {
   roha: 'RoHa Brewing',
   'woodward park city': 'Woodward Park City', // planner had "WoodWard"
   'base camp gj': 'Base Camp',
-  hk: 'HK Brewing',
+  hk: "Han's Kombucha", // same customer as HK Brewing; CRM account is "Han's Kombucha"
+  'hk brewing': "Han's Kombucha", // planner name; CRM account is "Han's Kombucha"
   alta: "Alta - Gold Miner's Daughter",
   'sip-n highland': 'Twisted Sugar - Highland', // rebranded location
   tf: 'TF Brewing',
