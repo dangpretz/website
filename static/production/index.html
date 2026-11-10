@@ -29,6 +29,16 @@
     /* iOS zoom fix */
     input, select, textarea { font-size: 16px !important; }
 
+    /* ── Staff Hub link (manager view only; slim strip above the sticky nav) ── */
+    .hub-strip {
+      display: block; background: var(--dark); color: var(--gray-3);
+      font: 700 12px 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.5px;
+      text-decoration: none; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hub-strip:active { color: var(--white); }
+    body.role-worker .hub-strip { display: none; }
+
     /* ── Top nav ─────────────────────────────────── */
     .topnav {
       position: sticky; top: 0; z-index: 100; background: var(--dark);
@@ -1095,6 +1105,7 @@
   } catch (_) {}
 </script>
 
+<a class="hub-strip" href="../index.html">&larr; Staff Hub</a>
 <nav class="topnav">
   <button class="nav-arrow" id="nav-prev" aria-label="Previous day">‹</button>
   <div class="date-display" id="date-display" role="button" tabindex="0" aria-label="Go to today">
