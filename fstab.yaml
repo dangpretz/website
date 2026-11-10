@@ -1,2 +1,8 @@
 mountpoints:
   /: https://drive.google.com/drive/folders/1o_kSsAQLUahGzP-fAMmyl2d84woCeQC3
+# Extensionless legacy paths have no code-bus HTML lookup. Map them onto the
+# stub files when content 404s. A redirects-sheet 301 is applied first and
+# hides these mappings.
+folders:
+  /careers: /careers.html
+  /jobs: /jobs.html
