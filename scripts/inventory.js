@@ -221,15 +221,15 @@ export const LEGACY_SKU_RENAMES = {
 
 // Per-SKU allowed case sizes. First value = default selection in dropdown.
 // SKUs missing or empty array → no standard cases (pretzel-only entry).
-// 10oz and 7oz pretzels ship in two sizes depending on the customer's
+// 10oz (48 or 12) and 7oz (72 or 32) pretzels ship in two sizes depending on the customer's
 // order; manager picks per delivery line item in the planner form.
 export const CASE_SIZE_OPTIONS = {
   '21oz mammoth pretzel': [25],
-  '10oz mustache': [48, 20],
-  '10oz plain': [48, 20],
-  '10oz bbk': [48, 20],
-  '10oz spicy bee': [48, 20],
-  '10oz Vegan Pretzel': [48, 20],
+  '10oz mustache': [48, 12],
+  '10oz plain': [48, 12],
+  '10oz bbk': [48, 12],
+  '10oz spicy bee': [48, 12],
+  '10oz Vegan Pretzel': [48, 12],
   '7oz plain': [72, 32],
   '7oz bbk': [72, 32],
   '7oz spicy bee': [72, 32],
