@@ -78,7 +78,15 @@
       background: rgba(9,9,11,0.92);
       backdrop-filter: blur(12px);
       z-index: 100;
+      flex-wrap: wrap;
     }
+    .hdr-back {
+      order: -1; flex-basis: 100%;
+      font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.12em;
+      text-transform: uppercase; text-decoration: none; color: var(--text-mid);
+      margin-bottom: -4px;
+    }
+    .hdr-back:hover { color: var(--text); }
     .hdr-wordmark {
       font-family: 'Playfair Display', serif;
       font-weight: 700;
@@ -1268,6 +1276,7 @@
 </div>
 
 <header class="hdr" id="main-hdr" style="display:none">
+  <a class="hdr-back" href="../index.html">&larr; Staff Hub</a>
   <span class="hdr-wordmark">Dangerous Pretzel</span>
   <span class="hdr-sep">/</span>
   <span class="hdr-label">Finance</span>

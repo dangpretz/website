@@ -40,6 +40,14 @@
     .login-btn:hover { opacity: 0.9; }
     .login-err { color: #C41E1E; font-size: 13px; margin-top: 10px; min-height: 18px; }
 
+    /* ── Staff Hub link (slim strip above the sticky nav) ── */
+    .hub-strip {
+      display: block; background: #1A1A1A; color: #999; text-decoration: none;
+      font: 600 12px 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 10px 5%; border-bottom: 1px solid #333;
+    }
+    .hub-strip:hover { color: #fff; }
+
     /* ── Nav ── */
     .site-nav {
       background: #1A1A1A; padding: 14px 5%;
@@ -392,6 +400,7 @@
 
 <!-- App -->
 <div id="app" hidden>
+  <a class="hub-strip" href="../index.html">&larr; Staff Hub</a>
   <nav class="site-nav">
     <div class="nav-wrap">
       <a href="../delivery-planner/index.html">
