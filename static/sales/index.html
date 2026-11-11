@@ -895,7 +895,7 @@ import { resolveDeliveries, normalizeCustomerName } from '../../scripts/inventor
 import {
   resolveCommissionsConfig, pricingKey, resolveTierPct, collectCustomerNames, priceableSkusFor,
 } from '../../scripts/commissions.js';
-import { repByCustomerFromAccounts } from '../../scripts/sales-crm.js';
+import { repByCustomerFromAccounts, derivePlannerOrders } from '../../scripts/sales-crm.js?v=2026-11-11-planner-orders';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const LOG_PATH = '/dangpretz/sales-crm';
@@ -1298,12 +1298,45 @@ async function refreshPricingConfig() {
 }
 
 // ── Computed metrics ──────────────────────────────────────────────────────────
+// Orders per account = orders logged by hand in the CRM + orders derived from
+// confirmed planner deliveries priced from the pricing table. The derived map
+// is rebuilt only when the deliveries or pricing config are reloaded.
+let plannerOrderCache = { d: null, c: null, map: {} };
+function plannerOrdersByCustomer() {
+  if (plannerOrderCache.d !== deliveries || plannerOrderCache.c !== pricingConfig) {
+    plannerOrderCache = {
+      d: deliveries,
+      c: pricingConfig,
+      map: derivePlannerOrders({ deliveries, config: pricingConfig, normalize: normalizeCustomerName }),
+    };
+  }
+  return plannerOrderCache.map;
+}
+function ordersForAccount(accountId) {
+  const logged = STATE.orders.filter(o => o.accountId === accountId);
+  const acct = STATE.accounts.get(accountId);
+  if (!acct) return logged;
+  const key = normalizeCustomerName(acct.name || '');
+  // Planner orders belong to the first account carrying that customer name
+  // (same rule accountForCustomer uses), so a duplicate account isn't double-counted.
+  const derived = key && accountForCustomer(acct.name)?.id === accountId
+    ? (plannerOrdersByCustomer()[key] || []).map(o => ({ ...o, accountId }))
+    : [];
+  return [...logged, ...derived];
+}
+function allOrders() {
+  return [...STATE.accounts.keys()].flatMap(id => ordersForAccount(id));
+}
+
 function getAccountMetrics(accountId) {
-  const orders = STATE.orders.filter(o => o.accountId === accountId).sort((a,b) => b.date.localeCompare(a.date));
+  const orders = ordersForAccount(accountId).sort((a,b) => b.date.localeCompare(a.date));
   const comms = STATE.comms.filter(c => c.accountId === accountId).sort((a,b) => b.date.localeCompare(a.date));
   const totalRevenue = orders.reduce((s,o) => s + Number(o.value||0), 0);
   const orderCount = orders.length;
-  const avgOrderValue = orderCount ? totalRevenue / orderCount : 0;
+  // Average over orders that carry a value, so a delivery with nothing priced yet
+  // doesn't drag the average down.
+  const valued = orders.filter(o => Number(o.value||0) > 0).length;
+  const avgOrderValue = valued ? totalRevenue / valued : 0;
   const lastOrderDate = orders[0]?.date || null;
   const lastContactDate = comms[0]?.date || null;
   let avgOrderFreq = null;
@@ -1999,8 +2032,9 @@ function renderDetailTab(tab, id, a, m, deal) {
         </div>`).join('') : '<div class="empty"><div class="empty-icon">💬</div>No communications logged yet.</div>'}`;
   }
   if (tab === 'orders') {
-    const orders = STATE.orders.filter(o => o.accountId === id).sort((a,b) => b.date.localeCompare(a.date));
+    const orders = ordersForAccount(id).sort((a,b) => b.date.localeCompare(a.date));
     const total = orders.reduce((s,o) => s + Number(o.value||0), 0);
+    const unpricedTotal = orders.reduce((s,o) => s + (o.unpricedLines || 0), 0);
     return `
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <button class="btn btn-red btn-sm" data-log-order="${id}">Log Order</button>
@@ -2009,11 +2043,12 @@ function renderDetailTab(tab, id, a, m, deal) {
         <table class="tbl">
           <thead><tr><th>Date</th><th>Items</th><th>Volume</th><th>Value</th></tr></thead>
           <tbody>
-            ${orders.map(o => `<tr><td>${fmtDate(o.date)}</td><td>${esc(o.items)}</td><td>${esc(o.volume)||'—'}</td><td>${fmt$(o.value)}</td></tr>`).join('')}
+            ${orders.map(o => `<tr><td>${fmtDate(o.date)}</td><td>${esc(o.items)}${o.source === 'planner' ? ' <span class="badge badge-prospect" title="Confirmed delivery from the delivery planner, priced from the pricing table">planner</span>' : ''}${o.unpricedLines ? ` <span class="muted" style="font-size:12px">(${o.unpricedLines} item${o.unpricedLines === 1 ? '' : 's'} not priced yet)</span>` : ''}</td><td>${esc(o.volume)||'—'}</td><td>${fmt$(o.value)}</td></tr>`).join('')}
             <tr class="totals"><td colspan="3">Total</td><td>${fmt$(total)}</td></tr>
           </tbody>
         </table>
-      </div></div>` : '<div class="empty"><div class="empty-icon">📦</div>No orders logged yet.</div>'}`;
+      </div></div>
+      <div class="muted" style="font-size:12px;margin-top:10px">Orders marked <em>planner</em> come automatically from confirmed deliveries, priced from this customer's pricing table at today's prices${unpricedTotal ? `. ${unpricedTotal} item${unpricedTotal === 1 ? ' has' : 's have'} no price yet and ${unpricedTotal === 1 ? 'is' : 'are'} left out of the total` : ''}.</div>` : '<div class="empty"><div class="empty-icon">📦</div>No orders yet.</div>'}`;
   }
   if (tab === 'tasks') {
     const tasks = [...STATE.tasks.values()].filter(t => t.accountId === id).sort((a,b) => a.dueDate?.localeCompare(b.dueDate));
@@ -2263,7 +2298,7 @@ function renderRevenueReport() {
   const dto = document.getElementById('rev-to')?.value || today();
   const segF = document.getElementById('rev-seg')?.value || '';
 
-  const filtered = STATE.orders.filter(o => o.date >= dfrom && o.date <= dto);
+  const filtered = allOrders().filter(o => o.date >= dfrom && o.date <= dto);
   const accountMap = new Map();
   filtered.forEach(o => {
     const acct = STATE.accounts.get(o.accountId);
