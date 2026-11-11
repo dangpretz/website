@@ -56,3 +56,66 @@ export function repByCustomerFromAccounts(accounts, normalize = (x) => x) {
   });
   return out;
 }
+
+// ── Orders derived from the delivery planner ────────────────────────────────
+// Lifetime value / order count / reorder frequency used to come only from
+// orders someone logged by hand in the CRM. This derives them instead from
+// confirmed WHOLESALE deliveries in the planner, priced from the commissions
+// pricing table (the same customer × connected-SKU prices the commissions
+// page uses): revenue of a line = quantity × per-unit price.
+//
+// Returns { normalizedCustomerName -> [order] }, each order:
+//   { id: 'planner:<deliveryId>', source: 'planner', deliveryId, date,
+//     items: '32 × 7oz plain, 20 × 3oz cheese dip', volume, value,
+//     unpricedLines }
+// A line is "unpriced" when its item has no connected-SKU mapping or the
+// customer has no price for that SKU yet; it adds nothing to `value` (so a
+// fully-unpriced order has value 0) and is counted so the UI can say so.
+// Prices apply as they are today — nothing is frozen at delivery time.
+//
+// `normalize` is injected (inventory.js normalizeCustomerName) so planner
+// names like "US Foods - Warehouse" land on the right CRM account; a null
+// result (event / placeholder) is skipped.
+export function derivePlannerOrders({ deliveries, config, normalize = (x) => x }) {
+  const out = {};
+  const pricing = (config && config.pricingByCustomerSku) || {};
+  const connected = (config && config.connectedSkuByItem) || {};
+  (Array.isArray(deliveries) ? deliveries : []).forEach((d) => {
+    if (d._deleted) return; // eslint-disable-line no-underscore-dangle
+    if ((d.orderCategory || 'wholesale') !== 'wholesale') return;
+    if (!['delivered', 'picked_up'].includes(d.status)) return;
+    const customer = normalize(d.customer || '');
+    if (!customer) return;
+    let items = [];
+    try { items = JSON.parse(d.lineItems || '[]'); } catch (_) { return; }
+    if (!Array.isArray(items)) return;
+
+    let value = 0;
+    let volume = 0;
+    let unpricedLines = 0;
+    const parts = [];
+    items.forEach((item) => {
+      const qty = Number(item.quantity) || 0;
+      if (!item.sku || qty <= 0) return;
+      volume += qty;
+      parts.push(`${qty} \u00d7 ${item.sku}`);
+      const sku = connected[item.sku];
+      const price = sku ? pricing[`${customer}::${sku}`] : null;
+      if (!price) { unpricedLines += 1; return; }
+      value += qty * price.price;
+    });
+    if (!parts.length) return;
+    if (!out[customer]) out[customer] = [];
+    out[customer].push({
+      id: `planner:${d.deliveryId}`,
+      source: 'planner',
+      deliveryId: d.deliveryId,
+      date: d.date || '',
+      items: parts.join(', '),
+      volume,
+      value,
+      unpricedLines,
+    });
+  });
+  return out;
+}
