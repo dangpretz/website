@@ -228,6 +228,13 @@
     .adjust-grid .span-2 { grid-column: span 2; }
 
     /* ── Mobile ── */
+    .count-in { display: block; font: 600 10px 'Manrope', sans-serif; color: #999; margin-top: 2px; }
+    .pack-preview { font: 600 12px/1.4 'Manrope', sans-serif; color: #ccc; margin: 0 0 12px; }
+    .check-row { display: flex; align-items: center; gap: 8px; font: 600 13px 'Manrope', sans-serif; color: #ccc; margin-bottom: 12px; }
+    .check-row input { width: auto; }
+    .btn-row-edit { background: none; border: none; cursor: pointer; font: 700 12px 'Manrope', sans-serif; color: #888; padding: 4px 6px; }
+    .btn-row-edit:hover { color: #C41E1E; }
+
     @media (max-width: 680px) {
       .inv-table th:nth-child(5),
       .inv-table td:nth-child(5),
@@ -235,10 +242,7 @@
       .inv-table td:nth-child(6),
       .inv-table th:nth-child(7),
       .inv-table td:nth-child(7) { display: none; }
-      .inv-table th.col-actions,
-      .inv-table td.col-actions { display: none; }
       .inv-table th, .inv-table td { padding: 10px 8px; font-size: 13px; }
-      .btn-par-edit { display: none; }
       .adjust-grid { grid-template-columns: 1fr; }
       .adjust-grid .span-2 { grid-column: span 1; }
     }
@@ -339,7 +343,7 @@
           <div class="adjust-grid" style="margin-bottom:14px;">
             <div class="field-group" style="margin-bottom:0;">
               <label for="quick-quantity">Quantity Used</label>
-              <input type="number" id="quick-quantity" placeholder="0" min="1" step="1">
+              <input type="number" id="quick-quantity" placeholder="0" min="0" step="any" inputmode="decimal">
             </div>
             <div class="field-group" style="margin-bottom:0;">
               <label for="quick-note">Note (optional)</label>
@@ -378,7 +382,7 @@
 
           <div class="field-group">
             <label for="sess-quantity">Quantity</label>
-            <input type="number" id="sess-quantity" placeholder="0" min="1" step="1">
+            <input type="number" id="sess-quantity" placeholder="0" min="0" step="any" inputmode="decimal">
           </div>
 
           <button class="btn-primary" id="sess-add-btn" disabled>+ Add to Session</button>
@@ -407,7 +411,7 @@
               </div>
               <div class="field-group" style="margin-bottom:0;">
                 <label for="adj-quantity">Qty (+ add, − remove)</label>
-                <input type="number" id="adj-quantity" placeholder="e.g. −2 or 5" step="1">
+                <input type="number" id="adj-quantity" placeholder="e.g. −2 or 0.5" step="any" inputmode="decimal">
               </div>
               <div class="field-group span-2" style="margin-bottom:0;">
                 <label for="adj-note">Note</label>
@@ -450,11 +454,18 @@
                 <input type="text" id="new-ing-code" placeholder="e.g. 1008416" autocomplete="off">
               </div>
               <div class="field-group" style="margin-bottom:0;">
-                <label for="new-ing-pack">Pack Size <span style="font-weight:400;color:#888">(optional)</span></label>
-                <input type="text" id="new-ing-pack" placeholder="e.g. 1/50/LB or 4/1/GAL" autocomplete="off">
+                <label for="new-ing-pack">Pack Size <span style="font-weight:400;color:#888">(case/inner/UNIT)</span></label>
+                <input type="text" id="new-ing-pack" placeholder="e.g. 4/5/LB or 1/50/LB" autocomplete="off">
+              </div>
+              <div class="field-group" style="margin-bottom:0;">
+                <label for="new-ing-vendor">Vendor <span style="font-weight:400;color:#888">(optional)</span></label>
+                <input type="text" id="new-ing-vendor" placeholder="US Foods, Amazon, Uline…" autocomplete="off">
               </div>
             </div>
+            <p class="pack-preview" id="new-ing-pack-preview">Count in: —</p>
+            <label class="check-row"><input type="checkbox" id="new-ing-temp"> Requires a temperature when received (cold item)</label>
             <button class="btn-submit" id="new-ing-submit-btn" disabled>Add Ingredient</button>
+            <button class="btn-submit" id="new-ing-cancel-btn" type="button" hidden style="margin-left:8px;background:#444;">Cancel edit</button>
           </div>
         </div>
       </div>
@@ -464,8 +475,8 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
-    import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
-    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
+    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js?v=dpclog';
 
     const RECEIVING_PATH = '/dangpretz/receiving';
     const INVENTORY_PATH = '/dangpretz/inventory';
@@ -505,13 +516,56 @@
 
     function parsePackSize(packSize) {
       const parts = (packSize || '').split('/');
-      if (parts.length < 3) return { innerUnitsPerCase: 1, innerUnitLabel: packSize || 'unit' };
+      if (parts.length < 3 || !parts[2]) return { innerUnitsPerCase: 1, innerUnitLabel: packSize || 'unit' };
       const count = parseFloat(parts[0]);
       return {
-        innerUnitsPerCase: isNaN(count) ? 1 : count,
+        innerUnitsPerCase: isNaN(count) || count <= 0 ? 1 : count,
         innerUnitLabel: `${parts[1]} ${parts[2]}`,
       };
     }
+
+    function formatQty(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return '—';
+      return String(Math.round(x * 100) / 100);
+    }
+
+    function parseQty(raw) {
+      const v = parseFloat(raw);
+      if (Number.isNaN(v) || v < 0) return null;
+      return Math.round(v * 1000) / 1000;
+    }
+
+    function codeKey(code) {
+      const s = String(code || '').trim();
+      if (!s) return '';
+      return s.replace(/^0+/, '') || s;
+    }
+
+    // "5 LB" or "5lb bag" becomes 1/5/LB so the Unit column and recipe math
+    // agree. A real case/inner/UNIT string is kept.
+    function normalizePack(raw) {
+      const s = String(raw || '').trim();
+      if (!s) return '';
+      const parts = s.split('/').map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 3) return `${parts[0]}/${parts[1]}/${parts[2].toUpperCase()}`;
+      const m = s.match(/^(\d+(?:\.\d+)?)\s*(lb|oz|gal|ea|ct|g|kg|l)\b/i);
+      if (m) return `1/${m[1]}/${m[2].toUpperCase()}`;
+      return s;
+    }
+
+    function describePack(packSize) {
+      const pack = normalizePack(packSize);
+      const parts = pack.split('/');
+      if (parts.length < 3 || !parts[2]) {
+        return 'Use case/inner/UNIT. Example: 4/5/LB counts 5 LB bags and a received case adds 4. 1/50/LB counts 50 LB bags.';
+      }
+      const perCase = parseFloat(parts[0]);
+      const adds = perCase > 0 ? perCase : 1;
+      return `Count in: ${parts[1]} ${parts[2]}. One received case adds ${adds}.`;
+    }
+
+    let editingProductId = null;
 
     // ── State ────────────────────────────────────────────────────────────────
     let inventoryMap = new Map();
@@ -623,6 +677,7 @@
         tbody.innerHTML = rows.map(buildTableRow).join('');
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
         tbody.querySelectorAll('.stock-cell').forEach(wireStockAdj);
+        tbody.querySelectorAll('.btn-row-edit').forEach(wireEditBtn);
         tbody.querySelectorAll('.btn-row-delete').forEach(wireDeleteBtn);
       }
 
@@ -650,27 +705,30 @@
           ? '<span class="status-badge low">LOW</span>'
           : '<span class="status-badge ok">OK</span>';
 
-      const parDisplay = par !== null ? String(par) : '—';
+      const parDisplay = par !== null ? formatQty(par) : '—';
       const needQty    = isLow ? (par - stock) : 0;
+      const unitHint = `<span class="count-in">count in ${escapeHtml(innerUnitLabel)}</span>`;
 
       const parCell = `<div class="par-cell" data-product-id="${escapeHtml(productId)}">
         <span class="par-value">${escapeHtml(parDisplay)}</span>
         <button class="btn-par-edit" title="Edit PAR" data-product-id="${escapeHtml(productId)}">✏</button>
+        ${unitHint}
       </div>`;
 
-      const stockCell = `<div class="stock-cell" data-product-id="${escapeHtml(productId)}" title="Click to adjust stock">
-        <span class="${stockClass}">${stock}${isLow ? `<span class="stock-need">buy ${needQty} more</span>` : ''}</span>
+      const stockCell = `<div class="stock-cell" data-product-id="${escapeHtml(productId)}" title="Click to set the physical count">
+        <span class="${stockClass}">${formatQty(stock)}${isLow ? `<span class="stock-need">buy ${formatQty(needQty)} more</span>` : ''}</span>
+        ${unitHint}
       </div>`;
 
       return `<tr class="${isLow ? 'low-stock' : ''}" data-product-id="${escapeHtml(productId)}">
-        <td>${escapeHtml(productName)}</td>
+        <td>${escapeHtml(productName)}${(() => { const item = catalog.find((p) => p.id === productId); return item && item.vendor ? `<span class="count-in">${escapeHtml(item.vendor)}</span>` : ''; })()}</td>
         <td>${escapeHtml(innerUnitLabel)}</td>
         <td>${stockCell}</td>
         <td>${parCell}</td>
         <td>${statusBadge}</td>
         <td>${formatDate(lastReceived)}</td>
         <td>${formatDate(lastUsed)}</td>
-        <td class="col-actions"><button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button></td>
+        <td class="col-actions"><button class="btn-row-edit" data-product-id="${escapeHtml(productId)}" title="Edit name, pack, vendor, temperature">Edit</button><button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button></td>
       </tr>`;
     }
 
@@ -683,11 +741,13 @@
         const currentPar = row?.par ?? '';
         const originalHtml = cell.innerHTML;
 
+        const unit = parsePackSize(row?.packSize).innerUnitLabel;
         cell.innerHTML = `<div class="par-edit-wrap">
-          <input type="number" class="par-edit-input" min="0" step="1" value="${currentPar}" placeholder="0">
+          <input type="number" class="par-edit-input" inputmode="decimal" min="0" step="any" value="${currentPar}" placeholder="0">
           <button class="btn-par-save">Save</button>
           <button class="btn-par-cancel">&times;</button>
-        </div>`;
+        </div>
+        <span class="count-in">count in ${escapeHtml(unit)}</span>`;
 
         const input     = cell.querySelector('.par-edit-input');
         const saveBtn   = cell.querySelector('.btn-par-save');
@@ -702,9 +762,9 @@
         });
 
         async function doSave() {
-          const val = parseInt(input.value, 10);
-          if (isNaN(val) || val < 0) {
-            showToast('PAR must be a non-negative whole number', 'error');
+          const val = parseQty(input.value);
+          if (val === null) {
+            showToast('PAR must be a non-negative number (halves are ok)', 'error');
             input.focus();
             return;
           }
@@ -744,11 +804,13 @@
         const currentStock = inventoryMap.get(productId)?.stock ?? 0;
         const originalHtml = cell.innerHTML;
 
+        const unit = parsePackSize(inventoryMap.get(productId)?.packSize).innerUnitLabel;
         cell.innerHTML = `<div class="stock-adj-wrap">
-          <input type="number" class="stock-adj-input" min="0" step="1" value="${currentStock}">
+          <input type="number" class="stock-adj-input" inputmode="decimal" min="0" step="any" value="${formatQty(currentStock)}">
           <button class="btn-stock-save">Save</button>
           <button class="btn-adj-cancel">&times;</button>
-        </div>`;
+        </div>
+        <span class="count-in">count in ${escapeHtml(unit)}</span>`;
 
         const input     = cell.querySelector('.stock-adj-input');
         const saveBtn   = cell.querySelector('.btn-stock-save');
@@ -762,9 +824,9 @@
         });
 
         async function doSave() {
-          const newVal = parseInt(input.value, 10);
-          if (isNaN(newVal) || newVal < 0) {
-            showToast('Enter a valid quantity', 'error');
+          const newVal = parseQty(input.value);
+          if (newVal === null) {
+            showToast('Enter a quantity in the count unit (halves are ok)', 'error');
             input.focus();
             return;
           }
@@ -798,6 +860,45 @@
           if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
           if (e.key === 'Escape') cancelBtn.click();
         });
+      });
+    }
+
+    // ── Edit name / pack / vendor / temperature ─────────────────────────────
+    function clearIngredientForm() {
+      editingProductId = null;
+      document.getElementById('new-ing-name').value = '';
+      const codeInput = document.getElementById('new-ing-code');
+      codeInput.value = '';
+      codeInput.readOnly = false;
+      document.getElementById('new-ing-pack').value = '';
+      document.getElementById('new-ing-vendor').value = '';
+      document.getElementById('new-ing-temp').checked = false;
+      document.getElementById('new-ing-submit-btn').textContent = 'Add Ingredient';
+      document.getElementById('new-ing-cancel-btn').hidden = true;
+      document.getElementById('new-ing-pack-preview').textContent = 'Count in: —';
+      updateNewIngBtn();
+    }
+
+    function wireEditBtn(btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const item = catalog.find((p) => p.id === btn.dataset.productId);
+        if (!item) return;
+        editingProductId = item.id;
+        document.getElementById('new-ing-name').value = item.name || '';
+        const codeInput = document.getElementById('new-ing-code');
+        codeInput.value = item.usFoodsCode || '';
+        codeInput.readOnly = true;
+        document.getElementById('new-ing-pack').value = item.packSize || '';
+        document.getElementById('new-ing-vendor').value = item.vendor || '';
+        document.getElementById('new-ing-temp').checked = item.requiresTemp === true;
+        document.getElementById('new-ing-submit-btn').textContent = 'Save changes';
+        document.getElementById('new-ing-submit-btn').disabled = false;
+        document.getElementById('new-ing-cancel-btn').hidden = false;
+        document.getElementById('new-ing-pack-preview').textContent = describePack(item.packSize || '');
+        const wrap = document.getElementById('new-ingredient-collapsible');
+        wrap.classList.add('collapsible-open');
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
     }
 
@@ -942,7 +1043,7 @@
 
     function updateQuickSubmitBtn() {
       const emp = document.getElementById('quick-employee').value.trim();
-      const qty = parseInt(document.getElementById('quick-quantity').value, 10);
+      const qty = parseFloat(document.getElementById('quick-quantity').value);
       document.getElementById('quick-submit-btn').disabled = !(emp && quickSelectedProduct && qty > 0);
     }
 
@@ -952,7 +1053,7 @@
     document.getElementById('quick-submit-btn').addEventListener('click', async () => {
       const btn = document.getElementById('quick-submit-btn');
       const usedBy   = document.getElementById('quick-employee').value.trim();
-      const quantity = parseInt(document.getElementById('quick-quantity').value, 10);
+      const quantity = parseFloat(document.getElementById('quick-quantity').value);
       const note     = document.getElementById('quick-note').value.trim();
       const now = new Date();
 
@@ -1003,15 +1104,15 @@
     });
 
     function updateSessAddBtn() {
-      const qty = parseInt(document.getElementById('sess-quantity').value, 10);
+      const qty = parseFloat(document.getElementById('sess-quantity').value);
       document.getElementById('sess-add-btn').disabled = !(sessionSelectedProduct && qty > 0);
     }
 
     document.getElementById('sess-quantity').addEventListener('input', updateSessAddBtn);
 
     document.getElementById('sess-add-btn').addEventListener('click', () => {
-      const qty = parseInt(document.getElementById('sess-quantity').value, 10);
-      if (!sessionSelectedProduct || qty <= 0) return;
+      const qty = parseFloat(document.getElementById('sess-quantity').value);
+      if (!sessionSelectedProduct || !(qty > 0)) return;
       sessionItems.push({ product: sessionSelectedProduct, quantity: qty });
       // Reset add-item inputs
       document.getElementById('sess-product-search').value = '';
@@ -1176,52 +1277,93 @@
     }
 
     document.getElementById('new-ing-name').addEventListener('input', updateNewIngBtn);
+    document.getElementById('new-ing-pack').addEventListener('input', () => {
+      document.getElementById('new-ing-pack-preview').textContent = describePack(document.getElementById('new-ing-pack').value);
+    });
+    document.getElementById('new-ing-cancel-btn').addEventListener('click', clearIngredientForm);
 
     document.getElementById('new-ing-submit-btn').addEventListener('click', async () => {
       const btn      = document.getElementById('new-ing-submit-btn');
       const name     = document.getElementById('new-ing-name').value.trim();
       let   code     = document.getElementById('new-ing-code').value.trim();
-      const packSize = document.getElementById('new-ing-pack').value.trim();
+      const packSize = normalizePack(document.getElementById('new-ing-pack').value);
+      const vendor   = document.getElementById('new-ing-vendor').value.trim();
+      const requiresTemp = document.getElementById('new-ing-temp').checked;
 
       if (!name) return;
-      if (!code) code = `custom-${Date.now()}`;
+
+      if (!editingProductId) {
+        if (!code) code = `custom-${Date.now()}`;
+        const clash = catalog.find((p) => p.usFoodsCode && codeKey(p.usFoodsCode) === codeKey(code));
+        if (clash) {
+          showToast(`${code} is already ${clash.name}. Use Edit on that row instead of adding a second one.`, 'error');
+          return;
+        }
+      }
 
       btn.disabled = true;
-      btn.textContent = 'Adding…';
+      btn.textContent = editingProductId ? 'Saving…' : 'Adding…';
       try {
-        await appendLog(RECEIVING_PATH, {
-          action:      'new_product',
-          productName: name,
-          usFoodsCode: code,
-          packSize,
-          timeStamp:   new Date().toISOString(),
-        });
+        if (editingProductId) {
+          await appendLog(RECEIVING_PATH, {
+            action: 'update_product',
+            productId: editingProductId,
+            productName: name,
+            packSize,
+            requiresTemp: String(requiresTemp),
+            vendor,
+            timeStamp: new Date().toISOString(),
+          });
+          const item = catalog.find((p) => p.id === editingProductId);
+          if (item) {
+            item.name = name;
+            item.orderName = name;
+            item.packSize = packSize;
+            item.requiresTemp = requiresTemp;
+            item.vendor = vendor;
+          }
+          const row = inventoryMap.get(editingProductId);
+          if (row) {
+            row.productName = name;
+            row.packSize = packSize;
+          }
+          renderTable();
+          showToast(`'${name}' updated`, 'success');
+          clearIngredientForm();
+        } else {
+          await appendLog(RECEIVING_PATH, {
+            action:      'new_product',
+            productName: name,
+            usFoodsCode: code,
+            packSize,
+            requiresTemp: String(requiresTemp),
+            vendor,
+            timeStamp:   new Date().toISOString(),
+          });
 
-        const newId = `new-${code}`;
-        // Optimistic local add — loadData() re-resolves from the log.
-        catalog = [...catalog, { id: newId, name, orderName: name, packSize, usFoodsCode: code, requiresTemp: false }];
-        inventoryMap.set(newId, {
-          productId:    newId,
-          productName:  name,
-          packSize,
-          stock:        0,
-          par:          null,
-          lastReceived: null,
-          lastUsed:     null,
-        });
+          const newId = `new-${code}`;
+          catalog = [...catalog, {
+            id: newId, name, orderName: name, packSize, usFoodsCode: code, requiresTemp, vendor,
+          }];
+          inventoryMap.set(newId, {
+            productId:    newId,
+            productName:  name,
+            packSize,
+            stock:        0,
+            par:          null,
+            lastReceived: null,
+            lastUsed:     null,
+          });
 
-        renderTable();
-        showToast(`'${name}' added to inventory`, 'success');
-
-        document.getElementById('new-ing-name').value = '';
-        document.getElementById('new-ing-code').value = '';
-        document.getElementById('new-ing-pack').value = '';
-        updateNewIngBtn();
+          renderTable();
+          showToast(`'${name}' added. ${describePack(packSize)}`, 'success');
+          clearIngredientForm();
+        }
       } catch (err) {
-        showToast('Failed to add ingredient: ' + (err.message || 'unknown error'), 'error');
+        showToast('Failed to save ingredient: ' + (err.message || 'unknown error'), 'error');
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Add Ingredient';
+        btn.textContent = editingProductId ? 'Save changes' : 'Add Ingredient';
         updateNewIngBtn();
       }
     });

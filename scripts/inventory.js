@@ -1874,8 +1874,10 @@ export function computeRecipeUsage({
     return skuAliases[k] || k;
   };
 
-  // productId -> date -> grams
-  const gramsByProductDate = {};
+  // One entry per batch, with the production row's timestamp, so a physical
+  // count can ignore batches made earlier that same day and still deduct
+  // batches made after the count.
+  const eventsByProduct = {};
   (Array.isArray(productionLogs) ? productionLogs : []).forEach((row) => {
     if (row.action !== 'shape_done' && row.action !== 'cheese_done') return;
     if (!row.date || row.date < since) return;
@@ -1888,27 +1890,61 @@ export function computeRecipeUsage({
       const mult = (Number(c.batches) || 0) * (SIZE_MULT[c.size || 'single'] || 1);
       if (!mult) return;
       Object.entries(recipe).forEach(([pid, grams]) => {
-        if (!gramsByProductDate[pid]) gramsByProductDate[pid] = {};
-        gramsByProductDate[pid][row.date] = (gramsByProductDate[pid][row.date] || 0) + grams * mult;
+        if (!grams) return;
+        if (!eventsByProduct[pid]) eventsByProduct[pid] = [];
+        eventsByProduct[pid].push({
+          date: row.date,
+          timeStamp: row.timeStamp || '',
+          grams: grams * mult,
+        });
       });
     });
   });
 
   const usageEntriesByProduct = {};
   const untracked = new Set();
-  Object.entries(gramsByProductDate).forEach(([pid, byDate]) => {
+  Object.entries(eventsByProduct).forEach(([pid, events]) => {
     const gpu = gramsPerStockUnit(packById[pid], densityMap[pid]);
-    const totalGrams = Object.values(byDate).reduce((s, g) => s + g, 0);
+    const totalGrams = events.reduce((s, e) => s + e.grams, 0);
     if (!(gpu > 0)) {
       if (totalGrams > 0) untracked.add(pid);
       return;
     }
-    usageEntriesByProduct[pid] = Object.entries(byDate)
-      .map(([date, grams]) => ({ date, units: grams / gpu }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    usageEntriesByProduct[pid] = events
+      .map((e) => ({ date: e.date, timeStamp: e.timeStamp, units: e.grams / gpu }))
+      .sort((a, b) => (a.timeStamp || a.date).localeCompare(b.timeStamp || b.date));
   });
 
   return { usageEntriesByProduct, untracked };
+}
+
+// Compare vendor codes with or without leading zeros (0877506 vs 877506).
+export function vendorCodeKey(code) {
+  const s = String(code || '').trim();
+  if (!s) return '';
+  const stripped = s.replace(/^0+/, '');
+  return stripped || s;
+}
+
+// Active-catalog id for a log productId.
+//   - An id that is already in the catalog stays put (including a real
+//     new-<code> product added from Receiving).
+//   - new-<code> that is NOT its own catalog row maps onto the catalog item
+//     with that vendor code. Old flour / cup / lid receives were logged as
+//     new-8091092, new-1851438, new-2939411 and showed up as extra rows.
+//   - Anything else (and an archived id, which is not in `catalog`) is
+//     dropped. Archiving the phantom row never removed it, because the row
+//     was invented here from the receive log rather than from the catalog.
+export function resolveStockProductId(rawId, catalog) {
+  const list = Array.isArray(catalog) ? catalog : [];
+  if (!rawId) return null;
+  if (list.some((p) => p && p.id === rawId)) return rawId;
+  const match = /^new-(.+)$/.exec(String(rawId));
+  if (!match) return null;
+  const key = vendorCodeKey(match[1]);
+  if (!key) return null;
+  const hit = list.find((p) => p && vendorCodeKey(p.usFoodsCode) === key);
+  return hit ? hit.id : null;
 }
 
 // The ingredient-inventory table state. Replaces the copy of computeInventory()
@@ -1948,12 +1984,15 @@ export function computeIngredientStock({
     });
   });
 
+  const idOf = (raw) => resolveStockProductId(raw, catalog);
+
   // Pass 1 — latest set_stock anchor per product (a physical count that
   // discards everything before it for that ingredient).
   (Array.isArray(inventoryLogs) ? inventoryLogs : []).forEach((r) => {
     if (r.action !== 'set_stock' || !r.productId) return;
-    seed(r.productId);
-    const row = map.get(r.productId);
+    const id = idOf(r.productId);
+    if (!id || !map.has(id)) return;
+    const row = map.get(id);
     const ts = r.timeStamp || '';
     if (ts >= row._anchorTs) {
       row._anchorTs = ts;
@@ -1962,11 +2001,12 @@ export function computeIngredientStock({
     }
   });
 
-  // Pass 2 — receiving after the anchor.
+  // Pass 2 — receiving after the anchor. Unknown ids are not seeded.
   (Array.isArray(receivingLogs) ? receivingLogs : []).forEach((r) => {
     if (r.action !== 'receive' || !r.productId) return;
-    seed(r.productId, map.has(r.productId) ? null : { productName: r.productName || r.productId, packSize: r.packSize || '' });
-    const row = map.get(r.productId);
+    const id = idOf(r.productId);
+    if (!id || !map.has(id)) return;
+    const row = map.get(id);
     if ((r.timeStamp || '') <= row._anchorTs) return;
     const parts = String(r.packSize || '').split('/');
     row.stock += parts.length >= 3 && parseFloat(parts[0]) > 0 ? parseFloat(parts[0]) : 1;
@@ -1975,8 +2015,9 @@ export function computeIngredientStock({
 
   // Pass 3 — manual use / adjust after the anchor; par any time.
   (Array.isArray(inventoryLogs) ? inventoryLogs : []).forEach((r) => {
-    if (!r.productId || !map.has(r.productId)) return;
-    const row = map.get(r.productId);
+    const id = idOf(r.productId);
+    if (!id || !map.has(id)) return;
+    const row = map.get(id);
     if (r.action === 'par') {
       const v = Number(r.par);
       if (!Number.isNaN(v)) row.par = v;
@@ -1995,9 +2036,18 @@ export function computeIngredientStock({
   Object.entries(usageEntriesByProduct).forEach(([pid, entries]) => {
     if (!map.has(pid)) return;
     const row = map.get(pid);
-    const cut = row._anchorDate > since ? row._anchorDate : since;
     entries.forEach((e) => {
-      if (e.date <= cut) return;
+      // On or before the day recipe draw-down shipped: never deduct.
+      if (!e.date || e.date <= since) return;
+      if (row._anchorTs) {
+        if (e.timeStamp) {
+          if (e.timeStamp <= row._anchorTs) return;
+        } else if (e.date <= row._anchorDate) {
+          // Undated same-day batches stay out — we can't tell if they were
+          // already in the count.
+          return;
+        }
+      }
       row.stock -= e.units;
       if (!row.lastUsed || e.date > row.lastUsed) row.lastUsed = e.date;
     });

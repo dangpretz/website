@@ -74,6 +74,8 @@
     /* Ingredient blocks (stacked layout) */
     .recipe-ing-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
     .ing-block { background: #252525; border-radius: 6px; padding: 10px 12px; }
+    .ing-block.archived { outline: 1px solid #a60; }
+    .ing-archived { font: 600 11px/1.4 'Manrope', sans-serif; color: #e6b45a; margin-bottom: 6px; }
     .ing-block-header { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
     .ing-block-name { font: 400 13px/1.3 'Manrope', sans-serif; color: #ccc; flex: 1; }
     .ing-block-pack { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; flex-shrink: 0; }
@@ -195,7 +197,7 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
-    import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
     import { resolveRecipes, readRecipeLineGrams, planRecipeWrites, writeLogRows } from '../../scripts/inventory.js?v=dpclog';
 
     const RECIPES_PATH   = '/dangpretz/recipes';
@@ -221,7 +223,8 @@
 
     // ── Product catalog — the shared ingredient list (scripts/ingredient-catalog.js),
     //    with the live receiving log applied. Filled in init().
-    let PRODUCTS = [];
+    let PRODUCTS = []; // active catalog — the add-ingredient dropdown
+    let BY_ID = {};    // active + archived, so a hidden recipe line can be shown and zeroed
 
     // ── Utilities ────────────────────────────────────────────────────────────
     function escapeHtml(s) {
@@ -281,7 +284,11 @@
       const densityHtml = isGal
         ? `<div class="density-row" style="margin-top:8px"><label class="density-label">g per ${innerUnitLabel}:</label><input type="number" class="density-input" data-product-id="${escapeHtml(p.id)}" value="${densityMap[p.id] || ''}" placeholder="e.g. 3785" min="1" step="1"></div>`
         : '';
-      return `<div class="ing-block" data-product-id="${escapeHtml(p.id)}">
+      const archivedNote = p.archived
+        ? '<div class="ing-archived">Archived — set grams to 0, or ×, then Save. That removes it from the recipe.</div>'
+        : '';
+      return `<div class="ing-block${p.archived ? ' archived' : ''}" data-product-id="${escapeHtml(p.id)}">
+          ${archivedNote}
           <div class="ing-block-header">
             <button class="btn-remove-ing" title="Remove">×</button>
             <span class="ing-block-name">${escapeHtml(p.name)}</span>
@@ -300,6 +307,25 @@
         </div>`;
     }
 
+    function linesForRecipe(recipe) {
+      const shown = [];
+      const seen = new Set();
+      PRODUCTS.forEach((p) => {
+        if (Number(recipe[p.id]) > 0) {
+          shown.push(p);
+          seen.add(p.id);
+        }
+      });
+      Object.keys(recipe || {}).forEach((id) => {
+        if (seen.has(id) || !(Number(recipe[id]) > 0)) return;
+        const known = BY_ID[id];
+        shown.push(known
+          ? { ...known, archived: true }
+          : { id, name: id, packSize: '', archived: true });
+      });
+      return shown;
+    }
+
     function buildSkuCard(sku) {
       const scale = scaleMap[sku] || {};
       const ppt = scale.pretzelsPerTray || '';
@@ -307,12 +333,12 @@
       const ppb = (ppt && tpb) ? String(ppt * tpb) : '';
 
       const recipe = recipeMap[sku] || {};
-      const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
+      const hasAny = Object.keys(recipe).some((id) => Number(recipe[id]) > 0) || ppt || tpb;
 
-      // Only render blocks for ingredients already in the recipe
-      const ingRows = PRODUCTS
-        .filter((p) => recipe[p.id] != null)
-        .map((p) => buildIngBlockHtml(p, recipe[p.id] != null ? recipe[p.id] : '', ppt, tpb))
+      // Positive lines only. Archived ingredients stay visible so they can be
+      // zeroed — hiding them was why basil could not be removed.
+      const ingRows = linesForRecipe(recipe)
+        .map((p) => buildIngBlockHtml(p, recipe[p.id], ppt, tpb))
         .join('');
 
       return `<div class="sku-card${hasAny ? ' expanded' : ''}" data-sku="${escapeHtml(sku)}">
@@ -381,7 +407,7 @@
         card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
           const val       = parseFloat(inp.value);
           const productId = inp.dataset.productId;
-          const product   = PRODUCTS.find((p) => p.id === productId);
+          const product   = BY_ID[productId];
           const block     = inp.closest('.ing-block');
           const perTrayEl    = block.querySelector('.per-tray');
           const perPretzelEl = block.querySelector('.per-pretzel');
@@ -417,7 +443,7 @@
           densInp.addEventListener('input', () => {
             const pid = densInp.dataset.productId;
             const gpu = parseFloat(densInp.value) || 0;
-            const product = PRODUCTS.find((p) => p.id === pid);
+            const product = BY_ID[pid];
             if (!product) return;
             const { innerUnitLabel } = parsePackSize(product.packSize);
             const purchaseEl = block.querySelector('.purchase-units');
@@ -566,7 +592,7 @@
         }
         const failedNames = failures.map((f) => {
           if (f.row.action === 'sku_scale') return 'batch size';
-          const product = PRODUCTS.find((p) => p.id === f.row.productId);
+          const product = BY_ID[f.row.productId];
           const name = product ? product.name : (f.row.productId || f.row.action);
           return f.row.action === 'ingredient_density' ? `${name} density` : name;
         });
@@ -600,7 +626,7 @@
         const recipe = recipeMap[sku] || {};
 
         // Only show ingredients that have a value set
-        const usedIngredients = PRODUCTS.filter((p) => recipe[p.id] != null && recipe[p.id] > 0);
+        const usedIngredients = linesForRecipe(recipe);
 
         const ingRows = usedIngredients.map((p) => {
           const { innerUnitLabel, gramsPerInnerUnit } = parsePackSize(p.packSize);
@@ -610,7 +636,7 @@
           const perPret  = (perBatch != null && ppb && ppb !== '—')    ? fmt2(perBatch / ppb) : '—';
           const purchase = gpu ? fmtPurchaseUnits(perBatch, gpu, innerUnitLabel) : '—';
           return `<tr>
-            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.name)}${p.archived ? ' <span style="color:#e6b45a">(archived)</span>' : ''}</td>
             <td class="num">${fmt2(perBatch)}g</td>
             <td class="num">${perTray}${perTray !== '—' ? 'g' : ''}</td>
             <td class="num">${perPret}${perPret !== '—' ? 'g' : ''}</td>
@@ -679,7 +705,12 @@
           fetchLog(RECIPES_PATH),
           fetchLog(RECEIVING_PATH),
         ]);
-        PRODUCTS = resolveIngredients(Array.isArray(receivingLogs) ? receivingLogs : []);
+        const receiving = Array.isArray(receivingLogs) ? receivingLogs : [];
+        const all = resolveIngredients(receiving, { includeArchived: true });
+        PRODUCTS = resolveIngredients(receiving);
+        const activeIds = new Set(PRODUCTS.map((p) => p.id));
+        BY_ID = {};
+        all.forEach((p) => { BY_ID[p.id] = activeIds.has(p.id) ? p : { ...p, archived: true }; });
         ({ scaleMap, recipeMap, densityMap } = resolveRecipes(Array.isArray(recipeLogs) ? recipeLogs : []));
         const defined = SKUS.filter((s) => recipeMap[s] && Object.keys(recipeMap[s]).length > 0).length;
         setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined · ${PRODUCTS.length} ingredients available`);

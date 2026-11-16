@@ -179,14 +179,11 @@
 
 
     /* ── Mobile ── */
+    .count-in { display: block; font: 600 10px 'Manrope', sans-serif; color: #999; }
     @media (max-width: 640px) {
-      /* Forecast table: hide Expected Use (4), PAR (6), Unit (2) — keep Ingredient, In Stock, Projected, Status */
-      .forecast-table th:nth-child(2),
-      .forecast-table td:nth-child(2),
+      /* Keep Unit, Stock, PAR, and Status. Hide Expected Use to fit a phone. */
       .forecast-table th:nth-child(4),
-      .forecast-table td:nth-child(4),
-      .forecast-table th:nth-child(6),
-      .forecast-table td:nth-child(6) { display: none; }
+      .forecast-table td:nth-child(4) { display: none; }
     }
   </style>
 </head>
@@ -263,8 +260,8 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
-    import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
-    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
+    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js?v=dpclog';
 
     const DELIVERY_PATH   = '/dangpretz/delivery-planner';
     const RECEIVING_PATH  = '/dangpretz/receiving';
@@ -563,10 +560,6 @@
 
       // Wire PAR edit buttons
       tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
-      // Wire stock adjustment buttons
-      tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
-
-      // Wire stock adj buttons
       tbody.querySelectorAll('.btn-stock-adj').forEach(wireStockAdj);
 
       statusEl.hidden = true;
@@ -698,11 +691,13 @@
         const currentPar = row?.par ?? '';
         const originalHtml = cell.innerHTML;
 
+        const unit = parsePackSize(row?.packSize).innerUnitLabel;
         cell.innerHTML = `<div class="par-edit-wrap">
-          <input type="number" class="par-edit-input" min="0" step="1" value="${currentPar}" placeholder="0">
+          <input type="number" class="par-edit-input" inputmode="decimal" min="0" step="any" value="${currentPar}" placeholder="0">
           <button class="btn-par-save">Save</button>
           <button class="btn-par-cancel">&times;</button>
-        </div>`;
+        </div>
+        <span class="count-in">count in ${escapeHtml(unit)}</span>`;
 
         const input     = cell.querySelector('.par-edit-input');
         const saveBtn   = cell.querySelector('.btn-par-save');
@@ -717,8 +712,8 @@
         });
 
         async function doSave() {
-          const val = parseInt(input.value, 10);
-          if (isNaN(val) || val < 0) { showToast('PAR must be a non-negative whole number', 'error'); input.focus(); return; }
+          const val = parseFloat(input.value);
+          if (Number.isNaN(val) || val < 0) { showToast('PAR must be a non-negative number (halves are ok)', 'error'); input.focus(); return; }
           saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
           try {
             await appendLog(INVENTORY_PATH, {
@@ -754,11 +749,13 @@
         const currentStock = inventoryMap.get(productId)?.stock ?? 0;
         const originalHtml = cell.innerHTML;
 
+        const unit = parsePackSize(inventoryMap.get(productId)?.packSize).innerUnitLabel;
         cell.innerHTML = `<div class="stock-adj-wrap">
-          <input type="number" class="stock-adj-input" min="0" step="1" value="${currentStock}">
+          <input type="number" class="stock-adj-input" inputmode="decimal" min="0" step="any" value="${currentStock}">
           <button class="btn-stock-save">Save</button>
           <button class="btn-adj-cancel">&times;</button>
-        </div>`;
+        </div>
+        <span class="count-in">count in ${escapeHtml(unit)}</span>`;
 
         const input     = cell.querySelector('.stock-adj-input');
         const saveBtn   = cell.querySelector('.btn-stock-save');
@@ -773,22 +770,23 @@
         });
 
         async function doSave() {
-          const newVal = parseInt(input.value, 10);
-          if (isNaN(newVal) || newVal < 0) {
-            showToast('Enter a valid quantity', 'error');
+          const newVal = parseFloat(input.value);
+          if (Number.isNaN(newVal) || newVal < 0) {
+            showToast('Enter a quantity in the count unit (halves are ok)', 'error');
             input.focus();
             return;
           }
-          const delta = newVal - currentStock;
           saveBtn.disabled = true;
           saveBtn.textContent = 'Saving…';
           try {
+            const now = new Date().toISOString();
             await appendLog(INVENTORY_PATH, {
-              action:    'adjust',
+              action:    'set_stock',
               productId,
-              quantity:  String(delta),
-              timeStamp: new Date().toISOString(),
-              note:      'inline stock set',
+              quantity:  String(newVal),
+              date:      now.slice(0, 10),
+              timeStamp: now,
+              note:      'physical count',
             });
             if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
             forecastMap = computeForecast(resolveDeliveries(allDeliveryLogs), recipeMap, scaleMap, inventoryMap, densityMap);

@@ -84,11 +84,11 @@ export const INGREDIENT_CATALOG = [
   { id: 'usf-7329113', name: 'Mayonnaise', orderName: 'Mayonnaise, Heavy Plastic Jug Shelf Stable', packSize: '4/1/GAL', usFoodsCode: '7329113', requiresTemp: false, par: 4 },
   { id: 'usf-4364063', name: 'Mustard', orderName: 'Mustard, Yellow Plastic Jar Shelf Stable', packSize: '4/1/GAL', usFoodsCode: '4364063', requiresTemp: false, par: 4 },
   { id: 'usf-7330202', name: 'Mustard, Whole Grain', orderName: 'Mustard, Dijon Whole Grain Can', packSize: '1/8.6/LB', usFoodsCode: '7330202', requiresTemp: false, par: 1 },
-  { id: 'usf-7634157', name: 'Napkin, Dinner', packSize: '30/160/CT', usFoodsCode: '7634157', requiresTemp: false, par: 8 },
+  { id: 'usf-7634157', name: 'Napkin, Dinner', packSize: '20/150/CT', usFoodsCode: '7634157', requiresTemp: false, par: 8 },
   { id: 'amz-packing-tape', name: 'Packing Tape', packSize: '', requiresTemp: false, par: 4 },
   { id: 'usf-9929174', name: 'Pepper, Fresno', orderName: 'Pepper, Jalapeno #1 Fresh', packSize: '1/5/LB', usFoodsCode: '9929174', requiresTemp: true, par: 3 },
   { id: 'usf-3547205', name: 'Pepper, Jalapeno', orderName: 'Pepper, Chili, Fresno Red Fresh', packSize: '1/10/LB', usFoodsCode: '3547205', requiresTemp: true, par: 2 },
-  { id: 'sysco-7110280', name: 'Pepperoni, Diced', packSize: '2/5/LB', requiresTemp: false, par: 2 },
+  { id: 'sysco-7110280', name: 'Pepperoni, Diced', packSize: '1/10/LB', requiresTemp: false, par: 2 },
   { id: 'sysco-7293935', name: 'Pepperoni, Sliced', packSize: '2/12.5/LB', requiresTemp: false, par: 1 },
   { id: 'sysco-portion-cup-2oz', name: 'Portion Cup, 2 oz', packSize: '12/200/CT', requiresTemp: false, par: 0 },
   { id: 'sysco-portion-cup-2oz-l', name: 'Portion Cup, 2 oz Lids', packSize: '24/100/CT', requiresTemp: false, par: 0 },
@@ -110,9 +110,9 @@ export const INGREDIENT_CATALOG = [
   { id: 'amz-soda-can-ddpepper', name: 'Soda Cans, Diet Dr. Pepper', packSize: '1/12/EA', requiresTemp: false, par: 6 },
   { id: 'amz-soda-can-dpepper', name: 'Soda Cans, Dr. Pepper', packSize: '1/12/EA', requiresTemp: false, par: 6 },
   { id: 'amz-soda-can-sprite', name: 'Soda Cans, Sprite', packSize: '1/12/EA', requiresTemp: false, par: 6 },
-  { id: 'amz-sodium-citrate', name: 'Sodium Citrate', packSize: '1/8/LB', requiresTemp: false, par: 1 },
+  { id: 'amz-sodium-citrate', name: 'Sodium Citrate', packSize: '1/2/LB', requiresTemp: false, par: 1 },
   { id: 'amz-soup-liner', name: 'Soup Liner Bag Rolls', packSize: '', requiresTemp: false, par: 0 },
-  { id: 'usf-7635246', name: 'Sour Cream', packSize: '2/5/LB', usFoodsCode: '7635246', requiresTemp: false, par: 3 },
+  { id: 'usf-7635246', name: 'Sour Cream', packSize: '2/5/LB', usFoodsCode: '7635246', requiresTemp: true, par: 3 },
   { id: 'usf-760876', name: 'Spice, Cinnamon, Ground', packSize: '3/5/LB', usFoodsCode: '760876', requiresTemp: false, par: 1 },
   { id: 'usf-760884', name: 'Spice, Garlic, Powder', packSize: '1/6/LB', usFoodsCode: '760884', requiresTemp: false, par: 1 },
   { id: 'usf-760991', name: 'Spice, Italian Seasoning', packSize: '1/28/OZ', usFoodsCode: '760991', requiresTemp: false, par: 1 },
@@ -127,13 +127,13 @@ export const INGREDIENT_CATALOG = [
   { id: 'usf-7016876', name: 'Sugar, Powdered', orderName: 'Sugar, Powdered Confectionary', packSize: '1/50/LB', usFoodsCode: '7016876', requiresTemp: false, par: 1 },
   { id: 'usf-3733821', name: 'Toilet Paper', packSize: '80/500/CT', usFoodsCode: '3733821', requiresTemp: false, par: 30 },
   { id: 'usf-8609075', name: 'Towel, Multifold', packSize: '16/250/EA', usFoodsCode: '8609075', requiresTemp: false, par: 16 },
-  { id: 'usf-5329420', name: 'Trash Bags', orderName: 'Liner, 60 Gal', packSize: '100/60/GAL', usFoodsCode: '5329420', requiresTemp: false, par: 100 },
+  { id: 'usf-5329420', name: 'Trash Bags', orderName: 'Liner, 60 Gal', packSize: '100/1/EA', usFoodsCode: '5329420', requiresTemp: false, par: 100 },
   { id: 'amz-twist-ties', name: 'Twist Ties', packSize: '', requiresTemp: false, par: 1 },
   { id: 'amz-vac-bag-large', name: 'Vacuum Seal Bags, Large', packSize: '', requiresTemp: false, par: 400 },
   { id: 'amz-vac-bag-small', name: 'Vacuum Seal Bags, Small', packSize: '', requiresTemp: false, par: 1500 },
   { id: 'amz-vac-roll-wide', name: 'Vacuum Seal Rolls, Wide', packSize: '1/3/roll', requiresTemp: false, par: 5 },
   { id: 'usf-761346', name: 'Vanilla Flavoring', packSize: '1/1/GAL', usFoodsCode: '761346', requiresTemp: false, par: 1 },
-  { id: 'sysco-wrap-paper', name: 'Wrap Paper 12 x 12', packSize: '1/1000/CT', requiresTemp: false, par: 1000 },
+  { id: 'sysco-wrap-paper', name: 'Wrap Paper 12x12 (Eastern Packaging)', packSize: '1/1000/CT', requiresTemp: false, par: 1000 },
   { id: 'usf-3022647', name: 'Yeast', orderName: 'Yeast, Dry Active', packSize: '20/1/LB', usFoodsCode: '3022647', requiresTemp: false, par: 27 },
 
   // ── Recipe ingredients not previously stocked as their own line (2026-09,
@@ -180,7 +180,12 @@ export function resolveIngredients(receivingLogs, { includeArchived = false } = 
   const drop = (id) => !includeArchived && archived.has(id);
 
   const out = INGREDIENT_CATALOG.filter((p) => !drop(p.id)).map((p) => ({ ...p }));
-  const haveCode = new Set(out.map((p) => p.usFoodsCode).filter(Boolean));
+  const codeKey = (code) => {
+    const s = String(code || '').trim();
+    if (!s) return '';
+    return s.replace(/^0+/, '') || s;
+  };
+  const haveCode = new Set(out.map((p) => codeKey(p.usFoodsCode)).filter(Boolean));
   const haveId = new Set(out.map((p) => p.id));
 
   logs.filter((r) => r.action === 'new_product').forEach((r) => {
@@ -190,9 +195,13 @@ export function resolveIngredients(receivingLogs, { includeArchived = false } = 
     const code = r.usFoodsCode || r.barcode || '';
     if (!code || !r.productName) return;
     const id = `new-${code}`;
-    if (drop(id) || haveId.has(id) || haveCode.has(code)) return;
+    const key = codeKey(code);
+    // An archived code can be added again (the old row was dropped above).
+    // A code that is still active — with or without leading zeros — cannot,
+    // or Receiving grows a second flour / cup / lid row.
+    if (drop(id) || haveId.has(id) || (key && haveCode.has(key))) return;
     haveId.add(id);
-    haveCode.add(code);
+    if (key) haveCode.add(key);
     out.push({
       id,
       name: r.productName,
@@ -201,7 +210,24 @@ export function resolveIngredients(receivingLogs, { includeArchived = false } = 
       usFoodsCode: code,
       requiresTemp: r.requiresTemp === true || r.requiresTemp === 'true',
       ...(r.barcode && !r.usFoodsCode ? { barcode: r.barcode } : {}),
+      ...(r.vendor ? { vendor: r.vendor } : {}),
     });
+  });
+
+  // Last update_product per id overrides name, pack, temperature, and vendor
+  // on a hardcoded row. The id does not change — recipes and stock point at it.
+  logs.forEach((r) => {
+    if (r.action !== 'update_product' || !r.productId) return;
+    const item = out.find((p) => p.id === r.productId);
+    if (!item) return;
+    if (r.productName) {
+      item.name = r.productName;
+      item.orderName = r.orderName || r.productName;
+    } else if (r.orderName) item.orderName = r.orderName;
+    if (r.packSize) item.packSize = r.packSize;
+    if (r.requiresTemp === true || r.requiresTemp === 'true') item.requiresTemp = true;
+    if (r.requiresTemp === false || r.requiresTemp === 'false') item.requiresTemp = false;
+    if (r.vendor) item.vendor = r.vendor;
   });
 
   return out.sort((a, b) => a.name.localeCompare(b.name));
