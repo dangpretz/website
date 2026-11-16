@@ -378,10 +378,14 @@
     // select only matters when its checkbox is checked — collectLinksFromGrid
     // skips unchecked rows entirely — but is disabled visually too so it
     // doesn't look like an active, meaningful control while unchecked.
+    // Links always display A→Z by label (the catalog's own order is just
+    // the order pages were added in).
+    const LINKS_BY_LABEL = [...LINK_CATALOG].sort((a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' }));
+
     function linksGridHtml(entry, namePrefix) {
       const checkedLinks = (entry && entry.links) || [];
       const levels = (entry && entry.levels) || {};
-      return LINK_CATALOG.map((l) => {
+      return LINKS_BY_LABEL.map((l) => {
         const checked = checkedLinks.includes(l.key);
         const level = levels[l.key] === ACCESS_VIEW ? ACCESS_VIEW : ACCESS_EDIT;
         return `
@@ -508,7 +512,7 @@
       const grid = document.getElementById('link-grid');
       const empty = document.getElementById('empty-state');
       const links = (currentSession && currentSession.links) || [];
-      const entries = LINK_CATALOG.filter((l) => links.includes(l.key));
+      const entries = LINKS_BY_LABEL.filter((l) => links.includes(l.key));
       if (!entries.length) {
         grid.hidden = true;
         empty.hidden = false;
