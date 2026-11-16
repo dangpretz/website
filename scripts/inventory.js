@@ -4,6 +4,7 @@
    no-plusplus,
    no-continue,
    no-restricted-syntax,
+   no-await-in-loop,
    max-len
 */
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -1702,6 +1703,158 @@ export function resolveRecipes(recipeLogs) {
   return { scaleMap, recipeMap, densityMap };
 }
 
+function waitMs(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+function sameNumber(a, b) {
+  const na = Number(a);
+  const nb = Number(b);
+  return !Number.isNaN(na) && !Number.isNaN(nb) && na === nb;
+}
+
+// Grams the Save button should trust. A focused number input on mobile can
+// still report "" when the button's click runs, even after the cook typed a
+// value — the input events already saw it, so `tracked` (productId → last
+// typed string) fills that gap. A non-empty DOM value always wins.
+export function readRecipeLineGrams(domLines, tracked = {}) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(domLines) ? domLines : []).forEach((line) => {
+    if (!line || !line.productId || seen.has(line.productId)) return;
+    seen.add(line.productId);
+    const domValue = line.value == null ? '' : String(line.value).trim();
+    const remembered = Object.hasOwn(tracked, line.productId) ? tracked[line.productId] : undefined;
+    let grams = domValue;
+    if (grams === '' && remembered != null) grams = String(remembered).trim();
+    out.push({ productId: line.productId, grams });
+  });
+  return out;
+}
+
+// Rows to append for one Save Recipe click.
+//   - New or edited lines only. Re-posting every flour/water/yeast line is
+//     what made the logger 500 under a burst of parallel writes, and a
+//     rejected line never appeared in the log (the new cheese line vanished
+//     on reload).
+//   - Lines the cook explicitly removed are written as 0. Lines that are
+//     simply not on screen (archived ingredients the editor hid) are left
+//     alone — treating "not in the DOM" as delete would wipe them on every save.
+//   - Blank new lines are not written.
+export function planRecipeWrites({
+  sku,
+  previousRecipe = {},
+  previousScale = null,
+  previousDensity = {},
+  pretzelsPerTray,
+  traysPerBatch,
+  lines = [],
+  removedProductIds = [],
+  densities = [],
+  timeStamp,
+  updatedBy = '',
+} = {}) {
+  const writes = [];
+  const seen = new Set();
+
+  (Array.isArray(lines) ? lines : []).forEach((line) => {
+    if (!line || !line.productId || seen.has(line.productId)) return;
+    seen.add(line.productId);
+    const grams = parseFloat(line.grams);
+    const prevRaw = Object.hasOwn(previousRecipe, line.productId) ? previousRecipe[line.productId] : null;
+    const prevNum = prevRaw == null || prevRaw === '' ? null : Number(prevRaw);
+    if (Number.isNaN(grams) || grams < 0) {
+      // Cleared field on a line that used to have grams → retire it.
+      if (prevNum != null && prevNum !== 0) {
+        writes.push({
+          action: 'recipe_v2', sku, productId: line.productId, gramsPerBatch: '0', timeStamp, updatedBy,
+        });
+      }
+      return;
+    }
+    if (grams === 0 && (prevNum == null || prevNum === 0)) return;
+    if (prevNum != null && prevNum === grams) return;
+    writes.push({
+      action: 'recipe_v2', sku, productId: line.productId, gramsPerBatch: String(grams), timeStamp, updatedBy,
+    });
+  });
+
+  (Array.isArray(removedProductIds) ? removedProductIds : []).forEach((productId) => {
+    if (!productId || seen.has(productId)) return;
+    const prevNum = Number(previousRecipe[productId]);
+    if (Number.isNaN(prevNum) || prevNum === 0) return;
+    seen.add(productId);
+    writes.push({
+      action: 'recipe_v2', sku, productId, gramsPerBatch: '0', timeStamp, updatedBy,
+    });
+  });
+
+  const ppt = Number(pretzelsPerTray);
+  const tpb = Number(traysPerBatch);
+  const scaleOk = ppt > 0 && tpb > 0;
+  const scaleChanged = !previousScale
+    || !sameNumber(previousScale.pretzelsPerTray, ppt)
+    || !sameNumber(previousScale.traysPerBatch, tpb);
+  if (scaleOk && scaleChanged) {
+    writes.push({
+      action: 'sku_scale',
+      sku,
+      pretzelsPerTray: String(ppt),
+      traysPerBatch: String(tpb),
+      timeStamp,
+      updatedBy,
+    });
+  }
+
+  (Array.isArray(densities) ? densities : []).forEach((d) => {
+    if (!d || !d.productId) return;
+    const v = parseFloat(d.gramsPerInnerUnit);
+    if (Number.isNaN(v) || v <= 0) return;
+    if (sameNumber(previousDensity[d.productId], v)) return;
+    writes.push({
+      action: 'ingredient_density',
+      productId: d.productId,
+      gramsPerInnerUnit: String(v),
+      timeStamp,
+      updatedBy,
+    });
+  });
+
+  return writes;
+}
+
+// One row at a time. Parallel POSTs to the log worker return HTTP 500 for
+// some of the batch while others land, and Promise.all then reports the
+// whole save as failed. Retries the failed row before moving on, and keeps
+// going so one bad line doesn't drop the rest. Returns the rows that still
+// failed after retries: { row, error }.
+export async function writeLogRows(appendLog, logpath, rows, options = {}) {
+  const retries = options.retries == null ? 2 : options.retries;
+  const delayMs = options.delayMs == null ? 250 : options.delayMs;
+  const failures = [];
+  const list = Array.isArray(rows) ? rows : [];
+
+  async function writeOne(row, attempt) {
+    try {
+      await appendLog(logpath, row);
+      return null;
+    } catch (err) {
+      if (attempt >= retries) return err;
+      if (delayMs > 0) await waitMs(delayMs * (attempt + 1));
+      return writeOne(row, attempt + 1);
+    }
+  }
+
+  let index = 0;
+  while (index < list.length) {
+    const row = list[index];
+    index += 1;
+    const error = await writeOne(row, 0);
+    if (error) failures.push({ row, error });
+  }
+  return failures;
+}
+
 const SIZE_MULT = { single: 1, double: 2, triple: 3 };
 
 // Recipe consumption from the production log. Returns per-product usage as
@@ -1721,8 +1874,10 @@ export function computeRecipeUsage({
     return skuAliases[k] || k;
   };
 
-  // productId -> date -> grams
-  const gramsByProductDate = {};
+  // One entry per batch, with the production row's timestamp, so a physical
+  // count can ignore batches made earlier that same day and still deduct
+  // batches made after the count.
+  const eventsByProduct = {};
   (Array.isArray(productionLogs) ? productionLogs : []).forEach((row) => {
     if (row.action !== 'shape_done' && row.action !== 'cheese_done') return;
     if (!row.date || row.date < since) return;
@@ -1735,27 +1890,61 @@ export function computeRecipeUsage({
       const mult = (Number(c.batches) || 0) * (SIZE_MULT[c.size || 'single'] || 1);
       if (!mult) return;
       Object.entries(recipe).forEach(([pid, grams]) => {
-        if (!gramsByProductDate[pid]) gramsByProductDate[pid] = {};
-        gramsByProductDate[pid][row.date] = (gramsByProductDate[pid][row.date] || 0) + grams * mult;
+        if (!grams) return;
+        if (!eventsByProduct[pid]) eventsByProduct[pid] = [];
+        eventsByProduct[pid].push({
+          date: row.date,
+          timeStamp: row.timeStamp || '',
+          grams: grams * mult,
+        });
       });
     });
   });
 
   const usageEntriesByProduct = {};
   const untracked = new Set();
-  Object.entries(gramsByProductDate).forEach(([pid, byDate]) => {
+  Object.entries(eventsByProduct).forEach(([pid, events]) => {
     const gpu = gramsPerStockUnit(packById[pid], densityMap[pid]);
-    const totalGrams = Object.values(byDate).reduce((s, g) => s + g, 0);
+    const totalGrams = events.reduce((s, e) => s + e.grams, 0);
     if (!(gpu > 0)) {
       if (totalGrams > 0) untracked.add(pid);
       return;
     }
-    usageEntriesByProduct[pid] = Object.entries(byDate)
-      .map(([date, grams]) => ({ date, units: grams / gpu }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    usageEntriesByProduct[pid] = events
+      .map((e) => ({ date: e.date, timeStamp: e.timeStamp, units: e.grams / gpu }))
+      .sort((a, b) => (a.timeStamp || a.date).localeCompare(b.timeStamp || b.date));
   });
 
   return { usageEntriesByProduct, untracked };
+}
+
+// Compare vendor codes with or without leading zeros (0877506 vs 877506).
+export function vendorCodeKey(code) {
+  const s = String(code || '').trim();
+  if (!s) return '';
+  const stripped = s.replace(/^0+/, '');
+  return stripped || s;
+}
+
+// Active-catalog id for a log productId.
+//   - An id that is already in the catalog stays put (including a real
+//     new-<code> product added from Receiving).
+//   - new-<code> that is NOT its own catalog row maps onto the catalog item
+//     with that vendor code. Old flour / cup / lid receives were logged as
+//     new-8091092, new-1851438, new-2939411 and showed up as extra rows.
+//   - Anything else (and an archived id, which is not in `catalog`) is
+//     dropped. Archiving the phantom row never removed it, because the row
+//     was invented here from the receive log rather than from the catalog.
+export function resolveStockProductId(rawId, catalog) {
+  const list = Array.isArray(catalog) ? catalog : [];
+  if (!rawId) return null;
+  if (list.some((p) => p && p.id === rawId)) return rawId;
+  const match = /^new-(.+)$/.exec(String(rawId));
+  if (!match) return null;
+  const key = vendorCodeKey(match[1]);
+  if (!key) return null;
+  const hit = list.find((p) => p && vendorCodeKey(p.usFoodsCode) === key);
+  return hit ? hit.id : null;
 }
 
 // The ingredient-inventory table state. Replaces the copy of computeInventory()
@@ -1795,12 +1984,15 @@ export function computeIngredientStock({
     });
   });
 
+  const idOf = (raw) => resolveStockProductId(raw, catalog);
+
   // Pass 1 — latest set_stock anchor per product (a physical count that
   // discards everything before it for that ingredient).
   (Array.isArray(inventoryLogs) ? inventoryLogs : []).forEach((r) => {
     if (r.action !== 'set_stock' || !r.productId) return;
-    seed(r.productId);
-    const row = map.get(r.productId);
+    const id = idOf(r.productId);
+    if (!id || !map.has(id)) return;
+    const row = map.get(id);
     const ts = r.timeStamp || '';
     if (ts >= row._anchorTs) {
       row._anchorTs = ts;
@@ -1809,11 +2001,12 @@ export function computeIngredientStock({
     }
   });
 
-  // Pass 2 — receiving after the anchor.
+  // Pass 2 — receiving after the anchor. Unknown ids are not seeded.
   (Array.isArray(receivingLogs) ? receivingLogs : []).forEach((r) => {
     if (r.action !== 'receive' || !r.productId) return;
-    seed(r.productId, map.has(r.productId) ? null : { productName: r.productName || r.productId, packSize: r.packSize || '' });
-    const row = map.get(r.productId);
+    const id = idOf(r.productId);
+    if (!id || !map.has(id)) return;
+    const row = map.get(id);
     if ((r.timeStamp || '') <= row._anchorTs) return;
     const parts = String(r.packSize || '').split('/');
     row.stock += parts.length >= 3 && parseFloat(parts[0]) > 0 ? parseFloat(parts[0]) : 1;
@@ -1822,8 +2015,9 @@ export function computeIngredientStock({
 
   // Pass 3 — manual use / adjust after the anchor; par any time.
   (Array.isArray(inventoryLogs) ? inventoryLogs : []).forEach((r) => {
-    if (!r.productId || !map.has(r.productId)) return;
-    const row = map.get(r.productId);
+    const id = idOf(r.productId);
+    if (!id || !map.has(id)) return;
+    const row = map.get(id);
     if (r.action === 'par') {
       const v = Number(r.par);
       if (!Number.isNaN(v)) row.par = v;
@@ -1842,9 +2036,18 @@ export function computeIngredientStock({
   Object.entries(usageEntriesByProduct).forEach(([pid, entries]) => {
     if (!map.has(pid)) return;
     const row = map.get(pid);
-    const cut = row._anchorDate > since ? row._anchorDate : since;
     entries.forEach((e) => {
-      if (e.date <= cut) return;
+      // On or before the day recipe draw-down shipped: never deduct.
+      if (!e.date || e.date <= since) return;
+      if (row._anchorTs) {
+        if (e.timeStamp) {
+          if (e.timeStamp <= row._anchorTs) return;
+        } else if (e.date <= row._anchorDate) {
+          // Undated same-day batches stay out — we can't tell if they were
+          // already in the count.
+          return;
+        }
+      }
       row.stock -= e.units;
       if (!row.lastUsed || e.date > row.lastUsed) row.lastUsed = e.date;
     });

@@ -440,8 +440,8 @@
   </div>
 
   <script type="module">
-    import { appendLog, fetchLog } from '../../scripts/sheet-logger.js';
-    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js';
+    import { appendLog, fetchLog } from '../../scripts/sheet-logger.js?v=dpclog';
+    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
 
     // ── Product catalog — shared ingredient list (scripts/ingredient-catalog.js).
     //    INGREDIENT_CATALOG is the synchronous fallback; the receiving log is
@@ -517,6 +517,18 @@
       }
     });
 
+    function codeKey(code) {
+      const s = String(code || '').trim();
+      if (!s) return '';
+      return s.replace(/^0+/, '') || s;
+    }
+
+    function findByCode(code) {
+      const key = codeKey(code);
+      if (!key) return null;
+      return catalog.find((p) => codeKey(p.usFoodsCode) === key) || null;
+    }
+
     function handleBarcode(raw) {
       pendingBarcode = raw;
       pendingProduct = null;
@@ -532,7 +544,7 @@
           return;
         }
         const code = raw.slice(6, 13);
-        const match = catalog.find((p) => p.usFoodsCode === code);
+        const match = findByCode(code);
         if (match) {
           showProductCard(match);
         } else {
@@ -635,10 +647,17 @@
         return;
       }
 
-      const newProduct = { id: `new-${codeText}`, name, orderName: name, packSize, requiresTemp: reqTemp, usFoodsCode: codeText };
-      if (!catalog.some((p) => p.id === newProduct.id || p.usFoodsCode === codeText)) catalog = [...catalog, newProduct];
+      const existing = findByCode(codeText);
+      if (existing) {
+        newProductForm.hidden = true;
+        showToast(`${codeText} is already ${existing.name}. Receiving that row.`, 'error');
+        showProductCard(existing);
+        return;
+      }
 
-      // Log the new product so it can be added to the code later
+      const newProduct = { id: `new-${codeText}`, name, orderName: name, packSize, requiresTemp: reqTemp, usFoodsCode: codeText };
+      catalog = [...catalog, newProduct];
+
       try {
         await appendLog(LOG_PATH, {
           action:       'new_product',

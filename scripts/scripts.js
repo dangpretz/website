@@ -1,4 +1,7 @@
-import { fetchLog, appendLog, transposeByKey } from './sheet-logger.js';
+// Query string busts the 2h cache of sheet-logger.js (max-age=7200). Same
+// URL everywhere so the page and this module share one module instance.
+// eslint-disable-next-line import/no-unresolved
+import { fetchLog, appendLog, transposeByKey } from './sheet-logger.js?v=dpclog';
 import {
   buildBlock,
   loadHeader,

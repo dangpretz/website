@@ -74,6 +74,8 @@
     /* Ingredient blocks (stacked layout) */
     .recipe-ing-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
     .ing-block { background: #252525; border-radius: 6px; padding: 10px 12px; }
+    .ing-block.archived { outline: 1px solid #a60; }
+    .ing-archived { font: 600 11px/1.4 'Manrope', sans-serif; color: #e6b45a; margin-bottom: 6px; }
     .ing-block-header { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
     .ing-block-name { font: 400 13px/1.3 'Manrope', sans-serif; color: #ccc; flex: 1; }
     .ing-block-pack { font: 400 11px 'Manrope', sans-serif; color: #555; white-space: nowrap; flex-shrink: 0; }
@@ -110,6 +112,7 @@
     .sku-save-btn:hover:not(:disabled) { background: #a01818; }
     .sku-save-btn:disabled { background: #555; cursor: not-allowed; }
     .sku-save-status { font: 400 12px 'Manrope', sans-serif; color: #666; }
+    .sku-save-status.error { color: #e55; }
 
     /* ── View toggle ── */
     .view-toggle { display: flex; gap: 8px; margin-bottom: 28px; }
@@ -193,9 +196,9 @@
   </div>
 
   <script type="module">
-    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
-    import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
-    import { resolveRecipes } from '../../scripts/inventory.js';
+    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
+    import { resolveRecipes, readRecipeLineGrams, planRecipeWrites, writeLogRows } from '../../scripts/inventory.js?v=dpclog';
 
     const RECIPES_PATH   = '/dangpretz/recipes';
     const RECEIVING_PATH = '/dangpretz/receiving';
@@ -220,7 +223,8 @@
 
     // ── Product catalog — the shared ingredient list (scripts/ingredient-catalog.js),
     //    with the live receiving log applied. Filled in init().
-    let PRODUCTS = [];
+    let PRODUCTS = []; // active catalog — the add-ingredient dropdown
+    let BY_ID = {};    // active + archived, so a hidden recipe line can be shown and zeroed
 
     // ── Utilities ────────────────────────────────────────────────────────────
     function escapeHtml(s) {
@@ -280,7 +284,11 @@
       const densityHtml = isGal
         ? `<div class="density-row" style="margin-top:8px"><label class="density-label">g per ${innerUnitLabel}:</label><input type="number" class="density-input" data-product-id="${escapeHtml(p.id)}" value="${densityMap[p.id] || ''}" placeholder="e.g. 3785" min="1" step="1"></div>`
         : '';
-      return `<div class="ing-block" data-product-id="${escapeHtml(p.id)}">
+      const archivedNote = p.archived
+        ? '<div class="ing-archived">Archived — set grams to 0, or ×, then Save. That removes it from the recipe.</div>'
+        : '';
+      return `<div class="ing-block${p.archived ? ' archived' : ''}" data-product-id="${escapeHtml(p.id)}">
+          ${archivedNote}
           <div class="ing-block-header">
             <button class="btn-remove-ing" title="Remove">×</button>
             <span class="ing-block-name">${escapeHtml(p.name)}</span>
@@ -299,6 +307,25 @@
         </div>`;
     }
 
+    function linesForRecipe(recipe) {
+      const shown = [];
+      const seen = new Set();
+      PRODUCTS.forEach((p) => {
+        if (Number(recipe[p.id]) > 0) {
+          shown.push(p);
+          seen.add(p.id);
+        }
+      });
+      Object.keys(recipe || {}).forEach((id) => {
+        if (seen.has(id) || !(Number(recipe[id]) > 0)) return;
+        const known = BY_ID[id];
+        shown.push(known
+          ? { ...known, archived: true }
+          : { id, name: id, packSize: '', archived: true });
+      });
+      return shown;
+    }
+
     function buildSkuCard(sku) {
       const scale = scaleMap[sku] || {};
       const ppt = scale.pretzelsPerTray || '';
@@ -306,12 +333,12 @@
       const ppb = (ppt && tpb) ? String(ppt * tpb) : '';
 
       const recipe = recipeMap[sku] || {};
-      const hasAny = Object.keys(recipe).length > 0 || ppt || tpb;
+      const hasAny = Object.keys(recipe).some((id) => Number(recipe[id]) > 0) || ppt || tpb;
 
-      // Only render blocks for ingredients already in the recipe
-      const ingRows = PRODUCTS
-        .filter((p) => recipe[p.id] != null)
-        .map((p) => buildIngBlockHtml(p, recipe[p.id] != null ? recipe[p.id] : '', ppt, tpb))
+      // Positive lines only. Archived ingredients stay visible so they can be
+      // zeroed — hiding them was why basil could not be removed.
+      const ingRows = linesForRecipe(recipe)
+        .map((p) => buildIngBlockHtml(p, recipe[p.id], ppt, tpb))
         .join('');
 
       return `<div class="sku-card${hasAny ? ' expanded' : ''}" data-sku="${escapeHtml(sku)}">
@@ -365,6 +392,11 @@
       const addedIds = new Set(
         [...card.querySelectorAll('.recipe-qty-input')].map((i) => i.dataset.productId),
       );
+      // Last string typed into each grams box. Mobile Safari can leave a
+      // focused number input's .value empty at the moment Save is tapped,
+      // which dropped brand-new lines (nothing was POSTed, so reload hid them).
+      const gramsTracked = new Map();
+      const removedIds = new Set();
 
       function updateDerived() {
         const ppt = parseFloat(pptInput.value) || 0;
@@ -375,7 +407,7 @@
         card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
           const val       = parseFloat(inp.value);
           const productId = inp.dataset.productId;
-          const product   = PRODUCTS.find((p) => p.id === productId);
+          const product   = BY_ID[productId];
           const block     = inp.closest('.ing-block');
           const perTrayEl    = block.querySelector('.per-tray');
           const perPretzelEl = block.querySelector('.per-pretzel');
@@ -389,7 +421,9 @@
           }
           if (purchaseEl && product) {
             const { innerUnitLabel, gramsPerInnerUnit } = parsePackSize(product.packSize);
-            const gpu = gramsPerInnerUnit || densityMap[productId] || 0;
+            const densInp = block.querySelector('.density-input');
+            const typedDensity = densInp ? parseFloat(densInp.value) : 0;
+            const gpu = gramsPerInnerUnit || typedDensity || densityMap[productId] || 0;
             purchaseEl.innerHTML = gpu ? fmtPurchaseUnits(val, gpu, innerUnitLabel) : '<em style="color:#888;font-size:11px">set density ↓</em>';
           }
         });
@@ -398,15 +432,18 @@
       function wireRow(block) {
         const productId = block.dataset.productId;
         const qtyInp = block.querySelector('.recipe-qty-input');
-        if (qtyInp) qtyInp.addEventListener('input', updateDerived);
+        if (qtyInp) {
+          const remember = () => { gramsTracked.set(productId, qtyInp.value); };
+          qtyInp.addEventListener('input', () => { remember(); updateDerived(); });
+          qtyInp.addEventListener('change', remember);
+        }
 
         const densInp = block.querySelector('.density-input');
         if (densInp) {
           densInp.addEventListener('input', () => {
             const pid = densInp.dataset.productId;
             const gpu = parseFloat(densInp.value) || 0;
-            densityMap[pid] = gpu;
-            const product = PRODUCTS.find((p) => p.id === pid);
+            const product = BY_ID[pid];
             if (!product) return;
             const { innerUnitLabel } = parsePackSize(product.packSize);
             const purchaseEl = block.querySelector('.purchase-units');
@@ -421,6 +458,8 @@
         if (removeBtn) {
           removeBtn.addEventListener('click', () => {
             addedIds.delete(productId);
+            gramsTracked.delete(productId);
+            removedIds.add(productId);
             block.remove();
             if (document.activeElement === searchInput) renderDropdown(searchInput.value);
           });
@@ -434,7 +473,9 @@
         const block = tbody.lastElementChild;
         wireRow(block);
         addedIds.add(product.id);
+        removedIds.delete(product.id);
         const inp = block.querySelector('.recipe-qty-input');
+        if (gramsVal !== '' && gramsVal != null) gramsTracked.set(product.id, String(gramsVal));
         if (inp) inp.focus();
       }
 
@@ -474,6 +515,8 @@
       card.querySelector('.sku-save-btn').addEventListener('click', async () => {
         const saveBtn    = card.querySelector('.sku-save-btn');
         const statusSpan = card.querySelector('.sku-save-status');
+        // Commit a focused number field before reading it.
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         const ppt = parseFloat(pptInput.value);
         const tpb = parseFloat(tpbInput.value);
 
@@ -481,62 +524,82 @@
           showToast('Enter both pretzels/tray and trays/batch', 'error'); return;
         }
 
-        saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; statusSpan.textContent = '';
+        const tracked = Object.fromEntries(gramsTracked);
+        const lines = readRecipeLineGrams(
+          [...card.querySelectorAll('.recipe-qty-input')].map((inp) => ({
+            productId: inp.dataset.productId,
+            value: inp.value,
+          })),
+          tracked,
+        );
+        const densities = [...card.querySelectorAll('.density-input')].map((inp) => ({
+          productId: inp.dataset.productId,
+          gramsPerInnerUnit: inp.value,
+        }));
         const now = new Date().toISOString();
-        const writes = [];
+        const writes = planRecipeWrites({
+          sku,
+          previousRecipe: recipeMap[sku] || {},
+          previousScale: scaleMap[sku] || null,
+          previousDensity: densityMap,
+          pretzelsPerTray: ppt,
+          traysPerBatch: tpb,
+          lines,
+          removedProductIds: [...removedIds],
+          densities,
+          timeStamp: now,
+          updatedBy: '',
+        });
 
-        if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) {
-          writes.push(appendLog(RECIPES_PATH, {
-            action: 'sku_scale', sku, pretzelsPerTray: String(ppt), traysPerBatch: String(tpb), timeStamp: now, updatedBy: '',
-          }));
+        if (!writes.length) {
+          statusSpan.classList.remove('error');
+          statusSpan.textContent = 'No changes to save';
+          return;
         }
 
-        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-          const productId = inp.dataset.productId;
-          const val = parseFloat(inp.value);
-          if (!isNaN(val) && val >= 0) {
-            writes.push(appendLog(RECIPES_PATH, {
-              action: 'recipe_v2', sku, productId, gramsPerBatch: String(val), timeStamp: now, updatedBy: '',
-            }));
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+        statusSpan.classList.remove('error');
+        statusSpan.textContent = '';
+
+        const failures = await writeLogRows(appendLog, RECIPES_PATH, writes);
+        const failedKeys = new Set(failures.map((f) => `${f.row.action}:${f.row.productId || ''}`));
+        writes.forEach((row) => {
+          if (failedKeys.has(`${row.action}:${row.productId || ''}`)) return;
+          if (row.action === 'recipe_v2') {
+            if (!recipeMap[sku]) recipeMap[sku] = {};
+            recipeMap[sku][row.productId] = Number(row.gramsPerBatch);
+            removedIds.delete(row.productId);
+          } else if (row.action === 'sku_scale') {
+            scaleMap[sku] = {
+              pretzelsPerTray: Number(row.pretzelsPerTray),
+              traysPerBatch: Number(row.traysPerBatch),
+            };
+          } else if (row.action === 'ingredient_density') {
+            densityMap[row.productId] = Number(row.gramsPerInnerUnit);
           }
         });
+        const metaEl = card.querySelector('.sku-card-meta');
+        if (metaEl && scaleMap[sku]) {
+          metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
+        }
 
-        card.querySelectorAll('.density-input').forEach((inp) => {
-          const productId = inp.dataset.productId;
-          const val = parseFloat(inp.value);
-          if (!isNaN(val) && val > 0) {
-            writes.push(appendLog(RECIPES_PATH, {
-              action: 'ingredient_density', productId, gramsPerInnerUnit: String(val), timeStamp: now, updatedBy: '',
-            }));
-          }
-        });
-
-        if (!writes.length) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; return; }
-
-        try {
-          await Promise.all(writes);
-          if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) scaleMap[sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
-          if (!recipeMap[sku]) recipeMap[sku] = {};
-          card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-            const val = parseFloat(inp.value);
-            if (!isNaN(val) && val >= 0) recipeMap[sku][inp.dataset.productId] = val;
-          });
-          card.querySelectorAll('.density-input').forEach((inp) => {
-            const val = parseFloat(inp.value);
-            if (!isNaN(val) && val > 0) densityMap[inp.dataset.productId] = val;
-          });
-          const metaEl = card.querySelector('.sku-card-meta');
-          if (metaEl && scaleMap[sku]) {
-            metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
-          }
+        saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe';
+        if (!failures.length) {
           showToast('✓ Recipe saved', 'success');
+          statusSpan.classList.remove('error');
           statusSpan.textContent = 'Saved ✓';
-        } catch (err) {
-          showToast('Save failed: ' + (err.message || 'error'), 'error');
-          statusSpan.textContent = 'Error saving';
-        } finally {
-          saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe';
+          return;
         }
+        const failedNames = failures.map((f) => {
+          if (f.row.action === 'sku_scale') return 'batch size';
+          const product = BY_ID[f.row.productId];
+          const name = product ? product.name : (f.row.productId || f.row.action);
+          return f.row.action === 'ingredient_density' ? `${name} density` : name;
+        });
+        const detail = failures[0].error && failures[0].error.message ? ` (${failures[0].error.message})` : '';
+        statusSpan.classList.add('error');
+        statusSpan.textContent = `Couldn't save: ${failedNames.join(', ')}. Tap Save to retry.`;
+        showToast(`Save failed for ${failedNames.join(', ')}${detail}`, 'error');
       });
     }
 
@@ -563,7 +626,7 @@
         const recipe = recipeMap[sku] || {};
 
         // Only show ingredients that have a value set
-        const usedIngredients = PRODUCTS.filter((p) => recipe[p.id] != null && recipe[p.id] > 0);
+        const usedIngredients = linesForRecipe(recipe);
 
         const ingRows = usedIngredients.map((p) => {
           const { innerUnitLabel, gramsPerInnerUnit } = parsePackSize(p.packSize);
@@ -573,7 +636,7 @@
           const perPret  = (perBatch != null && ppb && ppb !== '—')    ? fmt2(perBatch / ppb) : '—';
           const purchase = gpu ? fmtPurchaseUnits(perBatch, gpu, innerUnitLabel) : '—';
           return `<tr>
-            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.name)}${p.archived ? ' <span style="color:#e6b45a">(archived)</span>' : ''}</td>
             <td class="num">${fmt2(perBatch)}g</td>
             <td class="num">${perTray}${perTray !== '—' ? 'g' : ''}</td>
             <td class="num">${perPret}${perPret !== '—' ? 'g' : ''}</td>
@@ -642,7 +705,12 @@
           fetchLog(RECIPES_PATH),
           fetchLog(RECEIVING_PATH),
         ]);
-        PRODUCTS = resolveIngredients(Array.isArray(receivingLogs) ? receivingLogs : []);
+        const receiving = Array.isArray(receivingLogs) ? receivingLogs : [];
+        const all = resolveIngredients(receiving, { includeArchived: true });
+        PRODUCTS = resolveIngredients(receiving);
+        const activeIds = new Set(PRODUCTS.map((p) => p.id));
+        BY_ID = {};
+        all.forEach((p) => { BY_ID[p.id] = activeIds.has(p.id) ? p : { ...p, archived: true }; });
         ({ scaleMap, recipeMap, densityMap } = resolveRecipes(Array.isArray(recipeLogs) ? recipeLogs : []));
         const defined = SKUS.filter((s) => recipeMap[s] && Object.keys(recipeMap[s]).length > 0).length;
         setStatus('ready', `${SKUS.length} SKUs · ${defined} with recipes defined · ${PRODUCTS.length} ingredients available`);
