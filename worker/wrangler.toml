@@ -1,6 +1,8 @@
 name = "dpc-catering-checkout"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
+# Same-account workers.dev fetch (dpc-log) returns CF error 1042 without this.
+compatibility_flags = ["global_fetch_strictly_public"]
 account_id = "f399e3bcd5ea1501830d0ad1d35d9da3"
 
 # Retain ~24h of console.* output + HTTP request metadata so we can
