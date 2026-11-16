@@ -1,4 +1,5 @@
-import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+// eslint-disable-next-line import/no-unresolved -- ?v= busts the cached logger module
+import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
 import { getVoter } from '../../scripts/scripts.js';
 
 export default async function decorate(widget) {

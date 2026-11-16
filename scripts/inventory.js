@@ -4,6 +4,7 @@
    no-plusplus,
    no-continue,
    no-restricted-syntax,
+   no-await-in-loop,
    max-len
 */
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -1700,6 +1701,158 @@ export function resolveRecipes(recipeLogs) {
     }
   });
   return { scaleMap, recipeMap, densityMap };
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+function sameNumber(a, b) {
+  const na = Number(a);
+  const nb = Number(b);
+  return !Number.isNaN(na) && !Number.isNaN(nb) && na === nb;
+}
+
+// Grams the Save button should trust. A focused number input on mobile can
+// still report "" when the button's click runs, even after the cook typed a
+// value — the input events already saw it, so `tracked` (productId → last
+// typed string) fills that gap. A non-empty DOM value always wins.
+export function readRecipeLineGrams(domLines, tracked = {}) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(domLines) ? domLines : []).forEach((line) => {
+    if (!line || !line.productId || seen.has(line.productId)) return;
+    seen.add(line.productId);
+    const domValue = line.value == null ? '' : String(line.value).trim();
+    const remembered = Object.hasOwn(tracked, line.productId) ? tracked[line.productId] : undefined;
+    let grams = domValue;
+    if (grams === '' && remembered != null) grams = String(remembered).trim();
+    out.push({ productId: line.productId, grams });
+  });
+  return out;
+}
+
+// Rows to append for one Save Recipe click.
+//   - New or edited lines only. Re-posting every flour/water/yeast line is
+//     what made the logger 500 under a burst of parallel writes, and a
+//     rejected line never appeared in the log (the new cheese line vanished
+//     on reload).
+//   - Lines the cook explicitly removed are written as 0. Lines that are
+//     simply not on screen (archived ingredients the editor hid) are left
+//     alone — treating "not in the DOM" as delete would wipe them on every save.
+//   - Blank new lines are not written.
+export function planRecipeWrites({
+  sku,
+  previousRecipe = {},
+  previousScale = null,
+  previousDensity = {},
+  pretzelsPerTray,
+  traysPerBatch,
+  lines = [],
+  removedProductIds = [],
+  densities = [],
+  timeStamp,
+  updatedBy = '',
+} = {}) {
+  const writes = [];
+  const seen = new Set();
+
+  (Array.isArray(lines) ? lines : []).forEach((line) => {
+    if (!line || !line.productId || seen.has(line.productId)) return;
+    seen.add(line.productId);
+    const grams = parseFloat(line.grams);
+    const prevRaw = Object.hasOwn(previousRecipe, line.productId) ? previousRecipe[line.productId] : null;
+    const prevNum = prevRaw == null || prevRaw === '' ? null : Number(prevRaw);
+    if (Number.isNaN(grams) || grams < 0) {
+      // Cleared field on a line that used to have grams → retire it.
+      if (prevNum != null && prevNum !== 0) {
+        writes.push({
+          action: 'recipe_v2', sku, productId: line.productId, gramsPerBatch: '0', timeStamp, updatedBy,
+        });
+      }
+      return;
+    }
+    if (grams === 0 && (prevNum == null || prevNum === 0)) return;
+    if (prevNum != null && prevNum === grams) return;
+    writes.push({
+      action: 'recipe_v2', sku, productId: line.productId, gramsPerBatch: String(grams), timeStamp, updatedBy,
+    });
+  });
+
+  (Array.isArray(removedProductIds) ? removedProductIds : []).forEach((productId) => {
+    if (!productId || seen.has(productId)) return;
+    const prevNum = Number(previousRecipe[productId]);
+    if (Number.isNaN(prevNum) || prevNum === 0) return;
+    seen.add(productId);
+    writes.push({
+      action: 'recipe_v2', sku, productId, gramsPerBatch: '0', timeStamp, updatedBy,
+    });
+  });
+
+  const ppt = Number(pretzelsPerTray);
+  const tpb = Number(traysPerBatch);
+  const scaleOk = ppt > 0 && tpb > 0;
+  const scaleChanged = !previousScale
+    || !sameNumber(previousScale.pretzelsPerTray, ppt)
+    || !sameNumber(previousScale.traysPerBatch, tpb);
+  if (scaleOk && scaleChanged) {
+    writes.push({
+      action: 'sku_scale',
+      sku,
+      pretzelsPerTray: String(ppt),
+      traysPerBatch: String(tpb),
+      timeStamp,
+      updatedBy,
+    });
+  }
+
+  (Array.isArray(densities) ? densities : []).forEach((d) => {
+    if (!d || !d.productId) return;
+    const v = parseFloat(d.gramsPerInnerUnit);
+    if (Number.isNaN(v) || v <= 0) return;
+    if (sameNumber(previousDensity[d.productId], v)) return;
+    writes.push({
+      action: 'ingredient_density',
+      productId: d.productId,
+      gramsPerInnerUnit: String(v),
+      timeStamp,
+      updatedBy,
+    });
+  });
+
+  return writes;
+}
+
+// One row at a time. Parallel POSTs to the log worker return HTTP 500 for
+// some of the batch while others land, and Promise.all then reports the
+// whole save as failed. Retries the failed row before moving on, and keeps
+// going so one bad line doesn't drop the rest. Returns the rows that still
+// failed after retries: { row, error }.
+export async function writeLogRows(appendLog, logpath, rows, options = {}) {
+  const retries = options.retries == null ? 2 : options.retries;
+  const delayMs = options.delayMs == null ? 250 : options.delayMs;
+  const failures = [];
+  const list = Array.isArray(rows) ? rows : [];
+
+  async function writeOne(row, attempt) {
+    try {
+      await appendLog(logpath, row);
+      return null;
+    } catch (err) {
+      if (attempt >= retries) return err;
+      if (delayMs > 0) await waitMs(delayMs * (attempt + 1));
+      return writeOne(row, attempt + 1);
+    }
+  }
+
+  let index = 0;
+  while (index < list.length) {
+    const row = list[index];
+    index += 1;
+    const error = await writeOne(row, 0);
+    if (error) failures.push({ row, error });
+  }
+  return failures;
 }
 
 const SIZE_MULT = { single: 1, double: 2, triple: 3 };

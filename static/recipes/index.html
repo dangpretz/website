@@ -110,6 +110,7 @@
     .sku-save-btn:hover:not(:disabled) { background: #a01818; }
     .sku-save-btn:disabled { background: #555; cursor: not-allowed; }
     .sku-save-status { font: 400 12px 'Manrope', sans-serif; color: #666; }
+    .sku-save-status.error { color: #e55; }
 
     /* ── View toggle ── */
     .view-toggle { display: flex; gap: 8px; margin-bottom: 28px; }
@@ -193,9 +194,9 @@
   </div>
 
   <script type="module">
-    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js';
+    import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
     import { resolveIngredients } from '../../scripts/ingredient-catalog.js';
-    import { resolveRecipes } from '../../scripts/inventory.js';
+    import { resolveRecipes, readRecipeLineGrams, planRecipeWrites, writeLogRows } from '../../scripts/inventory.js?v=dpclog';
 
     const RECIPES_PATH   = '/dangpretz/recipes';
     const RECEIVING_PATH = '/dangpretz/receiving';
@@ -365,6 +366,11 @@
       const addedIds = new Set(
         [...card.querySelectorAll('.recipe-qty-input')].map((i) => i.dataset.productId),
       );
+      // Last string typed into each grams box. Mobile Safari can leave a
+      // focused number input's .value empty at the moment Save is tapped,
+      // which dropped brand-new lines (nothing was POSTed, so reload hid them).
+      const gramsTracked = new Map();
+      const removedIds = new Set();
 
       function updateDerived() {
         const ppt = parseFloat(pptInput.value) || 0;
@@ -389,7 +395,9 @@
           }
           if (purchaseEl && product) {
             const { innerUnitLabel, gramsPerInnerUnit } = parsePackSize(product.packSize);
-            const gpu = gramsPerInnerUnit || densityMap[productId] || 0;
+            const densInp = block.querySelector('.density-input');
+            const typedDensity = densInp ? parseFloat(densInp.value) : 0;
+            const gpu = gramsPerInnerUnit || typedDensity || densityMap[productId] || 0;
             purchaseEl.innerHTML = gpu ? fmtPurchaseUnits(val, gpu, innerUnitLabel) : '<em style="color:#888;font-size:11px">set density ↓</em>';
           }
         });
@@ -398,14 +406,17 @@
       function wireRow(block) {
         const productId = block.dataset.productId;
         const qtyInp = block.querySelector('.recipe-qty-input');
-        if (qtyInp) qtyInp.addEventListener('input', updateDerived);
+        if (qtyInp) {
+          const remember = () => { gramsTracked.set(productId, qtyInp.value); };
+          qtyInp.addEventListener('input', () => { remember(); updateDerived(); });
+          qtyInp.addEventListener('change', remember);
+        }
 
         const densInp = block.querySelector('.density-input');
         if (densInp) {
           densInp.addEventListener('input', () => {
             const pid = densInp.dataset.productId;
             const gpu = parseFloat(densInp.value) || 0;
-            densityMap[pid] = gpu;
             const product = PRODUCTS.find((p) => p.id === pid);
             if (!product) return;
             const { innerUnitLabel } = parsePackSize(product.packSize);
@@ -421,6 +432,8 @@
         if (removeBtn) {
           removeBtn.addEventListener('click', () => {
             addedIds.delete(productId);
+            gramsTracked.delete(productId);
+            removedIds.add(productId);
             block.remove();
             if (document.activeElement === searchInput) renderDropdown(searchInput.value);
           });
@@ -434,7 +447,9 @@
         const block = tbody.lastElementChild;
         wireRow(block);
         addedIds.add(product.id);
+        removedIds.delete(product.id);
         const inp = block.querySelector('.recipe-qty-input');
+        if (gramsVal !== '' && gramsVal != null) gramsTracked.set(product.id, String(gramsVal));
         if (inp) inp.focus();
       }
 
@@ -474,6 +489,8 @@
       card.querySelector('.sku-save-btn').addEventListener('click', async () => {
         const saveBtn    = card.querySelector('.sku-save-btn');
         const statusSpan = card.querySelector('.sku-save-status');
+        // Commit a focused number field before reading it.
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         const ppt = parseFloat(pptInput.value);
         const tpb = parseFloat(tpbInput.value);
 
@@ -481,62 +498,82 @@
           showToast('Enter both pretzels/tray and trays/batch', 'error'); return;
         }
 
-        saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; statusSpan.textContent = '';
+        const tracked = Object.fromEntries(gramsTracked);
+        const lines = readRecipeLineGrams(
+          [...card.querySelectorAll('.recipe-qty-input')].map((inp) => ({
+            productId: inp.dataset.productId,
+            value: inp.value,
+          })),
+          tracked,
+        );
+        const densities = [...card.querySelectorAll('.density-input')].map((inp) => ({
+          productId: inp.dataset.productId,
+          gramsPerInnerUnit: inp.value,
+        }));
         const now = new Date().toISOString();
-        const writes = [];
+        const writes = planRecipeWrites({
+          sku,
+          previousRecipe: recipeMap[sku] || {},
+          previousScale: scaleMap[sku] || null,
+          previousDensity: densityMap,
+          pretzelsPerTray: ppt,
+          traysPerBatch: tpb,
+          lines,
+          removedProductIds: [...removedIds],
+          densities,
+          timeStamp: now,
+          updatedBy: '',
+        });
 
-        if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) {
-          writes.push(appendLog(RECIPES_PATH, {
-            action: 'sku_scale', sku, pretzelsPerTray: String(ppt), traysPerBatch: String(tpb), timeStamp: now, updatedBy: '',
-          }));
+        if (!writes.length) {
+          statusSpan.classList.remove('error');
+          statusSpan.textContent = 'No changes to save';
+          return;
         }
 
-        card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-          const productId = inp.dataset.productId;
-          const val = parseFloat(inp.value);
-          if (!isNaN(val) && val >= 0) {
-            writes.push(appendLog(RECIPES_PATH, {
-              action: 'recipe_v2', sku, productId, gramsPerBatch: String(val), timeStamp: now, updatedBy: '',
-            }));
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+        statusSpan.classList.remove('error');
+        statusSpan.textContent = '';
+
+        const failures = await writeLogRows(appendLog, RECIPES_PATH, writes);
+        const failedKeys = new Set(failures.map((f) => `${f.row.action}:${f.row.productId || ''}`));
+        writes.forEach((row) => {
+          if (failedKeys.has(`${row.action}:${row.productId || ''}`)) return;
+          if (row.action === 'recipe_v2') {
+            if (!recipeMap[sku]) recipeMap[sku] = {};
+            recipeMap[sku][row.productId] = Number(row.gramsPerBatch);
+            removedIds.delete(row.productId);
+          } else if (row.action === 'sku_scale') {
+            scaleMap[sku] = {
+              pretzelsPerTray: Number(row.pretzelsPerTray),
+              traysPerBatch: Number(row.traysPerBatch),
+            };
+          } else if (row.action === 'ingredient_density') {
+            densityMap[row.productId] = Number(row.gramsPerInnerUnit);
           }
         });
+        const metaEl = card.querySelector('.sku-card-meta');
+        if (metaEl && scaleMap[sku]) {
+          metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
+        }
 
-        card.querySelectorAll('.density-input').forEach((inp) => {
-          const productId = inp.dataset.productId;
-          const val = parseFloat(inp.value);
-          if (!isNaN(val) && val > 0) {
-            writes.push(appendLog(RECIPES_PATH, {
-              action: 'ingredient_density', productId, gramsPerInnerUnit: String(val), timeStamp: now, updatedBy: '',
-            }));
-          }
-        });
-
-        if (!writes.length) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; return; }
-
-        try {
-          await Promise.all(writes);
-          if (!isNaN(ppt) && ppt > 0 && !isNaN(tpb) && tpb > 0) scaleMap[sku] = { pretzelsPerTray: ppt, traysPerBatch: tpb };
-          if (!recipeMap[sku]) recipeMap[sku] = {};
-          card.querySelectorAll('.recipe-qty-input').forEach((inp) => {
-            const val = parseFloat(inp.value);
-            if (!isNaN(val) && val >= 0) recipeMap[sku][inp.dataset.productId] = val;
-          });
-          card.querySelectorAll('.density-input').forEach((inp) => {
-            const val = parseFloat(inp.value);
-            if (!isNaN(val) && val > 0) densityMap[inp.dataset.productId] = val;
-          });
-          const metaEl = card.querySelector('.sku-card-meta');
-          if (metaEl && scaleMap[sku]) {
-            metaEl.textContent = `${scaleMap[sku].pretzelsPerTray} pretzels/tray · ${scaleMap[sku].traysPerBatch} trays/batch`;
-          }
+        saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe';
+        if (!failures.length) {
           showToast('✓ Recipe saved', 'success');
+          statusSpan.classList.remove('error');
           statusSpan.textContent = 'Saved ✓';
-        } catch (err) {
-          showToast('Save failed: ' + (err.message || 'error'), 'error');
-          statusSpan.textContent = 'Error saving';
-        } finally {
-          saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe';
+          return;
         }
+        const failedNames = failures.map((f) => {
+          if (f.row.action === 'sku_scale') return 'batch size';
+          const product = PRODUCTS.find((p) => p.id === f.row.productId);
+          const name = product ? product.name : (f.row.productId || f.row.action);
+          return f.row.action === 'ingredient_density' ? `${name} density` : name;
+        });
+        const detail = failures[0].error && failures[0].error.message ? ` (${failures[0].error.message})` : '';
+        statusSpan.classList.add('error');
+        statusSpan.textContent = `Couldn't save: ${failedNames.join(', ')}. Tap Save to retry.`;
+        showToast(`Save failed for ${failedNames.join(', ')}${detail}`, 'error');
       });
     }
 
