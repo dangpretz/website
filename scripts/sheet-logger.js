@@ -1,13 +1,22 @@
-const SHEET_LOGGER = 'https://sheet-logger.david8603.workers.dev';
+// Previous host: https://sheet-logger.david8603.workers.dev
+// Never put READ_TOKEN or WRITE_TOKEN in this public file. It is served
+// to every visitor; browser callers authenticate by Origin and pass no token.
+const SHEET_LOGGER = 'https://dpc-log.drew-f39.workers.dev';
+
+function loggerHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // Cache-bust every GET — sheet-logger doesn't set Cache-Control today, but
 // browsers + Cloudflare apply heuristic caching for responses without
 // explicit TTL, which would surface as "I just saved, why don't I see my
 // row?" Adding a unique query param sidesteps every cache layer.
-export async function fetchLog(logpath) {
+export async function fetchLog(logpath, { token } = {}) {
   const bust = `_t=${Date.now()}`;
   const sep = logpath.includes('?') ? '&' : '?';
-  const response = await fetch(`${SHEET_LOGGER}${logpath}${sep}${bust}`);
+  const response = await fetch(`${SHEET_LOGGER}${logpath}${sep}${bust}`, {
+    headers: loggerHeaders(token),
+  });
   if (!response.ok) {
     throw new Error(`fetchLog ${logpath} failed: HTTP ${response.status}`);
   }
@@ -17,7 +26,7 @@ export async function fetchLog(logpath) {
 // Throws on non-2xx so callers' try/catch can react. The prior silent-
 // success-only behavior meant network blips were invisible — saveStock
 // would log "Saved!" toast even when the row never landed in the sheet.
-export async function appendLog(logpath, message, { signal } = {}) {
+export async function appendLog(logpath, message, { signal, token } = {}) {
   const params = new URLSearchParams();
   Object.keys(message).forEach((key) => {
     params.append(key, message[key]);
@@ -28,6 +37,7 @@ export async function appendLog(logpath, message, { signal } = {}) {
     resp = await fetch(`${SHEET_LOGGER}${logpath}?${params.toString()}`, {
       method: 'POST',
       signal, // AbortSignal for per-attempt timeouts; undefined when not passed → no change
+      headers: loggerHeaders(token),
     });
   } catch (networkErr) {
     throw new Error(`appendLog ${logpath} network error: ${networkErr.message}`);
