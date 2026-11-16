@@ -303,9 +303,25 @@ async function handleFixFulfillment(request, env) {
 // in the planner does last-write-wins per deliveryId.
 // ════════════════════════════════════════════════════════════════════
 
-const SHEET_LOGGER_BASE = 'https://sheet-logger.david8603.workers.dev';
+let SHEET_LOGGER_BASE = 'https://dpc-log.drew-f39.workers.dev';
+let SHEET_LOGGER_TOKEN = '';
 const DELIVERY_LOG_PATH = '/dangpretz/delivery-planner';
 const FOH_SALES_LOG_PATH = '/dangpretz/foh-sales';
+
+// env.DPC_LOG_URL overrides the base (trailing slash stripped). The write
+// token comes only from env.DPC_LOG_WRITE_TOKEN — never hardcode it here.
+function configureSheetLogger(env) {
+  if (env.DPC_LOG_URL) {
+    SHEET_LOGGER_BASE = env.DPC_LOG_URL.replace(/\/$/, '');
+  }
+  SHEET_LOGGER_TOKEN = env.DPC_LOG_WRITE_TOKEN || '';
+}
+
+function sheetLoggerFetch(pathAndQuery, init = {}) {
+  const headers = { ...(init.headers || {}) };
+  if (SHEET_LOGGER_TOKEN) headers.Authorization = `Bearer ${SHEET_LOGGER_TOKEN}`;
+  return fetch(`${SHEET_LOGGER_BASE}${pathAndQuery}`, { ...init, headers });
+}
 
 // Append one row to a sheet-logger log. Same convention the rest of the
 // worker uses (fields as query-string params, empty POST body, server sets
@@ -316,7 +332,7 @@ async function sheetAppend(path, fields) {
     if (v === undefined || v === null) return;
     params.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
   });
-  const resp = await fetch(`${SHEET_LOGGER_BASE}${path}?${params.toString()}`, { method: 'POST' });
+  const resp = await sheetLoggerFetch(`${path}?${params.toString()}`, { method: 'POST' });
   return { ok: resp.ok, status: resp.status };
 }
 
@@ -521,8 +537,8 @@ async function syncSquareOrderToDelivery(squareOrder, invoiceCtx = null) {
   if (address)   params.set('address', address);
   if (orderNote) params.set('notes', orderNote.slice(0, 500));
 
-  const resp = await fetch(
-    `${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}?${params.toString()}`,
+  const resp = await sheetLoggerFetch(
+    `${DELIVERY_LOG_PATH}?${params.toString()}`,
     { method: 'POST' },
   );
 
@@ -725,7 +741,7 @@ async function handleCleanupSquare(request, env) {
   if (authErr) return authErr;
 
   // Pull all delivery log entries
-  const logRes = await fetch(`${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}`);
+  const logRes = await sheetLoggerFetch(DELIVERY_LOG_PATH);
   if (!logRes.ok) {
     return json({ error: 'failed to fetch delivery log' }, 502);
   }
@@ -751,8 +767,8 @@ async function handleCleanupSquare(request, env) {
       _source: 'square-cleanup',
     });
     try {
-      const r = await fetch(
-        `${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}?${params.toString()}`,
+      const r = await sheetLoggerFetch(
+        `${DELIVERY_LOG_PATH}?${params.toString()}`,
         { method: 'POST' },
       );
       results.push({ deliveryId, ok: r.ok, status: r.status });
@@ -1730,8 +1746,8 @@ function buildCateringEvent({ delivery, dtstamp }) {
 async function handleFohCalendar(request, env) {
   // Pull both logs in parallel.
   const [delivRes, prodRes] = await Promise.all([
-    fetch(`${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}`),
-    fetch(`${SHEET_LOGGER_BASE}${PRODUCTION_LOG_PATH}`),
+    sheetLoggerFetch(DELIVERY_LOG_PATH),
+    sheetLoggerFetch(PRODUCTION_LOG_PATH),
   ]);
   const deliveryLogs   = delivRes.ok   ? await delivRes.json()   : [];
   const productionLogs = prodRes.ok    ? await prodRes.json()    : [];
@@ -1946,8 +1962,8 @@ async function sha256Hex(s) {
 // for idempotent cron replays.
 async function collectFohCalEventList(env) {
   const [delivRes, prodRes] = await Promise.all([
-    fetch(`${SHEET_LOGGER_BASE}${DELIVERY_LOG_PATH}`),
-    fetch(`${SHEET_LOGGER_BASE}${PRODUCTION_LOG_PATH}`),
+    sheetLoggerFetch(DELIVERY_LOG_PATH),
+    sheetLoggerFetch(PRODUCTION_LOG_PATH),
   ]);
   const deliveryLogs   = delivRes.ok ? await delivRes.json() : [];
   const productionLogs = prodRes.ok  ? await prodRes.json() : [];
@@ -2313,6 +2329,7 @@ async function handleFohCalTest(request, env) {
 
 export default {
   async fetch(request, env) {
+    configureSheetLogger(env);
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
@@ -2732,6 +2749,7 @@ export default {
   // FOH sales + write the retail drawdown row, then run the catering catch-up.
   // (The old myecalendar iCal-invite cron was abandoned 2026-05-06.)
   async scheduled(_event, env, ctx) {
+    configureSheetLogger(env);
     ctx.waitUntil((async () => {
       try {
         const result = await runNightlySync(env);
