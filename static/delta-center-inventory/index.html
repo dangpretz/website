@@ -52,40 +52,36 @@
     .stat .n.warn { color: #C41E1E; }
     .stat .l { font: 700 10px 'Manrope', sans-serif; color: #999; letter-spacing: .8px; text-transform: uppercase; margin-top: 4px; }
 
-    /* ── Item list ── */
-    .group { margin-bottom: 22px; }
-    .group-title { font: 700 11px 'Manrope', sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #999; margin: 0 4px 8px; }
-    .item { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-bottom: 8px; overflow: hidden; border-left: 5px solid #ddd; }
-    .item.s-ok { border-left-color: #2a7a2a; }
-    .item.s-low { border-left-color: #e0a030; }
-    .item.s-out { border-left-color: #C41E1E; }
-    .item-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; width: 100%; background: none; border: none; text-align: left; }
-    .item-name { flex: 1; min-width: 0; }
-    .item-name .nm { font: 700 16px 'Manrope', sans-serif; color: #1A1A1A; overflow-wrap: anywhere; }
-    .item-name .meta { font: 400 12px 'Manrope', sans-serif; color: #999; margin-top: 2px; }
-    .stock { text-align: right; flex-shrink: 0; }
-    .stock .qty { font: 800 26px 'Manrope', sans-serif; font-variant-numeric: tabular-nums; line-height: 1; }
-    .stock .of { font: 600 11px 'Manrope', sans-serif; color: #999; margin-top: 3px; }
-    .pill { display: inline-block; font: 700 10px 'Manrope', sans-serif; letter-spacing: .5px; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; margin-top: 4px; }
+    /* ── Item table: one row per item ── */
+    .tbl-wrap { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table.inv { width: 100%; border-collapse: collapse; min-width: 560px; }
+    table.inv th { font: 700 10px 'Manrope', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #999; text-align: left; padding: 10px 12px; background: #faf8f4; border-bottom: 1px solid #eee7da; white-space: nowrap; }
+    table.inv td { padding: 8px 12px; border-bottom: 1px solid #f2efe9; vertical-align: middle; white-space: nowrap; }
+    table.inv tr:last-child td { border-bottom: none; }
+    table.inv .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .m-status { display: none; }
+    table.inv tr.grp td { background: #faf8f4; font: 700 11px 'Manrope', sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #999; padding: 8px 12px; }
+    table.inv tr.item td:first-child { border-left: 5px solid #ddd; }
+    table.inv tr.s-ok td:first-child { border-left-color: #2a7a2a; }
+    table.inv tr.s-low td:first-child { border-left-color: #e0a030; }
+    table.inv tr.s-out td:first-child { border-left-color: #C41E1E; }
+    table.inv td.nm-cell { position: sticky; left: 0; background: #fff; min-width: 150px; z-index: 1; }
+    table.inv th.nm-cell { position: sticky; left: 0; z-index: 2; }
+    .nm { font: 700 15px 'Manrope', sans-serif; color: #1A1A1A; }
+    .meta { font: 400 11px 'Manrope', sans-serif; color: #999; margin-top: 1px; }
+    .have { font: 800 20px 'Manrope', sans-serif; }
+    .parv { font: 600 14px 'Manrope', sans-serif; color: #666; }
+    .pill { display: inline-block; font: 700 10px 'Manrope', sans-serif; letter-spacing: .5px; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; }
     .pill.ok { background: #e6f4e6; color: #2a7a2a; }
     .pill.low { background: #fff3cc; color: #8a6000; }
     .pill.out { background: #fde8e8; color: #C41E1E; }
     .pill.none { background: #f0f0f0; color: #999; }
-    .need { font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-top: 3px; }
-
-    .item-body { padding: 0 16px 16px; border-top: 1px solid #f2efe9; }
-    .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
-    .act label { display: block; font: 700 10px 'Manrope', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #999; margin-bottom: 6px; }
-    .act .inline { display: flex; gap: 6px; }
-    .act input { flex: 1; min-width: 0; font: 700 18px 'Manrope', sans-serif; padding: 10px 12px; border: 2px solid #ddd; border-radius: 8px; outline: none; text-align: center; -moz-appearance: textfield; }
-    .act input::-webkit-outer-spin-button, .act input::-webkit-inner-spin-button { -webkit-appearance: none; }
-    .act input:focus { border-color: #C41E1E; }
-    .hist { margin-top: 12px; font: 400 12px/1.5 'Manrope', sans-serif; color: #999; }
-    .mgr { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e8e0d5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .mgr label { font: 700 10px 'Manrope', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #999; }
-    .mgr input { width: 84px; font: 700 15px 'Manrope', sans-serif; padding: 7px 10px; border: 2px solid #ddd; border-radius: 8px; text-align: center; outline: none; }
-    .mgr input:focus { border-color: #C41E1E; }
-    .mgr .spacer { flex: 1; }
+    .need { font: 700 12px 'Manrope', sans-serif; color: #C41E1E; margin-left: 6px; }
+    .cell-in { display: inline-flex; gap: 4px; align-items: center; }
+    .cell-in input { width: 64px; font: 700 15px 'Manrope', sans-serif; padding: 7px 6px; border: 2px solid #ddd; border-radius: 8px; outline: none; text-align: center; -moz-appearance: textfield; }
+    .cell-in input::-webkit-outer-spin-button, .cell-in input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .cell-in input:focus { border-color: #C41E1E; }
+    .cell-in .btn { padding: 6px 9px; min-width: 34px; }
     .linkbtn { background: none; border: none; color: #C41E1E; font: 700 12px 'Manrope', sans-serif; cursor: pointer; padding: 6px 4px; }
 
     .empty { text-align: center; padding: 48px 20px; font: 600 15px 'Manrope', sans-serif; color: #999; background: #fff; border-radius: 10px; }
@@ -105,9 +101,17 @@
     .view-note { font: 600 12px 'Manrope', sans-serif; color: #8a6000; background: #fff8e6; border: 1px solid #f0d9a0; border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; }
 
     @media (max-width: 520px) {
-      .item-head { padding: 12px; gap: 10px; }
-      .stock .qty { font-size: 24px; }
-      .row-actions { grid-template-columns: 1fr; }
+      table.inv { min-width: 0; }
+      table.inv td, table.inv th { padding-left: 6px; padding-right: 6px; }
+      table.inv td.nm-cell { white-space: normal; min-width: 0; width: 38%; }
+      th.col-status, td.col-status, th.m-hide, td.m-hide { display: none; }
+      .nm { font-size: 14px; line-height: 1.2; }
+      .meta { display: none; }
+      .m-status { display: block; margin-top: 3px; line-height: 1.5; }
+      .m-status .need { display: block; margin-left: 0; font-size: 11px; }
+      .have { font-size: 18px; }
+      .cell-in input { width: 50px; padding: 7px 2px; font-size: 16px; }
+      .cell-in .btn { padding: 6px 7px; min-width: 28px; }
       .field-row { grid-template-columns: 1fr; }
     }
   </style>
@@ -169,7 +173,7 @@
     let items = [];             // resolved, sorted
     let allSkus = [];
     let filter = 'all';
-    let openId = null;
+    let draft = {};             // typed-but-unsaved inputs, kept across re-renders
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -193,6 +197,7 @@
         loadFail: (m) => `Couldn't load: ${m}`, viewOnly: 'View only — you can see stock but not change it.',
         gPretzels: 'Pretzels', gBuns: 'Buns', gDips: 'Dips', gToppings: 'Toppings', gSupplies: 'Supplies',
         sTracked: 'Items tracked', sLow: 'Low or out', sNeed: 'Units to resupply',
+        colItem: 'Item', colHave: 'On hand', colPar: 'Par', colStatus: 'Status', colCount: 'Count', colResupply: 'Resupply',
         ok: 'OK', low: 'Low', out: 'Out', noPar: 'No par',
         par: (n) => `Par ${n}`, needN: (n) => `Send ${n}`,
         counted: (d, by) => `Counted ${d}${by ? ` by ${by}` : ''}`, notCounted: 'Not counted yet',
@@ -214,6 +219,7 @@
         loadFail: (m) => `No se pudo cargar: ${m}`, viewOnly: 'Solo lectura — puedes ver el inventario pero no cambiarlo.',
         gPretzels: 'Pretzels', gBuns: 'Panes', gDips: 'Salsas', gToppings: 'Coberturas', gSupplies: 'Suministros',
         sTracked: 'Productos', sLow: 'Bajos o agotados', sNeed: 'Unidades por surtir',
+        colItem: 'Producto', colHave: 'Existencia', colPar: 'Mínimo', colStatus: 'Estado', colCount: 'Contar', colResupply: 'Surtido',
         ok: 'OK', low: 'Bajo', out: 'Agotado', noPar: 'Sin mínimo',
         par: (n) => `Mínimo ${n}`, needN: (n) => `Enviar ${n}`,
         counted: (d, by) => `Contado ${d}${by ? ` por ${by}` : ''}`, notCounted: 'Aún sin contar',
@@ -359,38 +365,44 @@
         host.innerHTML = `<div class="empty">${items.length ? L('noneNeed') : L('noItems')}</div>`;
         return;
       }
-      let html = '';
+      // Keep anything typed in other rows when the table re-renders after a save.
+      host.querySelectorAll('input[data-key]').forEach((el) => { if (el.value !== el.defaultValue) draft[el.dataset.key] = el.value; else delete draft[el.dataset.key]; });
+      const showEdit = canWrite;
+      const colCount = 4 + (showEdit ? 2 : 0) + (isManager ? 1 : 0);
+      let rows = '';
       GROUPS.forEach((g) => {
         const list = shown.filter((it) => it.group === g);
         if (!list.length) return;
-        html += `<div class="group"><div class="group-title">${L(GROUP_LABEL[g])}</div>${list.map(itemHtml).join('')}</div>`;
+        rows += `<tr class="grp"><td colspan="${colCount}">${L(GROUP_LABEL[g])}</td></tr>${list.map(itemHtml).join('')}`;
       });
-      host.innerHTML = html;
+      host.innerHTML = `<div class="tbl-wrap"><table class="inv"><thead><tr>
+        <th class="nm-cell">${L('colItem')}</th><th class="num">${L('colHave')}</th>
+        ${showEdit ? `<th>${L('colCount')}</th><th>${L('colResupply')}</th>` : ''}<th class="col-status">${L('colStatus')}</th><th class="num${isManager ? '' : ' m-hide'}">${L('colPar')}</th>${isManager ? '<th></th>' : ''}
+      </tr></thead><tbody>${rows}</tbody></table></div>`;
+      host.querySelectorAll('input[data-key]').forEach((el) => { if (draft[el.dataset.key] !== undefined) el.value = draft[el.dataset.key]; });
       wire(host);
     }
 
     function itemHtml(it) {
       const st = statusOf(it); const need = needOf(it);
       const unit = it.unit === 'ea' ? L('unit_ea') : it.unit;
-      const open = openId === it.id;
-      const meta = it.count ? L('counted', fmtDate(it.count.at), it.count.by) : L('notCounted');
-      let body = '';
-      if (open) {
-        body = `<div class="item-body">
-          ${canWrite ? `<div class="row-actions">
-            <div class="act"><label>${L('countNow')}</label><div class="inline"><input type="number" inputmode="numeric" min="0" step="1" placeholder="${L('countHint')}" data-count-in="${esc(it.id)}"><button class="btn small" data-count-save="${esc(it.id)}">${L('save')}</button></div></div>
-            <div class="act"><label>${L('addResupply')}</label><div class="inline"><input type="number" inputmode="numeric" min="1" step="1" placeholder="${L('resupplyHint')}" data-resup-in="${esc(it.id)}"><button class="btn small" data-resup-save="${esc(it.id)}">${L('save')}</button></div></div>
-          </div>` : ''}
-          <div class="hist">${meta}${it.lastResupply ? ` · ${L('resupplied', num(it.lastResupply.qty), fmtDate(it.lastResupply.at))}` : ''}</div>
-          ${isManager ? `<div class="mgr"><label>${L('setPar')}</label><input type="number" inputmode="numeric" min="0" step="1" value="${it.par}" data-par-in="${esc(it.id)}"><button class="btn ghost small" data-par-save="${esc(it.id)}">${L('save')}</button><span class="spacer"></span>${it.builtIn ? '' : `<button class="linkbtn" data-remove="${esc(it.id)}">${L('remove')}</button>`}</div>` : ''}
-        </div>`;
-      }
-      return `<div class="item s-${st}">
-        <button class="item-head" data-toggle="${esc(it.id)}" aria-expanded="${open}">
-          <div class="item-name"><div class="nm">${esc(dispName(it))}</div><div class="meta">${esc(unit)}${unit && it.par > 0 ? ' · ' : ''}${it.par > 0 ? L('par', num(it.par)) : ''}</div></div>
-          <div class="stock"><div class="qty">${it.stock === null ? '—' : num(it.stock)}</div>
-            <span class="pill ${st}">${L(st === 'none' ? 'noPar' : st)}</span>${need > 0 ? `<div class="need">${L('needN', num(need))}</div>` : ''}</div>
-        </button>${body}</div>`;
+      const metaBits = [unit];
+      if (it.count) metaBits.push(L('counted', fmtDate(it.count.at), it.count.by));
+      if (it.lastResupply) metaBits.push(L('resupplied', num(it.lastResupply.qty), fmtDate(it.lastResupply.at)));
+      const meta = it.count || it.lastResupply ? metaBits.filter(Boolean).join(' · ') : [unit, L('notCounted')].filter(Boolean).join(' · ');
+      const id = esc(it.id);
+      const cellIn = (kind, min, label) => `<div class="cell-in"><input type="number" inputmode="numeric" min="${min}" step="1" aria-label="${label}" data-key="${kind}:${id}" data-${kind}-in="${id}"><button class="btn small" data-${kind}-save="${id}" aria-label="${label}">✓</button></div>`;
+      const statusHtml = `<span class="pill ${st}">${L(st === 'none' ? 'noPar' : st)}</span>${need > 0 ? `<span class="need">${L('needN', num(need))}</span>` : ''}`;
+      return `<tr class="item s-${st}">
+        <td class="nm-cell"><div class="nm">${esc(dispName(it))}</div><div class="meta">${esc(meta)}</div><div class="m-status">${statusHtml}</div></td>
+        <td class="num"><span class="have">${it.stock === null ? '—' : num(it.stock)}</span></td>
+        ${canWrite ? `<td>${cellIn('count', 0, L('countNow'))}</td><td>${cellIn('resup', 1, L('addResupply'))}</td>` : ''}
+        <td class="col-status">${statusHtml}</td>
+        <td class="num${isManager ? '' : ' m-hide'}">${isManager
+          ? `<div class="cell-in"><input type="number" inputmode="numeric" min="0" step="1" value="${it.par}" aria-label="${L('setPar')}" data-key="par:${id}" data-par-in="${id}"><button class="btn ghost small" data-par-save="${id}" aria-label="${L('setPar')}">✓</button></div>`
+          : `<span class="parv">${it.par > 0 ? num(it.par) : '—'}</span>`}</td>
+        ${isManager ? `<td>${it.builtIn ? '' : `<button class="linkbtn" data-remove="${id}">${L('remove')}</button>`}</td>` : ''}
+      </tr>`;
     }
 
     function readNum(sel, min) {
@@ -400,22 +412,29 @@
       return Math.round(n);
     }
     function wire(host) {
-      host.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => { openId = openId === b.dataset.toggle ? null : b.dataset.toggle; render(); }));
-      const guard = (btn, fn) => async () => {
+      // Clear the row's input before saving so the draft-restore in render() doesn't
+      // bring the saved number back; put it back if the save fails.
+      const guard = (btn, inputSel, fn) => async () => {
+        const inp = document.querySelector(inputSel); const val = inp ? inp.value : '';
+        const key = inp?.dataset.key;
+        if (inp) inp.value = inp.defaultValue; if (key) delete draft[key];
         btn.disabled = true;
-        try { await fn(); toast(L('saved')); } catch (e) { toast(L('failed', e.message), 'error'); btn.disabled = false; }
+        try { await fn(); toast(L('saved')); } catch (e) {
+          toast(L('failed', e.message), 'error'); btn.disabled = false;
+          const again = document.querySelector(inputSel); if (again) { again.value = val; if (key) draft[key] = val; }
+        }
       };
       host.querySelectorAll('[data-count-save]').forEach((b) => b.addEventListener('click', () => {
         const id = b.dataset.countSave; const q = readNum(`[data-count-in="${CSS.escape(id)}"]`, 0); if (q === null) return;
-        guard(b, () => write({ action: 'count', itemId: id, quantity: String(q), date: today(), countedBy: who() }))();
+        guard(b, `[data-count-in="${CSS.escape(id)}"]`, () => write({ action: 'count', itemId: id, quantity: String(q), date: today(), countedBy: who() }))();
       }));
       host.querySelectorAll('[data-resup-save]').forEach((b) => b.addEventListener('click', () => {
         const id = b.dataset.resupSave; const q = readNum(`[data-resup-in="${CSS.escape(id)}"]`, 1); if (q === null) return;
-        guard(b, () => write({ action: 'resupply', itemId: id, quantity: String(q), date: today(), by: who() }))();
+        guard(b, `[data-resup-in="${CSS.escape(id)}"]`, () => write({ action: 'resupply', itemId: id, quantity: String(q), date: today(), by: who() }))();
       }));
       host.querySelectorAll('[data-par-save]').forEach((b) => b.addEventListener('click', () => {
         const id = b.dataset.parSave; const q = readNum(`[data-par-in="${CSS.escape(id)}"]`, 0); if (q === null) return;
-        guard(b, () => write({ action: 'set_par', itemId: id, par: String(q), updatedBy: who() }))();
+        guard(b, `[data-par-in="${CSS.escape(id)}"]`, () => write({ action: 'set_par', itemId: id, par: String(q), updatedBy: who() }))();
       }));
       host.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
         // First tap arms the button for 4s; a second tap removes. (Native
@@ -425,12 +444,12 @@
           setTimeout(() => { delete b.dataset.armed; b.textContent = L('remove'); }, 4000);
           return;
         }
-        const id = b.dataset.remove; openId = null;
-        guard(b, () => write({ action: 'untrack_item', itemId: id, updatedBy: who() }))();
+        const id = b.dataset.remove;
+        guard(b, '#__none__', () => write({ action: 'untrack_item', itemId: id, updatedBy: who() }))();
       }));
       host.querySelectorAll('input[type=number]').forEach((inp) => inp.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter') return;
-        inp.closest('.inline, .mgr')?.querySelector('button')?.click();
+        inp.closest('.cell-in')?.querySelector('button')?.click();
       }));
     }
 
