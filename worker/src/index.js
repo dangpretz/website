@@ -1152,9 +1152,7 @@ async function sendOrderAlert({
   formData.append('Order ID', orderId);
   formData.append('_template', 'table');
   formData.append('_captcha', 'false');
-  // info@ is the already-activated FormSubmit inbox. Paul is CC'd and must
-  // click FormSubmit's one-time confirmation before those copies deliver.
-  formData.append('_cc', 'paul@dangerouspretzel.com');
+  // info@ is the already-activated FormSubmit inbox.
 
   const res = await fetch('https://formsubmit.co/ajax/info@dangerouspretzel.com', {
     method: 'POST',

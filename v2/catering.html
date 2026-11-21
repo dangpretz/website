@@ -847,7 +847,6 @@ body.cart-open #tw { bottom: 90px; }
       <input type="hidden" name="_subject" value="Catering Request">
       <input type="hidden" name="_template" value="table">
       <input type="hidden" name="_captcha" value="false">
-      <input type="hidden" name="_cc" value="paul@dangerouspretzel.com">
       <input type="hidden" name="Items" id="req-items" value="">
       <input type="hidden" name="Lead source" id="req-lead-source" value="">
       <p class="form-required-note">Required fields are marked with *.</p>
@@ -987,8 +986,7 @@ body.cart-open #tw { bottom: 90px; }
   // ── CONFIG ──
   const WORKER_URL = 'https://dpc-catering-checkout.drew-f39.workers.dev';
   const DELIVERY_FEE = 7500; // cents
-  // info@ is the activated FormSubmit inbox. _cc adds Paul; he must confirm
-  // FormSubmit's one-time activation email before copies arrive there.
+  // info@ is the activated FormSubmit inbox.
   const LEAD_URL = 'https://formsubmit.co/ajax/info@dangerouspretzel.com';
 
   function currentLeadSource() {
@@ -1000,7 +998,6 @@ body.cart-open #tw { bottom: 90px; }
     const formData = new FormData();
     formData.append('_template', 'table');
     formData.append('_captcha', 'false');
-    formData.append('_cc', 'paul@dangerouspretzel.com');
     Object.entries(fields).forEach(([key, value]) => {
       if (value === undefined || value === null) return;
       const text = String(value).trim();
