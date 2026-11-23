@@ -27,9 +27,9 @@ const PRODUCTION_VIEWS = [
 ];
 
 describe('production page access', () => {
-  it('keeps the historical keypad codes, unchanged', () => {
+  it('keeps the historical keypad codes, with the bootstrap code rotated', () => {
     assert.deepEqual(LEGACY_PRODUCTION_PIN_CODES, [
-      '0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377',
+      '0068', '0571', '8468', '6124', '9281', '9646', '6362', '4614', '9709', '1377',
     ]);
     assert.equal(LEGACY_PRODUCTION_PIN_CODES.includes(BOOTSTRAP_MANAGER_CODE), true);
   });
@@ -80,6 +80,14 @@ describe('production page access', () => {
 });
 
 describe('bootstrap manager', () => {
+  it('no longer accepts the offboarded former bootstrap code', () => {
+    const retired = '8770';
+    assert.notEqual(BOOTSTRAP_MANAGER_CODE, retired);
+    assert.equal(LEGACY_PRODUCTION_PIN_CODES.includes(retired), false);
+    assert.equal(resolveStaffDirectory([])[retired], undefined);
+    assert.equal(productionUnlockKind(retired, undefined, 'production:manager'), 'deny');
+  });
+
   it('resolves to a full manager when the log is empty', () => {
     const directory = resolveStaffDirectory([]);
     const bootstrap = directory[BOOTSTRAP_MANAGER_CODE];
@@ -88,21 +96,21 @@ describe('bootstrap manager', () => {
   });
 
   it('keeps a saved row for the bootstrap code instead of widening it', () => {
-    // Paul Foley is the current bootstrap code. His saved grants have to win
-    // over the full-manager fallback; this bugfix must not rewrite them.
+    // A saved row for the bootstrap code has to win over the full-manager
+    // fallback; this bugfix must not rewrite it.
     const saved = ['production:manager', 'inventory'];
     const directory = resolveStaffDirectory([{
       action: 'set_staff',
       code: BOOTSTRAP_MANAGER_CODE,
-      name: 'Paul Foley',
+      name: 'Saved Manager',
       isManager: 'true',
       links: saved.join(','),
     }]);
-    assert.equal(directory[BOOTSTRAP_MANAGER_CODE].name, 'Paul Foley');
+    assert.equal(directory[BOOTSTRAP_MANAGER_CODE].name, 'Saved Manager');
     assert.equal(directory[BOOTSTRAP_MANAGER_CODE].isManager, true);
     assert.deepEqual(directory[BOOTSTRAP_MANAGER_CODE].links, saved);
-    // The production keypad still accepts his code for every view, which is
-    // the access he has today. That decision does not change the saved row.
+    // The production keypad still accepts the bootstrap code for every view.
+    // That decision does not change the saved row.
     assert.equal(
       productionUnlockKind(BOOTSTRAP_MANAGER_CODE, directory[BOOTSTRAP_MANAGER_CODE], 'production:foh'),
       'legacy',
@@ -114,7 +122,7 @@ describe('bootstrap manager', () => {
       {
         action: 'set_staff',
         code: BOOTSTRAP_MANAGER_CODE,
-        name: 'Paul Foley',
+        name: 'Saved Manager',
         isManager: 'true',
         links: 'inventory',
       },
