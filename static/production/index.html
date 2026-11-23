@@ -1349,8 +1349,8 @@
     resolveDeliveries, resolveProductionLogs,
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip, dipDeferTo,
-    isShapeOnlyDelivery, isDiscontinuedDipSku, unmappedDipSkus, SKU_NAMES_ES,
-  } from '../../scripts/inventory.js?v=2026-11-23-dip-defer';
+    isShapeOnlyDelivery, isDiscontinuedDipSku, isDiscontinuedPretzelSku, unmappedDipSkus, SKU_NAMES_ES,
+  } from '../../scripts/inventory.js?v=2026-11-23-no-bootlegger';
   import {
     itemHasPriorityCustomer,
     orderBfpAllocation,
@@ -1479,7 +1479,6 @@
     '7oz plain',
     '7oz bbk',
     '7oz spicy bee',
-    '7oz bootlegger',
     '7oz pepperoni',
     'plain bombs',
     'bees bats',
@@ -1512,7 +1511,7 @@
   const allProductionSkus = () => [...new Set([
     ...Object.keys(BATCH_SIZES),
     ...Object.keys(skuConfig).filter(s => !isFOH(s) && getBatchSize(s) > 0),
-  ])];
+  ])].filter((sku) => !isDiscontinuedPretzelSku(sku));
 
   // ─── BUSINESS RULES ───────────────────────────────────────────────────────
   // Edit these to match operational reality. Each is a single source of truth
@@ -2121,6 +2120,7 @@
             if (skuAliases[key]) key = skuAliases[key]; // resolve old → canonical name
             if (isFOH(key)) { fohSeen.add(key); return; }
             if (isDiscontinuedDipSku(key)) return; // honey mustard — do not schedule
+            if (isDiscontinuedPretzelSku(key)) return; // bootlegger — do not schedule
             if (DIP_CONFIG[key]) return; // dips have their own pipeline (Dips tab); shape/BFP teams don't make them
             if (!skuMap[key]) skuMap[key] = { shapePretzels: 0, bfpPretzels: 0, orders: [] };
             const q = Number(quantity) || 0;
@@ -3382,6 +3382,7 @@
     let summaryNoneCount    = 0;
 
     allSkus.forEach(sku => {
+      if (isDiscontinuedPretzelSku(sku)) return;
       if (isFOH(sku)) return; // FOH SKUs aren't part of production forecast
       // Use effective inventory — same numbers as worker card and scheduler.
       // Sum all three buckets: cf (dough), fr (frozen), oh (on-hand for
@@ -3435,9 +3436,10 @@
 
     // FOH role: Stock tab is filtered to dip rows only. They manage dip
     // on-hand counts, not pretzel inventory. Manager sees everything.
-    const stockSkus = userRole === 'foh'
+    const stockSkus = (userRole === 'foh'
       ? allSkus.filter(sku => LIFECYCLELESS_SKUS.has(sku) || isFOH(sku))
-      : allSkus;
+      : allSkus
+    ).filter((sku) => !isDiscontinuedPretzelSku(sku));
     const rows = stockSkus.map(sku => {
       const isFohSku   = isFOH(sku);
       // Lifecycle-less SKUs: cheese, bulk dip, and the 4 retail dips coming
@@ -3974,6 +3976,31 @@
       parts.push(`<div class="alert-banner">${label} ${unknown.map(esc).join(', ')}</div>`);
     }
     return parts.join('');
+  }
+
+  // Bootlegger orders stay on the delivery. They are not a shape or BFP task.
+  function discontinuedPretzelNote() {
+    const today = toDateStr(new Date());
+    const hits = [];
+    (allDeliveries || []).forEach((d) => {
+      if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return;
+      if (!d.date || d.date < today) return;
+      let items = [];
+      try { items = JSON.parse(d.lineItems || '[]'); } catch { items = []; }
+      if (!Array.isArray(items)) return;
+      items.forEach((li) => {
+        let sku = (li.sku || li.name || '').trim();
+        if (skuAliases[sku]) sku = skuAliases[sku];
+        if (!isDiscontinuedPretzelSku(sku)) return;
+        const who = d.customer || d.location || '?';
+        hits.push(`${esc(who)} · ${esc(sku)} × ${Number(li.quantity) || 0} for ${esc(d.date)}`);
+      });
+    });
+    if (!hits.length) return '';
+    const label = appLang === 'es'
+      ? 'Bootlegger está descontinuado. No se programa:'
+      : 'Bootlegger is discontinued. Not scheduled:';
+    return `<div class="alert-banner">${label} ${hits.join('; ')}</div>`;
   }
 
   function renderCheeseTab(dateStr) {
@@ -4930,7 +4957,7 @@
     // Worker views see no banners (calmer UX). Per-card 🌅 tag surfaces
     // past-window work for everyone.
     const alertHtml = userRole === 'manager'
-      ? (agingDoughHtml + overbakeHtml + unconfigHtml + dupHtml + unconfirmedHtml)
+      ? (agingDoughHtml + overbakeHtml + discontinuedPretzelNote() + unconfigHtml + dupHtml + unconfirmedHtml)
       : '';
     document.getElementById('alert-area').innerHTML = alertHtml;
 
@@ -5588,9 +5615,9 @@
 
   async function loadSkus() {
     try {
-      const r = await fetch('../delivery-planner/skus.json?v=2026-11-23-no-honey-mustard');
-      allSkus = await r.json();
-    } catch { allSkus = Object.keys(BATCH_SIZES); } // fallback to hardcoded list
+      const r = await fetch('../delivery-planner/skus.json?v=2026-11-23-no-bootlegger');
+      allSkus = (await r.json()).filter((sku) => !isDiscontinuedPretzelSku(sku));
+    } catch { allSkus = Object.keys(BATCH_SIZES).filter((sku) => !isDiscontinuedPretzelSku(sku)); }
   }
 
   // Pull per-dip FOH walk-in rates from the worker (last 28 days of Square

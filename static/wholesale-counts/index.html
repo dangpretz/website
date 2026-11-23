@@ -150,7 +150,8 @@
     import { requireAccess } from '../../scripts/staff-access.js';
     import {
       resolveDeliveries, resolveProductionLogs, CASE_SIZES, LEGACY_SKU_RENAMES, SKU_NAMES_ES,
-    } from '../../scripts/inventory.js?v=2026-10-16-sku-names-es';
+      isDiscontinuedPretzelSku,
+    } from '../../scripts/inventory.js?v=2026-11-23-no-bootlegger';
 
     const DELIVERY_LOG = '/dangpretz/delivery-planner';
     const PRODUCTION_LOG = '/dangpretz/production';
@@ -272,7 +273,7 @@
             items.forEach((it) => {
               const sku = canon(it.sku);
               const qty = Number(it.quantity) || 0;
-              if (!sku || qty <= 0) return;
+              if (!sku || qty <= 0 || isDiscontinuedPretzelSku(sku)) return;
               counted = true;
               // Cases: use what the order recorded; otherwise fall back to the
               // SKU's standard case size and report any remainder as loose.

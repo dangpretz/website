@@ -118,6 +118,14 @@ export function isDiscontinuedDipSku(sku) {
   return /honey\s*mustard/i.test(String(sku || ''));
 }
 
+// 7oz Bootlegger left the menu 2026-11-23 (6.5oz is the same product).
+// Batch, case, and tray sizes stay in the maps below so old orders,
+// snapshots, and Spanish names still resolve. Callers skip scheduling,
+// counting, and new orders the same way honey mustard is skipped.
+export function isDiscontinuedPretzelSku(sku) {
+  return /bootlegger/i.test(String(sku || ''));
+}
+
 // Wholesale bulk cheese. "bulk dangerous dip (25 srv)" × 12 = 300 servings.
 // N comes from "(N srv)" in the SKU; packets without a count are 25.
 export function bulkCheeseDipServings(sku, quantity) {
@@ -1332,7 +1340,7 @@ export function getInventoryReport(args) {
   const now = Date.now();
   const agingDough = [];
   Object.entries(doughQueue).forEach(([sku, queue]) => {
-    if (isDiscontinuedDipSku(sku)) return;
+    if (isDiscontinuedDipSku(sku) || isDiscontinuedPretzelSku(sku)) return;
     const dipCfg = DIP_CONFIG[sku];
     const failAt = dipCfg ? dipCfg.shelfLifeDays : DOUGH_AGE_FAIL_DAYS;
     const warnAt = dipCfg ? Math.max(1, dipCfg.shelfLifeDays - 1) : DOUGH_AGE_WARN_DAYS;
@@ -1457,9 +1465,9 @@ export function attributeDeliveryCoverage({
       if (skuAliases[key]) key = skuAliases[key];
       const qty = Number(quantity) || 0;
       if (qty <= 0) return;
-      // Discontinued dips still show on the order. They are not production
-      // work, so they must not pull the order toward "to make".
-      if (isDiscontinuedDipSku(key)) return;
+      // Discontinued dips and pretzels still show on the order. They are
+      // not production work, so they must not pull the order toward "to make".
+      if (isDiscontinuedDipSku(key) || isDiscontinuedPretzelSku(key)) return;
       // Skip FOH/unconfigured SKUs — they aren't produced in-house, so
       // they shouldn't drag the aggregate to "to make".
       if (getBatchSize && getBatchSize(key) === 0) return;
