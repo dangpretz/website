@@ -563,7 +563,7 @@ const IDENTITIES = {
 
 const SKUS = [
   '21oz mammoth pretzel','10oz mustache','10oz plain','10oz bbk','10oz spicy bee','10oz Vegan Pretzel',
-  '7oz plain','7oz bbk','7oz spicy bee','7oz bootlegger','7oz pepperoni',
+  '7oz plain','7oz bbk','7oz spicy bee','7oz pepperoni',
   '4oz twist plain','4oz twist bbk','4oz twist spicy bee',
   '3oz cheese dip','sweet cream dip','hot ranch dip','house mustard dip',
   'bulk dangerous dip (25 srv)','plain bombs','bees bats',
@@ -950,10 +950,10 @@ function buildSkuGrid(savedVolumes = {}) {
     grid.appendChild(label);
     grid.appendChild(input);
   });
-  // Old events can still name honey mustard. Show that quantity and keep it
-  // on save. It is not in the picker, so a new event cannot add it.
+  // Old events can still name honey mustard or bootlegger. Show that
+  // quantity and keep it on save. Neither is in the picker.
   Object.entries(savedVolumes).forEach(([sku, qty]) => {
-    if (!/honey\s*mustard/i.test(sku) || !(Number(qty) > 0) || SKUS.includes(sku)) return;
+    if (!(/honey\s*mustard/i.test(sku) || /bootlegger/i.test(sku)) || !(Number(qty) > 0) || SKUS.includes(sku)) return;
     const label = document.createElement('div');
     label.className = 'sku-label sku-row';
     label.textContent = `${sku} (discontinued)`;
@@ -990,7 +990,7 @@ function openModal(id = null, presetDate = null) {
   deleteBtn.style.display = (ev && isAdmin) ? '' : 'none';
   if (ev && isAdmin) deleteBtn.dataset.deleteId = ev.id;
 
-  // Populate SKU grid. Discontinued honey mustard stays visible on old events.
+  // Populate SKU grid. Discontinued honey mustard and bootlegger stay visible on old events.
   let savedVolumes = {};
   if (ev?.skuVolumes) {
     try { savedVolumes = JSON.parse(ev.skuVolumes) || {}; } catch (_) { savedVolumes = {}; }

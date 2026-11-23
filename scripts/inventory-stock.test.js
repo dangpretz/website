@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { resolveIngredients } from './ingredient-catalog.js';
 import {
+  attributeDeliveryCoverage,
+  BATCH_SIZES,
   collectIngredientCountWrites,
   computeIngredientStock,
   computeRecipeUsage,
+  isDiscontinuedPretzelSku,
   resolveStockProductId,
 } from './inventory.js';
 
@@ -97,6 +100,48 @@ describe('computeIngredientStock duplicates', () => {
   });
 });
 
+describe('discontinued bootlegger', () => {
+  it('matches bootlegger names and leaves spicy bee and devil\'s delight active', () => {
+    assert.equal(isDiscontinuedPretzelSku('7oz bootlegger'), true);
+    assert.equal(isDiscontinuedPretzelSku('6.5oz bootlegger'), true);
+    assert.equal(isDiscontinuedPretzelSku('6.5oz bootlegger pretzel'), true);
+    assert.equal(isDiscontinuedPretzelSku('7oz spicy bee'), false);
+    assert.equal(isDiscontinuedPretzelSku('10oz spicy bee'), false);
+    assert.equal(isDiscontinuedPretzelSku('7oz pepperoni'), false);
+    assert.equal(isDiscontinuedPretzelSku("7oz devil's delight"), false);
+    assert.equal(BATCH_SIZES['7oz bootlegger'], 72);
+    assert.equal(BATCH_SIZES['7oz spicy bee'], 72);
+    assert.equal(BATCH_SIZES['10oz spicy bee'], 48);
+    assert.equal(BATCH_SIZES['7oz pepperoni'], 72);
+  });
+
+  it('does not turn a bootlegger line into production work', () => {
+    const coverage = attributeDeliveryCoverage({
+      activeDeliveries: [{
+        deliveryId: 'd1',
+        date: '2026-11-24',
+        customer: 'Cafe',
+        lineItems: JSON.stringify([
+          { sku: '7oz bootlegger', quantity: 72 },
+          { sku: '6.5oz bootlegger', quantity: 32 },
+          { sku: '7oz spicy bee', quantity: 48 },
+          { sku: '7oz pepperoni', quantity: 24 },
+        ]),
+      }],
+      inventoryReport: { effective: { frozen: {}, coldFerment: {}, onHand: {} } },
+      skuAliases: { '6.5oz bootlegger': '7oz bootlegger' },
+      getBatchSize: (sku) => BATCH_SIZES[sku] || 0,
+    });
+    const { lines } = coverage.get('d1');
+    assert.equal(lines['7oz bootlegger'], undefined);
+    assert.equal(lines['6.5oz bootlegger'], undefined);
+    assert.equal(lines['7oz spicy bee'].status, 'unstarted');
+    assert.equal(lines['7oz spicy bee'].qty, 48);
+    assert.equal(lines['7oz pepperoni'].qty, 24);
+    assert.equal(coverage.get('d1').aggregateStatus, 'unstarted');
+  });
+});
+
 describe('collectIngredientCountWrites', () => {
   it('matches the per-row physical count and skips blanks and unchanged rows', () => {
     const { writes, invalid } = collectIngredientCountWrites([
@@ -137,6 +182,19 @@ describe('resolveIngredients', () => {
     assert.equal(items.some((p) => p.id === 'usf-8091092'), false);
     const again = items.find((p) => p.id === 'new-8091092');
     assert.equal(again.name, 'Flour again');
+  });
+
+  it('hides dropped bourbon from counts and keeps the name for old recipes', () => {
+    const active = resolveIngredients([]);
+    assert.equal(active.some((p) => p.id === 'recipe-bourbon'), false);
+    assert.equal(active.some((p) => /bourbon/i.test(p.name)), false);
+    const archivedOnly = resolveIngredients([], { includeArchived: true });
+    assert.equal(archivedOnly.some((p) => p.id === 'recipe-bourbon'), false);
+    const kept = resolveIngredients([], { includeDropped: true }).find((p) => p.id === 'recipe-bourbon');
+    assert.equal(kept.name, 'Bourbon');
+    assert.equal(kept.dropped, true);
+    assert.equal(kept.par, 0);
+    assert.equal(active.some((p) => p.name === 'Flour'), true);
   });
 
   it('applies update_product onto a hardcoded row without changing its id', () => {

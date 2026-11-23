@@ -22,6 +22,9 @@
 // ║                to; absent for non-US-Foods items.                        ║
 // ║   requiresTemp true = cold-chain, Receiving prompts for a temp reading.  ║
 // ║   par          default PAR level for the Inventory low-stock check.      ║
+// ║   dropped      true = off the count list and the add-ingredient picker.  ║
+// ║                The id stays so old recipe lines can still resolve a name  ║
+// ║                when resolveIngredients is called with includeDropped.     ║
 // ║                                                                          ║
 // ║ resolveIngredients(receivingLogs) applies the live receiving log on top: ║
 // ║ drops `archive_product` ids, appends `new_product` entries, sorts by     ║
@@ -148,7 +151,9 @@ export const INGREDIENT_CATALOG = [
   { id: 'recipe-mango-puree', name: 'Mango Puree', packSize: '1/5/LB', requiresTemp: true },
   { id: 'recipe-tajin', name: 'Tajin', packSize: '1/5/LB', requiresTemp: false },
   { id: 'recipe-bacon-diced', name: 'Bacon, Diced', packSize: '2/5/LB', requiresTemp: true },
-  { id: 'recipe-bourbon', name: 'Bourbon', packSize: '1/1/L', requiresTemp: false },
+  // Dropped 2026-11-23 with 7oz Bootlegger, its only recipe. par 0 so a
+  // caller that still lists dropped rows does not keep a buy target.
+  { id: 'recipe-bourbon', name: 'Bourbon', packSize: '1/1/L', requiresTemp: false, par: 0, dropped: true },
   { id: 'recipe-maple-syrup', name: 'Maple Syrup', packSize: '1/1/GAL', requiresTemp: false },
   { id: 'recipe-pickles-chopped', name: 'Pickles, Chopped', packSize: '4/1/GAL', requiresTemp: true },
   { id: 'recipe-herb-dill', name: 'Herb, Dill, Fresh', packSize: '1/1/LB', requiresTemp: true },
@@ -172,14 +177,16 @@ export const INGREDIENT_CATALOG = [
 // Receiving History pass it so a delivery of a de-listed item can still be
 // scanned and logged. Inventory / Recipes / Forecast use the default (archived
 // items drop out).
-export function resolveIngredients(receivingLogs, { includeArchived = false } = {}) {
+export function resolveIngredients(receivingLogs, { includeArchived = false, includeDropped = false } = {}) {
   const logs = Array.isArray(receivingLogs) ? receivingLogs : [];
   const archived = new Set(
     logs.filter((r) => r.action === 'archive_product' && r.productId).map((r) => r.productId),
   );
   const drop = (id) => !includeArchived && archived.has(id);
 
-  const out = INGREDIENT_CATALOG.filter((p) => !drop(p.id)).map((p) => ({ ...p }));
+  const out = INGREDIENT_CATALOG
+    .filter((p) => !drop(p.id) && (includeDropped || !p.dropped))
+    .map((p) => ({ ...p }));
   const codeKey = (code) => {
     const s = String(code || '').trim();
     if (!s) return '';

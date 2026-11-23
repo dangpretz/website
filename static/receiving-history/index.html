@@ -421,7 +421,7 @@
 
   <script type="module">
     import { appendLog, fetchLog } from '../../scripts/sheet-logger.js?v=dpclog';
-    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
+    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js?v=2026-11-23-no-bourbon';
 
     const LOG_PATH = '/dangpretz/receiving';
     const TEMP_THRESHOLD = 42;
@@ -493,7 +493,7 @@
     // usFoodsCode: the 7-digit product code at chars 7–13 of a US Foods barcode.
     // requiresTemp: true for all dairy, refrigerated, and fresh produce items.
     // ── Product catalog — shared ingredient list (scripts/ingredient-catalog.js) ──
-    let catalog = [...INGREDIENT_CATALOG];
+    let catalog = INGREDIENT_CATALOG.filter((p) => !p.dropped);
 
     // ════════════════════════════════════════════════════════════
     // ENTRY FORM

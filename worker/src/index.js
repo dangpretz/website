@@ -381,6 +381,8 @@ const SQUARE_NAME_MAP = {
   '6.5oz plain pretzel':         '7oz plain',
   '6.5oz spicy bee':             '7oz spicy bee',
   '6.5oz spicy bee pretzel':     '7oz spicy bee',
+  // Dropped from the menu 2026-11-23. Old Square names still resolve;
+  // staff tools do not schedule or offer the SKU.
   '6.5oz bootlegger':            '7oz bootlegger',
   '6.5oz bootlegger pretzel':    '7oz bootlegger',
   '6.5oz pepperoni':             '7oz pepperoni',

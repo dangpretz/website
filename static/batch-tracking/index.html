@@ -332,8 +332,9 @@
     { code: 'PSB07', name: 'Spicy Bee 7oz',        nameEs: 'Spicy chico' },
     { code: 'TSB04', name: 'Spicy Bee Twist',      nameEs: 'Spicy Trenza' },
     { code: 'PDD07', name: "Devil's Delight 7oz",  nameEs: 'Pepperoni chico' },
-    { code: 'PBL07', name: 'Bootlegger 7oz',       nameEs: 'Tocino chico' },
-    { code: 'PBL06', name: 'Bootlegger 6.5oz',    nameEs: 'Tocino 6.5oz' },
+    // Dropped 2026-11-23. Kept so old batch codes still resolve a name.
+    { code: 'PBL07', name: 'Bootlegger 7oz',       nameEs: 'Tocino chico', dropped: true },
+    { code: 'PBL06', name: 'Bootlegger 6.5oz',    nameEs: 'Tocino 6.5oz', dropped: true },
     { code: 'PPE06', name: 'Pepperoni 6.5oz',     nameEs: 'Pepperoni 6.5oz' },
     { code: 'HPL07', name: 'Hot Dog Plain',        nameEs: 'Pan Plain' },
     { code: 'HGP07', name: 'Hot Dog BBK',          nameEs: 'Pan BBK' },
@@ -341,6 +342,7 @@
     { code: 'BPL01', name: 'Plain Bombs',          nameEs: 'Bombas Veganas' },
     { code: 'DDC03', name: 'Dangerous Dip',        nameEs: 'Queso' },
   ];
+  const ACTIVE_PRODUCTS = PRODUCTS.filter((p) => !p.dropped);
 
   // ── i18n ──────────────────────────────────────────────────────────────────────
   const STRINGS = {
@@ -447,7 +449,7 @@
     if (sel) {
       const current = sel.value;
       sel.innerHTML = `<option value="">${S.selectProduct}</option>` +
-        PRODUCTS.map((p) => `<option value="${p.code}">${lang === 'es' ? p.nameEs : p.name}</option>`).join('');
+        ACTIVE_PRODUCTS.map((p) => `<option value="${p.code}">${lang === 'es' ? p.nameEs : p.name}</option>`).join('');
       sel.value = current;
     }
     // Update filter product options
@@ -455,7 +457,7 @@
     if (fsel) {
       const cur = fsel.value;
       fsel.innerHTML = `<option value="">${S.filterProduct}</option>` +
-        PRODUCTS.map((p) => `<option value="${p.code}">${lang === 'es' ? p.nameEs : p.name}</option>`).join('');
+        ACTIVE_PRODUCTS.map((p) => `<option value="${p.code}">${lang === 'es' ? p.nameEs : p.name}</option>`).join('');
       fsel.value = cur;
     }
     // Active/inactive toggle buttons

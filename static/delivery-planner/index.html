@@ -1129,10 +1129,11 @@
       attributeDeliveryCoverage,
       isShapeOnlyDelivery,
       isDiscontinuedDipSku,
+      isDiscontinuedPretzelSku,
       expandBoxLineItems,
       caseSizeOptionsFor,
       normalizeCustomerName as normalizeCustomer,
-    } from '../../scripts/inventory.js?v=2026-11-23-dip-servings';
+    } from '../../scripts/inventory.js?v=2026-11-23-no-bootlegger';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
 
     // Set once at boot from the resolved session (see the boot IIFE below).
@@ -1524,8 +1525,8 @@
     }
 
     async function loadSkus() {
-      const res = await fetch('skus.json?v=2026-11-23-no-honey-mustard');
-      skus = await res.json();
+      const res = await fetch('skus.json?v=2026-11-23-no-bootlegger');
+      skus = (await res.json()).filter((sku) => !isDiscontinuedPretzelSku(sku));
     }
 
     function buildSkuSelect() {
@@ -2012,7 +2013,7 @@
       if (!line) {
         // Not in the coverage map (FOH, unconfigured, discontinued, or not
         // produced). Gray, and say so — the SKU text itself still shows.
-        if (isDiscontinuedDipSku(key)) {
+        if (isDiscontinuedDipSku(key) || isDiscontinuedPretzelSku(key)) {
           return { className: 'cov-foh', tooltip: 'Discontinued — do not make' };
         }
         return { className: 'cov-foh', tooltip: 'Not produced in-house' };

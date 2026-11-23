@@ -197,7 +197,7 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
-    import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
+    import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=2026-11-23-no-bourbon';
     import { resolveRecipes, readRecipeLineGrams, planRecipeWrites, writeLogRows } from '../../scripts/inventory.js?v=dpclog';
 
     const RECIPES_PATH   = '/dangpretz/recipes';
@@ -207,7 +207,7 @@
     const SKUS = [
       '21oz mammoth pretzel', '10oz mustache', '10oz plain',
       '10oz bbk', '10oz spicy bee', '10oz Vegan Pretzel', '7oz plain', '7oz bbk',
-      '7oz spicy bee', '7oz bootlegger', '7oz pepperoni',
+      '7oz spicy bee', '7oz pepperoni',
       // ── hot-dog-bun shape (2026-09) — same dough/recipe as the matching 7oz flavor ──
       '7oz hot dog plain', '7oz hot dog bbk', '7oz hot dog spicy bee',
       '4oz twist plain', '4oz twist bbk',
@@ -706,7 +706,7 @@
           fetchLog(RECEIVING_PATH),
         ]);
         const receiving = Array.isArray(receivingLogs) ? receivingLogs : [];
-        const all = resolveIngredients(receiving, { includeArchived: true });
+        const all = resolveIngredients(receiving, { includeArchived: true, includeDropped: true });
         PRODUCTS = resolveIngredients(receiving);
         const activeIds = new Set(PRODUCTS.map((p) => p.id));
         BY_ID = {};

@@ -441,13 +441,13 @@
 
   <script type="module">
     import { appendLog, fetchLog } from '../../scripts/sheet-logger.js?v=dpclog';
-    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
+    import { INGREDIENT_CATALOG, resolveIngredients } from '../../scripts/ingredient-catalog.js?v=2026-11-23-no-bourbon';
 
     // ── Product catalog — shared ingredient list (scripts/ingredient-catalog.js).
     //    INGREDIENT_CATALOG is the synchronous fallback; the receiving log is
     //    fetched below to fold in products added since (includeArchived so a
     //    delivery of a de-listed item can still be logged).
-    let catalog = [...INGREDIENT_CATALOG];
+    let catalog = INGREDIENT_CATALOG.filter((p) => !p.dropped);
 
     const TEMP_THRESHOLD = 42;
     const LOG_PATH = '/dangpretz/receiving';

@@ -180,7 +180,7 @@
     // Its own log — nothing here reads or writes the shop's /dangpretz/inventory
     // or the production app's stock snapshots, so the two never mix.
     const LOG_PATH = '/dangpretz/delta-center-inventory';
-    const SKU_LIST_URL = '../delivery-planner/skus.json?v=2026-11-23-no-honey-mustard';
+    const SKU_LIST_URL = '../delivery-planner/skus.json?v=2026-11-23-no-bootlegger';
     const resolveItems = resolveDeltaItems;
     let parMode = false;
 
@@ -431,7 +431,7 @@
     function openAdd() {
       $('list-panel').hidden = true;
       const tracked = new Set(items.map((i) => i.id));
-      const opts = allSkus.filter((s) => !tracked.has(`sku:${s}`)).map((s) => `<option value="${esc(s)}">${esc((lang === 'es' && SKU_NAMES_ES[s]) || s)}</option>`).join('');
+      const opts = allSkus.filter((s) => !tracked.has(`sku:${s}`) && !/bootlegger/i.test(s)).map((s) => `<option value="${esc(s)}">${esc((lang === 'es' && SKU_NAMES_ES[s]) || s)}</option>`).join('');
       $('add-panel').hidden = false;
       $('add-panel').innerHTML = `<h3>${L('addTitle')}</h3>
         <div class="field"><label>${L('fromList')}</label><select id="add-pick"><option value="">${L('pick')}</option>${opts}<option value="__new__">${L('newSupply')}</option></select></div>
