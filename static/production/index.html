@@ -417,6 +417,29 @@
       background: #fff0f0; border-radius: 12px; padding: 24px 20px;
       text-align: center; font: 600 15px 'Manrope', sans-serif; color: var(--red);
     }
+    .load-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 56px 20px; color: var(--gray-4);
+      font: 700 16px 'Manrope', sans-serif;
+    }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid var(--gray-2); border-top-color: var(--red);
+      animation: dpc-spin 0.8s linear infinite;
+    }
+    @keyframes dpc-spin { to { transform: rotate(360deg); } }
+    .refresh-banner {
+      margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
+      background: #fff3cd; color: #856404; font: 700 13px 'Manrope', sans-serif;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .refresh-banner button, .load-error button {
+      min-height: 44px; padding: 10px 16px; border: none; border-radius: 8px;
+      background: var(--red); color: #fff; font: 700 14px 'Manrope', sans-serif; cursor: pointer;
+    }
+    .stock-blank-note {
+      margin: 8px 0 0; font: 600 12px 'Manrope', sans-serif; color: #856404;
+    }
 
     /* ── Bottom sheet ──────────────────────────── */
     .sheet-overlay {
@@ -1164,7 +1187,34 @@
     <button class="tab-btn" data-tab="dips">🧀 Dips</button>
     <button class="tab-btn" data-tab="stock">📦 Stock</button>
   </div>
-  <div id="main-view"><div class="no-prod">Loading…</div></div>
+  <div id="main-view" data-load-state="loading"><div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div class="load-state-text" id="boot-loading">Loading…</div></div></div>
+<script>
+  // Date + spinner label before the module downloads the logs. The keypad
+  // check above is unchanged.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const role = (params.get('role') || '').toLowerCase().trim();
+    const worker = role === 'shape' || role === 'bfp' || role === 'dips' || role === 'stock';
+    let lang = params.get('lang');
+    if (lang !== 'es' && lang !== 'en') {
+      try { lang = localStorage.getItem('prod-lang'); } catch (_) { lang = null; }
+    }
+    if (lang !== 'es' && lang !== 'en') {
+      lang = worker ? 'es' : ((navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en');
+    }
+    const loading = document.getElementById('boot-loading');
+    if (loading) loading.textContent = lang === 'es' ? 'Cargando…' : 'Loading…';
+    const when = new Date().toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', {
+      weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/Denver',
+    });
+    const todayWord = lang === 'es' ? 'Hoy' : 'Today';
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    set('date-label', todayWord);
+    set('date-sub', when);
+    set('worker-date-label', todayWord);
+    set('worker-date-sub', when);
+  } catch (_) {}
+</script>
 </div>
 
 <!-- Extra / unscheduled batch sheet -->
@@ -1271,6 +1321,8 @@
 
 <script type="module">
   import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
+  import { readCachedLog, writeCachedLog, startLoadWatch } from '../../scripts/log-cache.js?v=2026-11-23-staff';
+  import { collectStockSnapshot, stockFieldValue } from '../../scripts/stock-count.js?v=2026-11-23-staff';
   import {
     STAFF_LOG_PATH,
     getSessionUnlock, setSessionUnlock,
@@ -2445,6 +2497,9 @@
       .filter((i) => i.date === dateStr && i.sku === sku)
       .sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
     if (!todays.length) {
+      if (shapeIngredientsStatus === 'loading') {
+        return `<div class="ingredient-scan-empty">${appLang === 'es' ? 'Cargando…' : 'Loading…'}</div>`;
+      }
       return `<div class="ingredient-scan-empty">${appLang === 'es' ? 'Nada escaneado' : 'Nothing scanned'}</div>`;
     }
     return todays.map(ingredientRowHtml).join('');
@@ -3355,8 +3410,11 @@
       // Pre-fill inputs with effective values — same source of truth as worker
       // card, scheduler, and forecast above. Manager confirms or adjusts based
       // on physical count rather than retyping from scratch.
-      const doughDisplay  = report.effective.coldFerment[sku] || 0;
-      const frozenDisplay = report.effective.frozen[sku] || 0;
+      const inDough = Object.prototype.hasOwnProperty.call(inv.coldFerment || {}, sku);
+      const inFrozen = Object.prototype.hasOwnProperty.call(inv.frozen || {}, sku);
+      const inOnHand = Object.prototype.hasOwnProperty.call(inv.onHand || {}, sku);
+      const doughDisplay = stockFieldValue(report.effective.coldFerment[sku], inDough);
+      const frozenDisplay = stockFieldValue(report.effective.frozen[sku], inFrozen);
       // For lifecycle-less SKUs the input pre-fills with the FULL effective
       // sum (cf + fr + oh) so that:
       //  - Batches logged via the Dips-tab stepper (which credit cf) are
@@ -3368,9 +3426,10 @@
       //    absorbed into oh on next save.
       // The Dips-tab ON HAND metric uses the same sum, so the two views
       // never disagree.
-      const onHandDisplay = isLifecycleless
-        ? (report.effective.onHand?.[sku] || 0) + frozenDisplay + doughDisplay
+      const onHandEffective = isLifecycleless
+        ? (report.effective.onHand?.[sku] || 0) + (report.effective.frozen[sku] || 0) + (report.effective.coldFerment[sku] || 0)
         : (report.effective.onHand?.[sku] || 0);
+      const onHandDisplay = stockFieldValue(onHandEffective, inOnHand || (isLifecycleless && (inFrozen || inDough)));
       const fc         = forecasts[sku];
       const ageDays    = oldestDoughAge[sku];
 
@@ -3451,15 +3510,15 @@
       // to commit, so misclicks are easy to recover from.
       const rightInput = isLifecycleless
         ? `<div style="display:flex;flex-direction:column;gap:2px;align-items:stretch">
-             <input class="stock-input" type="number" min="0" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" data-initial-value="${onHandDisplay}" placeholder="0" title="On hand">
+             <input class="stock-input" type="text" inputmode="decimal" data-stock-section="onhand" data-sku="${esc(sku)}" value="${onHandDisplay}" data-initial-value="${onHandDisplay}" data-prior="${esc(String(inv.onHand?.[sku] ?? ''))}" placeholder="—" title="On hand">
              <button type="button" data-stock-zero data-zero-sku="${esc(sku)}" style="background:none;border:none;font:500 10px 'Manrope',sans-serif;color:var(--gray-3);cursor:pointer;padding:0;line-height:1.2" title="${appLang === 'es' ? 'Poner en cero (no guarda)' : 'Set to zero (does not save)'}">↺ ${appLang === 'es' ? 'cero' : 'zero'}</button>
            </div>`
-        : `<input class="stock-input" type="number" min="0" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" data-initial-value="${frozenDisplay}" placeholder="0">`;
+        : `<input class="stock-input" type="text" inputmode="decimal" data-stock-section="frozen" data-sku="${esc(sku)}" value="${frozenDisplay}" data-initial-value="${frozenDisplay}" data-prior="${esc(String(inv.frozen?.[sku] ?? ''))}" placeholder="—">`;
       return `<div class="stock-row">
         <div><span class="stock-sku">${esc(skuDisplayName(sku))}</span>${ageBadge}${dedStr}${fcStr}${coverageHtml}</div>
         ${(isFohSku || isLifecycleless)
           ? `<span class="stock-na">—</span>`
-          : `<input class="stock-input" type="number" min="0" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" data-initial-value="${doughDisplay}" placeholder="0">`}
+          : `<input class="stock-input" type="text" inputmode="decimal" data-stock-section="shape" data-sku="${esc(sku)}" value="${doughDisplay}" data-initial-value="${doughDisplay}" data-prior="${esc(String(inv.coldFerment?.[sku] ?? ''))}" placeholder="—">`}
         ${rightInput}
       </div>`;
     }).join('');
@@ -3518,6 +3577,7 @@
         <div>
           <div class="stock-tab-title">${esc(tabTitle)}</div>
           <div class="stock-tab-note">${esc(lastSavedStr)}${esc(deductNote)}</div>
+          <p class="stock-blank-note" id="stock-blank-note" hidden></p>
         </div>
       </div>
       ${fohHeadsUp}
@@ -3933,23 +3993,30 @@
   }
 
   async function saveStock() {
-    const snaps = {};
-    document.querySelectorAll('[data-stock-section]').forEach(inp => {
-      const sku = (inp.dataset.sku || '').trim(); // defense in depth — match read path
-      const section = inp.dataset.stockSection;
-      const n   = parseInt(inp.value, 10) || 0;
-      if (!sku) return;
-      if (!snaps[sku]) snaps[sku] = { sku, coldFerment: 0, frozen: 0, onHand: 0 };
-      if (section === 'shape')  snaps[sku].coldFerment = n;
-      if (section === 'frozen') snaps[sku].frozen      = n;
-      // onhand bucket — for lifecycle-less SKUs (cheese, bulk dip, future
-      // retail dips). Distinct from `frozen` (which is reserved for actually
-      // frozen pretzels) so the cheese row doesn't pollute pretzel forecasts.
-      if (section === 'onhand') snaps[sku].onHand      = n;
-    });
-    // Save ALL SKUs the user touched, including zeros — clearing an SKU to 0
-    // must propagate so getLatestInventory can overwrite older non-zero values.
-    const snapArr = Object.values(snaps);
+    const entries = [...document.querySelectorAll('[data-stock-section]')].map((inp) => ({
+      sku: inp.dataset.sku,
+      section: inp.dataset.stockSection,
+      value: inp.value,
+      prior: inp.dataset.prior,
+      initial: inp.dataset.initialValue,
+    }));
+    // A blank keeps the prior count. An explicit 0 still saves as zero.
+    // Invalid numbers skip that SKU instead of wiping it.
+    const collected = collectStockSnapshot(entries);
+    if (collected.invalid.length || collected.skipped.length) {
+      const which = [...new Set([...collected.invalid.map((row) => row.sku), ...collected.skipped])].join(', ');
+      alert(appLang === 'es'
+        ? `No se guardó (número inválido o vacío sin conteo anterior): ${which}`
+        : `Not saved (invalid number, or blank with no prior count): ${which}`);
+      if (collected.snapshots.length === 0) return;
+    }
+    // Never write an empty snapshot. That would move "Último conteo" without
+    // any counts, which is what a click does if the inputs are not on screen yet.
+    if (!collected.snapshots.length) {
+      alert(appLang === 'es' ? 'No hay cantidades para guardar.' : 'There are no quantities to save.');
+      return;
+    }
+    const snapArr = collected.snapshots;
     const saveBtn = document.getElementById('stock-save');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…'; }
     // Capture the schedule BEFORE save so we can diff after rebuild.
@@ -3967,6 +4034,16 @@
       // breaks the save flow itself.
       try { showScheduleDiffToast(diffSchedules(prevSchedule, schedule)); }
       catch (toastErr) { console.warn('schedule diff toast skipped:', toastErr); }
+      if (collected.keptBlank.length) {
+        const note = appLang === 'es'
+          ? `Campos vacíos conservaron el conteo anterior (${collected.keptBlank.length}). No se guardaron como cero.`
+          : `Blank fields kept the prior count (${collected.keptBlank.length}). They were not saved as zero.`;
+        const toast = document.createElement('div');
+        toast.className = 'schedule-diff-toast';
+        toast.textContent = note;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+      }
     } catch (e) {
       alert('Error saving: ' + e.message);
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('save_stock'); }
@@ -4866,6 +4943,21 @@
     });
     const stockSaveBtn = document.getElementById('stock-save');
     if (stockSaveBtn) stockSaveBtn.addEventListener('click', saveStock);
+    const blankNote = document.getElementById('stock-blank-note');
+    if (blankNote) {
+      const refreshNote = () => {
+        const blanks = [...document.querySelectorAll('[data-stock-section]')].filter((inp) => inp.value.trim() === '').length;
+        if (!blanks) { blankNote.hidden = true; return; }
+        blankNote.hidden = false;
+        blankNote.textContent = appLang === 'es'
+          ? `${blanks} vacío(s): se conserva el conteo anterior. No se guardan como cero.`
+          : `${blanks} blank: the prior count is kept. Blanks are not saved as zero.`;
+      };
+      document.querySelectorAll('[data-stock-section]').forEach((inp) => {
+        inp.addEventListener('input', refreshNote);
+      });
+      refreshNote();
+    }
     const stockAuditBtn = document.getElementById('stock-audit');
     if (stockAuditBtn) stockAuditBtn.addEventListener('click', showStockAuditModal);
     // FOH dough-transfer save button (only present on FOH home view).
@@ -5133,30 +5225,13 @@
     });
   }
 
-  async function loadDeliveries() {
-    const logs = await fetchLog(DELIVERY_LOG);
+  function applyDeliveryLogs(logs) {
     deliveryLogs = Array.isArray(logs) ? logs : [];
-    // First-pass resolution with whatever skuConfig is currently known
-    // (might be empty if loadProduction hasn't completed yet — that's fine,
-    // resolveDeliveriesNow() runs again at the end of init/refresh).
     resolveDeliveriesNow();
   }
 
-  // Shape-tab ingredient scans — day-level traceability log, independent of
-  // the production log. See resolveShapeIngredients() for how scan/void/
-  // label_product rows combine into the list shown per day.
-  let shapeIngredientLogs = [];
-  async function loadShapeIngredients() {
-    try {
-      const logs = await fetchLog(SHAPE_INGREDIENTS_LOG);
-      shapeIngredientLogs = Array.isArray(logs) ? logs : [];
-    } catch (_) { shapeIngredientLogs = []; }
-  }
-
-  async function loadProduction() {
-    const logs = await fetchLog(PRODUCTION_LOG);
+  function applyProductionLogs(logs) {
     productionLogs = Array.isArray(logs) ? logs : [];
-    // Shared resolver returns the full bundle — unpack into module-scope state.
     const resolved = resolveProductionLogs(productionLogs);
     productionState   = resolved.state;
     skuConfig         = resolved.skuConfig;
@@ -5164,6 +5239,152 @@
     latestInventoryTs = resolved.latestInventoryTs;
     packedCases       = resolved.packedCases || {};
     deferrals         = resolved.deferrals || {};
+  }
+
+  // Shape-tab ingredient scans — day-level traceability log, independent of
+  // the production log. See resolveShapeIngredients() for how scan/void/
+  // label_product rows combine into the list shown per day.
+  let shapeIngredientLogs = [];
+  let shapeIngredientsStatus = 'loading';
+  let staffLoadGen = 0;
+  let staffLoadController = null;
+  let staffHasPainted = false;
+
+  function applyShapeLogs(logs) {
+    shapeIngredientLogs = Array.isArray(logs) ? logs : [];
+    shapeIngredientsStatus = 'ready';
+  }
+
+  function paintSchedule() {
+    resolveDeliveriesNow();
+    schedule = buildOptimalSchedule();
+    const main = document.getElementById('main-view');
+    if (main) main.dataset.loadState = 'ready';
+    render();
+  }
+
+  function showStaffLoading() {
+    const main = document.getElementById('main-view');
+    if (!main) return;
+    main.dataset.loadState = 'loading';
+    const label = appLang === 'es' ? 'Cargando…' : 'Loading…';
+    main.innerHTML = `<div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div>${esc(label)}</div></div>`;
+  }
+
+  function showStaffSlow() {
+    const main = document.getElementById('main-view');
+    if (!main || main.dataset.loadState === 'ready') return;
+    main.dataset.loadState = 'slow';
+    const label = appLang === 'es' ? 'Está tardando…' : 'This is taking a while…';
+    const retry = appLang === 'es' ? 'Reintentar' : 'Retry';
+    main.innerHTML = `<div class="load-error" role="status"><div class="spinner" aria-hidden="true" style="margin:0 auto 12px"></div>${esc(label)}<br><br><button type="button" id="load-retry">${esc(retry)}</button></div>`;
+    const btn = document.getElementById('load-retry');
+    if (btn) btn.addEventListener('click', () => { reloadStaffData(); });
+  }
+
+  function showStaffError(err) {
+    const main = document.getElementById('main-view');
+    if (!main) return;
+    main.dataset.loadState = 'error';
+    const title = appLang === 'es' ? 'No se pudo cargar' : 'Could not load data';
+    const retry = appLang === 'es' ? 'Reintentar' : 'Retry';
+    const detail = err && err.message ? `<div style="font-weight:400;font-size:13px;margin-top:6px">${esc(err.message)}</div>` : '';
+    main.innerHTML = `<div class="load-error">${esc(title)}${detail}<br><br><button type="button" id="load-retry">${esc(retry)}</button></div>`;
+    const btn = document.getElementById('load-retry');
+    if (btn) btn.addEventListener('click', () => { reloadStaffData(); });
+  }
+
+  function showRefreshBanner() {
+    const host = document.getElementById('alert-area');
+    if (!host || document.getElementById('refresh-banner')) return;
+    const msg = appLang === 'es' ? 'Sigue cargando. Puedes reintentar.' : 'Still loading. You can retry.';
+    const retry = appLang === 'es' ? 'Reintentar' : 'Retry';
+    host.insertAdjacentHTML('afterbegin', `<div class="refresh-banner" id="refresh-banner"><span>${esc(msg)}</span><button type="button" id="refresh-retry">${esc(retry)}</button></div>`);
+    const btn = document.getElementById('refresh-retry');
+    if (btn) btn.addEventListener('click', () => { reloadStaffData(); });
+  }
+
+  function hideRefreshBanner() {
+    const banner = document.getElementById('refresh-banner');
+    if (banner) banner.remove();
+  }
+
+  async function loadDeliveries(signal) {
+    const logs = await fetchLog(DELIVERY_LOG, { signal });
+    applyDeliveryLogs(logs);
+    await writeCachedLog(DELIVERY_LOG, logs);
+  }
+
+  async function loadShapeIngredients(signal) {
+    try {
+      const logs = await fetchLog(SHAPE_INGREDIENTS_LOG, { signal });
+      applyShapeLogs(logs);
+      await writeCachedLog(SHAPE_INGREDIENTS_LOG, logs);
+    } catch (err) {
+      if (err && err.name === 'AbortError') throw err;
+      shapeIngredientLogs = [];
+      shapeIngredientsStatus = 'ready';
+    }
+  }
+
+  async function loadProduction(signal) {
+    const logs = await fetchLog(PRODUCTION_LOG, { signal });
+    applyProductionLogs(logs);
+    await writeCachedLog(PRODUCTION_LOG, logs);
+  }
+
+  // Critical logs (deliveries + production) paint today's list as soon as
+  // they arrive. Shape ingredients, SKUs and dip rates refresh after that.
+  // A saved copy paints immediately, then this replaces it.
+  async function reloadStaffData() {
+    if (staffLoadController) staffLoadController.abort();
+    const controller = new AbortController();
+    staffLoadController = controller;
+    const gen = ++staffLoadGen;
+    const { signal } = controller;
+    updateNav();
+
+    if (!staffHasPainted) {
+      const cachedD = await readCachedLog(DELIVERY_LOG);
+      const cachedP = await readCachedLog(PRODUCTION_LOG);
+      const cachedS = await readCachedLog(SHAPE_INGREDIENTS_LOG);
+      if (gen !== staffLoadGen) return;
+      if (cachedD && cachedP) {
+        applyDeliveryLogs(cachedD);
+        applyProductionLogs(cachedP);
+        if (cachedS) applyShapeLogs(cachedS);
+        else shapeIngredientsStatus = 'loading';
+        paintSchedule();
+        staffHasPainted = true;
+      } else {
+        shapeIngredientsStatus = 'loading';
+        showStaffLoading();
+      }
+    }
+
+    const watch = startLoadWatch(15000, () => {
+      if (gen !== staffLoadGen) return;
+      if (!staffHasPainted) showStaffSlow();
+      else showRefreshBanner();
+    });
+
+    try {
+      await Promise.all([loadDeliveries(signal), loadProduction(signal)]);
+      if (gen !== staffLoadGen) return;
+      if (!_isInputBusy()) paintSchedule();
+      staffHasPainted = true;
+      watch.finish();
+      hideRefreshBanner();
+      await Promise.all([loadSkus(), loadCheeseConsumption(), loadShapeIngredients(signal)]);
+      if (gen !== staffLoadGen) return;
+      if (!_isInputBusy()) paintSchedule();
+    } catch (err) {
+      if (err && (err.name === 'AbortError' || /aborted/i.test(String(err.message || '')))) return;
+      watch.finish();
+      if (gen !== staffLoadGen) return;
+      if (!staffHasPainted) showStaffError(err);
+      else showRefreshBanner();
+    }
   }
 
   async function loadSkus() {
@@ -5246,9 +5467,7 @@
     const btn = document.getElementById('refresh-btn');
     btn.disabled = true; btn.textContent = '…';
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
-      schedule = buildOptimalSchedule();
-      render();
+      await reloadStaffData();
     } finally {
       btn.disabled = false; btn.textContent = '↻';
     }
@@ -5332,9 +5551,7 @@
   if (wRef) wRef.addEventListener('click', async () => {
     wRef.disabled = true; wRef.textContent = '…';
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
-      schedule = buildOptimalSchedule();
-      render();
+      await reloadStaffData();
     } finally {
       wRef.disabled = false; wRef.textContent = '↻';
     }
@@ -5363,7 +5580,8 @@
     // already sees diffs on saveStock; soft-refreshes there are silent.
     const prevSched = (_isWorkerView && _workerDiffArmed) ? schedule : null;
     try {
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
+      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]);
+      resolveDeliveriesNow();
       schedule = buildOptimalSchedule();
       // Skip render if user just started typing during the network call
       if (!_isInputBusy()) render();
@@ -5796,22 +6014,13 @@
   (async () => {
     try {
       await waitForPinUnlock();
-      await Promise.all([loadDeliveries(), loadProduction(), loadSkus(), loadCheeseConsumption(), loadShapeIngredients()]); resolveDeliveriesNow();
-      schedule = buildOptimalSchedule();
-      render();
+      updateNav();
+      await reloadStaffData();
       // Self-test mode: ?selftest=1 — synthesizes items and verifies the
       // day-total / spare / bucket math without depending on live data.
       if (_urlSearch.get('selftest') === '1') runSelfTests();
     } catch (e) {
-      document.getElementById('main-view').innerHTML = `
-        <div class="load-error">
-          ⚠️ Could not load data<br>
-          <span style="font:400 13px 'Manrope',sans-serif">${esc(e.message)}</span><br><br>
-          <button onclick="window.location.reload()"
-            style="padding:12px 28px;background:var(--red);color:#fff;border:none;border-radius:8px;font:700 15px 'Manrope',sans-serif;cursor:pointer;min-height:48px">
-            Retry
-          </button>
-        </div>`;
+      showStaffError(e);
     }
   })();
 </script>

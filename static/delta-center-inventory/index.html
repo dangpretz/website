@@ -45,6 +45,17 @@
 
     .status { text-align: center; padding: 48px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
     .status.error { color: #C41E1E; font-weight: 700; }
+    .load-state { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #e6e0d6; border-top-color: #C41E1E; animation: dpc-spin 0.8s linear infinite; }
+    @keyframes dpc-spin { to { transform: rotate(360deg); } }
+    .item-head-row { display: flex; flex-wrap: wrap; align-items: stretch; }
+    .item-head-row .item-head { flex: 1 1 100%; }
+    .tile-count, .tile-par { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px 12px; width: 100%; }
+    .tile-count span, .tile-par span { font: 700 10px 'Manrope', sans-serif; letter-spacing: .6px; text-transform: uppercase; color: #999; }
+    .tile-count input, .tile-par input { width: 96px; font: 800 20px 'Manrope', sans-serif; padding: 8px; border: 2px solid #C41E1E; border-radius: 8px; text-align: center; }
+    .count-bar { display: flex; flex-direction: column; gap: 8px; background: #1A1A1A; padding: 12px; border-radius: 12px; margin-top: 16px; }
+    .count-bar .btn { width: 100%; min-height: 52px; font-size: 18px; background: #C41E1E; border-color: #C41E1E; }
+    .count-result { color: #ddd; font: 600 13px 'Manrope', sans-serif; }
 
     .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
     .stat { background: #fff; border-radius: 10px; padding: 14px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); flex: 1; min-width: 130px; }
@@ -136,31 +147,42 @@
         </div>
         <div class="tools">
           <button class="btn ghost small" id="list-btn">Resupply list</button>
+          <button class="btn" id="count-save-top" type="button" hidden>Guardar</button>
+          <button class="btn ghost small" id="par-btn" hidden>Set pars</button>
           <button class="btn small" id="add-btn" hidden>+ Add item</button>
           <div class="seg lang" id="lang-pill"><button data-lang="en">EN</button><button data-lang="es">ES</button></div>
         </div>
       </div>
 
       <p class="view-note" id="view-note" hidden></p>
-      <div id="status" class="status">Loading…</div>
+      <p class="view-note" id="par-note" hidden></p>
+      <div id="status" class="status"><div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div id="status-text">Loading…</div></div></div>
       <div id="summary" class="summary" hidden></div>
 
       <div id="add-panel" class="panel" hidden></div>
       <div id="list-panel" class="panel" hidden></div>
       <div id="items" hidden></div>
+      <div class="count-bar" id="count-bar" hidden>
+        <button class="btn" type="button" id="count-save">Guardar</button>
+        <button class="btn ghost" type="button" id="par-save" hidden>Guardar mínimos</button>
+        <p class="count-result" id="count-result"></p>
+      </div>
     </div>
   </div>
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
+    import { readCachedLog, writeCachedLog, startLoadWatch } from '../../scripts/log-cache.js?v=2026-11-23-staff';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
     import { SKU_NAMES_ES, denverCalendarDate } from '../../scripts/inventory.js?v=2026-11-23-denver-date';
+    import { resolveDeltaItems, collectDeltaCounts, collectDeltaPars } from '../../scripts/delta-center.js?v=2026-11-23-staff';
 
     // Its own log — nothing here reads or writes the shop's /dangpretz/inventory
     // or the production app's stock snapshots, so the two never mix.
     const LOG_PATH = '/dangpretz/delta-center-inventory';
     const SKU_LIST_URL = '../delivery-planner/skus.json?v=2026-09-11-hot-dog-buns';
-    const PAR_DEFAULT = 0;
+    const resolveItems = resolveDeltaItems;
+    let parMode = false;
 
     let session = null;
     let canWrite = false;       // may count / log resupply
@@ -197,7 +219,10 @@
         par: (n) => `Par ${n}`, needN: (n) => `Send ${n}`,
         counted: (d, by) => `Counted ${d}${by ? ` by ${by}` : ''}`, notCounted: 'Not counted yet',
         resupplied: (n, d) => `Last resupply: +${n} on ${d}`,
-        countNow: 'Count now', countHint: 'What’s on the shelf', save: 'Save', addResupply: 'Resupplied', resupplyHint: 'Amount received',
+        countNow: 'Count', countHint: 'What’s on the shelf', save: 'Save', saveAll: 'Save', parBtn: 'Set pars', parSave: 'Save pars',
+        noPars: 'No par levels have been saved yet. A manager can set them — this page will not guess.',
+        nothingChanged: 'Nothing changed',
+        addResupply: 'Resupplied', resupplyHint: 'Amount received',
         setPar: 'Par level', remove: 'Remove item', confirmRemove: 'Tap again to remove',
         none: 'Nothing here yet.', noneNeed: 'Nothing needs resupply right now. 🎉', noItems: 'No items yet.',
         addTitle: 'Add item', fromList: 'Pretzel or dip', newSupply: 'New supply…', pick: 'Choose…',
@@ -218,7 +243,10 @@
         par: (n) => `Mínimo ${n}`, needN: (n) => `Enviar ${n}`,
         counted: (d, by) => `Contado ${d}${by ? ` por ${by}` : ''}`, notCounted: 'Aún sin contar',
         resupplied: (n, d) => `Último surtido: +${n} el ${d}`,
-        countNow: 'Contar ahora', countHint: 'Lo que hay en el estante', save: 'Guardar', addResupply: 'Surtido', resupplyHint: 'Cantidad recibida',
+        countNow: 'Contar', countHint: 'Lo que hay en el estante', save: 'Guardar', saveAll: 'Guardar', parBtn: 'Fijar mínimos', parSave: 'Guardar mínimos',
+        noPars: 'Todavía no hay mínimos guardados. Un encargado puede fijarlos. Esta página no inventa números.',
+        nothingChanged: 'Nada cambió',
+        addResupply: 'Surtido', resupplyHint: 'Cantidad recibida',
         setPar: 'Nivel mínimo', remove: 'Quitar producto', confirmRemove: 'Toca otra vez para quitar',
         none: 'Aún no hay nada.', noneNeed: 'No falta surtir nada por ahora. 🎉', noItems: 'Aún no hay productos.',
         addTitle: 'Agregar producto', fromList: 'Pretzel o salsa', newSupply: 'Nuevo suministro…', pick: 'Elegir…',
@@ -234,73 +262,6 @@
     const fmtDate = (iso) => { if (!iso) return ''; const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso); return d.toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric' }); };
     const num = (n) => Number(n).toLocaleString(lang === 'es' ? 'es-MX' : 'en-US');
 
-    // The items this page always tracks. They're built in (not log rows), so the
-    // list is complete on an empty log and can't be removed; counts, pars and
-    // resupplies are logged against their ids. ids for pretzels/buns/dips match
-    // the planner SKU names ("sku:<name>"). Devil's Delight is the 7oz pepperoni
-    // SKU; "7oz … buns" are the 7oz hot-dog-bun SKUs; "mustard dip" is house mustard.
-    const BUILT_IN = [
-      { id: 'sku:7oz plain', name: '7oz plain', es: '7oz plain', group: 'pretzels', unit: 'ea' },
-      { id: 'sku:7oz bbk', name: '7oz bbk', es: '7oz bbk', group: 'pretzels', unit: 'ea' },
-      { id: 'sku:7oz spicy bee', name: '7oz spicy bee', es: '7oz spicy bee', group: 'pretzels', unit: 'ea' },
-      { id: 'sku:7oz pepperoni', name: '7oz devil\'s delight', es: '7oz devil\'s delight', group: 'pretzels', unit: 'ea' },
-      { id: 'sku:21oz mammoth pretzel', name: 'mammoth pretzels', es: 'pretzels mammoth', group: 'pretzels', unit: 'ea' },
-      { id: 'sku:7oz hot dog plain', name: '7oz plain buns', es: '7oz pan plain', group: 'buns', unit: 'ea' },
-      { id: 'sku:7oz hot dog bbk', name: '7oz bbk buns', es: '7oz pan bbk', group: 'buns', unit: 'ea' },
-      { id: 'sku:7oz hot dog spicy bee', name: '7oz spicy buns', es: '7oz pan spicy bee', group: 'buns', unit: 'ea' },
-      { id: 'sku:3oz cheese dip', name: '3oz cheese dip', es: '3oz salsa de queso', group: 'dips', unit: 'ea' },
-      { id: 'sku:house mustard dip', name: '3oz mustard dip', es: '3oz salsa de mostaza', group: 'dips', unit: 'ea' },
-      { id: 'sku:sweet cream dip', name: '3oz sweet cream', es: '3oz crema dulce', group: 'dips', unit: 'ea' },
-      { id: 'supply:saint-glaze', name: 'saint glaze', es: 'glaseado saint', group: 'toppings', unit: '' },
-      { id: 'supply:cinnamon-sugar', name: 'cinnamon sugar', es: 'azúcar con canela', group: 'toppings', unit: '' },
-    ];
-    const BUILT_IN_IDS = new Set(BUILT_IN.map((b) => b.id));
-
-    // ── Reducer: log rows → current items ──
-    // track_item {itemId,name,unit,kind,group}   add an extra item to the list
-    // untrack_item {itemId}                      remove it (history cleared)
-    // set_par {itemId,par}                       stock to keep on hand
-    // count {itemId,quantity,date,countedBy}     physical count — REPLACES stock
-    // resupply {itemId,quantity,date,by}         received from the shop — ADDS to stock
-    // Stock = latest count + every resupply logged after that count.
-    function resolveItems(rows) {
-      const sorted = [...rows].sort((a, b) => (a.timeStamp || '').localeCompare(b.timeStamp || ''));
-      const byId = {};
-      BUILT_IN.forEach((b, i) => {
-        byId[b.id] = {
-          id: b.id, name: b.name, es: b.es, unit: b.unit, kind: 'builtin', group: b.group, builtIn: true, order: i,
-          par: PAR_DEFAULT, stock: null, count: null, lastResupply: null,
-        };
-      });
-      sorted.forEach((r) => {
-        const id = r.itemId;
-        if (!id) return;
-        if (r.action === 'track_item') {
-          if (BUILT_IN_IDS.has(id)) return; // already on the list
-          byId[id] = {
-            id, name: r.name || id, unit: r.unit || '', kind: r.kind || 'supply', group: r.group || 'supplies',
-            par: byId[id]?.par ?? PAR_DEFAULT, stock: byId[id]?.stock ?? null, count: byId[id]?.count || null, lastResupply: byId[id]?.lastResupply || null,
-          };
-        } else if (r.action === 'untrack_item') {
-          if (!BUILT_IN_IDS.has(id)) delete byId[id];
-        } else if (!byId[id]) {
-          // events for an item that isn't on the list (removed, or out of order) are ignored
-        } else if (r.action === 'set_par') {
-          const v = Number(r.par); if (!Number.isNaN(v) && v >= 0) byId[id].par = v;
-        } else if (r.action === 'count') {
-          const v = Number(r.quantity); if (Number.isNaN(v) || v < 0) return;
-          byId[id].stock = v;
-          byId[id].count = { at: r.date || (r.timeStamp || '').slice(0, 10), by: r.countedBy || '' };
-        } else if (r.action === 'resupply') {
-          const v = Number(r.quantity); if (Number.isNaN(v) || v <= 0) return;
-          byId[id].stock = (byId[id].stock || 0) + v;
-          byId[id].lastResupply = { qty: v, at: r.date || (r.timeStamp || '').slice(0, 10) };
-        }
-      });
-      // Built-ins keep their listed order; items a manager adds follow alphabetically.
-      return Object.values(byId).sort((a, b) => (GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group))
-        || ((a.order ?? 999) - (b.order ?? 999)) || a.name.localeCompare(b.name));
-    }
     const statusOf = (it) => {
       if (it.stock === null) return it.par > 0 ? 'out' : 'none';
       if (it.par <= 0) return 'none';
@@ -310,19 +271,35 @@
     const needOf = (it) => (it.par > 0 ? Math.max(0, it.par - (it.stock || 0)) : 0);
 
     // ── Data ──
+    function showLoadError(err) {
+      $('status').hidden = false;
+      $('status').classList.add('error');
+      const retry = lang === 'es' ? 'Reintentar' : 'Retry';
+      $('status').innerHTML = `${L('loadFail', err && err.message ? err.message : '')}<br><button type="button" class="btn" id="delta-retry" style="margin-top:12px">${retry}</button>`;
+      const btn = $('delta-retry');
+      if (btn) btn.addEventListener('click', () => { load(); });
+    }
     async function load() {
-      $('status').hidden = false; $('status').classList.remove('error'); $('status').textContent = L('loading');
+      const text = $('status-text');
+      $('status').hidden = false;
+      $('status').classList.remove('error');
+      if (text) text.textContent = L('loading');
+      else $('status').textContent = L('loading');
+      const watch = startLoadWatch(15000, () => { if ($('items').hidden) showLoadError(); });
       try {
         const [rows, skus] = await Promise.all([
           fetchLog(LOG_PATH).catch((e) => { if (/404/.test(e.message)) return []; throw e; }),
           fetch(SKU_LIST_URL).then((r) => (r.ok ? r.json() : [])).catch(() => []),
         ]);
+        watch.finish();
         logs = Array.isArray(rows) ? rows : [];
         allSkus = Array.isArray(skus) ? skus : [];
+        writeCachedLog(LOG_PATH, logs);
         $('status').hidden = true;
         render();
       } catch (err) {
-        $('status').classList.add('error'); $('status').textContent = L('loadFail', err.message);
+        watch.finish();
+        showLoadError(err);
       }
     }
     function rebuild() { items = resolveItems(logs); }
@@ -350,6 +327,12 @@
       const shown = items.filter((it) => (filter === 'need' ? needOf(it) > 0 || statusOf(it) === 'out' : true));
       const low = items.filter((it) => ['low', 'out'].includes(statusOf(it))).length;
       const unitsNeeded = items.reduce((s, it) => s + needOf(it), 0);
+      const parNote = $('par-note');
+      if (parNote) {
+        const anyPar = items.some((it) => it.par > 0);
+        parNote.hidden = anyPar;
+        parNote.textContent = L('noPars');
+      }
       $('summary').hidden = !items.length;
       $('summary').innerHTML = `
         <div class="stat"><div class="n">${num(items.length)}</div><div class="l">${L('sTracked')}</div></div>
@@ -387,12 +370,20 @@
           ${isManager ? `<div class="mgr"><label>${L('setPar')}</label><input type="number" inputmode="numeric" min="0" step="1" value="${it.par}" data-par-in="${esc(it.id)}"><button class="btn ghost small" data-par-save="${esc(it.id)}">${L('save')}</button><span class="spacer"></span>${it.builtIn ? '' : `<button class="linkbtn" data-remove="${esc(it.id)}">${L('remove')}</button>`}</div>` : ''}
         </div>`;
       }
+      const countField = canWrite
+        ? `<label class="tile-count"><span>${L('countNow')}</span><input type="text" inputmode="numeric" autocomplete="off" data-count-field="${esc(it.id)}" data-current="${it.stock == null ? '' : it.stock}" placeholder="${it.stock == null ? '—' : num(it.stock)}" value="${it.stock == null ? '' : it.stock}"></label>`
+        : '';
+      const parField = (isManager && parMode)
+        ? `<label class="tile-par"><span>${L('setPar')}</span><input type="text" inputmode="numeric" autocomplete="off" data-par-field="${esc(it.id)}" data-current="${it.par}" placeholder="${it.par > 0 ? String(it.par) : '—'}" value=""></label>`
+        : '';
       return `<div class="item s-${st}">
+        <div class="item-head-row">
         <button class="item-head" data-toggle="${esc(it.id)}" aria-expanded="${open}">
-          <div class="item-name"><div class="nm">${esc(dispName(it))}</div><div class="meta">${esc(unit)}${unit && it.par > 0 ? ' · ' : ''}${it.par > 0 ? L('par', num(it.par)) : ''}</div></div>
+          <div class="item-name"><div class="nm">${esc(dispName(it))}</div><div class="meta">${esc(unit)}${unit && it.par > 0 ? ' · ' : ''}${it.par > 0 ? L('par', num(it.par)) : L('noPar')}</div></div>
           <div class="stock"><div class="qty">${it.stock === null ? '—' : num(it.stock)}</div>
             <span class="pill ${st}">${L(st === 'none' ? 'noPar' : st)}</span>${need > 0 ? `<div class="need">${L('needN', num(need))}</div>` : ''}</div>
-        </button>${body}</div>`;
+        </button>${countField}${parField}
+        </div>${body}</div>`;
     }
 
     function readNum(sel, min) {
@@ -500,6 +491,12 @@
       $('hero-title').textContent = L('hero'); $('hero-sub').textContent = L('heroSub');
       $('f-all').textContent = L('all'); $('f-need').textContent = L('need');
       $('list-btn').textContent = L('listBtn'); $('add-btn').textContent = L('addBtn');
+      $('par-btn').textContent = L('parBtn');
+      $('count-save').textContent = L('saveAll');
+      $('count-save-top').textContent = L('saveAll');
+      $('par-save').textContent = L('parSave');
+      const statusText = $('status-text');
+      if (statusText && !$('status').hidden && !$('status').classList.contains('error')) statusText.textContent = L('loading');
       $('view-note').textContent = L('viewOnly');
       [...$('lang-pill').children].forEach((b) => b.classList.toggle('active', b.dataset.lang === lang));
     }
@@ -508,7 +505,10 @@
       lang = b.dataset.lang;
       try { localStorage.setItem(LANG_KEY, lang); } catch (_) { /* storage blocked */ }
       applyLang(); $('add-panel').hidden = true; $('list-panel').hidden = true;
-      if (!$('status').hidden && !$('status').classList.contains('error')) $('status').textContent = L('loading'); else render();
+      if (!$('status').hidden && !$('status').classList.contains('error')) {
+        const statusText = $('status-text');
+        if (statusText) statusText.textContent = L('loading');
+      } else render();
     });
     $('filter-seg').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
@@ -516,6 +516,74 @@
     });
     $('add-btn').addEventListener('click', openAdd);
     $('list-btn').addEventListener('click', openList);
+    $('par-btn').addEventListener('click', () => {
+      parMode = !parMode;
+      $('par-save').hidden = !parMode;
+      render();
+    });
+    async function commitRows(rows) {
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = { ...rows[i], timeStamp: new Date().toISOString() };
+        // Same log shape as the per-tile save. One row per changed item.
+        // eslint-disable-next-line no-await-in-loop
+        await appendLog(LOG_PATH, row);
+        logs.push(row);
+      }
+      writeCachedLog(LOG_PATH, logs);
+      render();
+    }
+    async function saveVisibleCounts() {
+      const entries = [...document.querySelectorAll('[data-count-field]')].map((inp) => ({
+        itemId: inp.dataset.countField,
+        value: inp.value,
+        current: inp.dataset.current === '' ? null : Number(inp.dataset.current),
+      }));
+      const { writes, invalid } = collectDeltaCounts(entries);
+      if (invalid.length) { toast(L('invalid'), 'error'); return; }
+      if (!writes.length) {
+        $('count-result').textContent = L('nothingChanged');
+        toast(L('nothingChanged'));
+        return;
+      }
+      const btn = $('count-save');
+      const top = $('count-save-top');
+      btn.disabled = true;
+      if (top) top.disabled = true;
+      try {
+        await commitRows(writes.map((w) => ({ ...w, date: today(), countedBy: who() })));
+        const summary = writes.map((w) => {
+          const it = items.find((x) => x.id === w.itemId);
+          return `${it ? dispName(it) : w.itemId}: ${w.quantity}`;
+        }).join(' · ');
+        $('count-result').textContent = summary;
+        toast(L('saved'));
+      } catch (e) {
+        toast(L('failed', e.message), 'error');
+      } finally {
+        btn.disabled = false;
+        if (top) top.disabled = false;
+      }
+    }
+    $('count-save').addEventListener('click', saveVisibleCounts);
+    $('count-save-top').addEventListener('click', saveVisibleCounts);
+    $('par-save').addEventListener('click', async () => {
+      const entries = [...document.querySelectorAll('[data-par-field]')].map((inp) => ({
+        itemId: inp.dataset.parField,
+        value: inp.value,
+        current: Number(inp.dataset.current),
+      }));
+      const { writes, invalid } = collectDeltaPars(entries);
+      if (invalid.length) { toast(L('invalid'), 'error'); return; }
+      if (!writes.length) { toast(L('nothingChanged')); return; }
+      const btn = $('par-save');
+      btn.disabled = true;
+      try {
+        await commitRows(writes.map((w) => ({ ...w, updatedBy: who() })));
+        toast(L('saved'));
+      } catch (e) {
+        toast(L('failed', e.message), 'error');
+      } finally { btn.disabled = false; }
+    });
     // keep a long-open tab current
     document.addEventListener('visibilitychange', () => {
       const typing = document.activeElement && document.activeElement.matches('input');
@@ -528,6 +596,9 @@
       canWrite = canEdit(session, 'delta-center-inventory');
       isManager = !!session.isManager && canWrite;
       $('add-btn').hidden = !isManager;
+      $('par-btn').hidden = !isManager;
+      $('count-bar').hidden = !canWrite;
+      $('count-save-top').hidden = !canWrite;
       $('view-note').hidden = canWrite;
       await load();
     })();

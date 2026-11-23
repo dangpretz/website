@@ -7,15 +7,15 @@ function loggerHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// Cache-bust every GET — sheet-logger doesn't set Cache-Control today, but
-// browsers + Cloudflare apply heuristic caching for responses without
-// explicit TTL, which would surface as "I just saved, why don't I see my
-// row?" Adding a unique query param sidesteps every cache layer.
-export async function fetchLog(logpath, { token } = {}) {
+// Cache-bust every GET. dpc-log sends Cache-Control: no-store and ignores
+// filter params (limit, since, fields), so each GET is the full log. The
+// unique query param also avoids a stale heuristic cache after a save.
+export async function fetchLog(logpath, { token, signal } = {}) {
   const bust = `_t=${Date.now()}`;
   const sep = logpath.includes('?') ? '&' : '?';
   const response = await fetch(`${SHEET_LOGGER}${logpath}${sep}${bust}`, {
     headers: loggerHeaders(token),
+    signal,
   });
   if (!response.ok) {
     throw new Error(`fetchLog ${logpath} failed: HTTP ${response.status}`);

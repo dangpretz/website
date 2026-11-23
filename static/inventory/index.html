@@ -201,6 +201,17 @@
     .btn-adj-cancel { background: none; border: none; color: #bbb; font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1; }
     .btn-adj-cancel:hover { color: #555; }
 
+    .load-state { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #e6e0d6; border-top-color: #C41E1E; animation: dpc-spin 0.8s linear infinite; }
+    @keyframes dpc-spin { to { transform: rotate(360deg); } }
+    .btn-count { background: #C41E1E; border: 2px solid #C41E1E; color: #fff; font: 800 14px 'Manrope', sans-serif; border-radius: 8px; padding: 10px 16px; cursor: pointer; min-height: 44px; }
+    .btn-count.active { background: #1A1A1A; border-color: #1A1A1A; }
+    .count-input { width: 88px; font: 700 16px 'Manrope', sans-serif; padding: 8px; border: 2px solid #C41E1E; border-radius: 8px; text-align: center; }
+    .last-updated { display: block; font: 600 11px 'Manrope', sans-serif; color: #777; margin-top: 4px; }
+    .count-bar { position: sticky; bottom: 0; z-index: 20; background: #1A1A1A; color: #fff; padding: 12px 16px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,.2); }
+    .count-bar button { width: 100%; min-height: 52px; background: #C41E1E; color: #fff; border: none; border-radius: 10px; font: 800 18px 'Manrope', sans-serif; cursor: pointer; }
+    .count-bar button:disabled { background: #666; }
+    .count-result { margin: 8px 0 0; font: 600 13px 'Manrope', sans-serif; color: #ddd; }
     .table-status { text-align: center; padding: 40px 20px; font: 400 14px 'Manrope', sans-serif; color: #888; }
     .table-status.error { color: #C41E1E; font-weight: 700; }
     .untracked-note { margin-top: 14px; font: 400 12px 'Manrope', sans-serif; color: #8a6000; background: #fff8e6; border: 1px solid #f0d9a0; border-radius: 8px; padding: 10px 14px; line-height: 1.5; }
@@ -277,6 +288,7 @@
             Show low stock only
           </label>
         </div>
+        <button class="btn-count" id="count-mode-btn" type="button">Contar inventario / Count</button>
         <button class="btn-refresh" id="refresh-btn">↻ Refresh</button>
       </div>
 
@@ -301,6 +313,10 @@
       </div>
 
       <p id="untracked-note" class="untracked-note" hidden></p>
+      <div class="count-bar" id="count-bar" hidden>
+        <button type="button" id="count-save-btn">Guardar</button>
+        <p class="count-result" id="count-result"></p>
+      </div>
 
     </div>
   </div>
@@ -475,13 +491,24 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
+    import { readCachedLog, writeCachedLog, startLoadWatch } from '../../scripts/log-cache.js?v=2026-11-23-staff';
     import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
-    import { resolveRecipes, computeRecipeUsage, computeIngredientStock, denverCalendarDate } from '../../scripts/inventory.js?v=2026-11-23-denver-date';
+    import { resolveRecipes, computeRecipeUsage, computeIngredientStock, collectIngredientCountWrites, denverCalendarDate } from '../../scripts/inventory.js?v=2026-11-23-denver-date';
 
     const RECEIVING_PATH = '/dangpretz/receiving';
     const INVENTORY_PATH = '/dangpretz/inventory';
     const PRODUCTION_PATH = '/dangpretz/production';
     const RECIPES_PATH = '/dangpretz/recipes';
+    const invLang = (() => {
+      const q = new URLSearchParams(window.location.search).get('lang');
+      if (q === 'es' || q === 'en') return q;
+      try {
+        const saved = localStorage.getItem('prod-lang');
+        if (saved === 'es' || saved === 'en') return saved;
+      } catch (_) { /* storage blocked */ }
+      return (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+    })();
+    const invText = (es, en) => (invLang === 'es' ? es : en);
 
     // ── Product catalog — the shared ingredient list lives in
     //    scripts/ingredient-catalog.js (resolveIngredients applies the receiving log).
@@ -575,16 +602,77 @@
     let filterQuery  = '';
     let sortCol = 'name';
     let sortDir = 'asc';
+    let countMode = false;
+    const countDrafts = new Map();
 
     // ── Load data ─────────────────────────────────────────────────────────────
+    function formatStamp(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleString(invLang === 'es' ? 'es-MX' : 'en-US', {
+        timeZone: 'America/Denver', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      });
+    }
+
+    function applyInventoryLogs(rRaw, iRaw, pRaw, recRaw) {
+      const rLogs = Array.isArray(rRaw) ? rRaw : [];
+      const iLogs = Array.isArray(iRaw) ? iRaw : [];
+      catalog = resolveIngredients(rLogs);
+      const fullCatalog = resolveIngredients(rLogs, { includeArchived: true });
+      const { recipeMap, densityMap } = resolveRecipes(Array.isArray(recRaw) ? recRaw : []);
+      const usage = computeRecipeUsage({
+        productionLogs: Array.isArray(pRaw) ? pRaw : [],
+        recipeMap, densityMap, catalog: fullCatalog,
+      });
+      inventoryMap = computeIngredientStock({
+        catalog, receivingLogs: rLogs, inventoryLogs: iLogs,
+        usageEntriesByProduct: usage.usageEntriesByProduct,
+      });
+      const activeIds = new Set(catalog.map((p) => p.id));
+      const nameById = Object.fromEntries(fullCatalog.map((p) => [p.id, p.name]));
+      untrackedIngredients = [...usage.untracked]
+        .filter((id) => activeIds.has(id))
+        .map((id) => nameById[id] || id)
+        .sort();
+      renderTable();
+    }
+
+    function showInventoryError(err) {
+      const statusEl = document.getElementById('table-status');
+      statusEl.className = 'table-status error';
+      statusEl.hidden = false;
+      statusEl.innerHTML = `${invText('No se pudo cargar', 'Could not load inventory')}${err && err.message ? `: ${escapeHtml(err.message)}` : ''}<br><button type="button" id="inv-retry" class="btn-count" style="margin-top:12px">${invText('Reintentar', 'Retry')}</button>`;
+      const btn = document.getElementById('inv-retry');
+      if (btn) btn.addEventListener('click', () => { loadData(); });
+    }
+
     async function loadData() {
       const statusEl = document.getElementById('table-status');
       const wrapEl   = document.getElementById('inv-table-wrap');
-      statusEl.className = 'table-status';
-      statusEl.textContent = 'Loading inventory…';
-      statusEl.hidden = false;
-      wrapEl.hidden = true;
+      const label = invText('Cargando…', 'Loading…');
+      let painted = !wrapEl.hidden && inventoryMap.size > 0;
+      if (!painted) {
+        statusEl.className = 'table-status';
+        statusEl.hidden = false;
+        statusEl.innerHTML = `<div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div>${label}</div></div>`;
+        wrapEl.hidden = true;
+      }
 
+      const cached = await Promise.all([
+        readCachedLog(RECEIVING_PATH),
+        readCachedLog(INVENTORY_PATH),
+        readCachedLog(PRODUCTION_PATH),
+        readCachedLog(RECIPES_PATH),
+      ]);
+      if (cached[0] && cached[1] && !painted) {
+        applyInventoryLogs(cached[0], cached[1], cached[2] || [], cached[3] || []);
+        painted = true;
+      }
+
+      const watch = startLoadWatch(15000, () => {
+        if (!painted) showInventoryError();
+      });
       try {
         const [rRaw, iRaw, pRaw, recRaw] = await Promise.all([
           fetchLog(RECEIVING_PATH),
@@ -592,32 +680,15 @@
           fetchLog(PRODUCTION_PATH).catch(() => []),
           fetchLog(RECIPES_PATH).catch(() => []),
         ]);
-        const rLogs = Array.isArray(rRaw) ? rRaw : [];
-        const iLogs = Array.isArray(iRaw) ? iRaw : [];
-        catalog = resolveIngredients(rLogs);
-        // Recipe consumption uses the full catalog (incl. archived) for pack
-        // lookup so an archived-but-still-used ingredient converts; the stock
-        // table itself is the active catalog only.
-        const fullCatalog = resolveIngredients(rLogs, { includeArchived: true });
-        const { recipeMap, densityMap } = resolveRecipes(Array.isArray(recRaw) ? recRaw : []);
-        const usage = computeRecipeUsage({
-          productionLogs: Array.isArray(pRaw) ? pRaw : [],
-          recipeMap, densityMap, catalog: fullCatalog,
-        });
-        inventoryMap = computeIngredientStock({
-          catalog, receivingLogs: rLogs, inventoryLogs: iLogs,
-          usageEntriesByProduct: usage.usageEntriesByProduct,
-        });
-        const activeIds = new Set(catalog.map((p) => p.id));
-        const nameById = Object.fromEntries(fullCatalog.map((p) => [p.id, p.name]));
-        untrackedIngredients = [...usage.untracked]
-          .filter((id) => activeIds.has(id))
-          .map((id) => nameById[id] || id)
-          .sort();
-        renderTable();
+        watch.finish();
+        writeCachedLog(RECEIVING_PATH, rRaw);
+        writeCachedLog(INVENTORY_PATH, iRaw);
+        writeCachedLog(PRODUCTION_PATH, pRaw);
+        writeCachedLog(RECIPES_PATH, recRaw);
+        applyInventoryLogs(rRaw, iRaw, pRaw, recRaw);
       } catch (err) {
-        statusEl.className = 'table-status error';
-        statusEl.textContent = 'Failed to load inventory: ' + (err.message || 'unknown error');
+        watch.finish();
+        if (!painted) showInventoryError(err);
       }
     }
 
@@ -676,7 +747,7 @@
       } else {
         tbody.innerHTML = rows.map(buildTableRow).join('');
         tbody.querySelectorAll('.btn-par-edit').forEach(wireParEdit);
-        tbody.querySelectorAll('.stock-cell').forEach(wireStockAdj);
+        if (!countMode) tbody.querySelectorAll('.stock-cell').forEach(wireStockAdj);
         tbody.querySelectorAll('.btn-row-edit').forEach(wireEditBtn);
         tbody.querySelectorAll('.btn-row-delete').forEach(wireDeleteBtn);
       }
@@ -715,8 +786,18 @@
         ${unitHint}
       </div>`;
 
-      const stockCell = `<div class="stock-cell" data-product-id="${escapeHtml(productId)}" title="Click to set the physical count">
+      const updatedLabel = row.lastUpdated
+        ? `${invText('Actualizado', 'Updated')} ${formatStamp(row.lastUpdated)}`
+        : invText('Sin conteo', 'No count yet');
+      const stockCell = countMode
+        ? `<div class="stock-cell counting" data-product-id="${escapeHtml(productId)}">
+            <input class="count-input" type="text" inputmode="decimal" data-count-id="${escapeHtml(productId)}" value="${escapeHtml(countDrafts.has(productId) ? countDrafts.get(productId) : formatQty(stock))}">
+            <span class="last-updated">${escapeHtml(updatedLabel)}</span>
+            ${unitHint}
+          </div>`
+        : `<div class="stock-cell" data-product-id="${escapeHtml(productId)}" title="${invText('Toca para corregir', 'Tap to correct')}">
         <span class="${stockClass}">${formatQty(stock)}${isLow ? `<span class="stock-need">buy ${formatQty(needQty)} more</span>` : ''}</span>
+        <span class="last-updated">${escapeHtml(updatedLabel)}</span>
         ${unitHint}
       </div>`;
 
@@ -798,8 +879,17 @@
 
     // ── Stock inline adjust ───────────────────────────────────────────────────
     function wireStockAdj(cell) {
-      cell.addEventListener('click', () => {
-        if (cell.querySelector('.stock-adj-input')) return; // already open
+      cell.addEventListener('click', (e) => {
+        if (countMode || cell.querySelector('.stock-adj-input')) return;
+        if (e.target.closest('button, input, a')) return;
+        // Open after this tap finishes so the new Save button is not under the finger.
+        setTimeout(() => openStockEditor(cell), 0);
+      });
+    }
+
+    function openStockEditor(cell) {
+      if (!cell.isConnected || cell.querySelector('.stock-adj-input') || countMode) return;
+      {
         const productId    = cell.dataset.productId;
         const currentStock = inventoryMap.get(productId)?.stock ?? 0;
         const originalHtml = cell.innerHTML;
@@ -818,7 +908,8 @@
 
         input.focus(); input.select();
 
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
           cell.innerHTML = originalHtml;
           wireStockAdj(cell);
         });
@@ -847,7 +938,10 @@
               timeStamp: now.toISOString(),
               note:      'physical count',
             });
-            if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
+            if (inventoryMap.has(productId)) {
+              inventoryMap.get(productId).stock = newVal;
+              inventoryMap.get(productId).lastUpdated = now.toISOString();
+            }
             renderTable();
             showToast(`Stock set to ${newVal}`, 'success');
           } catch (err) {
@@ -857,12 +951,13 @@
           }
         }
 
-        saveBtn.addEventListener('click', doSave);
+        saveBtn.addEventListener('click', (ev) => { ev.stopPropagation(); doSave(); });
+        input.addEventListener('click', (ev) => ev.stopPropagation());
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
           if (e.key === 'Escape') cancelBtn.click();
         });
-      });
+      }
     }
 
     // ── Edit name / pack / vendor / temperature ─────────────────────────────
@@ -964,6 +1059,70 @@
       const btn = document.getElementById('refresh-btn');
       btn.disabled = true;
       loadData().finally(() => { btn.disabled = false; });
+    });
+
+    document.getElementById('inv-tbody').addEventListener('input', (e) => {
+      const inp = e.target.closest('[data-count-id]');
+      if (inp) countDrafts.set(inp.dataset.countId, inp.value);
+    });
+
+    document.getElementById('count-mode-btn').addEventListener('click', () => {
+      countMode = !countMode;
+      document.getElementById('count-bar').hidden = !countMode;
+      document.getElementById('count-mode-btn').classList.toggle('active', countMode);
+      document.getElementById('count-result').textContent = '';
+      renderTable();
+    });
+
+    document.getElementById('count-save-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('count-save-btn');
+      const entries = [...document.querySelectorAll('[data-count-id]')].map((inp) => ({
+        productId: inp.dataset.countId,
+        value: inp.value,
+        current: inventoryMap.get(inp.dataset.countId)?.stock,
+      }));
+      const now = new Date();
+      const { writes, invalid } = collectIngredientCountWrites(entries, {
+        date: denverCalendarDate(now),
+        timeStamp: now.toISOString(),
+      });
+      if (invalid.length) {
+        showToast(invText('Hay una cantidad inválida', 'Enter a valid quantity'), 'error');
+        return;
+      }
+      if (!writes.length) {
+        showToast(invText('Nada cambió', 'Nothing changed'));
+        document.getElementById('count-result').textContent = invText('Nada cambió', 'Nothing changed');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = invText('Guardando…', 'Saving…');
+      const saved = [];
+      try {
+        for (let i = 0; i < writes.length; i += 1) {
+          const write = writes[i];
+          // Same row the per-row editor writes. Sequential so the log keeps order.
+          // eslint-disable-next-line no-await-in-loop
+          await appendLog(INVENTORY_PATH, write);
+          const row = inventoryMap.get(write.productId);
+          if (row) {
+            row.stock = Number(write.quantity);
+            row.lastUpdated = write.timeStamp;
+          }
+          saved.push(`${row ? row.productName : write.productId}: ${write.quantity}`);
+          countDrafts.delete(write.productId);
+        }
+        renderTable();
+        const summary = saved.join(', ');
+        document.getElementById('count-result').textContent = summary;
+        showToast(`${invText('Guardado', 'Saved')}: ${summary}`, 'success');
+      } catch (err) {
+        const partial = saved.length ? `${invText('Se guardó', 'Saved')}: ${saved.join(', ')}. ` : '';
+        showToast(partial + invText('Falló el resto: ', 'The rest failed: ') + (err.message || ''), 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar';
+      }
     });
 
     document.querySelectorAll('.inv-table th[data-col]').forEach((th) => {
