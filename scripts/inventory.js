@@ -2060,3 +2060,20 @@ export function computeIngredientStock({
   });
   return map;
 }
+
+// Calendar date at the shop (America/Denver), YYYY-MM-DD. toISOString() is
+// UTC, so an evening count in Salt Lake City was landing on the next day.
+// This is the date to *record* on a new count. Reading old rows is unchanged.
+export function denverCalendarDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type) => {
+    const part = parts.find((p) => p.type === type);
+    return part ? part.value : '';
+  };
+  return `${value('year')}-${value('month').padStart(2, '0')}-${value('day').padStart(2, '0')}`;
+}

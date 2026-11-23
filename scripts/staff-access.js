@@ -48,6 +48,54 @@ export const SESSION_KEY = 'dpc-unlock';
 // header comment). Keep in sync with what the manager page shows.
 export const BOOTSTRAP_MANAGER_CODE = '8770';
 
+// Codes the production page's keypad accepted before it consulted this
+// directory. They still unlock every production view, so nobody who can open
+// that page today is locked out — including codes with no directory row.
+// New access is a directory grant. Do not add or remove codes here.
+// 8770 is also BOOTSTRAP_MANAGER_CODE; a set_staff row for it still wins over
+// the fallback below for every other tool.
+export const LEGACY_PRODUCTION_PIN_CODES = [
+  '0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377',
+];
+
+const PRODUCTION_ROLE_KEYS = {
+  shape: 'production:shape',
+  bfp: 'production:bfp',
+  dips: 'production:dips',
+  stock: 'production:stock',
+  foh: 'production:foh',
+};
+
+// Role from ?role= on static/production/index.html. Anything else, including
+// the manager calendar (no role), is production:manager.
+export function productionPageKey(role) {
+  const normalized = String(role || '').toLowerCase().trim();
+  return PRODUCTION_ROLE_KEYS[normalized] || 'production:manager';
+}
+
+// May this code open the production view `pageKey`?
+// Historical keypad codes unlock every view. Everyone else needs that view
+// in their directory links — the same rule requireAccess() uses.
+export function productionAccessAllowed({ code, links, pageKey } = {}) {
+  if (LEGACY_PRODUCTION_PIN_CODES.includes(String(code || ''))) return true;
+  return Array.isArray(links) && links.includes(pageKey);
+}
+
+// How the production keypad should treat a code.
+// 'legacy'    — historical PIN. Unlock every view, do not read or write the
+//               directory. Checked before any directory entry so a saved row
+//               cannot narrow someone who gets in today.
+// 'directory' — not a historical PIN, and this directory entry grants pageKey.
+// 'deny'      — neither. A missing entry is 'deny' (don't treat "not loaded"
+//               as a grant).
+export function productionUnlockKind(code, entry, pageKey) {
+  if (LEGACY_PRODUCTION_PIN_CODES.includes(String(code || ''))) return 'legacy';
+  if (entry && productionAccessAllowed({ code, links: entry.links, pageKey })) {
+    return 'directory';
+  }
+  return 'deny';
+}
+
 // Every grantable link. Production's role-scoped URLs each get their own
 // key so a Shape-only grant can't be bypassed by hand-editing ?role=manager.
 export const LINK_CATALOG = [

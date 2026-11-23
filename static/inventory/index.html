@@ -476,7 +476,7 @@
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
     import { resolveIngredients } from '../../scripts/ingredient-catalog.js?v=dpclog';
-    import { resolveRecipes, computeRecipeUsage, computeIngredientStock } from '../../scripts/inventory.js?v=dpclog';
+    import { resolveRecipes, computeRecipeUsage, computeIngredientStock, denverCalendarDate } from '../../scripts/inventory.js?v=2026-11-23-denver-date';
 
     const RECEIVING_PATH = '/dangpretz/receiving';
     const INVENTORY_PATH = '/dangpretz/inventory';
@@ -836,13 +836,15 @@
             // A physical count: set_stock is an absolute anchor — it discards
             // every earlier receive / adjust / recipe deduction for this
             // ingredient, so a low count just means we miscounted.
-            const now = new Date().toISOString();
+            // `date` is the Denver calendar day. timeStamp stays UTC ISO so
+            // the log format and the anchor comparison don't change.
+            const now = new Date();
             await appendLog(INVENTORY_PATH, {
               action:    'set_stock',
               productId,
               quantity:  String(newVal),
-              date:      now.slice(0, 10),
-              timeStamp: now,
+              date:      denverCalendarDate(now),
+              timeStamp: now.toISOString(),
               note:      'physical count',
             });
             if (inventoryMap.has(productId)) inventoryMap.get(productId).stock = newVal;
@@ -1064,7 +1066,7 @@
           action:      'use',
           sessionId:   generateId(),
           usedBy,
-          date:        now.toISOString().slice(0, 10),
+          date:        denverCalendarDate(now),
           timeStamp:   now.toISOString(),
           productId:   quickSelectedProduct.id,
           productName: quickSelectedProduct.name,
@@ -1169,7 +1171,7 @@
       btn.textContent = 'Submitting…';
       const sharedSessionId = generateId();
       const now = new Date();
-      const date = now.toISOString().slice(0, 10);
+      const date = denverCalendarDate(now);
 
       try {
         for (const item of sessionItems) {
@@ -1240,7 +1242,7 @@
         await appendLog(INVENTORY_PATH, {
           action:      'adjust',
           adjustedBy,
-          date:        now.toISOString().slice(0, 10),
+          date:        denverCalendarDate(now),
           timeStamp:   now.toISOString(),
           productId:   adjSelectedProduct.id,
           productName: adjSelectedProduct.name,

@@ -154,7 +154,7 @@
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
-    import { SKU_NAMES_ES } from '../../scripts/inventory.js?v=2026-10-16-sku-names-es';
+    import { SKU_NAMES_ES, denverCalendarDate } from '../../scripts/inventory.js?v=2026-11-23-denver-date';
 
     // Its own log — nothing here reads or writes the shop's /dangpretz/inventory
     // or the production app's stock snapshots, so the two never mix.
@@ -338,7 +338,9 @@
       setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 400); }, 2200);
     }
     const who = () => session?.name || session?.code || '';
-    const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    // Shop calendar day (America/Denver), not the device clock and not UTC.
+    // Counts, resupply rows, and the list header all stamp this same day.
+    const today = () => denverCalendarDate();
     const GROUP_LABEL = { pretzels: 'gPretzels', buns: 'gBuns', dips: 'gDips', toppings: 'gToppings', supplies: 'gSupplies' };
     const GROUPS = ['pretzels', 'buns', 'dips', 'toppings', 'supplies'];
 
