@@ -1075,10 +1075,10 @@
 </head>
 <body>
 
-<!-- PIN gate — blocks all content (manager view and every ?role= tab) until a valid
-     4-digit employee code is entered. Visible by default in CSS so it's the first
-     thing painted; the inline script below hides it instantly (no flash) if this
-     device already unlocked earlier in the browser session. -->
+<!-- PIN gate — blocks all content (manager view and every ?role= tab) until a
+     valid code is entered. Visible by default in CSS so it's the first thing
+     painted; the inline script below hides it instantly (no flash) if this tab
+     already unlocked, or if a staff-hub session already has this view. -->
 <div class="pin-gate" id="pin-gate">
   <div class="pin-gate-logo">🥨</div>
   <div class="pin-gate-title">Dangerous Pretzel Co.</div>
@@ -1097,10 +1097,27 @@
 <script>
   // Blocking, non-module — runs the instant the parser reaches it, before the
   // deferred module script below even starts, so an already-unlocked device
-  // never flashes the PIN screen.
+  // never flashes the PIN screen. A staff-hub session whose links include
+  // this view is the same kind of unlock. The module below is the real check;
+  // this only hides the gate when that check will also allow the page.
   try {
+    const gate = document.getElementById('pin-gate');
     if (sessionStorage.getItem('prod-pin-unlocked') === '1') {
-      document.getElementById('pin-gate').classList.add('pin-gate-hidden');
+      gate.classList.add('pin-gate-hidden');
+    } else {
+      const session = JSON.parse(sessionStorage.getItem('dpc-unlock') || 'null');
+      const links = session && Array.isArray(session.links) ? session.links : null;
+      if (links) {
+        const role = (new URLSearchParams(window.location.search).get('role') || '').toLowerCase().trim();
+        const pageKey = {
+          shape: 'production:shape',
+          bfp: 'production:bfp',
+          dips: 'production:dips',
+          stock: 'production:stock',
+          foh: 'production:foh',
+        }[role] || 'production:manager';
+        if (links.includes(pageKey)) gate.classList.add('pin-gate-hidden');
+      }
     }
   } catch (_) {}
 </script>
@@ -1254,6 +1271,11 @@
 
 <script type="module">
   import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
+  import {
+    STAFF_LOG_PATH,
+    getSessionUnlock, setSessionUnlock,
+    productionAccessAllowed, productionPageKey, productionUnlockKind, resolveStaffDirectory,
+  } from '../../scripts/staff-access.js?v=2026-11-23-production-access';
   import {
     BATCH_SIZES, CASE_SIZES, TRAY_SIZES, FOH_SKUS, BAKE_GROUPS,
     DOUGH_AGE_WARN_DAYS, DOUGH_AGE_FAIL_DAYS,
@@ -5632,40 +5654,111 @@
 
   // ─── PIN GATE ─────────────────────────────────────────────────────────────
   // Blocks the entire app — manager view and every ?role= tab alike, since
-  // they're all the same file — until a valid 4-digit employee code is
-  // entered. Not a real security boundary (client-side, codes are visible in
-  // source), just a casual-access gate for shared kitchen tablets.
-  const PIN_CODES      = ['0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377'];
+  // they're all the same file — until the person is allowed in. Not a real
+  // security boundary (client-side), just a casual-access gate for shared
+  // kitchen tablets.
+  //
+  // Two ways in, and neither removes the other:
+  //   1. Staff-hub session (dpc-unlock) whose directory links include this
+  //      view — the same check the other tool pages make with requireAccess.
+  //      A shape-only grant still cannot open ?role=manager.
+  //   2. The historical keypad codes (LEGACY_PRODUCTION_PIN_CODES), which
+  //      unlock every view, including when the directory can't be reached.
+  //      That keeps everyone who can get in today able to get in. 8770 is
+  //      in that list, so the bootstrap manager still works with the log down.
+  // A directory code does NOT set the legacy flag. That flag skips the
+  // per-view check, which would let a role grant open the manager calendar.
   const PIN_SESSION_KEY = 'prod-pin-unlocked';
+  const productionViewKey = productionPageKey(userRole);
+
+  let staffDirectoryPromise = null;
+  function loadStaffDirectory() {
+    if (!staffDirectoryPromise) {
+      staffDirectoryPromise = fetchLog(STAFF_LOG_PATH)
+        .then((logs) => resolveStaffDirectory(logs))
+        .catch((err) => {
+          staffDirectoryPromise = null;
+          throw err;
+        });
+    }
+    return staffDirectoryPromise;
+  }
 
   function waitForPinUnlock() {
     const gate = document.getElementById('pin-gate');
+    const hideGate = () => gate.classList.add('pin-gate-hidden');
+
     let alreadyUnlocked = false;
     try { alreadyUnlocked = sessionStorage.getItem(PIN_SESSION_KEY) === '1'; } catch (_) {}
-    if (alreadyUnlocked) { gate.classList.add('pin-gate-hidden'); return Promise.resolve(); }
+    if (alreadyUnlocked) { hideGate(); return Promise.resolve(); }
+
+    const session = getSessionUnlock();
+    if (session && productionAccessAllowed({
+      code: session.code, links: session.links, pageKey: productionViewKey,
+    })) {
+      hideGate();
+      return Promise.resolve();
+    }
 
     return new Promise((resolve) => {
       let entered = '';
+      let settled = false;
       const dots     = [...gate.querySelectorAll('.pin-dot')];
       const errorEl  = document.getElementById('pin-error');
       const subEl    = document.getElementById('pin-gate-sub');
 
       const updateDots = () => dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
 
-      const tryUnlock = () => {
-        if (PIN_CODES.includes(entered)) {
-          try { sessionStorage.setItem(PIN_SESSION_KEY, '1'); } catch (_) {}
-          gate.classList.add('pin-gate-hidden');
-          resolve();
-          return;
-        }
-        errorEl.textContent = appLang === 'es' ? 'Código incorrecto' : 'Incorrect code';
+      const reject = (message) => {
+        errorEl.textContent = message;
         gate.classList.add('pin-shake');
         setTimeout(() => {
           gate.classList.remove('pin-shake');
           entered = '';
           updateDots();
         }, 350);
+      };
+
+      const finish = (saveLegacyFlag) => {
+        if (settled) return;
+        settled = true;
+        if (saveLegacyFlag) {
+          try { sessionStorage.setItem(PIN_SESSION_KEY, '1'); } catch (_) {}
+        }
+        hideGate();
+        resolve();
+      };
+
+      const tryUnlock = () => {
+        if (settled) return;
+        const attempt = entered;
+        // Legacy codes are checked before any directory fetch so a log
+        // outage cannot lock out the people who get in today, and so their
+        // grants are not narrowed to whatever the directory currently says.
+        if (productionUnlockKind(attempt, null, productionViewKey) === 'legacy') {
+          finish(true);
+          return;
+        }
+        loadStaffDirectory().then((directory) => {
+          if (settled || attempt !== entered) return;
+          const entry = directory[attempt];
+          if (productionUnlockKind(attempt, entry, productionViewKey) === 'directory') {
+            setSessionUnlock({
+              code: attempt,
+              name: entry.name,
+              isManager: entry.isManager,
+              links: entry.links,
+              levels: entry.levels || {},
+              ts: Date.now(),
+            });
+            finish(false);
+            return;
+          }
+          reject(appLang === 'es' ? 'Código incorrecto' : 'Incorrect code');
+        }).catch(() => {
+          if (settled || attempt !== entered) return;
+          reject(appLang === 'es' ? 'No se pudo verificar — intenta de nuevo' : 'Couldn\'t verify — try again');
+        });
       };
 
       subEl.textContent = appLang === 'es' ? 'Ingresa tu código de 4 dígitos' : 'Enter your 4-digit code';
