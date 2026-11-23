@@ -46,16 +46,19 @@ export const SESSION_KEY = 'dpc-unlock';
 
 // The bootstrap manager — the only code with a built-in fallback (see the
 // header comment). Keep in sync with what the manager page shows.
-export const BOOTSTRAP_MANAGER_CODE = '8770';
+export const BOOTSTRAP_MANAGER_CODE = '4614';
 
 // Codes the production page's keypad accepted before it consulted this
 // directory. They still unlock every production view, so nobody who can open
 // that page today is locked out — including codes with no directory row.
-// New access is a directory grant. Do not add or remove codes here.
-// 8770 is also BOOTSTRAP_MANAGER_CODE; a set_staff row for it still wins over
-// the fallback below for every other tool.
+// New access is a directory grant. Do not add codes here; remove a code only
+// when offboarding the person it belonged to. The bootstrap manager code is
+// kept in this list (so it works with the log down); a set_staff row for it
+// still wins over the fallback below for every other tool. When the bootstrap
+// code is rotated, swap it here and in the receiving-history and
+// shape-ingredients PIN_CODES lists too.
 export const LEGACY_PRODUCTION_PIN_CODES = [
-  '0068', '0571', '8468', '6124', '9281', '9646', '6362', '8770', '9709', '1377',
+  '0068', '0571', '8468', '6124', '9281', '9646', '6362', '4614', '9709', '1377',
 ];
 
 const PRODUCTION_ROLE_KEYS = {

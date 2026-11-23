@@ -5997,8 +5997,8 @@
   //      A shape-only grant still cannot open ?role=manager.
   //   2. The historical keypad codes (LEGACY_PRODUCTION_PIN_CODES), which
   //      unlock every view, including when the directory can't be reached.
-  //      That keeps everyone who can get in today able to get in. 8770 is
-  //      in that list, so the bootstrap manager still works with the log down.
+  //      That keeps everyone who can get in today able to get in. The
+  //      bootstrap manager code is in that list, so the bootstrap manager still works with the log down.
   // A directory code does NOT set the legacy flag. That flag skips the
   // per-view check, which would let a role grant open the manager calendar.
   const PIN_SESSION_KEY = 'prod-pin-unlocked';
