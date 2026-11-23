@@ -1106,7 +1106,7 @@
       gate.classList.add('pin-gate-hidden');
     } else {
       const session = JSON.parse(sessionStorage.getItem('dpc-unlock') || 'null');
-      const links = session && Array.isArray(session.links) ? session.links : null;
+      const links = session && session.code && Array.isArray(session.links) ? session.links : null;
       if (links) {
         const role = (new URLSearchParams(window.location.search).get('role') || '').toLowerCase().trim();
         const pageKey = {
