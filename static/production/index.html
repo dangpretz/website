@@ -1516,7 +1516,9 @@
   // ─── BUSINESS RULES ───────────────────────────────────────────────────────
   // Edit these to match operational reality. Each is a single source of truth
   // for the rule it represents — no other place hardcodes these numbers.
-  const BATCHES_PER_WORKER  = 6;   // batches per worker per day (cap)
+  // One worker's daily cap. Default headcount stays 2 for Shape and BFP
+  // (getWorkers), so an unset day is 16 batches. 3 workers = 24; 1 worker = 8.
+  const BATCHES_PER_WORKER  = 8;   // batches per worker per day (cap)
   const SHAPE_MIN_LEAD      = 2;   // shape must happen at least N days before delivery
   const SHAPE_MAX_LEAD      = 7;   // shape can happen up to N days before delivery
   const BFP_MIN_LEAD        = 1;   // BFP must happen at least N days before delivery
@@ -6075,6 +6077,57 @@
       const before = mkItem({ need: 3, made: 0 });
       const after  = mkItem({ need: 2, made: 1 });
       expect('T10 stable target: total before = after', before.totalBatches, after.totalBatches);
+    }
+    // T11 — Daily rate and default headcount.
+    // BATCHES_PER_WORKER is 8. Both teams still default to 2 workers
+    // (16 batches/day). Per-day log and localStorage overrides still win,
+    // and the minimums stay 0 for shape and 1 for bfp.
+    {
+      const probe = '2099-06-15';
+      const shapeKey = `prod-shape-workers-${probe}`;
+      const bfpKey = `prod-bfp-workers-${probe}`;
+      const prevState = productionState[probe];
+      let prevShapeStored = null;
+      let prevBfpStored = null;
+      try { prevShapeStored = localStorage.getItem(shapeKey); } catch { prevShapeStored = null; }
+      try { prevBfpStored = localStorage.getItem(bfpKey); } catch { prevBfpStored = null; }
+      try { localStorage.removeItem(shapeKey); localStorage.removeItem(bfpKey); } catch { /* storage blocked */ }
+      delete productionState[probe];
+      try {
+        expect('T11 rate is 8 batches/worker', BATCHES_PER_WORKER, 8);
+        expect('T11 shape default workers', getWorkers('shape', probe), 2);
+        expect('T11 bfp default workers', getWorkers('bfp', probe), 2);
+        expect('T11 default day is 16 batches', 2 * BATCHES_PER_WORKER, 16);
+        expect('T11 shape default capacity', getWorkers('shape', probe) * BATCHES_PER_WORKER, 16);
+        expect('T11 bfp default capacity', getWorkers('bfp', probe) * BATCHES_PER_WORKER, 16);
+        expect('T11 three workers is 24', 3 * BATCHES_PER_WORKER, 24);
+        expect('T11 one worker is 8', 1 * BATCHES_PER_WORKER, 8);
+
+        localStorage.setItem(shapeKey, '3');
+        localStorage.setItem(bfpKey, '1');
+        expect('T11 shape localStorage override', getWorkers('shape', probe), 3);
+        expect('T11 shape override capacity', getWorkers('shape', probe) * BATCHES_PER_WORKER, 24);
+        expect('T11 bfp localStorage override', getWorkers('bfp', probe), 1);
+        expect('T11 bfp override capacity', getWorkers('bfp', probe) * BATCHES_PER_WORKER, 8);
+
+        productionState[probe] = { shapeWorkers: 4, bfpWorkers: 5 };
+        expect('T11 shape log override beats storage', getWorkers('shape', probe), 4);
+        expect('T11 bfp log override beats storage', getWorkers('bfp', probe), 5);
+
+        productionState[probe] = { shapeWorkers: 0, bfpWorkers: 0 };
+        expect('T11 shape min stays 0', getWorkers('shape', probe), 0);
+        expect('T11 bfp min stays 1', getWorkers('bfp', probe), 1);
+        expect('T11 bfp floor capacity', getWorkers('bfp', probe) * BATCHES_PER_WORKER, 8);
+      } finally {
+        try {
+          if (prevShapeStored == null) localStorage.removeItem(shapeKey);
+          else localStorage.setItem(shapeKey, prevShapeStored);
+          if (prevBfpStored == null) localStorage.removeItem(bfpKey);
+          else localStorage.setItem(bfpKey, prevBfpStored);
+        } catch { /* storage blocked */ }
+        if (prevState == null) delete productionState[probe];
+        else productionState[probe] = prevState;
+      }
     }
 
     // Render results banner
