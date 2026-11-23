@@ -4010,6 +4010,12 @@
         : `Not saved (invalid number, or blank with no prior count): ${which}`);
       if (collected.snapshots.length === 0) return;
     }
+    // Never write an empty snapshot. That would move "Último conteo" without
+    // any counts, which is what a click does if the inputs are not on screen yet.
+    if (!collected.snapshots.length) {
+      alert(appLang === 'es' ? 'No hay cantidades para guardar.' : 'There are no quantities to save.');
+      return;
+    }
     const snapArr = collected.snapshots;
     const saveBtn = document.getElementById('stock-save');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = appLang === 'es' ? 'Guardando…' : 'Saving…'; }
