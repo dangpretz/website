@@ -3646,7 +3646,48 @@
       lookaheadDays: 14,
     });
 
-    const dayBatches = sched.batches.filter(b => b.date === dateStr);
+    const dayState = productionState[dateStr] || {};
+    const doneList = dayState.cheeseDone || []; // log key stays cheese_done across all dips
+    // todayMadeUnits tallies dips produced today for this SKU (each log entry
+    // contributes batches × singleBatchSize OR doubleBatchSize per its size).
+    const todayMadeUnits = doneList
+      .filter(c => c.sku === dipSku)
+      .reduce((s, c) => {
+        const sz = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
+        return s + (Number(c.batches) || 0) * sz;
+      }, 0);
+    const todayMadeBatches = Math.max(0, Math.round(doneList
+      .filter(c => c.sku === dipSku)
+      .reduce((s, c) => s + (Number(c.batches) || 0), 0)));
+
+    // The day's card uses the START-OF-DAY plan. cheese_done credits on-hand
+    // (coldFerment), so a schedule built from the live report shrinks today's
+    // target as batches are logged and the card read "Done" halfway through
+    // (and could pull later orders forward). Take today's made dips back out
+    // of inventory for the card only; UPCOMING still uses the live schedule.
+    let planSched = sched;
+    if (todayMadeUnits > 0.01) {
+      const eff = report.effective || {};
+      const planReport = {
+        ...report,
+        effective: {
+          ...eff,
+          coldFerment: { ...(eff.coldFerment || {}), [dipSku]: ((eff.coldFerment || {})[dipSku] || 0) - todayMadeUnits },
+        },
+      };
+      planSched = scheduleDip({
+        dipSku,
+        deliveries: allDeliveries,
+        inventoryReport: planReport,
+        fohDailyAvg: dailyAvg,
+        today: dateStr,
+        skuAliases,
+        deferrals,
+        lookaheadDays: 14,
+      });
+    }
+
+    const dayBatches = planSched.batches.filter(b => b.date === dateStr);
     const coverSeen = new Set();
     const mergedCovers = [];
     dayBatches.forEach((b) => {
@@ -3659,23 +3700,22 @@
     });
     // One card per day. A 332-serving order is 3 batches of 150, and any
     // other order whose make-day is today is on the same card.
+    // If nothing was planned but some was made today (an extra batch), keep
+    // a Done card with its − button instead of the "well stocked" card.
     const todayBatch = dayBatches.length ? {
       units: dayBatches.reduce((s, b) => s + (Number(b.units) || 0), 0),
       covers: mergedCovers,
       overdue: dayBatches.some(b => b.overdue),
       size: dayBatches.some(b => b.size === 'double') ? 'double' : 'single',
       count: dayBatches.length,
-    } : null;
-    const dayState = productionState[dateStr] || {};
-    const doneList = dayState.cheeseDone || []; // log key stays cheese_done across all dips
-    // todayMadeUnits tallies dips produced today for this SKU (each log entry
-    // contributes batches × singleBatchSize OR doubleBatchSize per its size).
-    const todayMadeUnits = doneList
-      .filter(c => c.sku === dipSku)
-      .reduce((s, c) => {
-        const sz = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
-        return s + (Number(c.batches) || 0) * sz;
-      }, 0);
+    } : (todayMadeUnits > 0.01 ? {
+      units: Math.round(todayMadeUnits),
+      covers: [],
+      overdue: false,
+      size: 'single',
+      count: Math.max(1, todayMadeBatches),
+      madeOnly: true,
+    } : null);
 
     const onHand = (report.effective.coldFerment[dipSku] || 0)
       + (report.effective.frozen[dipSku] || 0)
@@ -3687,7 +3727,9 @@
       const isDone = todayMadeUnits >= targetUnits - 0.01;
       const coversList = todayBatch.covers.length > 0
         ? todayBatch.covers.map(c => `${esc(c.customer)} (${c.qty}p ${appLang === 'es' ? 'para' : 'for'} ${esc(c.deliveryDate)})`).join(', ')
-        : (appLang === 'es' ? 'sólo FOH (mostrador)' : 'FOH walk-in only');
+        : (todayBatch.madeOnly
+          ? (appLang === 'es' ? 'Tanda extra hecha hoy' : 'Extra batch made today')
+          : (appLang === 'es' ? 'sólo FOH (mostrador)' : 'FOH walk-in only'));
       const cheeseOrders = dipSku === CHEESE_KEY ? renderCheeseOrderRows(dipSku, dateStr, todayBatch.covers) : '';
       const overdueTag = todayBatch.overdue
         ? `<span class="wcard-pill overdue">🚨 ${appLang === 'es' ? 'Atrasado' : 'Overdue'}</span>`
@@ -3719,6 +3761,7 @@
             <div class="wmetric">
               <div class="wmetric-label">${appLang === 'es' ? 'DIPS HECHOS' : 'DIPS MADE'}</div>
               <div class="wmetric-value"><strong>${Math.round(todayMadeUnits)}</strong><span class="of"> / ${targetUnits}</span></div>
+              <div class="wdip-batches" style="font:600 11px 'Manrope',sans-serif;color:var(--gray-3);margin-top:2px">${todayMadeBatches} / ${todayBatch.count} ${appLang === 'es' ? 'tandas' : (todayBatch.count === 1 ? 'batch' : 'batches')}</div>
             </div>
             <div class="wmetric">
               <div class="wmetric-label">${appLang === 'es' ? 'INVENTARIO' : 'ON HAND'}</div>
