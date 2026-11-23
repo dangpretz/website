@@ -246,7 +246,10 @@
     .btn-row-edit { background: none; border: none; cursor: pointer; font: 700 12px 'Manrope', sans-serif; color: #888; padding: 4px 6px; }
     .btn-row-edit:hover { color: #C41E1E; }
 
+    .inv-swipe-hint { display: none; }
     @media (max-width: 680px) {
+      .inv-swipe-hint { display: block; text-align: right; font: 600 11px 'Manrope', sans-serif; color: #888; margin: 0 4px 6px; }
+      .inv-swipe-hint.is-hidden { display: none; }
       .inv-table th:nth-child(5),
       .inv-table td:nth-child(5),
       .inv-table th:nth-child(6),
@@ -285,7 +288,7 @@
           <input type="text" id="inv-search" class="inv-search" placeholder="Search ingredients…" autocomplete="off">
           <label class="toggle-label">
             <input type="checkbox" id="low-stock-toggle">
-            Show low stock only
+            <span id="low-stock-label">Show low stock only</span>
           </label>
         </div>
         <button class="btn-count" id="count-mode-btn" type="button">Contar inventario / Count</button>
@@ -294,6 +297,7 @@
 
       <div id="table-status" class="table-status">Loading inventory…</div>
 
+      <div class="inv-swipe-hint" id="inv-swipe-hint" aria-hidden="true">desliza → / swipe →</div>
       <div class="inv-table-wrap" id="inv-table-wrap" hidden>
         <table class="inv-table">
           <thead>
@@ -509,6 +513,23 @@
       return (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
     })();
     const invText = (es, en) => (invLang === 'es' ? es : en);
+
+    // Static labels in the page shell. Runs once; the table re-renders its own text.
+    (function applyStaticText() {
+      const search = document.getElementById('inv-search');
+      if (search) search.placeholder = invText('Buscar ingredientes…', 'Search ingredients…');
+      const low = document.getElementById('low-stock-label');
+      if (low) low.textContent = invText('Mostrar solo bajos', 'Show low stock only');
+      const refresh = document.getElementById('refresh-btn');
+      if (refresh) refresh.textContent = invText('↻ Actualizar', '↻ Refresh');
+      const hint = document.getElementById('inv-swipe-hint');
+      if (hint) hint.textContent = invText('desliza →', 'swipe →');
+      const heads = { name: ['Producto', 'Product'], unit: ['Unidad', 'Unit'], stock: ['Inventario', 'Stock'] };
+      document.querySelectorAll('.inv-table th[data-col]').forEach((th) => {
+        const label = heads[th.dataset.col];
+        if (label && th.firstChild && th.firstChild.nodeType === 3) th.firstChild.nodeValue = invText(label[0], label[1]);
+      });
+    }());
 
     // ── Product catalog — the shared ingredient list lives in
     //    scripts/ingredient-catalog.js (resolveIngredients applies the receiving log).
@@ -778,7 +799,7 @@
 
       const parDisplay = par !== null ? formatQty(par) : '—';
       const needQty    = isLow ? (par - stock) : 0;
-      const unitHint = `<span class="count-in">count in ${escapeHtml(innerUnitLabel)}</span>`;
+      const unitHint = `<span class="count-in">${invText('contar en', 'count in')} ${escapeHtml(innerUnitLabel)}</span>`;
 
       const parCell = `<div class="par-cell" data-product-id="${escapeHtml(productId)}">
         <span class="par-value">${escapeHtml(parDisplay)}</span>
@@ -796,7 +817,7 @@
             ${unitHint}
           </div>`
         : `<div class="stock-cell" data-product-id="${escapeHtml(productId)}" title="${invText('Toca para corregir', 'Tap to correct')}">
-        <span class="${stockClass}">${formatQty(stock)}${isLow ? `<span class="stock-need">buy ${formatQty(needQty)} more</span>` : ''}</span>
+        <span class="${stockClass}">${formatQty(stock)}${isLow ? `<span class="stock-need">${invText(`comprar ${formatQty(needQty)} más`, `buy ${formatQty(needQty)} more`)}</span>` : ''}</span>
         <span class="last-updated">${escapeHtml(updatedLabel)}</span>
         ${unitHint}
       </div>`;
@@ -809,7 +830,7 @@
         <td>${statusBadge}</td>
         <td>${formatDate(lastReceived)}</td>
         <td>${formatDate(lastUsed)}</td>
-        <td class="col-actions"><button class="btn-row-edit" data-product-id="${escapeHtml(productId)}" title="Edit name, pack, vendor, temperature">Edit</button><button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button></td>
+        <td class="col-actions"><button class="btn-row-edit" data-product-id="${escapeHtml(productId)}" title="${invText('Editar nombre, empaque, proveedor, temperatura', 'Edit name, pack, vendor, temperature')}">${invText('Editar', 'Edit')}</button><button class="btn-row-delete" data-product-id="${escapeHtml(productId)}" data-product-name="${escapeHtml(productName)}" title="Remove ingredient">🗑</button></td>
       </tr>`;
     }
 
@@ -825,10 +846,10 @@
         const unit = parsePackSize(row?.packSize).innerUnitLabel;
         cell.innerHTML = `<div class="par-edit-wrap">
           <input type="number" class="par-edit-input" inputmode="decimal" min="0" step="any" value="${currentPar}" placeholder="0">
-          <button class="btn-par-save">Save</button>
+          <button class="btn-par-save">${invText('Guardar', 'Save')}</button>
           <button class="btn-par-cancel">&times;</button>
         </div>
-        <span class="count-in">count in ${escapeHtml(unit)}</span>`;
+        <span class="count-in">${invText('contar en', 'count in')} ${escapeHtml(unit)}</span>`;
 
         const input     = cell.querySelector('.par-edit-input');
         const saveBtn   = cell.querySelector('.btn-par-save');
@@ -897,10 +918,10 @@
         const unit = parsePackSize(inventoryMap.get(productId)?.packSize).innerUnitLabel;
         cell.innerHTML = `<div class="stock-adj-wrap">
           <input type="number" class="stock-adj-input" inputmode="decimal" min="0" step="any" value="${formatQty(currentStock)}">
-          <button class="btn-stock-save">Save</button>
+          <button class="btn-stock-save">${invText('Guardar', 'Save')}</button>
           <button class="btn-adj-cancel">&times;</button>
         </div>
-        <span class="count-in">count in ${escapeHtml(unit)}</span>`;
+        <span class="count-in">${invText('contar en', 'count in')} ${escapeHtml(unit)}</span>`;
 
         const input     = cell.querySelector('.stock-adj-input');
         const saveBtn   = cell.querySelector('.btn-stock-save');
@@ -943,7 +964,7 @@
               inventoryMap.get(productId).lastUpdated = now.toISOString();
             }
             renderTable();
-            showToast(`Stock set to ${newVal}`, 'success');
+            showToast(invText(`Inventario fijado a ${newVal}`, `Stock set to ${newVal}`), 'success');
           } catch (err) {
             cell.innerHTML = originalHtml;
             wireStockAdj(cell);
@@ -1076,11 +1097,16 @@
 
     document.getElementById('count-save-btn').addEventListener('click', async () => {
       const btn = document.getElementById('count-save-btn');
-      const entries = [...document.querySelectorAll('[data-count-id]')].map((inp) => ({
-        productId: inp.dataset.countId,
-        value: inp.value,
-        current: inventoryMap.get(inp.dataset.countId)?.stock,
-      }));
+      // Each box is prefilled with formatQty(stock), rounded to 2 decimals.
+      // Only rows whose box differs from that prefill were counted; an
+      // untouched 8.2467 shows as 8.25 and must not become a "physical count".
+      const entries = [...document.querySelectorAll('[data-count-id]')]
+        .filter((inp) => inp.value.trim() !== formatQty(inventoryMap.get(inp.dataset.countId)?.stock ?? 0))
+        .map((inp) => ({
+          productId: inp.dataset.countId,
+          value: inp.value,
+          current: inventoryMap.get(inp.dataset.countId)?.stock,
+        }));
       const now = new Date();
       const { writes, invalid } = collectIngredientCountWrites(entries, {
         date: denverCalendarDate(now),
