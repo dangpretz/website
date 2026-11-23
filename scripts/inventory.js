@@ -1969,6 +1969,7 @@ export function computeIngredientStock({
         par: null,
         lastReceived: null,
         lastUsed: null,
+        lastUpdated: null,
         _anchorTs: '',
         _anchorDate: '',
       });
@@ -1998,6 +1999,7 @@ export function computeIngredientStock({
       row._anchorTs = ts;
       row._anchorDate = r.date || ts.slice(0, 10);
       row.stock = Number(r.quantity) || 0;
+      if (ts) row.lastUpdated = ts;
     }
   });
 
@@ -2011,6 +2013,7 @@ export function computeIngredientStock({
     const parts = String(r.packSize || '').split('/');
     row.stock += parts.length >= 3 && parseFloat(parts[0]) > 0 ? parseFloat(parts[0]) : 1;
     if (r.date && (!row.lastReceived || r.date > row.lastReceived)) row.lastReceived = r.date;
+    if (r.timeStamp && r.timeStamp > (row.lastUpdated || '')) row.lastUpdated = r.timeStamp;
   });
 
   // Pass 3 — manual use / adjust after the anchor; par any time.
@@ -2027,8 +2030,10 @@ export function computeIngredientStock({
     if (r.action === 'use') {
       row.stock -= Number(r.quantity) || 0;
       if (r.date && (!row.lastUsed || r.date > row.lastUsed)) row.lastUsed = r.date;
+      if (r.timeStamp && r.timeStamp > (row.lastUpdated || '')) row.lastUpdated = r.timeStamp;
     } else if (r.action === 'adjust') {
       row.stock += Number(r.quantity) || 0;
+      if (r.timeStamp && r.timeStamp > (row.lastUpdated || '')) row.lastUpdated = r.timeStamp;
     }
   });
 
@@ -2050,6 +2055,7 @@ export function computeIngredientStock({
       }
       row.stock -= e.units;
       if (!row.lastUsed || e.date > row.lastUsed) row.lastUsed = e.date;
+      if (e.timeStamp && e.timeStamp > (row.lastUpdated || '')) row.lastUpdated = e.timeStamp;
     });
   });
 
@@ -2059,6 +2065,34 @@ export function computeIngredientStock({
     delete row._anchorDate;
   });
   return map;
+}
+
+// Rows for the ingredient "Contar" save. Same set_stock shape the per-row
+// editor writes. Empty inputs are left alone. Unchanged numbers are not written.
+export function collectIngredientCountWrites(entries, { date, timeStamp } = {}) {
+  const writes = [];
+  const invalid = [];
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const raw = String(entry.value ?? '').trim();
+    if (raw === '') return;
+    const qty = Number(raw);
+    if (!Number.isFinite(qty) || qty < 0) {
+      invalid.push(entry.productId);
+      return;
+    }
+    const rounded = Math.round(qty * 1000) / 1000;
+    const current = Number(entry.current);
+    if (Number.isFinite(current) && Math.abs(current - rounded) < 0.0005) return;
+    writes.push({
+      action: 'set_stock',
+      productId: entry.productId,
+      quantity: String(rounded),
+      date,
+      timeStamp,
+      note: 'physical count',
+    });
+  });
+  return { writes, invalid };
 }
 
 // Calendar date at the shop (America/Denver), YYYY-MM-DD. toISOString() is

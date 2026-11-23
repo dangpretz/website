@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { resolveIngredients } from './ingredient-catalog.js';
 import {
+  collectIngredientCountWrites,
   computeIngredientStock,
   computeRecipeUsage,
   resolveStockProductId,
@@ -92,6 +93,27 @@ describe('computeIngredientStock duplicates', () => {
       usageEntriesByProduct: usage.usageEntriesByProduct,
     });
     assert.ok(Math.abs(stock.get('usf-8091092').stock - 9) < 0.001);
+    assert.equal(stock.get('usf-8091092').lastUpdated, '2026-11-16T18:00:00.000Z');
+  });
+});
+
+describe('collectIngredientCountWrites', () => {
+  it('matches the per-row physical count and skips blanks and unchanged rows', () => {
+    const { writes, invalid } = collectIngredientCountWrites([
+      { productId: 'usf-8091092', value: '4.5', current: 9 },
+      { productId: 'usf-0877506', value: '', current: 2 },
+      { productId: 'usf-1', value: '2', current: 2 },
+      { productId: 'usf-2', value: '-1', current: 1 },
+    ], { date: '2026-11-23', timeStamp: '2026-11-23T15:17:00.000Z' });
+    assert.deepEqual(invalid, ['usf-2']);
+    assert.deepEqual(writes, [{
+      action: 'set_stock',
+      productId: 'usf-8091092',
+      quantity: '4.5',
+      date: '2026-11-23',
+      timeStamp: '2026-11-23T15:17:00.000Z',
+      note: 'physical count',
+    }]);
   });
 });
 

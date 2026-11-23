@@ -264,6 +264,12 @@
     /* Spacing between this and the view-mode toggle comes from .week-nav's own gap,
        not a margin here — avoids overflow when both go full-width on mobile. */
 
+    .load-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 36px 16px; color: #888; font: 700 15px 'Manrope', sans-serif; }
+    .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #e6e0d6; border-top-color: #C41E1E; animation: dpc-spin 0.8s linear infinite; }
+    @keyframes dpc-spin { to { transform: rotate(360deg); } }
+    .load-error { color: #C41E1E; font: 700 15px 'Manrope', sans-serif; text-align: center; padding: 28px 16px; }
+    .load-error button, .refresh-banner button { min-height: 44px; margin-top: 12px; padding: 10px 16px; border: none; border-radius: 8px; background: #C41E1E; color: #fff; font: 700 14px 'Manrope', sans-serif; cursor: pointer; }
+    .refresh-banner { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; background: #fff3cd; color: #856404; font: 700 13px 'Manrope', sans-serif; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .week-empty {
       text-align: center; color: #666; padding: 40px 20px;
       font: 400 15px 'Manrope', sans-serif;
@@ -914,10 +920,9 @@
           <button class="view-toggle-btn" id="cat-catering" data-category="catering">Catering</button>
         </div>
       </div>
-      <div id="schedule-container">
-        <div class="week-grid" id="week-grid">
-          <div class="week-empty">Loading...</div>
-        </div>
+      <div id="refresh-banner-host"></div>
+      <div id="schedule-container" data-load-state="loading">
+        <div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div id="planner-loading">Loading…</div></div>
       </div>
     </div>
   </section>
@@ -927,7 +932,7 @@
     <div class="max-1100">
       <h2>TOTALS</h2>
       <div id="totals-by-sku">
-        <p class="empty" style="color:#999">No data yet.</p>
+        <div class="load-state" role="status" id="totals-loading"><div class="spinner" aria-hidden="true"></div><div>Loading…</div></div>
       </div>
     </div>
   </section>
@@ -1116,6 +1121,7 @@
 
   <script type="module">
     import { fetchLog, appendLog } from '../../scripts/sheet-logger.js?v=dpclog';
+    import { readCachedLog, writeCachedLog, startLoadWatch } from '../../scripts/log-cache.js?v=2026-11-23-staff';
     import {
       makeSkuMeta,
       resolveProductionLogs,
@@ -1149,6 +1155,21 @@
     const PRODUCTION_LOG_PATH = '/dangpretz/production';
     const TEMPLATE_LOG_PATH = '/dangpretz/delivery-templates';
     const WORKER_BASE = 'https://dpc-catering-checkout.drew-f39.workers.dev';
+    const plannerLang = (() => {
+      const q = new URLSearchParams(window.location.search).get('lang');
+      if (q === 'es' || q === 'en') return q;
+      try {
+        const saved = localStorage.getItem('prod-lang');
+        if (saved === 'es' || saved === 'en') return saved;
+      } catch (_) {}
+      return (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+    })();
+    const plannerText = (es, en) => (plannerLang === 'es' ? es : en);
+    const plannerLoadingLabel = plannerText('Cargando…', 'Loading…');
+    const plannerLoadingEl = document.getElementById('planner-loading');
+    if (plannerLoadingEl) plannerLoadingEl.textContent = plannerLoadingLabel;
+    const totalsLoadingEl = document.querySelector('#totals-loading div:last-child');
+    if (totalsLoadingEl) totalsLoadingEl.textContent = plannerLoadingLabel;
 
     // Admin-token bootstrap: read from ?adminToken=… on first manager visit,
     // persist in localStorage, and clean the URL. Token absence just hides
@@ -2382,85 +2403,151 @@
       });
     }
 
-    async function loadRecords() {
+    let plannerLoadGen = 0;
+    let plannerController = null;
+    let plannerHasPainted = false;
+
+    function showPlannerLoading() {
+      scheduleContainer.dataset.loadState = 'loading';
+      const label = plannerText('Cargando…', 'Loading…');
+      scheduleContainer.innerHTML = `<div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div>${label}</div></div>`;
+      totalsBySkuList.innerHTML = `<div class="load-state" role="status"><div class="spinner" aria-hidden="true"></div><div>${label}</div></div>`;
+    }
+
+    function showPlannerSlow() {
+      if (plannerHasPainted) return;
+      scheduleContainer.dataset.loadState = 'slow';
+      const label = plannerText('Está tardando…', 'This is taking a while…');
+      const retry = plannerText('Reintentar', 'Retry');
+      scheduleContainer.innerHTML = `<div class="load-error" role="status"><div class="spinner" aria-hidden="true" style="margin:0 auto 12px"></div>${label}<br><button type="button" id="planner-retry">${retry}</button></div>`;
+      const btn = document.getElementById('planner-retry');
+      if (btn) btn.addEventListener('click', () => { loadRecords(); });
+    }
+
+    function showPlannerError(err) {
+      scheduleContainer.dataset.loadState = 'error';
+      const detail = err && err.message ? `<div style="font-weight:400;font-size:13px;margin-top:6px">${escapeHtml(err.message)}</div>` : '';
+      scheduleContainer.innerHTML = `<div class="load-error">${plannerText('No se pudo cargar', 'Could not load deliveries')}${detail}<br><button type="button" id="planner-retry">${plannerText('Reintentar', 'Retry')}</button></div>`;
+      totalsBySkuList.innerHTML = '';
+      const btn = document.getElementById('planner-retry');
+      if (btn) btn.addEventListener('click', () => { loadRecords(); });
+    }
+
+    function showPlannerBanner() {
+      const host = document.getElementById('refresh-banner-host');
+      if (!host || document.getElementById('planner-refresh-banner')) return;
+      host.innerHTML = `<div class="refresh-banner" id="planner-refresh-banner"><span>${plannerText('Sigue cargando. Puedes reintentar.', 'Still loading. You can retry.')}</span><button type="button" id="planner-refresh-retry">${plannerText('Reintentar', 'Retry')}</button></div>`;
+      const btn = document.getElementById('planner-refresh-retry');
+      if (btn) btn.addEventListener('click', () => { loadRecords(); });
+    }
+
+    function hidePlannerBanner() {
+      const banner = document.getElementById('planner-refresh-banner');
+      if (banner) banner.remove();
+    }
+
+    function attachCoverage(deliveries, productionLogs) {
+      if (!productionLogs) return;
       try {
-        // Fetch deliveries (primary) and production log (for coverage badges) in parallel.
-        const [logs, productionLogs] = await Promise.all([
-          fetchLog(LOG_PATH),
-          fetchLog(PRODUCTION_LOG_PATH).catch(() => []), // coverage is best-effort; planner still works without it
-        ]);
-
-        const deliveries = resolveDeliveriesFromLogs(logs);
-
-        // Compute per-delivery coverage via the shared module. Same FIFO logic
-        // as the production app's stock tab — green/yellow/blue/red badges
-        // tell the manager at-a-glance which orders are ready vs need work.
-        // Passes the planner's already-resolved `deliveries` (rather than
-        // re-resolving via the shared resolver) so deliveryId values match
-        // between the coverage map and the rendered cards.
-        try {
-          const prodResolved = resolveProductionLogs(productionLogs);
-          const meta = makeSkuMeta(prodResolved.skuConfig);
-          // Shape-only feature: tag deliveries that should skip BFP (catering
-          // boxes, FOH Placeholder) and expand box line items so coverage math
-          // counts the right pretzels. Detection runs BEFORE expansion so the
-          // "Catering:" prefix still matches.
-          if (SHAPE_ONLY_ENABLED) {
-            for (const d of deliveries) {
-              d._shapeOnly = isShapeOnlyDelivery(d);
-              try {
-                const items = JSON.parse(d.lineItems || '[]');
-                const expanded = expandBoxLineItems(items, prodResolved.skuConfig);
-                if (expanded !== items) d.lineItems = JSON.stringify(expanded);
-              } catch (_) {}
-            }
+        const prodResolved = resolveProductionLogs(productionLogs);
+        const meta = makeSkuMeta(prodResolved.skuConfig);
+        if (SHAPE_ONLY_ENABLED) {
+          for (const d of deliveries) {
+            d._shapeOnly = isShapeOnlyDelivery(d);
+            try {
+              const items = JSON.parse(d.lineItems || '[]');
+              const expanded = expandBoxLineItems(items, prodResolved.skuConfig);
+              if (expanded !== items) d.lineItems = JSON.stringify(expanded);
+            } catch (_) {}
           }
-          const inventoryReport = getInventoryReport({
-            productionLogs: prodResolved.productionLogs,
-            productionState: prodResolved.state,
-            allDeliveries: deliveries,
-            skuAliases: prodResolved.skuAliases,
-            latestInventoryTs: prodResolved.latestInventoryTs,
-            getBatchSize: meta.getBatchSize,
-            getTraySize: meta.getTraySize,
-          });
-          // Today-and-forward only — past unconfirmed ghost orders shouldn't
-          // eat current inventory FIFO. Mirrors stock-tab filter.
-          const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
-          const activeDeliveries = deliveries.filter(d =>
-            !['delivered','picked_up','cancelled'].includes(d.status) &&
-            (d.date || '') >= today);
-          const coverage = attributeDeliveryCoverage({
-            activeDeliveries,
-            inventoryReport,
-            skuAliases: prodResolved.skuAliases,
-            getBatchSize: meta.getBatchSize,
-          });
-          // Stash coverage + alias resolver on each delivery row so renderers
-          // can color individual line item pills by per-SKU coverage status.
-          deliveries.forEach(d => {
-            const cov = coverage.get(d.deliveryId);
-            if (cov) {
-              d._coverage = cov;
-              d._aliases  = prodResolved.skuAliases;
-            }
-          });
-        } catch (covErr) {
-          // Coverage is non-blocking; if it fails the planner still works.
-          console.warn('coverage computation skipped:', covErr);
         }
+        const inventoryReport = getInventoryReport({
+          productionLogs: prodResolved.productionLogs,
+          productionState: prodResolved.state,
+          allDeliveries: deliveries,
+          skuAliases: prodResolved.skuAliases,
+          latestInventoryTs: prodResolved.latestInventoryTs,
+          getBatchSize: meta.getBatchSize,
+          getTraySize: meta.getTraySize,
+        });
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+        const activeDeliveries = deliveries.filter(d =>
+          !['delivered','picked_up','cancelled'].includes(d.status) &&
+          (d.date || '') >= today);
+        const coverage = attributeDeliveryCoverage({
+          activeDeliveries,
+          inventoryReport,
+          skuAliases: prodResolved.skuAliases,
+          getBatchSize: meta.getBatchSize,
+        });
+        deliveries.forEach(d => {
+          const cov = coverage.get(d.deliveryId);
+          if (cov) {
+            d._coverage = cov;
+            d._aliases = prodResolved.skuAliases;
+          }
+        });
+      } catch (covErr) {
+        console.warn('coverage computation skipped:', covErr);
+      }
+    }
 
-        currentDeliveries = deliveries;
-        updateCustomerSelect(deliveries);
-        renderTotalsBySku(deliveries);
-        renderView();
+    function paintDeliveries(logs, productionLogs) {
+      const deliveries = resolveDeliveriesFromLogs(logs);
+      attachCoverage(deliveries, productionLogs);
+      currentDeliveries = deliveries;
+      updateCustomerSelect(deliveries);
+      renderTotalsBySku(deliveries);
+      renderView();
+      scheduleContainer.dataset.loadState = 'ready';
+      plannerHasPainted = true;
+    }
+
+    async function loadRecords() {
+      if (plannerController) plannerController.abort();
+      const controller = new AbortController();
+      plannerController = controller;
+      const gen = ++plannerLoadGen;
+      const { signal } = controller;
+
+      if (!plannerHasPainted) {
+        const cachedDeliveries = await readCachedLog(LOG_PATH);
+        const cachedProduction = await readCachedLog(PRODUCTION_LOG_PATH);
+        if (gen !== plannerLoadGen) return;
+        if (cachedDeliveries) paintDeliveries(cachedDeliveries, cachedProduction);
+        else showPlannerLoading();
+      }
+
+      const watch = startLoadWatch(15000, () => {
+        if (gen !== plannerLoadGen) return;
+        if (!plannerHasPainted) showPlannerSlow();
+        else showPlannerBanner();
+      });
+
+      try {
+        const logs = await fetchLog(LOG_PATH, { signal });
+        if (gen !== plannerLoadGen) return;
+        await writeCachedLog(LOG_PATH, logs);
+        // List first. Coverage badges wait for the production log.
+        paintDeliveries(logs, null);
+        watch.finish();
+        hidePlannerBanner();
+        let productionLogs = [];
+        try {
+          productionLogs = await fetchLog(PRODUCTION_LOG_PATH, { signal });
+        } catch (err) {
+          if (err && err.name === 'AbortError') throw err;
+          productionLogs = [];
+        }
+        if (gen !== plannerLoadGen) return;
+        await writeCachedLog(PRODUCTION_LOG_PATH, productionLogs);
+        paintDeliveries(logs, productionLogs);
       } catch (e) {
-        currentDeliveries = [];
-        scheduleContainer.innerHTML = `<div class="week-empty" style="color:#C41E1E">
-          ⚠️ Could not load deliveries.
-          <button onclick="window.location.reload()" style="margin-left:12px;padding:8px 16px;background:#C41E1E;color:#fff;border:none;border-radius:4px;font:700 13px 'Manrope',sans-serif;cursor:pointer;">Retry</button>
-        </div>`;
-        totalsBySkuList.innerHTML = '<p class="empty" style="color:#999">—</p>';
+        if (e && (e.name === 'AbortError' || /aborted/i.test(String(e.message || '')))) return;
+        watch.finish();
+        if (gen !== plannerLoadGen) return;
+        if (!plannerHasPainted) showPlannerError(e);
+        else showPlannerBanner();
         console.error('fetchLog error', e);
       }
     }
@@ -3010,9 +3097,7 @@
       const session = await requireAccess('delivery-planner');
       CAN_EDIT = canEdit(session, 'delivery-planner');
       applyViewOnlyMode();
-      await loadSkus();
-      await loadRecords();
-      await loadRecurrences();
+      await Promise.all([loadSkus(), loadRecords(), loadRecurrences()]);
     })();
 
     // Refresh deliveries + coverage badges whenever the tab regains focus.
