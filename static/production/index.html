@@ -1308,7 +1308,7 @@
         <div id="cfg-box-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
         <button class="btn-secondary" id="cfg-box-add-row" type="button" style="width:100%;padding:10px;background:none;border:1.5px dashed var(--gray-2);border-radius:10px;color:var(--gray-4);font:700 13px 'Manrope',sans-serif;cursor:pointer;margin-bottom:12px">+ Add a SKU to this box</button>
         <p style="font:400 12px 'Manrope',sans-serif;color:var(--gray-3);margin:0">
-          Example: <em>Catering: Honey Mustard Dip Box</em> → 12 × <em>honey mustard dip</em>.
+          Example: <em>Catering: House Mustard Dip Box</em> → 12 × <em>house mustard dip</em>.
         </p>
       </div>
     </div>
@@ -1337,8 +1337,8 @@
     resolveDeliveries, resolveProductionLogs,
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip,
-    isShapeOnlyDelivery, SKU_NAMES_ES,
-  } from '../../scripts/inventory.js?v=2026-10-16-sku-names-es';
+    isShapeOnlyDelivery, isDiscontinuedDipSku, unmappedDipSkus, SKU_NAMES_ES,
+  } from '../../scripts/inventory.js?v=2026-11-23-dip-servings';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1450,7 +1450,6 @@
     'hot ranch dip',
     'sweet cream dip',
     'house mustard dip',
-    'honey mustard dip',
   ]);
   // FOH bakes/sells these SKUs in-store. When FOH pulls trays from the
   // wholesale walk-in to stock their speed rack, the Dough section logs a
@@ -2095,6 +2094,7 @@
             let key = sku.trim();
             if (skuAliases[key]) key = skuAliases[key]; // resolve old → canonical name
             if (isFOH(key)) { fohSeen.add(key); return; }
+            if (isDiscontinuedDipSku(key)) return; // honey mustard — do not schedule
             if (DIP_CONFIG[key]) return; // dips have their own pipeline (Dips tab); shape/BFP teams don't make them
             if (!skuMap[key]) skuMap[key] = { shapePretzels: 0, bfpPretzels: 0, orders: [] };
             const q = Number(quantity) || 0;
@@ -3618,7 +3618,26 @@
       lookaheadDays: 14,
     });
 
-    const todayBatch = sched.batches.find(b => b.date === dateStr);
+    const dayBatches = sched.batches.filter(b => b.date === dateStr);
+    const coverSeen = new Set();
+    const mergedCovers = [];
+    dayBatches.forEach((b) => {
+      (b.covers || []).forEach((c) => {
+        const k = `${c.customer}|${c.qty}|${c.deliveryDate}`;
+        if (coverSeen.has(k)) return;
+        coverSeen.add(k);
+        mergedCovers.push(c);
+      });
+    });
+    // One card per day. A 332-serving order is 3 batches of 150, and any
+    // other order whose make-day is today is on the same card.
+    const todayBatch = dayBatches.length ? {
+      units: dayBatches.reduce((s, b) => s + (Number(b.units) || 0), 0),
+      covers: mergedCovers,
+      overdue: dayBatches.some(b => b.overdue),
+      size: dayBatches.some(b => b.size === 'double') ? 'double' : 'single',
+      count: dayBatches.length,
+    } : null;
     const dayState = productionState[dateStr] || {};
     const doneList = dayState.cheeseDone || []; // log key stays cheese_done across all dips
     // todayMadeUnits tallies dips produced today for this SKU (each log entry
@@ -3657,7 +3676,9 @@
         <div class="wcard ${isDone ? 'status-done' : (todayBatch.overdue ? 'status-overdue' : 'status-pending')}" style="--wcard-stripe:#E5C16A">
           <div class="wcard-head">
             <div>
-              <div class="wcard-name">${cfg.emoji} ${appLang === 'es' ? 'Hacer 1 tanda de' : 'Make 1 batch'} ${esc(cfg.label)}</div>
+              <div class="wcard-name">${cfg.emoji} ${todayBatch.count === 1
+                ? (appLang === 'es' ? 'Hacer 1 tanda de' : 'Make 1 batch')
+                : (appLang === 'es' ? `Hacer ${todayBatch.count} tandas de` : `Make ${todayBatch.count} batches`)} ${esc(cfg.label)}</div>
               <div style="font:500 12px 'Manrope',sans-serif;color:var(--gray-3);margin-top:2px">
                 ${esc(coversList)}
               </div>
@@ -3716,7 +3737,16 @@
         </div>`;
     }
 
-    const upcoming = sched.batches.filter(b => b.date > dateStr).slice(0, 8);
+    const upcomingByDate = new Map();
+    sched.batches.filter(b => b.date > dateStr).forEach((b) => {
+      const g = upcomingByDate.get(b.date) || { date: b.date, count: 0, units: 0, overdue: false, size: b.size };
+      g.count += 1;
+      g.units += Number(b.units) || 0;
+      g.overdue = g.overdue || b.overdue;
+      if (b.size === 'double') g.size = 'double';
+      upcomingByDate.set(b.date, g);
+    });
+    const upcoming = [...upcomingByDate.values()].slice(0, 8);
     const upcomingHtml = upcoming.length === 0 ? '' : `
       <div style="margin-top:12px">
         <div class="status-section-label" style="color:var(--gray-3);font-size:11px">
@@ -3725,7 +3755,9 @@
         ${upcoming.map(b => {
           const dateLabel = `${fmtDay(parseDate(b.date))} ${fmtShort(parseDate(b.date))}`;
           const overdue = b.overdue ? ' 🚨' : '';
-          const sizeStr = b.size === 'double' ? ` · double (${b.units})` : ` · ${b.units}`;
+          const sizeStr = b.count > 1
+            ? ` · ${b.count} × ${Math.round(b.units / b.count)}`
+            : (b.size === 'double' ? ` · double (${b.units})` : ` · ${b.units}`);
           return `<div style="display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #eee;font:500 12px 'Manrope',sans-serif">
             <span><strong>${esc(dateLabel)}</strong>${overdue}${sizeStr}</span>
           </div>`;
@@ -3786,6 +3818,41 @@
     </div>`;
   }
 
+  // Honey mustard orders stay visible and are not turned into a make-batch.
+  // Unknown dip-like SKUs are listed so a new planner name is not silent.
+  function dipAuditNotes(dateStr) {
+    const discontinued = [];
+    (allDeliveries || []).forEach((d) => {
+      if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return;
+      if (!d.date || d.date < dateStr) return;
+      let items = [];
+      try { items = JSON.parse(d.lineItems || '[]'); } catch { items = []; }
+      if (!Array.isArray(items)) return;
+      items.forEach((li) => {
+        let sku = (li.sku || li.name || '').trim();
+        if (skuAliases[sku]) sku = skuAliases[sku];
+        if (!isDiscontinuedDipSku(sku)) return;
+        const who = d.customer || d.location || '?';
+        discontinued.push(`${esc(who)} · ${esc(sku)} × ${Number(li.quantity) || 0} for ${esc(d.date)}`);
+      });
+    });
+    const unknown = unmappedDipSkus(allDeliveries, skuAliases, dateStr);
+    const parts = [];
+    if (discontinued.length) {
+      const label = appLang === 'es'
+        ? 'La mostaza honey está descontinuada. No se programa:'
+        : 'Honey mustard is discontinued. Not scheduled:';
+      parts.push(`<div class="alert-banner">${label} ${discontinued.join('; ')}</div>`);
+    }
+    if (unknown.length) {
+      const label = appLang === 'es'
+        ? 'SKUs de salsa que esta pestaña no cuenta:'
+        : 'Dip SKUs this tab does not count:';
+      parts.push(`<div class="alert-banner">${label} ${unknown.map(esc).join(', ')}</div>`);
+    }
+    return parts.join('');
+  }
+
   function renderCheeseTab(dateStr) {
     // Tab key is still 'cheese' (legacy) but rendered content is now all dips.
     const report = getInventoryReportLocal();
@@ -3805,6 +3872,7 @@
           ${appLang === 'es' ? 'Programación FOH para queso y salsas de menudeo' : 'FOH schedule for cheese + retail dips'}
         </div>
       </div>
+      ${dipAuditNotes(dateStr)}
       ${dipsHtml}
       ${calHint}
     </div></div>`;
@@ -3840,6 +3908,7 @@
           ${appLang === 'es' ? 'Programación FOH para queso y salsas de menudeo' : 'FOH schedule for cheese + retail dips'}
         </div>
       </div>
+      ${dipAuditNotes(dateStr)}
       ${dipsHtml}
       <div style="margin:28px 0 14px 0;padding-top:18px;border-top:2px solid var(--gray-1)">
         <div style="font:800 18px 'Paytone One',sans-serif;color:var(--dark)">${appLang === 'es' ? '🥨 Masa → estante rápido' : '🥨 Dough → speed rack'}</div>
@@ -5389,7 +5458,7 @@
 
   async function loadSkus() {
     try {
-      const r = await fetch('../delivery-planner/skus.json?v=2026-09-11-hot-dog-buns');
+      const r = await fetch('../delivery-planner/skus.json?v=2026-11-23-no-honey-mustard');
       allSkus = await r.json();
     } catch { allSkus = Object.keys(BATCH_SIZES); } // fallback to hardcoded list
   }
