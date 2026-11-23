@@ -1336,9 +1336,9 @@
     makeSkuMeta,
     resolveDeliveries, resolveProductionLogs,
     getInventoryReport, attributeDeliveryCoverage,
-    scheduleCheese, scheduleDip,
+    scheduleCheese, scheduleDip, dipDeferTo,
     isShapeOnlyDelivery, isDiscontinuedDipSku, unmappedDipSkus, SKU_NAMES_ES,
-  } from '../../scripts/inventory.js?v=2026-11-23-dip-servings';
+  } from '../../scripts/inventory.js?v=2026-11-23-dip-defer';
 
   // Shape-only catering + box expansion. ENABLED BY DEFAULT — catering
   // boxes (Catering: ...) and FOH Placeholder deliveries skip BFP and
@@ -1683,6 +1683,7 @@
       pill_done:         'Done',
       pill_morning:      'Morning priority',
       defer_tomorrow:    '→ Defer to tomorrow',
+      make_tomorrow:     '→ Make tomorrow',
       defer_undo:        '← Undo defer',
       deferred_to:       ({ day }) => `Deferred to ${day}`,
       morning_note:      'Prep window has closed — make this first',
@@ -1835,6 +1836,7 @@
       pill_done:         'Listo',
       pill_morning:      'Para la mañana',
       defer_tomorrow:    '→ Aplazar a mañana',
+      make_tomorrow:     '→ Hacer mañana',
       defer_undo:        '← Deshacer aplazo',
       deferred_to:       ({ day }) => `Aplazado al ${day}`,
       morning_note:      'La ventana de preparación cerró — hacer esto primero',
@@ -3604,6 +3606,31 @@
   // Per-dip card: today's recommended batch (if any) + stepper + upcoming list.
   // Stepper logs `cheese_done` rows with {sku, batches, size}; size determines
   // single vs double crediting in getInventoryReport.
+  // Cheese orders get the same defer control as Shape. One row per order,
+  // logged as action 'defer' with team 'dips' and that order's deliveryId.
+  function renderCheeseOrderRows(dipSku, cardDate, covers) {
+    if (!covers || !covers.length) return '';
+    const realToday = toDateStr(new Date());
+    const tomorrow = toDateStr(addDays(parseDate(realToday), 1));
+    return covers.map((c) => {
+      const label = `${esc(c.customer)} (${c.qty}p ${appLang === 'es' ? 'para' : 'for'} ${esc(c.deliveryDate)})`;
+      const deferred = dipDeferTo(deferrals, dipSku, { date: c.deliveryDate, deliveryId: c.deliveryId });
+      // Only from today's card, and never onto the ship date. Wednesday's
+      // cheese (made Monday) can move to Tuesday; Tuesday's deliveries cannot.
+      const canPush = cardDate === realToday && !!c.deliveryId && String(c.deliveryDate) > tomorrow;
+      const btn = canPush
+        ? `<button type="button" class="wdefer-btn" data-defer data-key="dips|${esc(dipSku)}" data-deliveries="${esc(c.deliveryDate)}" data-delivery-id="${esc(c.deliveryId)}" data-defer-to="${esc(tomorrow)}">${t('make_tomorrow')}</button>`
+        : '';
+      const undo = deferred
+        ? `<button type="button" class="wundo-defer-btn" data-undo-defer data-key="dips|${esc(dipSku)}" data-deliveries="${esc(c.deliveryDate)}" data-delivery-id="${esc(c.deliveryId)}">${t('defer_undo')}</button>`
+        : '';
+      const note = deferred
+        ? `<span class="wdefer-note">${t('deferred_to', { day: `${fmtDay(parseDate(deferred))} ${fmtShort(parseDate(deferred))}` })}</span>`
+        : '';
+      return `<div class="wdefer-row" style="margin-top:4px"><span style="font:500 12px 'Manrope',sans-serif;color:var(--gray-3)">${label}</span>${btn}${undo}${note}</div>`;
+    }).join('');
+  }
+
   function renderDipCard(dipSku, dateStr, report) {
     const cfg = DIP_CONFIG[dipSku];
     if (!cfg) return '';
@@ -3615,6 +3642,7 @@
       fohDailyAvg: dailyAvg,
       today: dateStr,
       skuAliases,
+      deferrals,
       lookaheadDays: 14,
     });
 
@@ -3623,7 +3651,7 @@
     const mergedCovers = [];
     dayBatches.forEach((b) => {
       (b.covers || []).forEach((c) => {
-        const k = `${c.customer}|${c.qty}|${c.deliveryDate}`;
+        const k = `${c.deliveryId || ''}|${c.customer}|${c.qty}|${c.deliveryDate}`;
         if (coverSeen.has(k)) return;
         coverSeen.add(k);
         mergedCovers.push(c);
@@ -3660,6 +3688,7 @@
       const coversList = todayBatch.covers.length > 0
         ? todayBatch.covers.map(c => `${esc(c.customer)} (${c.qty}p ${appLang === 'es' ? 'para' : 'for'} ${esc(c.deliveryDate)})`).join(', ')
         : (appLang === 'es' ? 'sólo FOH (mostrador)' : 'FOH walk-in only');
+      const cheeseOrders = dipSku === CHEESE_KEY ? renderCheeseOrderRows(dipSku, dateStr, todayBatch.covers) : '';
       const overdueTag = todayBatch.overdue
         ? `<span class="wcard-pill overdue">🚨 ${appLang === 'es' ? 'Atrasado' : 'Overdue'}</span>`
         : '';
@@ -3679,12 +3708,13 @@
               <div class="wcard-name">${cfg.emoji} ${todayBatch.count === 1
                 ? (appLang === 'es' ? 'Hacer 1 tanda de' : 'Make 1 batch')
                 : (appLang === 'es' ? `Hacer ${todayBatch.count} tandas de` : `Make ${todayBatch.count} batches`)} ${esc(cfg.label)}</div>
-              <div style="font:500 12px 'Manrope',sans-serif;color:var(--gray-3);margin-top:2px">
+              ${cheeseOrders ? '' : `<div style="font:500 12px 'Manrope',sans-serif;color:var(--gray-3);margin-top:2px">
                 ${esc(coversList)}
-              </div>
+              </div>`}
             </div>
             <div style="display:flex;gap:6px;align-items:center">${sizeChip}${statusPill}</div>
           </div>
+          ${cheeseOrders}
           <div class="wcard-metrics" style="margin-top:8px">
             <div class="wmetric">
               <div class="wmetric-label">${appLang === 'es' ? 'DIPS HECHOS' : 'DIPS MADE'}</div>
@@ -3739,11 +3769,16 @@
 
     const upcomingByDate = new Map();
     sched.batches.filter(b => b.date > dateStr).forEach((b) => {
-      const g = upcomingByDate.get(b.date) || { date: b.date, count: 0, units: 0, overdue: false, size: b.size };
+      const g = upcomingByDate.get(b.date) || { date: b.date, count: 0, units: 0, overdue: false, size: b.size, covers: [] };
       g.count += 1;
       g.units += Number(b.units) || 0;
       g.overdue = g.overdue || b.overdue;
       if (b.size === 'double') g.size = 'double';
+      (b.covers || []).forEach((c) => {
+        const k = `${c.deliveryId || ''}|${c.customer}|${c.qty}|${c.deliveryDate}`;
+        if (g.covers.some((x) => `${x.deliveryId || ''}|${x.customer}|${x.qty}|${x.deliveryDate}` === k)) return;
+        g.covers.push(c);
+      });
       upcomingByDate.set(b.date, g);
     });
     const upcoming = [...upcomingByDate.values()].slice(0, 8);
@@ -3758,8 +3793,12 @@
           const sizeStr = b.count > 1
             ? ` · ${b.count} × ${Math.round(b.units / b.count)}`
             : (b.size === 'double' ? ` · double (${b.units})` : ` · ${b.units}`);
-          return `<div style="display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #eee;font:500 12px 'Manrope',sans-serif">
-            <span><strong>${esc(dateLabel)}</strong>${overdue}${sizeStr}</span>
+          const who = dipSku === CHEESE_KEY
+            ? renderCheeseOrderRows(dipSku, b.date, b.covers || [])
+            : '';
+          return `<div style="padding:6px 12px;border-bottom:1px solid #eee;font:500 12px 'Manrope',sans-serif">
+            <div><strong>${esc(dateLabel)}</strong>${overdue}${sizeStr}</div>
+            ${who}
           </div>`;
         }).join('')}
       </div>`;
@@ -4867,16 +4906,23 @@
     // the card, then reloads + reschedules. deferTo:'' clears the deferral.
     const writeDefers = async (btn, deferTo) => {
       const [team, sku] = btn.dataset.key.split('|');
+      const deliveryId  = (btn.dataset.deliveryId || '').trim();
       const deliveries  = (btn.dataset.deliveries || '').split(',').filter(Boolean);
       if (deliveries.length === 0) return;
       btn.disabled = true;
       try {
         await Promise.all(deliveries
           .filter(dd => !deferTo || deferTo <= dd) // never push past this ship date
-          .map(dd => appendLog(PRODUCTION_LOG, {
-            action: 'defer', team, sku, deliveryDate: dd,
-            deferTo, by: userRole, timeStamp: new Date().toISOString(),
-          })));
+          .map((dd) => {
+            const row = {
+              action: 'defer', team, sku, deliveryDate: dd,
+              deferTo, by: userRole, timeStamp: new Date().toISOString(),
+            };
+            // Shape defers a whole SKU/date. Dips name one order so two
+            // Wednesday cheese deliveries can move independently.
+            if (deliveryId) row.deliveryId = deliveryId;
+            return appendLog(PRODUCTION_LOG, row);
+          }));
         await loadProduction();
         schedule = buildOptimalSchedule();
         render();
