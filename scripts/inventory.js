@@ -109,20 +109,63 @@ export const DIP_CONFIG = {
     squareNames: [/^house\s*mustard(\s*-\s*catering)?$/i],
     squareModifiers: [/^house\s*mustard$/i],
   },
-  'honey mustard dip': {
-    key: 'honey-mustard',
-    emoji: '🍯',
-    label: 'honey mustard',
-    minLead: 1,
-    maxLead: 7,
-    singleBatchSize: 35,
-    doubleBatchSize: 70,
-    dailyCap: 1,
-    shelfLifeDays: 7,
-    squareNames: [/^honey\s*mustard(\s*-\s*catering)?$/i],
-    squareModifiers: [/^honey\s*mustard$/i],
-  },
 };
+
+// Honey mustard was discontinued 2026-11-23. It stays out of DIP_CONFIG so
+// nothing schedules a batch. Old log rows still name the SKU; callers match
+// with isDiscontinuedDipSku and render the name instead of planning it.
+export function isDiscontinuedDipSku(sku) {
+  return /honey\s*mustard/i.test(String(sku || ''));
+}
+
+// Wholesale bulk cheese. "bulk dangerous dip (25 srv)" × 12 = 300 servings.
+// N comes from "(N srv)" in the SKU; packets without a count are 25.
+export function bulkCheeseDipServings(sku, quantity) {
+  const name = String(sku || '').trim();
+  const qty = Number(quantity) || 0;
+  if (!name || qty <= 0) return 0;
+  if (!/bulk dangerous dip/i.test(name) && !/bulk cheese dip/i.test(name)) return 0;
+  const match = name.match(/\(\s*(\d+)\s*srv\s*\)/i);
+  const per = match && Number(match[1]) > 0 ? Number(match[1]) : 25;
+  return qty * per;
+}
+
+const warnedUnmappedDips = new Set();
+
+function noteUnmappedDipSku(sku) {
+  const name = String(sku || '').trim();
+  if (!name) return;
+  const key = name.toLowerCase();
+  if (warnedUnmappedDips.has(key)) return;
+  if (isDiscontinuedDipSku(name) || DIP_CONFIG[name]) return;
+  if (/bulk dangerous dip/i.test(name) || /bulk cheese dip/i.test(name)) return;
+  if (!/dip/i.test(name)) return;
+  warnedUnmappedDips.add(key);
+  // eslint-disable-next-line no-console
+  console.warn(`Dips: planner SKU "${name}" was not counted on the Dips tab.`);
+}
+
+// Dip-like planner SKUs in upcoming deliveries that this scheduler will not
+// turn into a batch. Used by the Dips tab to list what it is skipping.
+export function unmappedDipSkus(deliveries, skuAliases = {}, today = '') {
+  const found = new Set();
+  (deliveries || []).forEach((d) => {
+    if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return;
+    if (today && (!d.date || d.date < today)) return;
+    let items = [];
+    try { items = JSON.parse(d.lineItems || '[]'); } catch { items = []; }
+    if (!Array.isArray(items)) return;
+    items.forEach((li) => {
+      let name = String(li.sku || li.name || '').trim();
+      if (!name) return;
+      if (skuAliases[name]) name = skuAliases[name];
+      if (isDiscontinuedDipSku(name) || DIP_CONFIG[name]) return;
+      if (/bulk dangerous dip/i.test(name) || /bulk cheese dip/i.test(name)) return;
+      if (/dip/i.test(name)) found.add(name);
+    });
+  });
+  return [...found];
+}
 
 // Backward-compat shims — callers that imported the old constants still work.
 // Phase 3b+ should read DIP_CONFIG['3oz cheese dip'] directly.
@@ -163,7 +206,6 @@ export const BATCH_SIZES = {
   'hot ranch dip': DIP_CONFIG['hot ranch dip'].singleBatchSize,
   'sweet cream dip': DIP_CONFIG['sweet cream dip'].singleBatchSize,
   'house mustard dip': DIP_CONFIG['house mustard dip'].singleBatchSize,
-  'honey mustard dip': DIP_CONFIG['honey mustard dip'].singleBatchSize,
 };
 
 // Pretzels per case — wholesale shipping unit. Default per SKU; managers
@@ -979,6 +1021,7 @@ export function getInventoryReport(args) {
         if (skuAliases[key]) key = skuAliases[key];
         const cfg = DIP_CONFIG[key];
         let bs;
+        if (isDiscontinuedDipSku(key)) return;
         if (cfg) {
           bs = c.size === 'double' ? cfg.doubleBatchSize : cfg.singleBatchSize;
         } else {
@@ -1280,6 +1323,7 @@ export function getInventoryReport(args) {
   const now = Date.now();
   const agingDough = [];
   Object.entries(doughQueue).forEach(([sku, queue]) => {
+    if (isDiscontinuedDipSku(sku)) return;
     const dipCfg = DIP_CONFIG[sku];
     const failAt = dipCfg ? dipCfg.shelfLifeDays : DOUGH_AGE_FAIL_DAYS;
     const warnAt = dipCfg ? Math.max(1, dipCfg.shelfLifeDays - 1) : DOUGH_AGE_WARN_DAYS;
@@ -1404,6 +1448,9 @@ export function attributeDeliveryCoverage({
       if (skuAliases[key]) key = skuAliases[key];
       const qty = Number(quantity) || 0;
       if (qty <= 0) return;
+      // Discontinued dips still show on the order. They are not production
+      // work, so they must not pull the order toward "to make".
+      if (isDiscontinuedDipSku(key)) return;
       // Skip FOH/unconfigured SKUs — they aren't produced in-house, so
       // they shouldn't drag the aggregate to "to make".
       if (getBatchSize && getBatchSize(key) === 0) return;
@@ -1539,7 +1586,16 @@ export function scheduleDip({
     lineItems.forEach(({ sku, quantity }) => {
       let key = (sku || '').trim();
       if (skuAliases && skuAliases[key]) key = skuAliases[key];
-      if (key !== dipSku) return;
+      if (!key || isDiscontinuedDipSku(key)) return;
+      const bulkServings = bulkCheeseDipServings(key, quantity);
+      if (bulkServings > 0) {
+        if (dipSku === CHEESE_SKU_KEY) qtyForDip += bulkServings;
+        return;
+      }
+      if (key !== dipSku) {
+        noteUnmappedDipSku(key);
+        return;
+      }
       qtyForDip += Number(quantity) || 0;
     });
     if (qtyForDip <= 0) return;
@@ -1565,11 +1621,13 @@ export function scheduleDip({
   const startInventory = cfStart + frStart + ohStart;
 
   const batches = [];
-  // Set of dayIdx for O(1) lookup. Updated alongside batches.push() — keep
-  // in sync. Previous .some() across batches grew linearly per call;
-  // at 100+ dips × 30 days × inner loop, the scan got expensive.
-  const batchedDays = new Set();
-  const hasBatchOn = (dayIdx) => batchedDays.has(dayIdx);
+  // How many batches are already on a day. A normal lead window still gets
+  // one batch per day. A one-day window, or a window that has already
+  // passed, can stack more batches on that day so a 300-serving wholesale
+  // order is not left as a single 150 batch.
+  const batchCounts = new Map();
+  const countOn = (dayIdx) => batchCounts.get(dayIdx) || 0;
+  let inv = startInventory;
   // Pick batch size at placement time. If the immediate deficit (-inv at the
   // time we decide to place) exceeds a single, upgrade to double.
   const pickSize = (deficit) => {
@@ -1577,54 +1635,60 @@ export function scheduleDip({
     if (deficit > cfg.singleBatchSize) return { size: 'double', units: cfg.doubleBatchSize };
     return { size: 'single', units: cfg.singleBatchSize };
   };
+  const place = (j, overdue, demandDay) => {
+    const { size, units } = pickSize(-inv);
+    if (!(units > 0)) return false;
+    batches.push({
+      date: demand[j].date,
+      dayIndex: j,
+      covers: [...demand[demandDay].covers],
+      foh: demand[demandDay].foh,
+      overdue,
+      fillsDay: demandDay,
+      size,
+      units,
+    });
+    batchCounts.set(j, countOn(j) + 1);
+    inv += units;
+    return true;
+  };
 
-  let inv = startInventory;
   for (let i = 0; i < dayCount; i++) {
     inv -= demand[i].total;
-    while (inv < 0) {
+    let guard = 0;
+    while (inv < 0 && guard < 40) {
+      guard += 1;
       let placed = false;
       const earliest = Math.max(0, i - cfg.maxLead);
       const latest = i - cfg.minLead;
-      const { size, units } = pickSize(-inv);
-      for (let j = latest; j >= earliest; j--) {
-        if (j < 0) break;
-        if (hasBatchOn(j)) continue;
-        batches.push({
-          date: demand[j].date,
-          dayIndex: j,
-          covers: [...demand[i].covers],
-          foh: demand[i].foh,
-          overdue: false,
-          fillsDay: i,
-          size,
-          units,
-        });
-        batchedDays.add(j);
-        inv += units;
-        placed = true;
-        break;
+      // One legal make-day (or the make-by day is today): keep adding
+      // batches there until this day's deficit is covered.
+      const singleDay = latest >= 0 && latest === earliest;
+      if (latest >= earliest) {
+        for (let j = latest; j >= earliest; j--) {
+          if (j < 0) break;
+          if (!singleDay && countOn(j) > 0) continue;
+          placed = place(j, false, i);
+          break;
+        }
+      }
+      // Lead window is entirely before today. Make it today, and keep
+      // going until the servings fit. Tuesday's order viewed on Monday
+      // lands here. A today-only FOH deficit (no delivery) is left for a
+      // later day to place inside its own window, so retail dips don't
+      // flip to "overdue" just because walk-in demand starts this morning.
+      if (!placed && latest < 0 && !(i === 0 && demand[i].delivery <= 0)) {
+        placed = place(0, true, i);
       }
       if (!placed) {
         for (let j = 0; j < i; j++) {
-          if (!hasBatchOn(j)) {
-            batches.push({
-              date: demand[j].date,
-              dayIndex: j,
-              covers: [...demand[i].covers],
-              foh: demand[i].foh,
-              overdue: true,
-              fillsDay: i,
-              size,
-              units,
-            });
-            batchedDays.add(j);
-            inv += units;
-            placed = true;
+          if (countOn(j) === 0) {
+            placed = place(j, true, i);
             break;
           }
         }
-        if (!placed) break; // bail to avoid infinite loop
       }
+      if (!placed) break;
     }
   }
 

@@ -565,7 +565,7 @@ const SKUS = [
   '21oz mammoth pretzel','10oz mustache','10oz plain','10oz bbk','10oz spicy bee','10oz Vegan Pretzel',
   '7oz plain','7oz bbk','7oz spicy bee','7oz bootlegger','7oz pepperoni',
   '4oz twist plain','4oz twist bbk','4oz twist spicy bee',
-  '3oz cheese dip','sweet cream dip','hot ranch dip','house mustard dip','honey mustard dip',
+  '3oz cheese dip','sweet cream dip','hot ranch dip','house mustard dip',
   'bulk dangerous dip (25 srv)','plain bombs','bees bats',
 ];
 
@@ -936,7 +936,7 @@ function renderMonthly() {
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
-function buildSkuGrid() {
+function buildSkuGrid(savedVolumes = {}) {
   const grid = document.getElementById('sku-grid');
   grid.querySelectorAll('.sku-row').forEach(r => r.remove());
   SKUS.forEach(sku => {
@@ -947,6 +947,22 @@ function buildSkuGrid() {
     input.type = 'number'; input.min = '0'; input.step = '1'; input.placeholder = '0';
     input.className = 'sku-qty-input sku-row';
     input.dataset.sku = sku;
+    grid.appendChild(label);
+    grid.appendChild(input);
+  });
+  // Old events can still name honey mustard. Show that quantity and keep it
+  // on save. It is not in the picker, so a new event cannot add it.
+  Object.entries(savedVolumes).forEach(([sku, qty]) => {
+    if (!/honey\s*mustard/i.test(sku) || !(Number(qty) > 0) || SKUS.includes(sku)) return;
+    const label = document.createElement('div');
+    label.className = 'sku-label sku-row';
+    label.textContent = `${sku} (discontinued)`;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.readOnly = true;
+    input.className = 'sku-qty-input sku-row';
+    input.dataset.sku = sku;
+    input.value = qty;
     grid.appendChild(label);
     grid.appendChild(input);
   });
@@ -974,17 +990,16 @@ function openModal(id = null, presetDate = null) {
   deleteBtn.style.display = (ev && isAdmin) ? '' : 'none';
   if (ev && isAdmin) deleteBtn.dataset.deleteId = ev.id;
 
-  // Populate SKU grid
-  buildSkuGrid();
+  // Populate SKU grid. Discontinued honey mustard stays visible on old events.
+  let savedVolumes = {};
   if (ev?.skuVolumes) {
-    try {
-      const vols = JSON.parse(ev.skuVolumes);
-      document.querySelectorAll('#sku-grid input[data-sku]').forEach(inp => {
-        const v = vols[inp.dataset.sku];
-        if (v) inp.value = v;
-      });
-    } catch(_) {}
+    try { savedVolumes = JSON.parse(ev.skuVolumes) || {}; } catch (_) { savedVolumes = {}; }
   }
+  buildSkuGrid(savedVolumes);
+  document.querySelectorAll('#sku-grid input[data-sku]').forEach(inp => {
+    const v = savedVolumes[inp.dataset.sku];
+    if (v) inp.value = v;
+  });
 
   document.getElementById('event-modal').classList.add('open');
   document.getElementById('event-name').focus();

@@ -1128,10 +1128,11 @@
       getInventoryReport,
       attributeDeliveryCoverage,
       isShapeOnlyDelivery,
+      isDiscontinuedDipSku,
       expandBoxLineItems,
       caseSizeOptionsFor,
       normalizeCustomerName as normalizeCustomer,
-    } from '../../scripts/inventory.js?v=2026-05-22-new-skus';
+    } from '../../scripts/inventory.js?v=2026-11-23-dip-servings';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
 
     // Set once at boot from the resolved session (see the boot IIFE below).
@@ -1523,7 +1524,7 @@
     }
 
     async function loadSkus() {
-      const res = await fetch('skus.json?v=2026-09-11-hot-dog-buns');
+      const res = await fetch('skus.json?v=2026-11-23-no-honey-mustard');
       skus = await res.json();
     }
 
@@ -2009,8 +2010,11 @@
       const key = aliases[lineSku] || lineSku;
       const line = cov.lines[key];
       if (!line) {
-        // Not in the coverage map (FOH, unconfigured, or not produced) —
-        // render in a subdued gray so it's clearly out-of-band.
+        // Not in the coverage map (FOH, unconfigured, discontinued, or not
+        // produced). Gray, and say so — the SKU text itself still shows.
+        if (isDiscontinuedDipSku(key)) {
+          return { className: 'cov-foh', tooltip: 'Discontinued — do not make' };
+        }
         return { className: 'cov-foh', tooltip: 'Not produced in-house' };
       }
       const STATUS_TIP = {
