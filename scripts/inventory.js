@@ -621,7 +621,9 @@ export function resolveDeliveries(logs, options = {}) {
  * packedCases, deferrals }. `productionLogs` is the input array — kept for
  * callers that need raw rows (e.g. timestamp-precise event accounting in
  * getInventoryReport). `deferrals` maps `${team}|${sku}|${deliveryDate}` →
- * the date shape/BFP work for that order was pushed to ('' = cleared).
+ * the date that work was pushed to ('' = cleared). A dips row with
+ * deliveryId uses `${team}|${sku}|${deliveryDate}|${deliveryId}` so one
+ * order can move without taking the other orders on that ship date.
  */
 export function resolveProductionLogs(logs) {
   const state = {};
@@ -809,6 +811,10 @@ export function resolveProductionLogs(logs) {
   // Pass 4: defer events. NOT date-keyed — a defer decision applies to a
   // (team, sku, deliveryDate) tuple regardless of the day it was logged.
   // Last-write-wins by timeStamp; deferTo:'' is a tombstone that clears it.
+  // Shape/BFP rows have no deliveryId, so their key stays
+  // `${team}|${sku}|${deliveryDate}`. A dips row names one order
+  // (deliveryId) so two cheese orders on the same ship date can move
+  // separately. Same `defer` action either way.
   const deferrals = {};
   const deferralTs = {};
   productionLogs.forEach((row) => {
@@ -817,7 +823,10 @@ export function resolveProductionLogs(logs) {
     const sku = canonicalSku(row.sku);
     const deliveryDate = (row.deliveryDate || '').trim();
     if (!team || !sku || !deliveryDate) return;
-    const key = `${team}|${sku}|${deliveryDate}`;
+    const deliveryId = (row.deliveryId || '').trim();
+    const key = deliveryId
+      ? `${team}|${sku}|${deliveryDate}|${deliveryId}`
+      : `${team}|${sku}|${deliveryDate}`;
     const ts = row.timeStamp || '';
     if (!(key in deferrals) || (deferralTs[key] || '') <= ts) {
       deferrals[key] = (row.deferTo || '').trim();
@@ -1535,6 +1544,9 @@ function addDaysISO(s, n) {
  * @param {number} args.fohDailyAvg         Average FOH walk-in units/day for this dip (Square).
  * @param {string} args.today               'YYYY-MM-DD' (Mountain TZ).
  * @param {Object} args.skuAliases          From resolveProductionLogs.
+ * @param {Object} [args.deferrals]         From resolveProductionLogs. A dips
+ *   entry (`dips|sku|deliveryDate|deliveryId`) moves that order's make-day
+ *   to deferTo. Shape/BFP keys are ignored here. Omitted = no moves.
  * @param {number} [args.lookaheadDays=14]  How far forward to plan.
  * @returns {{
  *   dipSku: string,
@@ -1544,8 +1556,25 @@ function addDaysISO(s, n) {
  *   fohDailyAvg: number,
  * }}
  */
+// Make-day a dips defer log pushed this order to. '' when it was never
+// deferred or the latest row cleared it (deferTo:''). Shape keys are a
+// different team, so they do not match.
+export function dipDeferTo(deferrals, dipSku, delivery) {
+  if (!deferrals || !delivery) return '';
+  const date = String(delivery.date || '').trim();
+  if (!date) return '';
+  const id = String(delivery.deliveryId || '').trim();
+  if (id) {
+    const perOrder = `dips|${dipSku}|${date}|${id}`;
+    if (Object.hasOwn(deferrals, perOrder)) return String(deferrals[perOrder] || '').trim();
+  }
+  const perDate = `dips|${dipSku}|${date}`;
+  if (Object.hasOwn(deferrals, perDate)) return String(deferrals[perDate] || '').trim();
+  return '';
+}
+
 export function scheduleDip({
-  dipSku, deliveries, inventoryReport, fohDailyAvg, today, skuAliases, lookaheadDays = 14,
+  dipSku, deliveries, inventoryReport, fohDailyAvg, today, skuAliases, deferrals = null, lookaheadDays = 14,
 }) {
   const cfg = DIP_CONFIG[dipSku];
   // FOH-only dips (e.g. portion-served dangerous/sweet cream dips) aren't
@@ -1575,7 +1604,12 @@ export function scheduleDip({
     foh: dailyAvg,
     total: dailyAvg,
     covers: [],
+    deferred: [],
   }));
+  // Orders we may still need to name on their make-day when a deferral
+  // left them covered by surplus instead of their own batch.
+  const planned = [];
+  const indexOf = (date) => Math.round((parseISODate(date) - parseISODate(today)) / 86400000);
 
   (deliveries || []).forEach((d) => {
     if (['delivered', 'picked_up', 'cancelled'].includes(d.status)) return;
@@ -1599,18 +1633,30 @@ export function scheduleDip({
       qtyForDip += Number(quantity) || 0;
     });
     if (qtyForDip <= 0) return;
-    const dayIdx = (() => {
-      const ms = parseISODate(d.date) - parseISODate(today);
-      return Math.round(ms / 86400000);
-    })();
+    const dayIdx = indexOf(d.date);
     if (dayIdx < 0 || dayIdx >= dayCount) return;
-    demand[dayIdx].delivery += qtyForDip;
-    demand[dayIdx].total += qtyForDip;
-    demand[dayIdx].covers.push({
+    const cover = {
       customer: d.customer || d.location || '?',
       qty: qtyForDip,
       deliveryDate: d.date,
-    });
+      deliveryId: d.deliveryId || '',
+    };
+    // Staff moved this order's make to a later day (still before it ships).
+    // It stays out of today's count and is produced on deferTo instead.
+    const deferTo = dipDeferTo(deferrals, dipSku, d);
+    const deferIndex = deferTo ? indexOf(deferTo) : -1;
+    const deferActive = !!deferTo && deferTo > today && deferTo < d.date
+      && deferIndex >= 0 && deferIndex < dayCount;
+    if (deferActive) {
+      demand[dayIdx].deferred.push({ qty: qtyForDip, makeIndex: deferIndex, covers: [cover] });
+      planned.push({ makeIndex: deferIndex, cover });
+      return;
+    }
+    const natural = dayIdx - cfg.minLead;
+    planned.push({ makeIndex: natural < 0 ? 0 : natural, cover });
+    demand[dayIdx].delivery += qtyForDip;
+    demand[dayIdx].total += qtyForDip;
+    demand[dayIdx].covers.push(cover);
   });
 
   // Starting inventory = sum across all three buckets. Pre-Phase-3a snapshots
@@ -1627,6 +1673,10 @@ export function scheduleDip({
   // order is not left as a single 150 batch.
   const batchCounts = new Map();
   const countOn = (dayIdx) => batchCounts.get(dayIdx) || 0;
+  // Make-days that already hold a deferred order. Later demand whose
+  // latest legal day is one of these stacks here, so Fisher's Thursday
+  // batch stays on Tuesday with the Wednesday orders moved onto it.
+  const forcedStack = new Set();
   let inv = startInventory;
   // Pick batch size at placement time. If the immediate deficit (-inv at the
   // time we decide to place) exceeds a single, upgrade to double.
@@ -1635,13 +1685,14 @@ export function scheduleDip({
     if (deficit > cfg.singleBatchSize) return { size: 'double', units: cfg.doubleBatchSize };
     return { size: 'single', units: cfg.singleBatchSize };
   };
-  const place = (j, overdue, demandDay) => {
+  const place = (j, overdue, demandDay, coversOverride) => {
     const { size, units } = pickSize(-inv);
     if (!(units > 0)) return false;
+    const covers = coversOverride || demand[demandDay].covers;
     batches.push({
       date: demand[j].date,
       dayIndex: j,
-      covers: [...demand[demandDay].covers],
+      covers: [...covers],
       foh: demand[demandDay].foh,
       overdue,
       fillsDay: demandDay,
@@ -1663,7 +1714,7 @@ export function scheduleDip({
       const latest = i - cfg.minLead;
       // One legal make-day (or the make-by day is today): keep adding
       // batches there until this day's deficit is covered.
-      const singleDay = latest >= 0 && latest === earliest;
+      const singleDay = latest >= 0 && (latest === earliest || forcedStack.has(latest));
       if (latest >= earliest) {
         for (let j = latest; j >= earliest; j--) {
           if (j < 0) break;
@@ -1690,6 +1741,41 @@ export function scheduleDip({
       }
       if (!placed) break;
     }
+    // Deferred orders are consumed on the ship date but made on deferTo.
+    // Stacking is allowed there: the worker asked for one make-day.
+    for (const portion of demand[i].deferred) {
+      inv -= portion.qty;
+      let guard2 = 0;
+      while (inv < 0 && guard2 < 40) {
+        guard2 += 1;
+        const placed = place(portion.makeIndex, false, i, portion.covers);
+        if (!placed) break;
+        forcedStack.add(portion.makeIndex);
+      }
+    }
+  }
+
+  // A deferred make-day's surplus can feed the order that already belonged
+  // on that day (Fisher, made two days before Thursday). Name it on the
+  // batch. With no deferrals this does not run, so an untouched schedule
+  // stays the same.
+  if (demand.some((day) => day.deferred.length)) {
+    const seen = new Set();
+    batches.forEach((b) => {
+      (b.covers || []).forEach((c) => {
+        seen.add(`${c.deliveryId}|${c.deliveryDate}|${c.qty}`);
+      });
+    });
+    planned.forEach((p) => {
+      const c = p.cover;
+      const k = `${c.deliveryId}|${c.deliveryDate}|${c.qty}`;
+      if (seen.has(k)) return;
+      if (p.makeIndex < 0 || p.makeIndex >= dayCount) return;
+      const host = batches.find((b) => b.dayIndex === p.makeIndex);
+      if (!host) return;
+      host.covers.push(c);
+      seen.add(k);
+    });
   }
 
   return {

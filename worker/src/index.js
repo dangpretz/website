@@ -1783,6 +1783,7 @@ async function handleFohCalendar(request, env) {
     fohDailyAvg: dailyAvg,
     today,
     skuAliases: prod.skuAliases,
+    deferrals: prod.deferrals,
     lookaheadDays: 14,
   });
 
@@ -1797,6 +1798,7 @@ async function handleFohCalendar(request, env) {
       fohDailyAvg: dipAvgs[dipSku] || 0,
       today,
       skuAliases: prod.skuAliases,
+      deferrals: prod.deferrals,
       lookaheadDays: 14,
     });
     // Defensive: scheduleDip returns {batches: []} for SKUs missing from
@@ -1988,6 +1990,7 @@ async function collectFohCalEventList(env) {
     fohDailyAvg: dailyAvg,
     today,
     skuAliases: prod.skuAliases,
+    deferrals: prod.deferrals,
     lookaheadDays: 14,
   });
 
