@@ -272,8 +272,11 @@ export const LEGACY_SKU_RENAMES = {
 
 // Per-SKU allowed case sizes. First value = default selection in dropdown.
 // SKUs missing or empty array → no standard cases (pretzel-only entry).
-// 10oz (12 or 48, default 12) and 7oz (72 or 32) pretzels ship in two sizes depending on the customer's
-// order; manager picks per delivery line item in the planner form.
+// 10oz (12 or 48, default 12) and 7oz (36, 72, or 32; default 36) pretzels
+// ship in more than one size depending on the customer's order; manager
+// picks per delivery line item in the planner form. 72 and 32 stay so
+// existing 7oz planner lines still resolve. 2026-11: 7oz wholesale boxes
+// moved to 36 per case.
 export const CASE_SIZE_OPTIONS = {
   '21oz mammoth pretzel': [25],
   '10oz mustache': [12, 48],
@@ -281,14 +284,14 @@ export const CASE_SIZE_OPTIONS = {
   '10oz bbk': [12, 48],
   '10oz spicy bee': [12, 48],
   '10oz Vegan Pretzel': [12, 48],
-  '7oz plain': [72, 32],
-  '7oz bbk': [72, 32],
-  '7oz spicy bee': [72, 32],
-  '7oz bootlegger': [72, 32],
-  '7oz pepperoni': [72, 32],
-  '7oz hot dog plain': [72, 32],
-  '7oz hot dog bbk': [72, 32],
-  '7oz hot dog spicy bee': [72, 32],
+  '7oz plain': [36, 72, 32],
+  '7oz bbk': [36, 72, 32],
+  '7oz spicy bee': [36, 72, 32],
+  '7oz bootlegger': [36, 72, 32],
+  '7oz pepperoni': [36, 72, 32],
+  '7oz hot dog plain': [36, 72, 32],
+  '7oz hot dog bbk': [36, 72, 32],
+  '7oz hot dog spicy bee': [36, 72, 32],
   '4oz twist plain': [40],
   '4oz twist bbk': [40],
   '4oz twist spicy bee': [40],
