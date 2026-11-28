@@ -1132,8 +1132,11 @@
       isDiscontinuedPretzelSku,
       expandBoxLineItems,
       caseSizeOptionsFor,
+      caseCountForQuantity,
+      mergePlannerLineItem,
+      mergePlannerDeliveryUpdate,
       normalizeCustomerName as normalizeCustomer,
-    } from '../../scripts/inventory.js?v=2026-11-27-fallback-32-12';
+    } from '../../scripts/inventory.js?v=2026-11-28-line-edit';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
 
     // Set once at boot from the resolved session (see the boot IIFE below).
@@ -1491,6 +1494,22 @@
           byId[id] = { ...row, deliveryId: id };
           if (prevBarcodes) byId[id].barcodes = prevBarcodes;
           if (prevConfirmation) byId[id].confirmation = prevConfirmation;
+          // The edit form does not edit notes, contact, or address. A sheet
+          // row leaves those cells blank, which would wipe them. Keep the
+          // previous value when the update didn't bring a new one. Fields
+          // the form does edit always come from this row.
+          if (prev) {
+            const editedByUpdate = new Set([
+              'action', 'deliveryId', 'customer', 'date', 'type', 'orderCategory',
+              'lineItems', 'status', 'timeStamp', 'barcodes', 'confirmation',
+            ]);
+            Object.entries(prev).forEach(([key, value]) => {
+              if (editedByUpdate.has(key)) return;
+              if (value == null || value === '' || typeof value === 'object') return;
+              const incoming = byId[id][key];
+              if (incoming == null || incoming === '') byId[id][key] = value;
+            });
+          }
           let s = row.status || 'scheduled';
           if (s === 'ready_deliver' || s === 'ready_pickup') s = 'scheduled';
           byId[id].status = s;
@@ -1553,7 +1572,7 @@
       return input;
     }
 
-    function addLineRow(skuVal, qtyVal, caseSizeVal, caseCountVal) {
+    function addLineRow(skuVal, qtyVal, caseSizeVal, caseCountVal, sourceLine) {
       lineItemsEmpty.hidden = true;
       const row = document.createElement('div');
       row.className = 'line-item-row';
@@ -1629,6 +1648,7 @@
       });
 
       row.append(skuWrapper, caseCountCell, opTimes, caseSizeCell, opEq, qtyCell, removeBtn);
+      if (sourceLine && typeof sourceLine === 'object') row._sourceLine = sourceLine;
 
       // Hint row, hidden until pretzel/case mismatch shows up
       const hint = document.createElement('div');
@@ -1688,13 +1708,11 @@
         }
       };
 
-      // Cases × Size → Pretzels: live update as the user types/picks —
-      // but ONLY if the user hasn't manually edited pretzels. Once they
-      // type into pretzels, treat that value as the source of truth and
-      // stop overwriting it. (Hint still shows "≈ cs cases" so the user
-      // sees the implied count without us stomping their number.) The
-      // dirty flag resets when SKU changes (different product, fresh row)
-      // or when pretzels is cleared back to empty.
+      // Cases typed in → pretzels, until the user edits pretzels. Changing
+      // the case SIZE keeps pretzels fixed and recomputes the case count
+      // (ceil, same as save). The hint still shows "≈ n.n cases" when the
+      // quantity is not an exact multiple. The dirty flag resets when SKU
+      // changes (different product, fresh row) or when pretzels is cleared.
       let pretzelsDirty = false;
       const syncQtyFromCases = () => {
         if (pretzelsDirty) { updateHint(); return; }
@@ -1703,8 +1721,16 @@
         if (cs > 0 && cc > 0) qtyInput.value = String(cs * cc);
         updateHint();
       };
+      const syncCaseCountFromQty = () => {
+        const cs = Number(caseSizeSelect.value) || 0;
+        const qty = Number(qtyInput.value) || 0;
+        if (cs > 0 && qty > 0) {
+          caseCountInput.value = String(caseCountForQuantity(qty, cs));
+        }
+        updateHint();
+      };
       caseCountInput.addEventListener('input', syncQtyFromCases);
-      caseSizeSelect.addEventListener('change', syncQtyFromCases);
+      caseSizeSelect.addEventListener('change', syncCaseCountFromQty);
       qtyInput.addEventListener('input', () => {
         // Any keystroke in pretzels = user wants this value preserved.
         // Empty pretzels = back to derived mode, and immediately re-sync
@@ -2581,7 +2607,7 @@
       let items = [];
       if (row.lineItems) { try { items = JSON.parse(row.lineItems); if (!Array.isArray(items)) items = []; } catch (_) {} }
       else if (row.sku && (row.volume != null)) { items = [{ sku: row.sku, quantity: Number(row.volume) || 0 }]; }
-      items.forEach((it) => addLineRow(it.sku, it.quantity, it.caseSize, it.caseCount));
+      items.forEach((it) => addLineRow(it.sku, it.quantity, it.caseSize, it.caseCount, it));
     }
 
     function startEdit(deliveryId) {
@@ -3048,21 +3074,18 @@
         if (sku && (!qty || Number(qty) <= 0)) { hasZeroQty = true; return; }
         if (sku && qty && Number(qty) > 0) {
           const quantity = Number(qty);
-          const lineItem = { sku, quantity };
-          // Persist case info ONLY if BOTH size and count were entered (i.e.
-          // the manager actively picked cases). Pretzels is the source of
-          // truth — on submit, reconcile caseCount from quantity so we
-          // never persist mathematically inconsistent triples like
-          // {qty:100, cs:48, cc:3}. The user-entered count is treated as a
-          // hint that drove quantity during entry; quantity wins on submit.
+          // Pretzels is the source of truth. Reconcile caseCount from
+          // quantity so we never persist triples like {qty:100, cs:48, cc:3}.
+          // Start from the line that was loaded so note and any other field
+          // this form does not edit survive the save.
           const caseSize = Number(caseSizeRaw) || 0;
           const caseCountEntered = Number(caseCountRaw) || 0;
-          if (caseSize > 0 && caseCountEntered > 0) {
-            const reconciledCount = Math.ceil(quantity / caseSize);
-            lineItem.caseSize = caseSize;
-            lineItem.caseCount = reconciledCount;
-          }
-          lineItems.push(lineItem);
+          const caseCount = (caseSize > 0 && caseCountEntered > 0)
+            ? caseCountForQuantity(quantity, caseSize)
+            : 0;
+          lineItems.push(mergePlannerLineItem(row._sourceLine, {
+            sku, quantity, caseSize, caseCount,
+          }));
         }
       });
       if (!customer || !date || !type) { showError('Please fill in customer, date, and type.'); return; }
@@ -3074,7 +3097,11 @@
       const lineItemsJson = JSON.stringify(lineItems);
       try {
         if (editingId) {
-          await appendLog(LOG_PATH, { action: 'update', deliveryId: editingId, customer, date, type, orderCategory, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
+          const existing = currentDeliveries.find((d) => d.deliveryId === editingId);
+          await appendLog(LOG_PATH, mergePlannerDeliveryUpdate(existing, {
+            action: 'update', deliveryId: editingId, customer, date, type, orderCategory,
+            lineItems: lineItemsJson, status: 'scheduled', timeStamp,
+          }));
         } else if (!recurringCheck.checked) {
           await appendLog(LOG_PATH, { action: 'create', deliveryId: generateDeliveryId(), customer, date, type, orderCategory, lineItems: lineItemsJson, status: 'scheduled', timeStamp });
         }
