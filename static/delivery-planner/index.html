@@ -1135,8 +1135,10 @@
       caseCountForQuantity,
       mergePlannerLineItem,
       mergePlannerDeliveryUpdate,
+      planRecurringOccurrence,
+      createGenerationLock,
       normalizeCustomerName as normalizeCustomer,
-    } from '../../scripts/inventory.js?v=2026-11-28-line-edit';
+    } from '../../scripts/inventory.js?v=2026-11-28-recurrence-dedupe';
     import { requireAccess, canEdit } from '../../scripts/staff-access.js';
 
     // Set once at boot from the resolved session (see the boot IIFE below).
@@ -2977,9 +2979,19 @@
       } catch (e) { console.error('Recurrence log error', e); currentRecurrences = []; }
     }
 
+    const recurrenceGenerationLock = createGenerationLock();
+
     async function generateRecurringDeliveries(recData) {
+      await recurrenceGenerationLock.run(() => generateRecurringDeliveriesOnce(recData));
+    }
+
+    async function generateRecurringDeliveriesOnce(recData) {
       const { recurrences, generated } = recData;
       if (!recurrences.length) return;
+      // Read the delivery log itself. The marker can be missing even when
+      // the line write already landed (Thieve's Guild 12/14, 2026-11-16).
+      const deliveryLogs = await fetchLog(LOG_PATH);
+      const existingLines = resolveDeliveriesFromLogs(deliveryLogs);
       const horizon = new Date(); horizon.setDate(horizon.getDate() + 28);
       const horizonStr = toDateStr(horizon);
       const todayStr = toDateStr(new Date());
@@ -2995,13 +3007,63 @@
           const dateStr = toDateStr(cursor);
           if (endDate && dateStr > endDate) break;
           if (dateStr >= todayStr) {
+            const action = planRecurringOccurrence({
+              recurrenceId: rec.recurrenceId,
+              date: dateStr,
+              existingLines,
+              generated,
+            });
             const genKey = rec.recurrenceId + ':' + dateStr;
-            if (!generated[genKey]) {
+            if (action === 'mark') {
+              const existing = existingLines.find((line) => (
+                String(line.recurrenceId || '') === String(rec.recurrenceId || '')
+                && String(line.date || '').slice(0, 10) === dateStr
+              ));
+              try {
+                await appendLog(TEMPLATE_LOG_PATH, {
+                  action: 'recurrence_generated',
+                  recurrenceId: rec.recurrenceId,
+                  generatedDate: dateStr,
+                  deliveryId: existing?.deliveryId || '',
+                  timeStamp: new Date().toISOString(),
+                });
+                generated[genKey] = true;
+              } catch (err) { console.error('Recurrence marker error', err); }
+            } else if (action === 'create') {
               const newId = generateDeliveryId();
               try {
-                await appendLog(LOG_PATH, { action: 'create', deliveryId: newId, customer: rec.customer || '', date: dateStr, type: rec.type || 'delivery', orderCategory: rec.orderCategory || 'wholesale', lineItems: rec.lineItems || '[]', status: 'scheduled', recurrenceId: rec.recurrenceId, timeStamp: new Date().toISOString() });
-                await appendLog(TEMPLATE_LOG_PATH, { action: 'recurrence_generated', recurrenceId: rec.recurrenceId, generatedDate: dateStr, deliveryId: newId, timeStamp: new Date().toISOString() });
-                generated[genKey] = true; didGenerate = true;
+                await appendLog(LOG_PATH, {
+                  action: 'create',
+                  deliveryId: newId,
+                  customer: rec.customer || '',
+                  date: dateStr,
+                  type: rec.type || 'delivery',
+                  orderCategory: rec.orderCategory || 'wholesale',
+                  lineItems: rec.lineItems || '[]',
+                  status: 'scheduled',
+                  recurrenceId: rec.recurrenceId,
+                  timeStamp: new Date().toISOString(),
+                });
+                existingLines.push({
+                  deliveryId: newId,
+                  date: dateStr,
+                  recurrenceId: rec.recurrenceId,
+                });
+                didGenerate = true;
+                try {
+                  await appendLog(TEMPLATE_LOG_PATH, {
+                    action: 'recurrence_generated',
+                    recurrenceId: rec.recurrenceId,
+                    generatedDate: dateStr,
+                    deliveryId: newId,
+                    timeStamp: new Date().toISOString(),
+                  });
+                  generated[genKey] = true;
+                } catch (markerErr) {
+                  // The line is stored. The next load sees it and writes
+                  // the marker instead of a second delivery.
+                  console.error('Recurrence marker error', markerErr);
+                }
               } catch (err) { console.error('Recurrence generation error', err); }
             }
           }

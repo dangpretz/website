@@ -369,6 +369,51 @@ export function mergePlannerDeliveryUpdate(existing, edits) {
   return payload;
 }
 
+/**
+ * What the standing-order generator should do for one recurrence date.
+ * A delivery line already stored for that recurrence and date wins over
+ * the `recurrence_generated` marker. The marker is written after the line,
+ * so a failed marker write must not cause a second line on the next load.
+ * A marker with no line still skips: writing the marker first can leave
+ * that hole, which is why the line check is the duplicate guard and the
+ * marker is only a backfill.
+ *
+ * @returns {'create'|'mark'|'skip'}
+ */
+export function planRecurringOccurrence({
+  recurrenceId, date, existingLines, generated,
+}) {
+  const id = String(recurrenceId || '');
+  const day = String(date || '').slice(0, 10);
+  const key = `${id}:${day}`;
+  if (!id || !day) return 'skip';
+  const hasLine = (Array.isArray(existingLines) ? existingLines : []).some((line) => {
+    if (!line || line._deleted) return false;
+    return String(line.recurrenceId || '') === id
+      && String(line.date || '').slice(0, 10) === day;
+  });
+  const hasMarker = Boolean(generated && generated[key]);
+  if (hasLine) return hasMarker ? 'skip' : 'mark';
+  if (hasMarker) return 'skip';
+  return 'create';
+}
+
+/**
+ * One standing-order generation pass at a time in this page session.
+ * A second call waits and runs after the first, so two reloads of the
+ * generator cannot both pass the "no line yet" check and both write.
+ */
+export function createGenerationLock() {
+  let tail = Promise.resolve();
+  return {
+    run(task) {
+      const run = tail.then(() => task());
+      tail = run.then(() => {}, () => {});
+      return run;
+    },
+  };
+}
+
 // Pretzels per baking sheet (tray) — BFP team's natural unit.
 export const TRAY_SIZES = {
   '21oz mammoth pretzel': 2,
