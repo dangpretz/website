@@ -216,23 +216,24 @@ export const BATCH_SIZES = {
   'house mustard dip': DIP_CONFIG['house mustard dip'].singleBatchSize,
 };
 
-// Pretzels per case — wholesale shipping unit. Default per SKU; managers
-// can pick from CASE_SIZE_OPTIONS per delivery.
+// Pretzels per case — wholesale shipping unit. Fallback when a saved
+// planner line has no case size: 7oz is 32, 10oz is 12. Managers can
+// pick another size from CASE_SIZE_OPTIONS per delivery.
 export const CASE_SIZES = {
   '21oz mammoth pretzel': 25,
-  '10oz mustache': 48,
-  '10oz plain': 48,
-  '10oz bbk': 48,
-  '10oz spicy bee': 48,
-  '10oz Vegan Pretzel': 48,
-  '7oz plain': 72,
-  '7oz bbk': 72,
-  '7oz spicy bee': 72,
-  '7oz bootlegger': 72,
-  '7oz pepperoni': 72,
-  '7oz hot dog plain': 72,
-  '7oz hot dog bbk': 72,
-  '7oz hot dog spicy bee': 72,
+  '10oz mustache': 12,
+  '10oz plain': 12,
+  '10oz bbk': 12,
+  '10oz spicy bee': 12,
+  '10oz Vegan Pretzel': 12,
+  '7oz plain': 32,
+  '7oz bbk': 32,
+  '7oz spicy bee': 32,
+  '7oz bootlegger': 32,
+  '7oz pepperoni': 32,
+  '7oz hot dog plain': 32,
+  '7oz hot dog bbk': 32,
+  '7oz hot dog spicy bee': 32,
   '4oz twist plain': 40,
   '4oz twist bbk': 40,
   '4oz twist spicy bee': 40,
