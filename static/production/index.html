@@ -1350,7 +1350,7 @@
     getInventoryReport, attributeDeliveryCoverage,
     scheduleCheese, scheduleDip, dipDeferTo,
     isShapeOnlyDelivery, isDiscontinuedDipSku, isDiscontinuedPretzelSku, unmappedDipSkus, SKU_NAMES_ES,
-  } from '../../scripts/inventory.js?v=2026-11-23-no-bootlegger';
+  } from '../../scripts/inventory.js?v=2026-11-27-fallback-32-12';
   import {
     itemHasPriorityCustomer,
     orderBfpAllocation,
@@ -3048,8 +3048,8 @@
           if (qty <= 0) return;
           // Use the line item's explicit case info ONLY. Falling back to
           // ceil(qty / defaultCaseSize) produces misleading slots like
-          // "1×72" for a 15-pretzel order — reads as "one case of 72" when
-          // really it's 15 in a 72-capacity case. Without explicit case
+          // "1×32" for a 15-pretzel order — reads as "one case of 32" when
+          // really it's 15 in a 32-capacity case. Without explicit case
           // data, drop to "{qty}p" display (no slots, just the pretzel
           // count). Manager can edit the delivery in the planner to attach
           // case info if BFP needs to pack against it.

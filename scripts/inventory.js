@@ -216,23 +216,24 @@ export const BATCH_SIZES = {
   'house mustard dip': DIP_CONFIG['house mustard dip'].singleBatchSize,
 };
 
-// Pretzels per case — wholesale shipping unit. Default per SKU; managers
-// can pick from CASE_SIZE_OPTIONS per delivery.
+// Pretzels per case — wholesale shipping unit. Fallback when a saved
+// planner line has no case size: 7oz is 32, 10oz is 12. Managers can
+// pick another size from CASE_SIZE_OPTIONS per delivery.
 export const CASE_SIZES = {
   '21oz mammoth pretzel': 25,
-  '10oz mustache': 48,
-  '10oz plain': 48,
-  '10oz bbk': 48,
-  '10oz spicy bee': 48,
-  '10oz Vegan Pretzel': 48,
-  '7oz plain': 72,
-  '7oz bbk': 72,
-  '7oz spicy bee': 72,
-  '7oz bootlegger': 72,
-  '7oz pepperoni': 72,
-  '7oz hot dog plain': 72,
-  '7oz hot dog bbk': 72,
-  '7oz hot dog spicy bee': 72,
+  '10oz mustache': 12,
+  '10oz plain': 12,
+  '10oz bbk': 12,
+  '10oz spicy bee': 12,
+  '10oz Vegan Pretzel': 12,
+  '7oz plain': 32,
+  '7oz bbk': 32,
+  '7oz spicy bee': 32,
+  '7oz bootlegger': 32,
+  '7oz pepperoni': 32,
+  '7oz hot dog plain': 32,
+  '7oz hot dog bbk': 32,
+  '7oz hot dog spicy bee': 32,
   '4oz twist plain': 40,
   '4oz twist bbk': 40,
   '4oz twist spicy bee': 40,
@@ -304,6 +305,68 @@ export const CASE_SIZE_OPTIONS = {
 export function caseSizeOptionsFor(sku) {
   const canonical = LEGACY_SKU_RENAMES[sku] || sku;
   return CASE_SIZE_OPTIONS[canonical] || [];
+}
+
+/**
+ * Case count for a fixed pretzel quantity at a case size.
+ * Exact multiples stay exact. Anything else rounds up — the same
+ * reconciliation the planner uses on save, so quantity is never rewritten
+ * to make the triple divide evenly.
+ */
+export function caseCountForQuantity(quantity, caseSize) {
+  const qty = Number(quantity) || 0;
+  const cs = Number(caseSize) || 0;
+  if (qty <= 0 || cs <= 0) return 0;
+  return Math.ceil(qty / cs);
+}
+
+/**
+ * Overlay the fields the planner line form edits onto an existing line.
+ * `note` and any other key the form does not edit are kept.
+ * Case size and count are removed when the form has no case entry.
+ */
+export function mergePlannerLineItem(existing, fields = {}) {
+  const line = (existing && typeof existing === 'object') ? { ...existing } : {};
+  line.sku = fields.sku;
+  line.quantity = Number(fields.quantity) || 0;
+  const caseSize = Number(fields.caseSize) || 0;
+  const caseCount = Number(fields.caseCount) || 0;
+  if (caseSize > 0 && caseCount > 0) {
+    line.caseSize = caseSize;
+    line.caseCount = caseCount;
+  } else {
+    delete line.caseSize;
+    delete line.caseCount;
+  }
+  return line;
+}
+
+// Keys the order edit form writes. Everything else on the saved delivery
+// (deliveryNote, Square notes, contact, address) is copied through.
+const PLANNER_EDIT_FIELDS = new Set([
+  'action', 'deliveryId', 'customer', 'date', 'type', 'orderCategory',
+  'lineItems', 'status', 'timeStamp',
+]);
+// Computed while rendering. Never written back to the log.
+const PLANNER_RESOLVED_FIELDS = new Set([
+  'confirmation', 'barcodes', '_coverage', '_aliases', '_shapeOnly',
+  '_deleted', '_confirmedAt',
+]);
+
+/**
+ * Build an update row from the delivery already on screen plus the fields
+ * the edit form changed. Blank form-less fields stay as they were.
+ */
+export function mergePlannerDeliveryUpdate(existing, edits) {
+  const payload = { ...edits };
+  if (!existing || typeof existing !== 'object') return payload;
+  Object.entries(existing).forEach(([key, value]) => {
+    if (PLANNER_EDIT_FIELDS.has(key) || PLANNER_RESOLVED_FIELDS.has(key)) return;
+    if (value == null || value === '') return;
+    if (typeof value === 'object') return;
+    payload[key] = value;
+  });
+  return payload;
 }
 
 // Pretzels per baking sheet (tray) — BFP team's natural unit.
