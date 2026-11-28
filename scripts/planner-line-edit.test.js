@@ -27,8 +27,20 @@ describe('caseCountForQuantity', () => {
 describe('mergePlannerLineItem', () => {
   it('keeps note and other unedited fields while applying the form', () => {
     const saved = mergePlannerLineItem(
-      { sku: '7oz plain', quantity: 1080, caseSize: 72, caseCount: 15, note: 'extra salt', squareLineId: 'li_1' },
-      { sku: '7oz plain', quantity: 1080, caseSize: 32, caseCount: 34 },
+      {
+        sku: '7oz plain',
+        quantity: 1080,
+        caseSize: 72,
+        caseCount: 15,
+        note: 'extra salt',
+        squareLineId: 'li_1',
+      },
+      {
+        sku: '7oz plain',
+        quantity: 1080,
+        caseSize: 32,
+        caseCount: 34,
+      },
     );
     assert.equal(saved.note, 'extra salt');
     assert.equal(saved.squareLineId, 'li_1');
@@ -39,8 +51,19 @@ describe('mergePlannerLineItem', () => {
 
   it('drops case fields when the form has no case entry', () => {
     const saved = mergePlannerLineItem(
-      { sku: '7oz plain', quantity: 15, caseSize: 32, caseCount: 1, note: 'keep' },
-      { sku: '7oz bbk', quantity: 15, caseSize: 0, caseCount: 0 },
+      {
+        sku: '7oz plain',
+        quantity: 15,
+        caseSize: 32,
+        caseCount: 1,
+        note: 'keep',
+      },
+      {
+        sku: '7oz bbk',
+        quantity: 15,
+        caseSize: 0,
+        caseCount: 0,
+      },
     );
     assert.equal(saved.sku, '7oz bbk');
     assert.equal(saved.note, 'keep');
@@ -50,9 +73,17 @@ describe('mergePlannerLineItem', () => {
 
   it('builds a new line when there is no existing one', () => {
     const saved = mergePlannerLineItem(null, {
-      sku: '10oz plain', quantity: 24, caseSize: 12, caseCount: 2,
+      sku: '10oz plain',
+      quantity: 24,
+      caseSize: 12,
+      caseCount: 2,
     });
-    assert.deepEqual(saved, { sku: '10oz plain', quantity: 24, caseSize: 12, caseCount: 2 });
+    assert.deepEqual(saved, {
+      sku: '10oz plain',
+      quantity: 24,
+      caseSize: 12,
+      caseCount: 2,
+    });
   });
 });
 
@@ -92,6 +123,6 @@ describe('mergePlannerDeliveryUpdate', () => {
     assert.equal(payload.lineItems, '[{"sku":"7oz plain","quantity":1080}]');
     assert.equal(payload.confirmation, undefined);
     assert.equal(payload.barcodes, undefined);
-    assert.equal(payload._coverage, undefined);
+    assert.equal(Object.hasOwn(payload, '_coverage'), false);
   });
 });
